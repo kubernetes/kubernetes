@@ -25,44 +25,39 @@ package backoff
 import (
 	"time"
 
+	grpcbackoff "google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/internal/grpcrand"
 )
 
 // Strategy defines the methodology for backing off after a grpc connection
 // failure.
-//
 type Strategy interface {
 	// Backoff returns the amount of time to wait before the next retry given
 	// the number of consecutive failures.
 	Backoff(retries int) time.Duration
 }
 
-const (
-	// baseDelay is the amount of time to wait before retrying after the first
-	// failure.
-	baseDelay = 1.0 * time.Second
-	// factor is applied to the backoff after each retry.
-	factor = 1.6
-	// jitter provides a range to randomize backoff delays.
-	jitter = 0.2
-)
+// DefaultExponential is an exponential backoff implementation using the
+// default values for all the configurable knobs defined in
+// https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md.
+var DefaultExponential = Exponential{Config: grpcbackoff.DefaultConfig}
 
 // Exponential implements exponential backoff algorithm as defined in
 // https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md.
 type Exponential struct {
-	// MaxDelay is the upper bound of backoff delay.
-	MaxDelay time.Duration
+	// Config contains all options to configure the backoff algorithm.
+	Config grpcbackoff.Config
 }
 
 // Backoff returns the amount of time to wait before the next retry given the
 // number of retries.
 func (bc Exponential) Backoff(retries int) time.Duration {
 	if retries == 0 {
-		return baseDelay
+		return bc.Config.BaseDelay
 	}
-	backoff, max := float64(baseDelay), float64(bc.MaxDelay)
+	backoff, max := float64(bc.Config.BaseDelay), float64(bc.Config.MaxDelay)
 	for backoff < max && retries > 0 {
-		backoff *= factor
+		backoff *= bc.Config.Multiplier
 		retries--
 	}
 	if backoff > max {
@@ -70,7 +65,7 @@ func (bc Exponential) Backoff(retries int) time.Duration {
 	}
 	// Randomize backoff delays so that if a cluster of requests start at
 	// the same time, they won't operate in lockstep.
-	backoff *= 1 + jitter*(grpcrand.Float64()*2-1)
+	backoff *= 1 + bc.Config.Jitter*(grpcrand.Float64()*2-1)
 	if backoff < 0 {
 		return 0
 	}

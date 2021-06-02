@@ -20,7 +20,7 @@ import (
 	"context"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
@@ -43,7 +43,7 @@ type cronJobStrategy struct {
 // Strategy is the default logic that applies when creating and updating CronJob objects.
 var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 and batch/v2alpha1 for backwards compatibility,
+// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 for backwards compatibility,
 // and DeleteDependents for all other versions.
 func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	var groupVersion schema.GroupVersion
@@ -51,7 +51,7 @@ func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.
 		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 	switch groupVersion {
-	case batchv1beta1.SchemeGroupVersion, batchv2alpha1.SchemeGroupVersion:
+	case batchv1beta1.SchemeGroupVersion:
 		// for back compatibility
 		return rest.OrphanDependents
 	default:
@@ -64,10 +64,27 @@ func (cronJobStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (cronJobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"batch/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears the status of a scheduled job before creation.
 func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
+
+	cronJob.Generation = 1
 
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
@@ -79,14 +96,25 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob.Status = oldCronJob.Status
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+
+	// Any changes to the spec increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newCronJob.Spec, oldCronJob.Spec) {
+		newCronJob.Generation = oldCronJob.Generation + 1
+	}
 }
 
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	allErrs := validation.ValidateCronJob(cronJob)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil, field.NewPath("spec.jobTemplate.spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
+	return validation.ValidateCronJob(cronJob, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newCronJob := obj.(*batch.CronJob)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -106,12 +134,20 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
-	allErrs := validation.ValidateCronJobUpdate(newCronJob, oldCronJob)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(
-		&newCronJob.Spec.JobTemplate.Spec.Template,
-		&oldCronJob.Spec.JobTemplate.Spec.Template,
-		field.NewPath("spec.jobTemplate.spec.template"))...)
-	return allErrs
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newCronJob := obj.(*batch.CronJob)
+	oldCronJob := old.(*batch.CronJob)
+	if newCronJob.Generation != oldCronJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	}
+	return warnings
 }
 
 type cronJobStatusStrategy struct {
@@ -121,6 +157,19 @@ type cronJobStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = cronJobStatusStrategy{Strategy}
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (cronJobStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"batch/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
+
 func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.CronJob)
 	oldJob := old.(*batch.CronJob)
@@ -129,4 +178,9 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

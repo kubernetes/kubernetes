@@ -23,14 +23,14 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -38,41 +38,40 @@ import (
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
 type nodeOptions struct {
-	kubeConfigPath   string
-	kubeletVersion   string
-	advertiseAddress string
-	nodeName         string
-	etcdUpgrade      bool
-	renewCerts       bool
-	dryRun           bool
+	kubeConfigPath        string
+	etcdUpgrade           bool
+	renewCerts            bool
+	dryRun                bool
+	patchesDir            string
+	ignorePreflightErrors []string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ phases.Data = &nodeData{}
 
-// nodeData defines all the runtime information used when running the kubeadm upgrade node worklow;
+// nodeData defines all the runtime information used when running the kubeadm upgrade node workflow;
 // this data is shared across all the phases that are included in the workflow.
 type nodeData struct {
-	etcdUpgrade        bool
-	renewCerts         bool
-	dryRun             bool
-	kubeletVersion     string
-	cfg                *kubeadmapi.InitConfiguration
-	isControlPlaneNode bool
-	client             clientset.Interface
+	etcdUpgrade           bool
+	renewCerts            bool
+	dryRun                bool
+	cfg                   *kubeadmapi.InitConfiguration
+	isControlPlaneNode    bool
+	client                clientset.Interface
+	patchesDir            string
+	ignorePreflightErrors sets.String
 }
 
-// NewCmdNode returns the cobra command for `kubeadm upgrade node`
-func NewCmdNode() *cobra.Command {
+// newCmdNode returns the cobra command for `kubeadm upgrade node`
+func newCmdNode() *cobra.Command {
 	nodeOptions := newNodeOptions()
 	nodeRunner := workflow.NewRunner()
 
 	cmd := &cobra.Command{
 		Use:   "node",
 		Short: "Upgrade commands for a node in the cluster",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return nodeRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -80,8 +79,10 @@ func NewCmdNode() *cobra.Command {
 	// adds flags to the node command
 	// flags could be eventually inherited by the sub-commands automatically generated for phases
 	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
+	options.AddPatchesFlag(cmd.Flags(), &nodeOptions.patchesDir)
 
 	// initialize the workflow runner with the list of phases
+	nodeRunner.AppendPhase(phases.NewPreflightPhase())
 	nodeRunner.AppendPhase(phases.NewControlPlane())
 	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
 
@@ -95,12 +96,6 @@ func NewCmdNode() *cobra.Command {
 	// command help, adding --skip-phases flag and by adding phases subcommands
 	nodeRunner.BindToCommand(cmd)
 
-	// upgrade node config command is subject to GA deprecation policy, so we should deprecate it
-	// and keep it here for one year or three releases - the longer of the two - starting from v1.15 included
-	cmd.AddCommand(NewCmdUpgradeNodeConfig())
-	// upgrade node experimental control plane can be removed, but we are keeping it for one more cycle
-	cmd.AddCommand(NewCmdUpgradeControlPlane())
-
 	return cmd
 }
 
@@ -109,13 +104,17 @@ func newNodeOptions() *nodeOptions {
 	return &nodeOptions{
 		kubeConfigPath: constants.GetKubeletKubeConfigPath(),
 		dryRun:         false,
+		renewCerts:     true,
+		etcdUpgrade:    true,
 	}
 }
 
 func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 	options.AddKubeConfigFlag(flagSet, &nodeOptions.kubeConfigPath)
 	flagSet.BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
-	flagSet.StringVar(&nodeOptions.kubeletVersion, options.KubeletVersion, nodeOptions.kubeletVersion, "The *desired* version for the kubelet config after the upgrade. If not specified, the KubernetesVersion from the kubeadm-config ConfigMap will be used")
+	flagSet.BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	flagSet.BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
+	flagSet.StringSliceVar(&nodeOptions.ignorePreflightErrors, options.IgnorePreflightErrors, nodeOptions.ignorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
 }
 
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
@@ -130,7 +129,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 	// isControlPlane checks if a node is a control-plane node by looking up
 	// the kube-apiserver manifest file
 	isControlPlaneNode := true
-	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, kubeadmconstants.GetStaticPodDirectory())
+	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
 		isControlPlaneNode = false
 	}
@@ -138,19 +137,27 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", !isControlPlaneNode)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
 	return &nodeData{
-		etcdUpgrade:        options.etcdUpgrade,
-		renewCerts:         options.renewCerts,
-		dryRun:             options.dryRun,
-		kubeletVersion:     options.kubeletVersion,
-		cfg:                cfg,
-		client:             client,
-		isControlPlaneNode: isControlPlaneNode,
+		etcdUpgrade:           options.etcdUpgrade,
+		renewCerts:            options.renewCerts,
+		dryRun:                options.dryRun,
+		cfg:                   cfg,
+		client:                client,
+		isControlPlaneNode:    isControlPlaneNode,
+		patchesDir:            options.patchesDir,
+		ignorePreflightErrors: ignorePreflightErrorsSet,
 	}, nil
 }
 
@@ -169,11 +176,6 @@ func (d *nodeData) RenewCerts() bool {
 	return d.renewCerts
 }
 
-// KubeletVersion returns the kubeletVersion flag.
-func (d *nodeData) KubeletVersion() string {
-	return d.kubeletVersion
-}
-
 // Cfg returns initConfiguration.
 func (d *nodeData) Cfg() *kubeadmapi.InitConfiguration {
 	return d.cfg
@@ -189,75 +191,12 @@ func (d *nodeData) Client() clientset.Interface {
 	return d.client
 }
 
-// NewCmdUpgradeNodeConfig returns the cobra.Command for downloading the new/upgrading the kubelet configuration from the kubelet-config-1.X
-// ConfigMap in the cluster
-// TODO: to remove when 1.18 is released
-func NewCmdUpgradeNodeConfig() *cobra.Command {
-	nodeOptions := newNodeOptions()
-	nodeRunner := workflow.NewRunner()
-
-	cmd := &cobra.Command{
-		Use:        "config",
-		Short:      "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
-		Deprecated: "use \"kubeadm upgrade node\" instead",
-		Run: func(cmd *cobra.Command, args []string) {
-			// This is required for preserving the old behavior of `kubeadm upgrade node config`.
-			// The new implementation exposed as a phase under `kubeadm upgrade node` infers the target
-			// kubelet config version from the kubeadm-config ConfigMap
-			if len(nodeOptions.kubeletVersion) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --kubelet-version argument is required"))
-			}
-
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	// adds flags to the node command
-	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
-
-	// initialize the workflow runner with the list of phases
-	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
-
-	// sets the data builder function, that will be used by the runner
-	// both when running the entire workflow or single phases
-	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newNodeData(cmd, args, nodeOptions)
-	})
-
-	return cmd
+// PatchesDir returns the folder where patches for components are stored
+func (d *nodeData) PatchesDir() string {
+	return d.patchesDir
 }
 
-// NewCmdUpgradeControlPlane returns the cobra.Command for upgrading the controlplane instance on this node
-// TODO: to remove when 1.16 is released
-func NewCmdUpgradeControlPlane() *cobra.Command {
-	nodeOptions := newNodeOptions()
-	nodeRunner := workflow.NewRunner()
-
-	cmd := &cobra.Command{
-		Use:        "experimental-control-plane",
-		Short:      "Upgrade the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
-		Deprecated: "this command is deprecated. Use \"kubeadm upgrade node\" instead",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	// adds flags to the node command
-	options.AddKubeConfigFlag(cmd.Flags(), &nodeOptions.kubeConfigPath)
-	cmd.Flags().BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
-	cmd.Flags().BoolVar(&nodeOptions.etcdUpgrade, "etcd-upgrade", nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().BoolVar(&nodeOptions.renewCerts, "certificate-renewal", nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
-
-	// initialize the workflow runner with the list of phases
-	nodeRunner.AppendPhase(phases.NewControlPlane())
-
-	// sets the data builder function, that will be used by the runner
-	// both when running the entire workflow or single phases
-	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newNodeData(cmd, args, nodeOptions)
-	})
-
-	return cmd
+// IgnorePreflightErrors returns the list of preflight errors to ignore.
+func (d *nodeData) IgnorePreflightErrors() sets.String {
+	return d.ignorePreflightErrors
 }

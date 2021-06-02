@@ -1,17 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- childsb
-- jsafrane
-- saad-ali
-- msau42
+- sig-storage-approvers
 reviewers:
-- childsb
-- saad-ali
-- jsafrane
-- jingxu97
-- rootfs
-- gnufied
-- msau42
-- verult
-- davidz627
+- sig-storage-reviewers

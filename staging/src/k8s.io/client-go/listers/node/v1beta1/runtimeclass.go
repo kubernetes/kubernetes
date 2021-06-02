@@ -26,10 +26,13 @@ import (
 )
 
 // RuntimeClassLister helps list RuntimeClasses.
+// All objects returned here must be treated as read-only.
 type RuntimeClassLister interface {
 	// List lists all RuntimeClasses in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.RuntimeClass, err error)
 	// Get retrieves the RuntimeClass from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.RuntimeClass, error)
 	RuntimeClassListerExpansion
 }

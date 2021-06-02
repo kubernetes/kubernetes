@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -22,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetLoadBalancer(t *testing.T) {
@@ -37,7 +40,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	status, found, err := gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
 	assert.Nil(t, status)
 	assert.False(t, found)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
@@ -48,7 +51,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	status, found, err = gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
 	assert.Equal(t, expectedStatus, status)
 	assert.True(t, found)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {
@@ -81,6 +84,8 @@ func TestEnsureLoadBalancerCreatesInternalLb(t *testing.T) {
 	require.NoError(t, err)
 
 	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
+	require.NoError(t, err)
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
@@ -124,6 +129,8 @@ func TestEnsureLoadBalancerDeletesExistingExternalLb(t *testing.T) {
 	createExternalLoadBalancer(gce, apiService, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	apiService = fakeLoadbalancerService(string(LBTypeInternal))
+	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
+	require.NoError(t, err)
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
@@ -163,9 +170,23 @@ func TestEnsureLoadBalancerDeletedDeletesInternalLb(t *testing.T) {
 	require.NoError(t, err)
 
 	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
+	require.NoError(t, err)
 	createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, apiService)
 	assert.NoError(t, err)
 	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
+}
+
+func TestBasePath(t *testing.T) {
+	t.Parallel()
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	// Loadbalancer controller code expects basepath to contain the projects string.
+	expectBasePath := "https://compute.googleapis.com/compute/v1/projects/"
+	require.NoError(t, err)
+	if gce.service.BasePath != expectBasePath {
+		t.Errorf("Compute basePath has changed. Got %q, want %q", gce.service.BasePath, expectBasePath)
+	}
 }

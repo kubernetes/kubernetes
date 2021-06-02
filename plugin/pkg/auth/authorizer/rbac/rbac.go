@@ -19,9 +19,10 @@ package rbac
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -71,7 +72,7 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
@@ -81,7 +82,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 
 	// Build a detailed log of the denial.
 	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
 			b := &bytes.Buffer{}
@@ -115,7 +116,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 			scope = "cluster-wide"
 		}
 
-		klog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+		klog.Infof("RBAC: no rules authorize user %q with groups %q to %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 	}
 
 	reason := ""

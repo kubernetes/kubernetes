@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements verification logic for RuntimeClass.
@@ -56,7 +58,12 @@ func (strategy) AllowCreateOnUpdate() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	_ = obj.(*node.RuntimeClass)
+	rc := obj.(*node.RuntimeClass)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && rc != nil {
+		// Set Overhead to nil only if the feature is disabled and it is not used
+		rc.Overhead = nil
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -73,6 +80,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateRuntimeClass(runtimeClass)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*node.RuntimeClass)
@@ -83,6 +93,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*node.RuntimeClass)
 	errorList := validation.ValidateRuntimeClass(newObj)
 	return append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by

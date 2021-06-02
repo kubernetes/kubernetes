@@ -22,14 +22,13 @@ import (
 	"math"
 	"strings"
 
-	"github.com/go-openapi/validate"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -59,9 +58,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -89,13 +86,16 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (customResourceValidator) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
@@ -119,9 +119,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs

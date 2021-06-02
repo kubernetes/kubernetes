@@ -26,6 +26,7 @@ var (
 	defaultCachePeriod = time.Second * 2
 )
 
+// RuntimeCache is in interface for obtaining cached Pods.
 type RuntimeCache interface {
 	GetPods() ([]*Pod, error)
 	ForceUpdateIfOlder(time.Time) error

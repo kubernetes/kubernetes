@@ -24,14 +24,14 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
-var controlPlaneJoinExample = normalizer.Examples(`
+var controlPlaneJoinExample = cmdutil.Examples(`
 	# Joins a machine as a control plane instance
 	kubeadm join phase control-plane-join all
 `)
@@ -40,8 +40,10 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
 		options.ControlPlane,
-		options.ExperimentalControlPlane,
 		options.NodeName,
+	}
+	if name == "etcd" || name == "all" {
+		flags = append(flags, options.Patches)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
@@ -84,8 +86,7 @@ func newUpdateStatusSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name: "update-status",
 		Short: fmt.Sprintf(
-			"Register the new control-plane node into the %s maintained in the %s ConfigMap",
-			kubeadmconstants.ClusterStatusConfigMapKey,
+			"Register the new control-plane node into the ClusterStatus maintained in the %s ConfigMap (DEPRECATED)",
 			kubeadmconstants.KubeadmConfigConfigMap,
 		),
 		Run:           runUpdateStatusPhase,
@@ -129,6 +130,11 @@ func runEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
+	// Create the etcd data directory
+	if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
+		return err
+	}
+
 	// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
 	// the existing etcd members before being created.
 	// This operation must be executed after kubelet is already started in order to minimize the time
@@ -137,8 +143,9 @@ func runEtcdPhase(c workflow.RunData) error {
 	// From https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
 	// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
-	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
+	// existing one."
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
@@ -151,24 +158,10 @@ func runUpdateStatusPhase(c workflow.RunData) error {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
 	}
 
-	if data.Cfg().ControlPlane == nil {
-		return nil
+	if data.Cfg().ControlPlane != nil {
+		fmt.Println("The 'update-status' phase is deprecated and will be removed in a future release. " +
+			"Currently it performs no operation")
 	}
-
-	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
-	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
-	}
-	cfg, err := data.InitCfg()
-	if err != nil {
-		return err
-	}
-
-	if err := uploadconfigphase.UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
-	}
-
 	return nil
 }
 

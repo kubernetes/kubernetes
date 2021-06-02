@@ -17,6 +17,8 @@ limitations under the License.
 package eventratelimit
 
 import (
+	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -506,7 +508,7 @@ func TestEventRateLimiting(t *testing.T) {
 					clock.Step(rq.delay)
 				}
 				attributes := attributesForRequest(rq)
-				err = eventratelimit.Validate(attributes, nil)
+				err = eventratelimit.Validate(context.TODO(), attributes, nil)
 				if rq.accepted != (err == nil) {
 					expectedAction := "admitted"
 					if !rq.accepted {
@@ -516,7 +518,7 @@ func TestEventRateLimiting(t *testing.T) {
 				}
 				if err != nil {
 					statusErr, ok := err.(*errors.StatusError)
-					if ok && statusErr.ErrStatus.Code != errors.StatusTooManyRequests {
+					if ok && statusErr.ErrStatus.Code != http.StatusTooManyRequests {
 						t.Fatalf("%v: Request %v should yield a 429 response: %v", tc.name, rqIndex, err)
 					}
 				}

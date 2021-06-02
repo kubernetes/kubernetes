@@ -24,10 +24,9 @@ import (
 	"path"
 	"testing"
 
-	"github.com/kardianos/osext"
-	"k8s.io/klog"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -65,15 +64,22 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // standard kubelet launcher)
 func (e *E2EServices) Start() error {
 	var err error
-	if !framework.TestContext.NodeConformance {
+	if e.services, err = e.startInternalServices(); err != nil {
+		return fmt.Errorf("failed to start internal services: %v", err)
+	}
+	klog.Infof("Node services started.")
+	// running the kubelet depends on whether we are running conformance test-suite
+	if framework.TestContext.NodeConformance {
+		klog.Info("nothing to do in node-e2e-services, running conformance suite")
+	} else {
 		// Start kubelet
 		e.kubelet, err = e.startKubelet()
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %v", err)
 		}
+		klog.Infof("Kubelet started.")
 	}
-	e.services, err = e.startInternalServices()
-	return err
+	return nil
 }
 
 // Stop stops the e2e services.
@@ -94,12 +100,10 @@ func (e *E2EServices) Stop() {
 			klog.Errorf("Failed to stop kubelet: %v", err)
 		}
 	}
-	if e.rmDirs != nil {
-		for _, d := range e.rmDirs {
-			err := os.RemoveAll(d)
-			if err != nil {
-				klog.Errorf("Failed to delete directory %s: %v", d, err)
-			}
+	for _, d := range e.rmDirs {
+		err := os.RemoveAll(d)
+		if err != nil {
+			klog.Errorf("Failed to delete directory %s: %v", d, err)
 		}
 	}
 }
@@ -127,12 +131,16 @@ const (
 
 // startInternalServices starts the internal services in a separate process.
 func (e *E2EServices) startInternalServices() (*server, error) {
-	testBin, err := osext.Executable()
+	testBin, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
-	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
+	startCmd := exec.Command(testBin,
+		append(
+			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
+			os.Args[1:]...,
+		)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }

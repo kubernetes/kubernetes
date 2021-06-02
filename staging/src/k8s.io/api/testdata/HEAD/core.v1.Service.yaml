@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -14,11 +14,10 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -28,35 +27,57 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 spec:
-  clusterIP: "27"
+  allocateLoadBalancerNodePorts: true
+  clusterIP: "25"
+  clusterIPs:
+  - "26"
   externalIPs:
-  - "28"
-  externalName: "31"
-  externalTrafficPolicy: 螩B
-  healthCheckNodePort: -21009133
-  loadBalancerIP: "29"
+  - "27"
+  externalName: "30"
+  externalTrafficPolicy: ƏS$+½H牗洝尿
+  healthCheckNodePort: -1965738697
+  internalTrafficPolicy: ""
+  ipFamilies:
+  - 斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ
+  ipFamilyPolicy: 9ȫŚ
+  loadBalancerClass: "32"
+  loadBalancerIP: "28"
   loadBalancerSourceRanges:
-  - "30"
+  - "29"
   ports:
-  - name: "24"
-    nodePort: 2048967527
-    port: -1493017703
-    protocol: 脽ěĂ凗蓏Ŋ蛊ĉy緅縕
-    targetPort: -123438221
+  - appProtocol: "21"
+    name: "20"
+    nodePort: -474380055
+    port: 202283346
+    protocol: '@Hr鯹)晿'
+    targetPort: "22"
   publishNotReadyAddresses: true
   selector:
-    "25": "26"
-  sessionAffinity: 洝尿彀
+    "23": "24"
+  sessionAffinity: 甞谐颋ǅS
   sessionAffinityConfig:
     clientIP:
-      timeoutSeconds: -1487653240
-  type: ǡƏS$+½H
+      timeoutSeconds: 2072604405
+  topologyKeys:
+  - "31"
+  type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
 status:
+  conditions:
+  - lastTransitionTime: "2404-01-10T11:35:42Z"
+    message: "38"
+    observedGeneration: -8651056334266075769
+    reason: "37"
+    status: ž(-譵
+    type: "36"
   loadBalancer:
     ingress:
-    - hostname: "33"
-      ip: "32"
+    - hostname: "34"
+      ip: "33"
+      ports:
+      - error: "35"
+        port: 684408190
+        protocol: ƈ斎AO6ĴC浔Ű

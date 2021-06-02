@@ -63,7 +63,9 @@ data:
   Corefile: |
     .:53 {
         errors
-        health
+        health {
+            lameduck 5s
+        }
         ready
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
             pods insecure
@@ -71,7 +73,9 @@ data:
             ttl 30
         }
         prometheus :9153
-        forward . /etc/resolv.conf
+        forward . /etc/resolv.conf {
+            max_concurrent 1000
+        }
         cache 30
         loop
         reload
@@ -104,19 +108,31 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.5.0
+        image: k8s.gcr.io/coredns/coredns:v1.8.0
         imagePullPolicy: IfNotPresent
         resources:
           limits:

@@ -28,7 +28,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,6 +62,7 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
+		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             now.UTC(),
 		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
@@ -96,8 +97,8 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "-"), strings.Join(alternateDNS, "-"))
-	certFixturePath := path.Join(fixtureDirectory, baseName+".crt")
-	keyFixturePath := path.Join(fixtureDirectory, baseName+".key")
+	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")
+	keyFixturePath := filepath.Join(fixtureDirectory, baseName+".key")
 	if len(fixtureDirectory) > 0 {
 		cert, err := ioutil.ReadFile(certFixturePath)
 		if err == nil {

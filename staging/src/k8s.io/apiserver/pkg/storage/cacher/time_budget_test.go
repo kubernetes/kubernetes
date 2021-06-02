@@ -22,7 +22,7 @@ import (
 )
 
 func TestTimeBudget(t *testing.T) {
-	budget := &timeBudget{
+	budget := &timeBudgetImpl{
 		budget:    time.Duration(0),
 		maxBudget: time.Duration(200),
 	}

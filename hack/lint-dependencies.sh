@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks version dependencies of modules. It checks whether all
+# pinned versions of checked dependencies match their preferred version or not.
+# Usage: `hack/lint-dependencies.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -23,8 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
   kube::log::error "Cannot run with \$GOPROXY=off"
@@ -34,18 +38,39 @@ fi
 kube::golang::verify_go_version
 kube::util::require-jq
 
-outdated=$(go list -m -json all | jq -r '
-  select(.Replace.Version != null) | 
-  select(.Version != .Replace.Version) | 
-  "\(.Path)
+# let us log all errors before we exit
+rc=0
+
+# List of dependencies we need to avoid dragging back into kubernetes/kubernetes
+forbidden_repos=(
+  "k8s.io/klog"  # we have switched to klog v2, so avoid klog v1
+)
+for forbidden_repo in "${forbidden_repos[@]}"; do
+  deps_on_forbidden=$(go mod graph | grep " ${forbidden_repo}@" || echo "")
+  if [ -n "${deps_on_forbidden}" ]; then
+    kube::log::error "The following have transitive dependencies on ${forbidden_repo}, which is not allowed:"
+    echo "${deps_on_forbidden}"
+    echo ""
+    rc=1
+  fi
+done
+
+outdated=$(go list -m -json all | jq -r "
+  select(.Replace.Version != null) |
+  select(.Version != .Replace.Version) |
+  select(.Path) |
+  \"\(.Path)
     pinned:    \(.Replace.Version)
     preferred: \(.Version)
-    hack/pin-dependency.sh \(.Path) \(.Version)"
-')
+    hack/pin-dependency.sh \(.Path) \(.Version)\"
+")
 if [[ -n "${outdated}" ]]; then
   echo "These modules are pinned to versions different than the minimal preferred version."
-  echo "That means that without require directives, a different version would be selected."
-  echo "The command to switch to the minimal preferred version is listed for each module."
+  echo "That means that without replace directives, a different version would be selected,"
+  echo "which breaks consumers of our published modules."
+  echo "1. Use hack/pin-dependency.sh to switch to the preferred version for each module"
+  echo "2. Run hack/update-vendor.sh to rebuild the vendor directory"
+  echo "3. Run hack/lint-dependencies.sh to verify no additional changes are required"
   echo ""
   echo "${outdated}"
 fi
@@ -55,13 +80,13 @@ unused=$(comm -23 \
   <(go list -m -json all | jq -r .Path | sort))
 if [[ -n "${unused}" ]]; then
   echo ""
-  echo "Pinned module versions that aren't actually used:"
+  echo "Use the given commands to remove pinned module versions that aren't actually used:"
   echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
 if [[ -n "${unused}${outdated}" ]]; then
-  exit 1
+  rc=1
 fi
 
-echo "All pinned dependencies match their preferred version."
-exit 0
+echo "All pinned versions of checked dependencies match their preferred version."
+exit $rc

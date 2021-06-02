@@ -83,6 +83,7 @@ func decodeV3Endpoints(modelDef modelDefinition, opts DecodeModelOptions) (Resol
 		p := &ps[i]
 		custAddEC2Metadata(p)
 		custAddS3DualStack(p)
+		custRegionalS3(p)
 		custRmIotDataService(p)
 		custFixAppAutoscalingChina(p)
 		custFixAppAutoscalingUsGov(p)
@@ -92,12 +93,39 @@ func decodeV3Endpoints(modelDef modelDefinition, opts DecodeModelOptions) (Resol
 }
 
 func custAddS3DualStack(p *partition) {
-	if p.ID != "aws" {
+	if !(p.ID == "aws" || p.ID == "aws-cn" || p.ID == "aws-us-gov") {
 		return
 	}
 
 	custAddDualstack(p, "s3")
 	custAddDualstack(p, "s3-control")
+}
+
+func custRegionalS3(p *partition) {
+	if p.ID != "aws" {
+		return
+	}
+
+	service, ok := p.Services["s3"]
+	if !ok {
+		return
+	}
+
+	// If global endpoint already exists no customization needed.
+	if _, ok := service.Endpoints["aws-global"]; ok {
+		return
+	}
+
+	service.PartitionEndpoint = "aws-global"
+	service.Endpoints["us-east-1"] = endpoint{}
+	service.Endpoints["aws-global"] = endpoint{
+		Hostname: "s3.amazonaws.com",
+		CredentialScope: credentialScope{
+			Region: "us-east-1",
+		},
+	}
+
+	p.Services["s3"] = service
 }
 
 func custAddDualstack(p *partition, svcName string) {

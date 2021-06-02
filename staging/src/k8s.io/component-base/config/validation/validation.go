@@ -40,7 +40,7 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.LeaseDuration, "must be greater than zero"))
 	}
 	if cc.RenewDeadline.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("renewDeadline"), cc.LeaseDuration, "must be greater than zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("renewDeadline"), cc.RenewDeadline, "must be greater than zero"))
 	}
 	if cc.RetryPeriod.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("retryPeriod"), cc.RetryPeriod, "must be greater than zero"))
@@ -49,7 +49,13 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.RenewDeadline, "LeaseDuration must be greater than RenewDeadline"))
 	}
 	if len(cc.ResourceLock) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceLock"), cc.RenewDeadline, "resourceLock is required"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceLock"), cc.ResourceLock, "resourceLock is required"))
+	}
+	if len(cc.ResourceNamespace) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNamespace"), cc.ResourceNamespace, "resourceNamespace is required"))
+	}
+	if len(cc.ResourceName) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceName"), cc.ResourceName, "resourceName is required"))
 	}
 	return allErrs
 }

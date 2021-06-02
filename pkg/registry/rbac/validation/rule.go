@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -30,11 +30,12 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/rbac/validation"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 type AuthorizationRuleResolver interface {
-	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namepsace
+	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
 	GetRoleReferenceRules(roleRef rbacv1.RoleRef, namespace string) ([]rbacv1.PolicyRule, error)
 
@@ -65,7 +66,7 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 		ruleResolutionErrors = append(ruleResolutionErrors, err)
 	}
 
-	ownerRightsCover, missingRights := Covers(ownerRules, rules)
+	ownerRightsCover, missingRights := validation.Covers(ownerRules, rules)
 	if !ownerRightsCover {
 		compactMissingRights := missingRights
 		if compact, err := CompactRules(missingRights); err == nil {
@@ -266,6 +267,15 @@ func appliesTo(user user.Info, bindingSubjects []rbacv1.Subject, namespace strin
 		}
 	}
 	return 0, false
+}
+
+func has(set []string, ele string) bool {
+	for _, s := range set {
+		if s == ele {
+			return true
+		}
+	}
+	return false
 }
 
 func appliesToUser(user user.Info, subject rbacv1.Subject, namespace string) bool {

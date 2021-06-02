@@ -30,11 +30,11 @@ run_RESTMapper_evaluation_tests() {
   ### Non-existent resource type should give a recognizeable error
   # Pre-condition: None
   # Command
-  kubectl get "${kube_flags[@]}" unknownresourcetype 2>${RESTMAPPER_ERROR_FILE} || true
+  kubectl get "${kube_flags[@]:?}" unknownresourcetype 2>"${RESTMAPPER_ERROR_FILE}" || true
   if grep -q "the server doesn't have a resource type" "${RESTMAPPER_ERROR_FILE}"; then
-    kube::log::status "\"kubectl get unknownresourcetype\" returns error as expected: $(cat ${RESTMAPPER_ERROR_FILE})"
+    kube::log::status "\"kubectl get unknownresourcetype\" returns error as expected: $(cat "${RESTMAPPER_ERROR_FILE}")"
   else
-    kube::log::status "\"kubectl get unknownresourcetype\" returns unexpected error or non-error: $(cat ${RESTMAPPER_ERROR_FILE})"
+    kube::log::status "\"kubectl get unknownresourcetype\" returns unexpected error or non-error: $(cat "${RESTMAPPER_ERROR_FILE}")"
     exit 1
   fi
   rm "${RESTMAPPER_ERROR_FILE}"
@@ -86,9 +86,9 @@ run_resource_aliasing_tests() {
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
   # all 4 cassandra's might not be in the request immediately...
-  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:cassandra:' || \
-  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:' || \
-  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:'
+  # :? suffix is for possible service.kubernetes.io/headless
+  # label with "" value
+  kube::test::get_object_assert "$object" "$request" '(cassandra:){2}(cassandra:(cassandra::?)?)?'
 
   kubectl delete all -l app=cassandra "${kube_flags[@]}"
 
@@ -120,10 +120,10 @@ run_swagger_tests() {
 
   # Verify schema
   file="${KUBE_TEMP}/schema.json"
-  curl -s "http://127.0.0.1:${API_PORT}/openapi/v2" > "${file}"
-  [[ "$(grep "list of returned" "${file}")" ]]
-  [[ "$(grep "List of services" "${file}")" ]]
-  [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]
+  curl -kfsS -H 'Authorization: Bearer admin-token' "https://127.0.0.1:${SECURE_API_PORT}/openapi/v2" > "${file}"
+  grep -q "list of returned" "${file}"
+  grep -q "List of services" "${file}"
+  grep -q "Watch for changes to the described resources" "${file}"
 
   set +o nounset
   set +o errexit

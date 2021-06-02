@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sysctl"
 )
 

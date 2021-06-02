@@ -17,17 +17,19 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -35,13 +37,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
+
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
 )
 
+// ResourceResyncTime defines the resync period of the garbage collector's informers.
 const ResourceResyncTime time.Duration = 0
 
 // GarbageCollector runs reflectors to watch for changes of managed API
@@ -56,39 +65,47 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
-	restMapper    resettableRESTMapper
-	dynamicClient dynamic.Interface
+	restMapper     resettableRESTMapper
+	metadataClient metadata.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
 	attemptToOrphan        workqueue.RateLimitingInterface
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
-	absentOwnerCache *UIDCache
-	sharedInformers  controller.InformerFactory
+	absentOwnerCache *ReferenceCache
 
 	workerLock sync.RWMutex
 }
 
+// NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
-	dynamicClient dynamic.Interface,
+	kubeClient clientset.Interface,
+	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
-	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
-	sharedInformers controller.InformerFactory,
+	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
+
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
-	absentOwnerCache := NewUIDCache(500)
+	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
-		dynamicClient:    dynamicClient,
+		metadataClient:   metadataClient,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	gb := &GraphBuilder{
+	gc.dependencyGraphBuilder = &GraphBuilder{
+		eventRecorder:    eventRecorder,
+		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
 		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
@@ -101,10 +118,6 @@ func NewGarbageCollector(
 		sharedInformers:  sharedInformers,
 		ignoredResources: ignoredResources,
 	}
-	if err := gb.syncMonitors(deletableResources); err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to sync all monitors: %v", err))
-	}
-	gc.dependencyGraphBuilder = gb
 
 	return gc, nil
 }
@@ -119,6 +132,7 @@ func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVe
 	return nil
 }
 
+// Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
@@ -130,7 +144,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 
 	go gc.dependencyGraphBuilder.Run(stopCh)
 
-	if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
+	if !cache.WaitForNamedCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
 		return
 	}
 
@@ -224,7 +238,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
 			// note that workers stay paused until we successfully resync.
-			if !controller.WaitForCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
 				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
 				return false, nil
 			}
@@ -271,6 +285,7 @@ func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan 
 	return stopChWithTimeout
 }
 
+// IsSynced returns true if dependencyGraphBuilder is synced.
 func (gc *GarbageCollector) IsSynced() bool {
 	return gc.dependencyGraphBuilder.IsSynced()
 }
@@ -279,6 +294,10 @@ func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 	for gc.attemptToDeleteWorker() {
 	}
 }
+
+var enqueuedVirtualDeleteEventErr = goerrors.New("enqueued virtual delete event")
+
+var namespacedOwnerOfClusterScopedObjectErr = goerrors.New("cluster-scoped objects cannot refer to namespaced owners")
 
 func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	item, quit := gc.attemptToDelete.Get()
@@ -293,8 +312,31 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return true
 	}
+
+	if !n.isObserved() {
+		nodeFromGraph, existsInGraph := gc.dependencyGraphBuilder.uidToNode.Read(n.identity.UID)
+		if !existsInGraph {
+			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
+			// and in the meantime a deletion of the real object associated with that uid was observed
+			klog.V(5).Infof("item %s no longer in the graph, skipping attemptToDeleteItem", n)
+			return true
+		}
+		if nodeFromGraph.isObserved() {
+			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
+			// and in the meantime the real object associated with that uid was observed
+			klog.V(5).Infof("item %s no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", n)
+			return true
+		}
+	}
+
 	err := gc.attemptToDeleteItem(n)
-	if err != nil {
+	if err == enqueuedVirtualDeleteEventErr {
+		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
+		return true
+	} else if err == namespacedOwnerOfClusterScopedObjectErr {
+		// a cluster-scoped object referring to a namespaced owner is an error that will not resolve on retry, no need to requeue this node
+		return true
+	} else if err != nil {
 		if _, ok := err.(*restMappingError); ok {
 			// There are at least two ways this can happen:
 			// 1. The reference is to an object of a custom type that has not yet been
@@ -323,11 +365,21 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 // If isDangling looks up the referenced object at the API server, it also
 // returns its latest state.
 func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
-	dangling bool, owner *unstructured.Unstructured, err error) {
-	if gc.absentOwnerCache.Has(reference.UID) {
+	dangling bool, owner *metav1.PartialObjectMetadata, err error) {
+
+	// check for recorded absent cluster-scoped parent
+	absentOwnerCacheKey := objectReference{OwnerReference: ownerReferenceCoordinates(reference)}
+	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
 		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	}
+	// check for recorded absent namespaced parent
+	absentOwnerCacheKey.Namespace = item.identity.Namespace
+	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
+		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist in namespace %s", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name, item.identity.Namespace)
+		return true, nil, nil
+	}
+
 	// TODO: we need to verify the reference resource is supported by the
 	// system. If it's not a valid resource, the garbage collector should i)
 	// ignore the reference when decide if the object should be deleted, and
@@ -338,14 +390,24 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	if err != nil {
 		return false, nil, err
 	}
+	if !namespaced {
+		absentOwnerCacheKey.Namespace = ""
+	}
+
+	if len(item.identity.Namespace) == 0 && namespaced {
+		// item is a cluster-scoped object referring to a namespace-scoped owner, which is not valid.
+		// return a marker error, rather than retrying on the lookup failure forever.
+		klog.V(2).Infof("object %s is cluster-scoped, but refers to a namespaced owner of type %s/%s", item.identity, reference.APIVersion, reference.Kind)
+		return false, nil, namespacedOwnerOfClusterScopedObjectErr
+	}
 
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
+	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(context.TODO(), reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		gc.absentOwnerCache.Add(reference.UID)
+		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		klog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	case err != nil:
@@ -354,7 +416,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 
 	if owner.GetUID() != reference.UID {
 		klog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-		gc.absentOwnerCache.Add(reference.UID)
+		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		return true, nil, nil
 	}
 	return false, owner, nil
@@ -399,8 +461,16 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	return ret
 }
 
+// attemptToDeleteItem looks up the live API object associated with the node,
+// and issues a delete IFF the uid matches, the item is not blocked on deleting dependents,
+// and all owner references are dangling.
+//
+// if the API get request returns a NotFound error, or the retrieved item's uid does not match,
+// a virtual delete event for the node is enqueued and enqueuedVirtualDeleteEventErr is returned.
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
-	klog.V(2).Infof("processing item %s", item.identity)
+	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+		"objectUID", item.identity.UID, "kind", item.identity.Kind, "virtual", !item.isObserved())
+
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
 		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
@@ -417,10 +487,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// the virtual node from GraphBuilder.uidToNode.
 		klog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		// since we're manually inserting a delete event to remove this node,
-		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
-		item.markObserved()
-		return nil
+		return enqueuedVirtualDeleteEventErr
 	case err != nil:
 		return err
 	}
@@ -428,10 +495,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	if latest.GetUID() != item.identity.UID {
 		klog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		// since we're manually inserting a delete event to remove this node,
-		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
-		item.markObserved()
-		return nil
+		return enqueuedVirtualDeleteEventErr
 	}
 
 	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
@@ -513,7 +577,8 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		klog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		klog.V(2).InfoS("Deleting object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID, "kind", item.identity.Kind, "propagationPolicy", policy)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }
@@ -619,13 +684,9 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 // GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 // This method is used by integration tests.
-func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
-	for _, u := range UIDs {
-		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
-			return true
-		}
-	}
-	return false
+func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
+	_, ok := gc.dependencyGraphBuilder.uidToNode.Read(u)
+	return ok
 }
 
 // GetDeletableResources returns all resources from discoveryClient that the

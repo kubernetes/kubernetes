@@ -24,6 +24,11 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.9
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// This API is never server served.  It is used for outbound requests from apiservers.  This will ensure it never gets served accidentally
+// and having the generator against this group will protect future APIs which may be served.
+// +k8s:prerelease-lifecycle-gen:replacement=admission.k8s.io,v1,AdmissionReview
 
 // AdmissionReview describes an admission review request/response.
 type AdmissionReview struct {
@@ -82,7 +87,7 @@ type AdmissionRequest struct {
 	RequestSubResource string `json:"requestSubResource,omitempty" protobuf:"bytes,15,opt,name=requestSubResource"`
 
 	// Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
-	// rely on the server to generate the name.  If that is the case, this method will return the empty string.
+	// rely on the server to generate the name.  If that is the case, this field will contain an empty string.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,5,opt,name=name"`
 	// Namespace is the namespace associated with the request (if any).
@@ -93,10 +98,10 @@ type AdmissionRequest struct {
 	Operation Operation `json:"operation" protobuf:"bytes,7,opt,name=operation"`
 	// UserInfo is information about the requesting user
 	UserInfo authenticationv1.UserInfo `json:"userInfo" protobuf:"bytes,8,opt,name=userInfo"`
-	// Object is the object from the incoming request prior to default values being applied
+	// Object is the object from the incoming request.
 	// +optional
 	Object runtime.RawExtension `json:"object,omitempty" protobuf:"bytes,9,opt,name=object"`
-	// OldObject is the existing object. Only populated for UPDATE requests.
+	// OldObject is the existing object. Only populated for DELETE and UPDATE requests.
 	// +optional
 	OldObject runtime.RawExtension `json:"oldObject,omitempty" protobuf:"bytes,10,opt,name=oldObject"`
 	// DryRun indicates that modifications will definitely not be persisted for this request.
@@ -140,6 +145,13 @@ type AdmissionResponse struct {
 	// the admission webhook to add additional context to the audit log for this request.
 	// +optional
 	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty" protobuf:"bytes,6,opt,name=auditAnnotations"`
+
+	// warnings is a list of warning messages to return to the requesting API client.
+	// Warning messages describe a problem the client making the API request should correct or be aware of.
+	// Limit warnings to 120 characters if possible.
+	// Warnings over 256 characters and large numbers of warnings may be truncated.
+	// +optional
+	Warnings []string `json:"warnings,omitempty" protobuf:"bytes,7,rep,name=warnings"`
 }
 
 // PatchType is the type of patch being used to represent the mutated object

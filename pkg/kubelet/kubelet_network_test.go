@@ -31,11 +31,11 @@ func TestGetIPTablesMark(t *testing.T) {
 	}{
 		{
 			14,
-			"0x00004000/0x00004000",
+			"0x00004000",
 		},
 		{
 			15,
-			"0x00008000/0x00008000",
+			"0x00008000",
 		},
 	}
 	for _, tc := range tests {

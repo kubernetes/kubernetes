@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	. "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -38,6 +37,7 @@ import (
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	maxUnavailable := intstr.FromInt(1)
+	maxSurge := intstr.FromInt(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -45,7 +45,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -57,7 +57,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -80,6 +80,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -110,6 +111,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
@@ -146,6 +148,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -181,7 +184,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -204,6 +207,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
@@ -231,6 +235,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
@@ -253,6 +258,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
@@ -292,7 +298,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -435,7 +441,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestDefaultDeploymentAvailability(t *testing.T) {
 	d := roundTrip(t, runtime.Object(&appsv1beta2.Deployment{})).(*appsv1beta2.Deployment)
 
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

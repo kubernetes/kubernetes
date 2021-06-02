@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -32,11 +34,13 @@ const (
 	schemaVersion        = "v1"
 )
 
-type DockershimCheckpoint interface {
+// ContainerCheckpoint provides the interface for process container's checkpoint data
+type ContainerCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetData() (string, string, string, []*PortMapping, bool)
 }
 
+// Protocol is the type of port mapping protocol
 type Protocol string
 
 // PortMapping is the port mapping configurations of a sandbox.
@@ -61,9 +65,9 @@ type CheckpointData struct {
 type PodSandboxCheckpoint struct {
 	// Version of the pod sandbox checkpoint schema.
 	Version string `json:"version"`
-	// Pod name of the sandbox. Same as the pod name in the PodSpec.
+	// Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
 	Name string `json:"name"`
-	// Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+	// Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
 	Namespace string `json:"namespace"`
 	// Data to checkpoint for pod sandbox.
 	Data *CheckpointData `json:"data,omitempty"`
@@ -71,7 +75,8 @@ type PodSandboxCheckpoint struct {
 	Checksum checksum.Checksum `json:"checksum"`
 }
 
-func NewPodSandboxCheckpoint(namespace, name string, data *CheckpointData) DockershimCheckpoint {
+// NewPodSandboxCheckpoint inits a PodSandboxCheckpoint with the given args
+func NewPodSandboxCheckpoint(namespace, name string, data *CheckpointData) ContainerCheckpoint {
 	return &PodSandboxCheckpoint{
 		Version:   schemaVersion,
 		Namespace: namespace,
@@ -80,19 +85,24 @@ func NewPodSandboxCheckpoint(namespace, name string, data *CheckpointData) Docke
 	}
 }
 
+// MarshalCheckpoint encodes the PodSandboxCheckpoint instance to a json object
 func (cp *PodSandboxCheckpoint) MarshalCheckpoint() ([]byte, error) {
 	cp.Checksum = checksum.New(*cp.Data)
 	return json.Marshal(*cp)
 }
 
+// UnmarshalCheckpoint decodes the blob data to the PodSandboxCheckpoint instance
 func (cp *PodSandboxCheckpoint) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
 }
 
+// VerifyChecksum verifies whether the PodSandboxCheckpoint's data checksum is
+// the same as calculated checksum
 func (cp *PodSandboxCheckpoint) VerifyChecksum() error {
 	return cp.Checksum.Verify(*cp.Data)
 }
 
+// GetData gets the PodSandboxCheckpoint's version and some net information
 func (cp *PodSandboxCheckpoint) GetData() (string, string, string, []*PortMapping, bool) {
 	return cp.Version, cp.Name, cp.Namespace, cp.Data.PortMappings, cp.Data.HostNetwork
 }

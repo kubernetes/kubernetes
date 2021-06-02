@@ -21,5 +21,15 @@ openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
 -out /certs/certificate.crt \
 -subj "/C=UK/ST=Warwickshire/L=Leamington/O=OrgName/OU=IT Department/CN=example.com"
 
+# If we're running on Windows, skip loading the Linux .so modules.
+if [ "$(uname)" = "Windows_NT" ]; then
+	sed -i -E "s/^(load_module modules\/ndk_http_module.so;)$/#\1/" conf/nginx.conf
+	sed -i -E "s/^(load_module modules\/ngx_http_lua_module.so;)$/#\1/" conf/nginx.conf
+	sed -i -E "s/^(load_module modules\/ngx_http_lua_upstream_module.so;)$/#\1/" conf/nginx.conf
+
+	# NOTE(claudiub): on Windows, nginx will take the paths in the nginx.conf file as relative paths.
+	cmd /S /C "mklink /D C:\\openresty\\certs C:\\certs"
+fi
+
 echo "Starting nginx"
 nginx -g "daemon off;"

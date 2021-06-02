@@ -36,6 +36,7 @@ func TestAddCustomGlobalFlags(t *testing.T) {
 	// flag set. This allows us to test against all global flags from
 	// flags.CommandLine.
 	nfs := namedFlagSets.FlagSet("test")
+	nfs.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	globalflag.AddGlobalFlags(nfs, "test-cmd")
 	AddCustomGlobalFlags(nfs)
 
@@ -46,11 +47,11 @@ func TestAddCustomGlobalFlags(t *testing.T) {
 
 	// Get all flags from flags.CommandLine, except flag `test.*`.
 	wantedFlag := []string{"help"}
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	normalizeFunc := nfs.GetNormalizeFunc()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		if !strings.Contains(flag.Name, "test.") {
-			wantedFlag = append(wantedFlag, flag.Name)
+			wantedFlag = append(wantedFlag, string(normalizeFunc(nfs, flag.Name)))
 		}
 	})
 	sort.Strings(wantedFlag)

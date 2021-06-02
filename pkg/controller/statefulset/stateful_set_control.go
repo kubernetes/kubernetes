@@ -17,15 +17,14 @@ limitations under the License.
 package statefulset
 
 import (
-	"math"
 	"sort"
 
-	"k8s.io/klog"
-
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -81,22 +80,34 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	}
 	history.SortControllerRevisions(revisions)
 
+	currentRevision, updateRevision, err := ssc.performUpdate(set, pods, revisions)
+	if err != nil {
+		return utilerrors.NewAggregate([]error{err, ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)})
+	}
+
+	// maintain the set's revision history limit
+	return ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)
+}
+
+func (ssc *defaultStatefulSetControl) performUpdate(
+	set *apps.StatefulSet, pods []*v1.Pod, revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, error) {
+
 	// get the current, and update revisions
 	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
 	if err != nil {
-		return err
+		return currentRevision, updateRevision, err
 	}
 
 	// perform the main update function and get the status
 	status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods)
 	if err != nil {
-		return err
+		return currentRevision, updateRevision, err
 	}
 
 	// update the set's status
 	err = ssc.updateStatefulSetStatus(set, status)
 	if err != nil {
-		return err
+		return currentRevision, updateRevision, err
 	}
 
 	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
@@ -113,8 +124,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		status.CurrentRevision,
 		status.UpdateRevision)
 
-	// maintain the set's revision history limit
-	return ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)
+	return currentRevision, updateRevision, nil
 }
 
 func (ssc *defaultStatefulSetControl) ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error) {
@@ -151,7 +161,13 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	update *apps.ControllerRevision) error {
 	history := make([]*apps.ControllerRevision, 0, len(revisions))
 	// mark all live revisions
-	live := map[string]bool{current.Name: true, update.Name: true}
+	live := map[string]bool{}
+	if current != nil {
+		live[current.Name] = true
+	}
+	if update != nil {
+		live[update.Name] = true
+	}
 	for i := range pods {
 		live[getPodRevision(pods[i])] = true
 	}
@@ -231,6 +247,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	for i := range revisions {
 		if revisions[i].Name == set.Status.CurrentRevision {
 			currentRevision = revisions[i]
+			break
 		}
 	}
 
@@ -281,7 +298,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unhealthy := 0
-	firstUnhealthyOrdinal := math.MaxInt32
 	var firstUnhealthyPod *v1.Pod
 
 	// First we partition pods into two lists valid replicas and condemned Pods
@@ -333,8 +349,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range replicas {
 		if !isHealthy(replicas[i]) {
 			unhealthy++
-			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
+			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = replicas[i]
 			}
 		}
@@ -343,8 +358,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range condemned {
 		if !isHealthy(condemned[i]) {
 			unhealthy++
-			if ord := getOrdinal(condemned[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
+			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = condemned[i]
 			}
 		}

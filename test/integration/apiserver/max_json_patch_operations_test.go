@@ -17,12 +17,13 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -50,17 +51,17 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 			Name: "test",
 		},
 	}
-	_, err := clientSet.CoreV1().Secrets("default").Create(secret)
+	_, err := clientSet.CoreV1().Secrets("default").Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = c.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
-		Body(hugePatch).Do().Error()
+		Body(hugePatch).Do(context.TODO()).Error()
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
-	if !errors.IsRequestEntityTooLargeError(err) {
+	if !apierrors.IsRequestEntityTooLargeError(err) {
 		t.Errorf("expected requested entity too large err, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "The allowed maximum operations in a JSON patch is") {

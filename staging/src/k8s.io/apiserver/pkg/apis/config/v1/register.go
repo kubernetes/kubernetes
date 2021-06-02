@@ -40,6 +40,7 @@ func init() {
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
 	localSchemeBuilder.Register(addKnownTypes)
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {

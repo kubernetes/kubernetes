@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	adreg "k8s.io/api/admissionregistration/v1beta1"
+	adreg "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

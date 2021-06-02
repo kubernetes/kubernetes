@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -122,7 +124,7 @@ func TestAddressManagerBadExternallyOwned(t *testing.T) {
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	ad, err := mgr.HoldAddress()
-	assert.NotNil(t, err) // FIXME
+	assert.Error(t, err) // FIXME
 	require.Equal(t, ad, "")
 }
 

@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Harness adds some functionality to testing.T, in particular resource cleanup.

@@ -111,7 +111,7 @@ type EtcdVersionPair struct {
 func ParseEtcdVersionPair(s string) (*EtcdVersionPair, error) {
 	parts := strings.Split(s, "/")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Malformed version file, expected <major>.<minor>.<patch>/<storage> but got %s", s)
+		return nil, fmt.Errorf("malformed version file, expected <major>.<minor>.<patch>/<storage> but got %s", s)
 	}
 	version, err := ParseEtcdVersion(parts[0])
 	if err != nil {
@@ -174,10 +174,9 @@ func (sv SupportedVersions) NextVersionPair(current *EtcdVersionPair) *EtcdVersi
 	return &EtcdVersionPair{version: nextVersion, storageVersion: storageVersion}
 }
 
-// ParseSupportedVersions parses a comma separated list of etcd versions.
-func ParseSupportedVersions(s string) (SupportedVersions, error) {
+// ParseSupportedVersions parses a list of etcd versions.
+func ParseSupportedVersions(list []string) (SupportedVersions, error) {
 	var err error
-	list := strings.Split(s, ",")
 	versions := make(SupportedVersions, len(list))
 	for i, v := range list {
 		versions[i], err = ParseEtcdVersion(strings.TrimSpace(v))
@@ -189,8 +188,8 @@ func ParseSupportedVersions(s string) (SupportedVersions, error) {
 }
 
 // MustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
-func MustParseSupportedVersions(s string) SupportedVersions {
-	versions, err := ParseSupportedVersions(s)
+func MustParseSupportedVersions(list []string) SupportedVersions {
+	versions, err := ParseSupportedVersions(list)
 	if err != nil {
 		panic(err)
 	}

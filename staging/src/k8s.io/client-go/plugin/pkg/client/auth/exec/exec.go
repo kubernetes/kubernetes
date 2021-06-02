@@ -18,8 +18,8 @@ package exec
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -28,26 +28,36 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
+const installHintVerboseHelp = `
+
+It looks like you are trying to use a client-go credential plugin that is not installed.
+
+To learn more about this feature, consult the documentation available at:
+      https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
@@ -76,8 +86,15 @@ func newCache() *cache {
 
 var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
 
-func cacheKey(c *api.ExecConfig) string {
-	return spewConfig.Sprint(c)
+func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) string {
+	key := struct {
+		conf    *api.ExecConfig
+		cluster *clientauthentication.Cluster
+	}{
+		conf:    conf,
+		cluster: cluster,
+	}
+	return spewConfig.Sprint(key)
 }
 
 type cache struct {
@@ -105,13 +122,51 @@ func (c *cache) put(s string, a *Authenticator) *Authenticator {
 	return a
 }
 
-// GetAuthenticator returns an exec-based plugin for providing client credentials.
-func GetAuthenticator(config *api.ExecConfig) (*Authenticator, error) {
-	return newAuthenticator(globalCache, config)
+// sometimes rate limits how often a function f() is called. Specifically, Do()
+// will run the provided function f() up to threshold times every interval
+// duration.
+type sometimes struct {
+	threshold int
+	interval  time.Duration
+
+	clock clock.Clock
+	mu    sync.Mutex
+
+	count  int       // times we have called f() in this window
+	window time.Time // beginning of current window of length interval
 }
 
-func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) {
-	key := cacheKey(config)
+func (s *sometimes) Do(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := s.clock.Now()
+	if s.window.IsZero() {
+		s.window = now
+	}
+
+	// If we are no longer in our saved time window, then we get to reset our run
+	// count back to 0 and start increasing towards the threshold again.
+	if inWindow := now.Sub(s.window) < s.interval; !inWindow {
+		s.window = now
+		s.count = 0
+	}
+
+	// If we have not run the function more than threshold times in this current
+	// time window, we get to run it now!
+	if underThreshold := s.count < s.threshold; underThreshold {
+		s.count++
+		f()
+	}
+}
+
+// GetAuthenticator returns an exec-based plugin for providing client credentials.
+func GetAuthenticator(config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
+	return newAuthenticator(globalCache, config, cluster)
+}
+
+func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
+	key := cacheKey(config, cluster)
 	if a, ok := c.get(key); ok {
 		return a, nil
 	}
@@ -121,16 +176,34 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 		return nil, fmt.Errorf("exec plugin: invalid apiVersion %q", config.APIVersion)
 	}
 
+	connTracker := connrotation.NewConnectionTracker()
+	defaultDialer := connrotation.NewDialerWithTracker(
+		(&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		connTracker,
+	)
+
 	a := &Authenticator{
-		cmd:   config.Command,
-		args:  config.Args,
-		group: gv,
+		cmd:                config.Command,
+		args:               config.Args,
+		group:              gv,
+		cluster:            cluster,
+		provideClusterInfo: config.ProvideClusterInfo,
+
+		installHint: config.InstallHint,
+		sometimes: &sometimes{
+			threshold: 10,
+			interval:  time.Hour,
+			clock:     clock.RealClock{},
+		},
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
-		interactive: terminal.IsTerminal(int(os.Stdout.Fd())),
+		interactive: term.IsTerminal(int(os.Stdin.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
+
+		defaultDialer: defaultDialer,
+		connTracker:   connTracker,
 	}
 
 	for _, env := range config.Env {
@@ -144,10 +217,18 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 // The plugin input and output are defined by the API group client.authentication.k8s.io.
 type Authenticator struct {
 	// Set by the config
-	cmd   string
-	args  []string
-	group schema.GroupVersion
-	env   []string
+	cmd                string
+	args               []string
+	group              schema.GroupVersion
+	env                []string
+	cluster            *clientauthentication.Cluster
+	provideClusterInfo bool
+
+	// Used to avoid log spew by rate limiting install hint printing. We didn't do
+	// this by interval based rate limiting alone since that way may have prevented
+	// the install hint from showing up for kubectl users.
+	sometimes   *sometimes
+	installHint string
 
 	// Stubbable for testing
 	stdin       io.Reader
@@ -156,6 +237,11 @@ type Authenticator struct {
 	now         func() time.Time
 	environ     func() []string
 
+	// defaultDialer is used for clients which don't specify a custom dialer
+	defaultDialer *connrotation.Dialer
+	// connTracker tracks all connections opened that we need to close when rotating a client certificate
+	connTracker *connrotation.ConnectionTracker
+
 	// Cached results.
 	//
 	// The mutex also guards calling the plugin. Since the plugin could be
@@ -163,18 +249,26 @@ type Authenticator struct {
 	mu          sync.Mutex
 	cachedCreds *credentials
 	exp         time.Time
-
-	onRotate func()
 }
 
 type credentials struct {
-	token string
-	cert  *tls.Certificate
+	token string           `datapolicy:"token"`
+	cert  *tls.Certificate `datapolicy:"secret-key"`
 }
 
 // UpdateTransportConfig updates the transport.Config to use credentials
 // returned by the plugin.
 func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
+	// If a bearer token is present in the request - avoid the GetCert callback when
+	// setting up the transport, as that triggers the exec action if the server is
+	// also configured to allow client certificates for authentication. For requests
+	// like "kubectl get --token (token) pods" we should assume the intention is to
+	// use the provided token for authentication. The same can be said for when the
+	// user specifies basic auth.
+	if c.HasTokenAuth() || c.HasBasicAuth() {
+		return nil
+	}
+
 	c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return &roundTripper{a, rt}
 	})
@@ -184,14 +278,14 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	}
 	c.TLS.GetCert = a.cert
 
-	var dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	var d *connrotation.Dialer
 	if c.Dial != nil {
-		dial = c.Dial
+		// if c has a custom dialer, we have to wrap it
+		d = connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
 	} else {
-		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+		d = a.defaultDialer
 	}
-	d := connrotation.NewDialer(dial)
-	a.onRotate = d.CloseAll
+
 	c.Dial = d.DialContext
 
 	return nil
@@ -251,6 +345,7 @@ func (a *Authenticator) cert() (*tls.Certificate, error) {
 func (a *Authenticator) getCreds() (*credentials, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
 	if a.cachedCreds != nil && !a.credsExpired() {
 		return a.cachedCreds, nil
 	}
@@ -258,6 +353,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 	if err := a.refreshCredsLocked(nil); err != nil {
 		return nil, err
 	}
+
 	return a.cachedCreds, nil
 }
 
@@ -286,19 +382,16 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 			Interactive: a.interactive,
 		},
 	}
+	if a.provideClusterInfo {
+		cred.Spec.Cluster = a.cluster
+	}
 
 	env := append(a.environ(), a.env...)
-	if a.group == v1alpha1.SchemeGroupVersion {
-		// Input spec disabled for beta due to lack of use. Possibly re-enable this later if
-		// someone wants it back.
-		//
-		// See: https://github.com/kubernetes/kubernetes/issues/61796
-		data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
-		if err != nil {
-			return fmt.Errorf("encode ExecCredentials: %v", err)
-		}
-		env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
+	data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
+	if err != nil {
+		return fmt.Errorf("encode ExecCredentials: %v", err)
 	}
+	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
 
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command(a.cmd, a.args...)
@@ -309,8 +402,10 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		cmd.Stdin = a.stdin
 	}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("exec: %v", err)
+	err = cmd.Run()
+	incrementCallsMetric(err)
+	if err != nil {
+		return a.wrapCmdRunErrorLocked(err)
 	}
 
 	_, gvk, err := codecs.UniversalDecoder(a.group).Decode(stdout.Bytes(), nil, cred)
@@ -346,6 +441,17 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		if err != nil {
 			return fmt.Errorf("failed parsing client key/certificate: %v", err)
 		}
+
+		// Leaf is initialized to be nil:
+		//  https://golang.org/pkg/crypto/tls/#X509KeyPair
+		// Leaf certificate is the first certificate:
+		//  https://golang.org/pkg/crypto/tls/#Certificate
+		// Populating leaf is useful for quickly accessing the underlying x509
+		// certificate values.
+		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			return fmt.Errorf("failed parsing client leaf certificate: %v", err)
+		}
 		newCreds.cert = &cert
 	}
 
@@ -353,8 +459,50 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 	a.cachedCreds = newCreds
 	// Only close all connections when TLS cert rotates. Token rotation doesn't
 	// need the extra noise.
-	if a.onRotate != nil && oldCreds != nil && !reflect.DeepEqual(oldCreds.cert, a.cachedCreds.cert) {
-		a.onRotate()
+	if oldCreds != nil && !reflect.DeepEqual(oldCreds.cert, a.cachedCreds.cert) {
+		// Can be nil if the exec auth plugin only returned token auth.
+		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
+			metrics.ClientCertRotationAge.Observe(time.Since(oldCreds.cert.Leaf.NotBefore))
+		}
+		a.connTracker.CloseAll()
 	}
+
+	expiry := time.Time{}
+	if a.cachedCreds.cert != nil && a.cachedCreds.cert.Leaf != nil {
+		expiry = a.cachedCreds.cert.Leaf.NotAfter
+	}
+	expirationMetrics.set(a, expiry)
 	return nil
+}
+
+// wrapCmdRunErrorLocked pulls out the code to construct a helpful error message
+// for when the exec plugin's binary fails to Run().
+//
+// It must be called while holding the Authenticator's mutex.
+func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
+	switch err.(type) {
+	case *exec.Error: // Binary does not exist (see exec.Error).
+		builder := strings.Builder{}
+		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
+
+		a.sometimes.Do(func() {
+			fmt.Fprint(&builder, installHintVerboseHelp)
+			if a.installHint != "" {
+				fmt.Fprintf(&builder, "\n\n%s", a.installHint)
+			}
+		})
+
+		return errors.New(builder.String())
+
+	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
+		e := err.(*exec.ExitError)
+		return fmt.Errorf(
+			"exec: executable %s failed with exit code %d",
+			a.cmd,
+			e.ProcessState.ExitCode(),
+		)
+
+	default:
+		return fmt.Errorf("exec: %v", err)
+	}
 }

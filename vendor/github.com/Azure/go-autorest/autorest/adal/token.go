@@ -24,18 +24,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/date"
-	"github.com/Azure/go-autorest/version"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/form3tech-oss/jwt-go"
 )
 
 const (
@@ -62,13 +63,40 @@ const (
 	// msiEndpoint is the well known endpoint for getting MSI authentications tokens
 	msiEndpoint = "http://169.254.169.254/metadata/identity/oauth2/token"
 
+	// the API version to use for the MSI endpoint
+	msiAPIVersion = "2018-02-01"
+
 	// the default number of attempts to refresh an MSI authentication token
 	defaultMaxMSIRefreshAttempts = 5
+
+	// asMSIEndpointEnv is the environment variable used to store the endpoint on App Service and Functions
+	asMSIEndpointEnv = "MSI_ENDPOINT"
+
+	// asMSISecretEnv is the environment variable used to store the request secret on App Service and Functions
+	asMSISecretEnv = "MSI_SECRET"
+
+	// the API version to use for the App Service MSI endpoint
+	appServiceAPIVersion = "2017-09-01"
+
+	// secret header used when authenticating against app service MSI endpoint
+	secretHeader = "Secret"
+
+	// the format for expires_on in UTC with AM/PM
+	expiresOnDateFormatPM = "1/2/2006 15:04:05 PM +00:00"
+
+	// the format for expires_on in UTC without AM/PM
+	expiresOnDateFormat = "1/2/2006 15:04:05 +00:00"
 )
 
 // OAuthTokenProvider is an interface which should be implemented by an access token retriever
 type OAuthTokenProvider interface {
 	OAuthToken() string
+}
+
+// MultitenantOAuthTokenProvider provides tokens used for multi-tenant authorization.
+type MultitenantOAuthTokenProvider interface {
+	PrimaryOAuthToken() string
+	AuxiliaryOAuthTokens() []string
 }
 
 // TokenRefreshError is an interface used by errors returned during token refresh.
@@ -94,6 +122,9 @@ type RefresherWithContext interface {
 // TokenRefreshCallback is the type representing callbacks that will be called after
 // a successful token refresh
 type TokenRefreshCallback func(Token) error
+
+// TokenRefresh is a type representing a custom callback to refresh a token
+type TokenRefresh func(ctx context.Context, resource string) (*Token, error)
 
 // Token encapsulates the access token used to authorize Azure requests.
 // https://docs.microsoft.com/en-us/azure/active-directory/develop/v1-oauth2-client-creds-grant-flow#service-to-service-access-token-response
@@ -234,7 +265,7 @@ func (secret *ServicePrincipalCertificateSecret) SignJwt(spt *ServicePrincipalTo
 		"sub": spt.inner.ClientID,
 		"jti": base64.URLEncoding.EncodeToString(jti),
 		"nbf": time.Now().Unix(),
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	}
 
 	signedString, err := token.SignedString(secret.PrivateKey)
@@ -333,11 +364,13 @@ func (secret ServicePrincipalAuthorizationCodeSecret) MarshalJSON() ([]byte, err
 
 // ServicePrincipalToken encapsulates a Token created for a Service Principal.
 type ServicePrincipalToken struct {
-	inner            servicePrincipalToken
-	refreshLock      *sync.RWMutex
-	sender           Sender
-	refreshCallbacks []TokenRefreshCallback
+	inner             servicePrincipalToken
+	refreshLock       *sync.RWMutex
+	sender            Sender
+	customRefreshFunc TokenRefresh
+	refreshCallbacks  []TokenRefreshCallback
 	// MaxMSIRefreshAttempts is the maximum number of attempts to refresh an MSI token.
+	// Settings this to a value less than 1 will use the default value.
 	MaxMSIRefreshAttempts int
 }
 
@@ -349,6 +382,11 @@ func (spt ServicePrincipalToken) MarshalTokenJSON() ([]byte, error) {
 // SetRefreshCallbacks replaces any existing refresh callbacks with the specified callbacks.
 func (spt *ServicePrincipalToken) SetRefreshCallbacks(callbacks []TokenRefreshCallback) {
 	spt.refreshCallbacks = callbacks
+}
+
+// SetCustomRefreshFunc sets a custom refresh function used to refresh the token.
+func (spt *ServicePrincipalToken) SetCustomRefreshFunc(customRefreshFunc TokenRefresh) {
+	spt.customRefreshFunc = customRefreshFunc
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -385,8 +423,13 @@ func (spt *ServicePrincipalToken) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	spt.refreshLock = &sync.RWMutex{}
-	spt.sender = &http.Client{}
+	// Don't override the refreshLock or the sender if those have been already set.
+	if spt.refreshLock == nil {
+		spt.refreshLock = &sync.RWMutex{}
+	}
+	if spt.sender == nil {
+		spt.sender = sender()
+	}
 	return nil
 }
 
@@ -433,7 +476,7 @@ func NewServicePrincipalTokenWithSecret(oauthConfig OAuthConfig, id string, reso
 			RefreshWithin: defaultRefresh,
 		},
 		refreshLock:      &sync.RWMutex{},
-		sender:           &http.Client{},
+		sender:           sender(),
 		refreshCallbacks: callbacks,
 	}
 	return spt, nil
@@ -624,19 +667,52 @@ func GetMSIVMEndpoint() (string, error) {
 	return msiEndpoint, nil
 }
 
+// NOTE: this only indicates if the ASE environment credentials have been set
+// which does not necessarily mean that the caller is authenticating via ASE!
+func isAppService() bool {
+	_, asMSIEndpointEnvExists := os.LookupEnv(asMSIEndpointEnv)
+	_, asMSISecretEnvExists := os.LookupEnv(asMSISecretEnv)
+
+	return asMSIEndpointEnvExists && asMSISecretEnvExists
+}
+
+// GetMSIAppServiceEndpoint get the MSI endpoint for App Service and Functions
+func GetMSIAppServiceEndpoint() (string, error) {
+	asMSIEndpoint, asMSIEndpointEnvExists := os.LookupEnv(asMSIEndpointEnv)
+
+	if asMSIEndpointEnvExists {
+		return asMSIEndpoint, nil
+	}
+	return "", errors.New("MSI endpoint not found")
+}
+
+// GetMSIEndpoint get the appropriate MSI endpoint depending on the runtime environment
+func GetMSIEndpoint() (string, error) {
+	if isAppService() {
+		return GetMSIAppServiceEndpoint()
+	}
+	return GetMSIVMEndpoint()
+}
+
 // NewServicePrincipalTokenFromMSI creates a ServicePrincipalToken via the MSI VM Extension.
 // It will use the system assigned identity when creating the token.
 func NewServicePrincipalTokenFromMSI(msiEndpoint, resource string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, nil, callbacks...)
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, nil, nil, callbacks...)
 }
 
 // NewServicePrincipalTokenFromMSIWithUserAssignedID creates a ServicePrincipalToken via the MSI VM Extension.
-// It will use the specified user assigned identity when creating the token.
+// It will use the clientID of specified user assigned identity when creating the token.
 func NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint, resource string, userAssignedID string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, &userAssignedID, callbacks...)
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, &userAssignedID, nil, callbacks...)
 }
 
-func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedID *string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
+// NewServicePrincipalTokenFromMSIWithIdentityResourceID creates a ServicePrincipalToken via the MSI VM Extension.
+// It will use the azure resource id of user assigned identity when creating the token.
+func NewServicePrincipalTokenFromMSIWithIdentityResourceID(msiEndpoint, resource string, identityResourceID string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
+	return newServicePrincipalTokenFromMSI(msiEndpoint, resource, nil, &identityResourceID, callbacks...)
+}
+
+func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedID *string, identityResourceID *string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
 	if err := validateStringParam(msiEndpoint, "msiEndpoint"); err != nil {
 		return nil, err
 	}
@@ -648,6 +724,11 @@ func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedI
 			return nil, err
 		}
 	}
+	if identityResourceID != nil {
+		if err := validateStringParam(*identityResourceID, "identityResourceID"); err != nil {
+			return nil, err
+		}
+	}
 	// We set the oauth config token endpoint to be MSI's endpoint
 	msiEndpointURL, err := url.Parse(msiEndpoint)
 	if err != nil {
@@ -656,9 +737,19 @@ func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedI
 
 	v := url.Values{}
 	v.Set("resource", resource)
-	v.Set("api-version", "2018-02-01")
+	// we only support token API version 2017-09-01 for app services
+	clientIDParam := "client_id"
+	if isASEEndpoint(*msiEndpointURL) {
+		v.Set("api-version", appServiceAPIVersion)
+		clientIDParam = "clientid"
+	} else {
+		v.Set("api-version", msiAPIVersion)
+	}
 	if userAssignedID != nil {
-		v.Set("client_id", *userAssignedID)
+		v.Set(clientIDParam, *userAssignedID)
+	}
+	if identityResourceID != nil {
+		v.Set("mi_res_id", *identityResourceID)
 	}
 	msiEndpointURL.RawQuery = v.Encode()
 
@@ -674,7 +765,7 @@ func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedI
 			RefreshWithin: defaultRefresh,
 		},
 		refreshLock:           &sync.RWMutex{},
-		sender:                &http.Client{},
+		sender:                sender(),
 		refreshCallbacks:      callbacks,
 		MaxMSIRefreshAttempts: defaultMaxMSIRefreshAttempts,
 	}
@@ -715,8 +806,9 @@ func (spt *ServicePrincipalToken) EnsureFresh() error {
 // EnsureFreshWithContext will refresh the token if it will expire within the refresh window (as set by
 // RefreshWithin) and autoRefresh flag is on.  This method is safe for concurrent use.
 func (spt *ServicePrincipalToken) EnsureFreshWithContext(ctx context.Context) error {
-	if spt.inner.AutoRefresh && spt.inner.Token.WillExpireIn(spt.inner.RefreshWithin) {
-		// take the write lock then check to see if the token was already refreshed
+	// must take the read lock when initially checking the token's expiration
+	if spt.inner.AutoRefresh && spt.Token().WillExpireIn(spt.inner.RefreshWithin) {
+		// take the write lock then check again to see if the token was already refreshed
 		spt.refreshLock.Lock()
 		defer spt.refreshLock.Unlock()
 		if spt.inner.Token.WillExpireIn(spt.inner.RefreshWithin) {
@@ -740,13 +832,13 @@ func (spt *ServicePrincipalToken) InvokeRefreshCallbacks(token Token) error {
 }
 
 // Refresh obtains a fresh token for the Service Principal.
-// This method is not safe for concurrent use and should be syncrhonized.
+// This method is safe for concurrent use.
 func (spt *ServicePrincipalToken) Refresh() error {
 	return spt.RefreshWithContext(context.Background())
 }
 
 // RefreshWithContext obtains a fresh token for the Service Principal.
-// This method is not safe for concurrent use and should be syncrhonized.
+// This method is safe for concurrent use.
 func (spt *ServicePrincipalToken) RefreshWithContext(ctx context.Context) error {
 	spt.refreshLock.Lock()
 	defer spt.refreshLock.Unlock()
@@ -754,13 +846,13 @@ func (spt *ServicePrincipalToken) RefreshWithContext(ctx context.Context) error 
 }
 
 // RefreshExchange refreshes the token, but for a different resource.
-// This method is not safe for concurrent use and should be syncrhonized.
+// This method is safe for concurrent use.
 func (spt *ServicePrincipalToken) RefreshExchange(resource string) error {
 	return spt.RefreshExchangeWithContext(context.Background(), resource)
 }
 
 // RefreshExchangeWithContext refreshes the token, but for a different resource.
-// This method is not safe for concurrent use and should be syncrhonized.
+// This method is safe for concurrent use.
 func (spt *ServicePrincipalToken) RefreshExchangeWithContext(ctx context.Context, resource string) error {
 	spt.refreshLock.Lock()
 	defer spt.refreshLock.Unlock()
@@ -779,19 +871,49 @@ func (spt *ServicePrincipalToken) getGrantType() string {
 }
 
 func isIMDS(u url.URL) bool {
-	imds, err := url.Parse(msiEndpoint)
+	return isMSIEndpoint(u) == true || isASEEndpoint(u) == true
+}
+
+func isMSIEndpoint(endpoint url.URL) bool {
+	msi, err := url.Parse(msiEndpoint)
 	if err != nil {
 		return false
 	}
-	return u.Host == imds.Host && u.Path == imds.Path
+	return endpoint.Host == msi.Host && endpoint.Path == msi.Path
+}
+
+func isASEEndpoint(endpoint url.URL) bool {
+	aseEndpoint, err := GetMSIAppServiceEndpoint()
+	if err != nil {
+		// app service environment isn't enabled
+		return false
+	}
+	ase, err := url.Parse(aseEndpoint)
+	if err != nil {
+		return false
+	}
+	return endpoint.Host == ase.Host && endpoint.Path == ase.Path
 }
 
 func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource string) error {
+	if spt.customRefreshFunc != nil {
+		token, err := spt.customRefreshFunc(ctx, resource)
+		if err != nil {
+			return err
+		}
+		spt.inner.Token = *token
+		return spt.InvokeRefreshCallbacks(spt.inner.Token)
+	}
 	req, err := http.NewRequest(http.MethodPost, spt.inner.OauthConfig.TokenEndpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("adal: Failed to build the refresh request. Error = '%v'", err)
 	}
-	req.Header.Add("User-Agent", version.UserAgent())
+	req.Header.Add("User-Agent", UserAgent())
+	// Add header when runtime is on App Service or Functions
+	if isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
+		asMSISecret, _ := os.LookupEnv(asMSISecretEnv)
+		req.Header.Add(secretHeader, asMSISecret)
+	}
 	req = req.WithContext(ctx)
 	if !isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
 		v := url.Values{}
@@ -826,17 +948,29 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 
 	if _, ok := spt.inner.Secret.(*ServicePrincipalMSISecret); ok {
 		req.Method = http.MethodGet
-		req.Header.Set(metadataHeader, "true")
+		// the metadata header isn't applicable for ASE
+		if !isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
+			req.Header.Set(metadataHeader, "true")
+		}
 	}
 
 	var resp *http.Response
+	if isMSIEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
+		resp, err = getMSIEndpoint(ctx, spt.sender)
+		if err != nil {
+			// return a TokenRefreshError here so that we don't keep retrying
+			return newTokenRefreshError(fmt.Sprintf("the MSI endpoint is not available. Failed HTTP request to MSI endpoint: %v", err), nil)
+		}
+		resp.Body.Close()
+	}
 	if isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
 		resp, err = retryForIMDS(spt.sender, req, spt.MaxMSIRefreshAttempts)
 	} else {
 		resp, err = spt.sender.Do(req)
 	}
 	if err != nil {
-		return newTokenRefreshError(fmt.Sprintf("adal: Failed to execute the refresh request. Error = '%v'", err), nil)
+		// don't return a TokenRefreshError here; this will allow retry logic to apply
+		return fmt.Errorf("adal: Failed to execute the refresh request. Error = '%v'", err)
 	}
 
 	defer resp.Body.Close()
@@ -844,9 +978,9 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 
 	if resp.StatusCode != http.StatusOK {
 		if err != nil {
-			return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Failed reading response body: %v", resp.StatusCode, err), resp)
+			return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Failed reading response body: %v Endpoint %s", resp.StatusCode, err, req.URL.String()), resp)
 		}
-		return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Response body: %s", resp.StatusCode, string(rb)), resp)
+		return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Response body: %s Endpoint %s", resp.StatusCode, string(rb), req.URL.String()), resp)
 	}
 
 	// for the following error cases don't return a TokenRefreshError.  the operation succeeded
@@ -859,15 +993,60 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 	if len(strings.Trim(string(rb), " ")) == 0 {
 		return fmt.Errorf("adal: Empty service principal token received during refresh")
 	}
-	var token Token
+	token := struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+
+		// AAD returns expires_in as a string, ADFS returns it as an int
+		ExpiresIn json.Number `json:"expires_in"`
+		// expires_on can be in two formats, a UTC time stamp or the number of seconds.
+		ExpiresOn string      `json:"expires_on"`
+		NotBefore json.Number `json:"not_before"`
+
+		Resource string `json:"resource"`
+		Type     string `json:"token_type"`
+	}{}
+	// return a TokenRefreshError in the follow error cases as the token is in an unexpected format
 	err = json.Unmarshal(rb, &token)
 	if err != nil {
-		return fmt.Errorf("adal: Failed to unmarshal the service principal token during refresh. Error = '%v' JSON = '%s'", err, string(rb))
+		return newTokenRefreshError(fmt.Sprintf("adal: Failed to unmarshal the service principal token during refresh. Error = '%v' JSON = '%s'", err, string(rb)), resp)
 	}
+	expiresOn := json.Number("")
+	// ADFS doesn't include the expires_on field
+	if token.ExpiresOn != "" {
+		if expiresOn, err = parseExpiresOn(token.ExpiresOn); err != nil {
+			return newTokenRefreshError(fmt.Sprintf("adal: failed to parse expires_on: %v value '%s'", err, token.ExpiresOn), resp)
+		}
+	}
+	spt.inner.Token.AccessToken = token.AccessToken
+	spt.inner.Token.RefreshToken = token.RefreshToken
+	spt.inner.Token.ExpiresIn = token.ExpiresIn
+	spt.inner.Token.ExpiresOn = expiresOn
+	spt.inner.Token.NotBefore = token.NotBefore
+	spt.inner.Token.Resource = token.Resource
+	spt.inner.Token.Type = token.Type
 
-	spt.inner.Token = token
+	return spt.InvokeRefreshCallbacks(spt.inner.Token)
+}
 
-	return spt.InvokeRefreshCallbacks(token)
+// converts expires_on to the number of seconds
+func parseExpiresOn(s string) (json.Number, error) {
+	// convert the expiration date to the number of seconds from now
+	timeToDuration := func(t time.Time) json.Number {
+		dur := t.Sub(time.Now().UTC())
+		return json.Number(strconv.FormatInt(int64(dur.Round(time.Second).Seconds()), 10))
+	}
+	if _, err := strconv.ParseInt(s, 10, 64); err == nil {
+		// this is the number of seconds case, no conversion required
+		return json.Number(s), nil
+	} else if eo, err := time.Parse(expiresOnDateFormatPM, s); err == nil {
+		return timeToDuration(eo), nil
+	} else if eo, err := time.Parse(expiresOnDateFormat, s); err == nil {
+		return timeToDuration(eo), nil
+	} else {
+		// unknown format
+		return json.Number(""), err
+	}
 }
 
 // retry logic specific to retrieving a token from the IMDS endpoint
@@ -901,12 +1080,19 @@ func retryForIMDS(sender Sender, req *http.Request, maxAttempts int) (resp *http
 	attempt := 0
 	delay := time.Duration(0)
 
+	// maxAttempts is user-specified, ensure that its value is greater than zero else no request will be made
+	if maxAttempts < 1 {
+		maxAttempts = defaultMaxMSIRefreshAttempts
+	}
+
 	for attempt < maxAttempts {
+		if resp != nil && resp.Body != nil {
+			io.Copy(ioutil.Discard, resp.Body)
+			resp.Body.Close()
+		}
 		resp, err = sender.Do(req)
-		// retry on temporary network errors, e.g. transient network failures.
-		// if we don't receive a response then assume we can't connect to the
-		// endpoint so we're likely not running on an Azure VM so don't retry.
-		if (err != nil && !isTemporaryNetworkError(err)) || resp == nil || resp.StatusCode == http.StatusOK || !containsInt(retries, resp.StatusCode) {
+		// we want to retry if err is not nil or the status code is in the list of retry codes
+		if err == nil && !responseHasStatusCode(resp, retries...) {
 			return
 		}
 
@@ -930,20 +1116,12 @@ func retryForIMDS(sender Sender, req *http.Request, maxAttempts int) (resp *http
 	return
 }
 
-// returns true if the specified error is a temporary network error or false if it's not.
-// if the error doesn't implement the net.Error interface the return value is true.
-func isTemporaryNetworkError(err error) bool {
-	if netErr, ok := err.(net.Error); !ok || (ok && netErr.Temporary()) {
-		return true
-	}
-	return false
-}
-
-// returns true if slice ints contains the value n
-func containsInt(ints []int, n int) bool {
-	for _, i := range ints {
-		if i == n {
-			return true
+func responseHasStatusCode(resp *http.Response, codes ...int) bool {
+	if resp != nil {
+		for _, i := range codes {
+			if i == resp.StatusCode {
+				return true
+			}
 		}
 	}
 	return false
@@ -977,4 +1155,112 @@ func (spt *ServicePrincipalToken) Token() Token {
 	spt.refreshLock.RLock()
 	defer spt.refreshLock.RUnlock()
 	return spt.inner.Token
+}
+
+// MultiTenantServicePrincipalToken contains tokens for multi-tenant authorization.
+type MultiTenantServicePrincipalToken struct {
+	PrimaryToken    *ServicePrincipalToken
+	AuxiliaryTokens []*ServicePrincipalToken
+}
+
+// PrimaryOAuthToken returns the primary authorization token.
+func (mt *MultiTenantServicePrincipalToken) PrimaryOAuthToken() string {
+	return mt.PrimaryToken.OAuthToken()
+}
+
+// AuxiliaryOAuthTokens returns one to three auxiliary authorization tokens.
+func (mt *MultiTenantServicePrincipalToken) AuxiliaryOAuthTokens() []string {
+	tokens := make([]string, len(mt.AuxiliaryTokens))
+	for i := range mt.AuxiliaryTokens {
+		tokens[i] = mt.AuxiliaryTokens[i].OAuthToken()
+	}
+	return tokens
+}
+
+// NewMultiTenantServicePrincipalToken creates a new MultiTenantServicePrincipalToken with the specified credentials and resource.
+func NewMultiTenantServicePrincipalToken(multiTenantCfg MultiTenantOAuthConfig, clientID string, secret string, resource string) (*MultiTenantServicePrincipalToken, error) {
+	if err := validateStringParam(clientID, "clientID"); err != nil {
+		return nil, err
+	}
+	if err := validateStringParam(secret, "secret"); err != nil {
+		return nil, err
+	}
+	if err := validateStringParam(resource, "resource"); err != nil {
+		return nil, err
+	}
+	auxTenants := multiTenantCfg.AuxiliaryTenants()
+	m := MultiTenantServicePrincipalToken{
+		AuxiliaryTokens: make([]*ServicePrincipalToken, len(auxTenants)),
+	}
+	primary, err := NewServicePrincipalToken(*multiTenantCfg.PrimaryTenant(), clientID, secret, resource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SPT for primary tenant: %v", err)
+	}
+	m.PrimaryToken = primary
+	for i := range auxTenants {
+		aux, err := NewServicePrincipalToken(*auxTenants[i], clientID, secret, resource)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create SPT for auxiliary tenant: %v", err)
+		}
+		m.AuxiliaryTokens[i] = aux
+	}
+	return &m, nil
+}
+
+// NewMultiTenantServicePrincipalTokenFromCertificate creates a new MultiTenantServicePrincipalToken with the specified certificate credentials and resource.
+func NewMultiTenantServicePrincipalTokenFromCertificate(multiTenantCfg MultiTenantOAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string) (*MultiTenantServicePrincipalToken, error) {
+	if err := validateStringParam(clientID, "clientID"); err != nil {
+		return nil, err
+	}
+	if err := validateStringParam(resource, "resource"); err != nil {
+		return nil, err
+	}
+	if certificate == nil {
+		return nil, fmt.Errorf("parameter 'certificate' cannot be nil")
+	}
+	if privateKey == nil {
+		return nil, fmt.Errorf("parameter 'privateKey' cannot be nil")
+	}
+	auxTenants := multiTenantCfg.AuxiliaryTenants()
+	m := MultiTenantServicePrincipalToken{
+		AuxiliaryTokens: make([]*ServicePrincipalToken, len(auxTenants)),
+	}
+	primary, err := NewServicePrincipalTokenWithSecret(
+		*multiTenantCfg.PrimaryTenant(),
+		clientID,
+		resource,
+		&ServicePrincipalCertificateSecret{
+			PrivateKey:  privateKey,
+			Certificate: certificate,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SPT for primary tenant: %v", err)
+	}
+	m.PrimaryToken = primary
+	for i := range auxTenants {
+		aux, err := NewServicePrincipalTokenWithSecret(
+			*auxTenants[i],
+			clientID,
+			resource,
+			&ServicePrincipalCertificateSecret{
+				PrivateKey:  privateKey,
+				Certificate: certificate,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create SPT for auxiliary tenant: %v", err)
+		}
+		m.AuxiliaryTokens[i] = aux
+	}
+	return &m, nil
+}
+
+// MSIAvailable returns true if the MSI endpoint is available for authentication.
+func MSIAvailable(ctx context.Context, sender Sender) bool {
+	resp, err := getMSIEndpoint(ctx, sender)
+	if err == nil {
+		resp.Body.Close()
+	}
+	return err == nil
 }

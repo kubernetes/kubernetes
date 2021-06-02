@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -24,22 +26,24 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/aws"
 )
 
 const (
-	diskPartitionSuffix = ""
-	checkSleepDuration  = time.Second
+	diskPartitionSuffix     = ""
+	nvmeDiskPartitionSuffix = "p"
+	checkSleepDuration      = time.Second
 )
 
 // AWSDiskUtil provides operations for EBS volume.
@@ -68,7 +72,7 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 }
 
 // CreateVolume creates an AWS EBS volume.
-// Returns: volumeID, volumeSizeGB, labels, error
+// Returns: volumeID, volumeSizeGB, labels, fstype, error
 func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (aws.KubernetesVolumeID, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin.host.GetCloudProvider())
 	if err != nil {
@@ -112,7 +116,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 	labels, err := cloud.GetVolumeLabels(name)
 	if err != nil {
 		// We don't really want to leak the volume here...
-		klog.Errorf("error building labels for new EBS volume %q: %v", name, err)
+		klog.Errorf("Error building labels for new EBS volume %q: %v", name, err)
 	}
 
 	fstype := ""
@@ -173,7 +177,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 		case "iopspergb":
 			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid iopsPerGB value %q, must be integer between 1 and 30: %v", v, err)
+				return nil, fmt.Errorf("invalid iopsPerGB value %q: %v", v, err)
 			}
 		case "encrypted":
 			volumeOptions.Encrypted, err = strconv.ParseBool(v)
@@ -200,7 +204,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
 		if pathExists, err := mount.PathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
+			return "", fmt.Errorf("error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
 		}
@@ -228,15 +232,18 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 	// and we have to get the volume id from the nvme interface
 	awsVolumeID, err := volumeID.MapToAWSVolumeID()
 	if err != nil {
-		klog.Warningf("error mapping volume %q to AWS volume: %v", volumeID, err)
+		klog.Warningf("Error mapping volume %q to AWS volume: %v", volumeID, err)
 	} else {
 		// This is the magic name on which AWS presents NVME devices under /dev/disk/by-id/
 		// For example, vol-0fab1d5e3f72a5e23 creates a symlink at /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0fab1d5e3f72a5e23
 		nvmeName := "nvme-Amazon_Elastic_Block_Store_" + strings.Replace(string(awsVolumeID), "-", "", -1)
 		nvmePath, err := findNvmeVolume(nvmeName)
 		if err != nil {
-			klog.Warningf("error looking for nvme volume %q: %v", volumeID, err)
+			klog.Warningf("Error looking for nvme volume %q: %v", volumeID, err)
 		} else if nvmePath != "" {
+			if partition != "" {
+				nvmePath = nvmePath + nvmeDiskPartitionSuffix + partition
+			}
 			devicePaths = append(devicePaths, nvmePath)
 		}
 	}
@@ -244,11 +251,11 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 	return devicePaths
 }
 
-// Return cloud provider
+// Returns cloud provider
 func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error) {
 	awsCloudProvider, ok := cloudProvider.(*aws.Cloud)
 	if !ok || awsCloudProvider == nil {
-		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get AWS Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return awsCloudProvider, nil
@@ -284,4 +291,51 @@ func findNvmeVolume(findName string) (device string, err error) {
 	}
 
 	return resolved, nil
+}
+
+func formatVolumeID(volumeID string) (string, error) {
+	// This is a workaround to fix the issue in converting aws volume id from globalPDPath and globalMapPath
+	// There are three formats for AWSEBSVolumeSource.VolumeID and they are stored on disk in paths like so:
+	// VolumeID									mountPath								mapPath
+	// aws:///vol-1234					aws/vol-1234						aws:/vol-1234
+	// aws://us-east-1/vol-1234 aws/us-east-1/vol-1234  aws:/us-east-1/vol-1234
+	// vol-1234									vol-1234								vol-1234
+	// This code is for converting volume ids from paths back to AWS style VolumeIDs
+	sourceName := volumeID
+	if strings.HasPrefix(volumeID, "aws/") || strings.HasPrefix(volumeID, "aws:/") {
+		names := strings.Split(volumeID, "/")
+		length := len(names)
+		if length < 2 || length > 3 {
+			return "", fmt.Errorf("invalid volume name format %q", volumeID)
+		}
+		volName := names[length-1]
+		if !strings.HasPrefix(volName, "vol-") {
+			return "", fmt.Errorf("invalid volume name format for AWS volume (%q)", volName)
+		}
+		if length == 2 {
+			sourceName = awsURLNamePrefix + "" + "/" + volName // empty zone label
+		}
+		if length == 3 {
+			sourceName = awsURLNamePrefix + names[1] + "/" + volName // names[1] is the zone label
+		}
+		klog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
+	}
+	return sourceName, nil
+}
+
+func newAWSVolumeSpec(volumeName, volumeID string, mode v1.PersistentVolumeMode) *volume.Spec {
+	awsVolume := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: volumeID,
+				},
+			},
+			VolumeMode: &mode,
+		},
+	}
+	return volume.NewSpecFromPersistentVolume(awsVolume, false)
 }

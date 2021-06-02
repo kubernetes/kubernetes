@@ -14,20 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script builds protoc-gen-gogo binary in runtime and genertates 
+# `*/api.pb.go` from the protobuf file `*/api.proto`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
+
+runtime_versions=("v1alpha2" "v1")
 
 kube::golang::setup_env
 
-BINS=(
-	vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
-)
-make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
 if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
@@ -40,24 +42,34 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 function cleanup {
-	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak"
-	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp"
+	for v in "${runtime_versions[@]}"; do
+		rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${v}/api.pb.go.bak"
+		rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${v}/api.pb.go.tmp"
+	done
 }
 
 trap cleanup EXIT
 
 gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
+PATH="${gogopath}:${PATH}"
 
-PATH="${gogopath}:${PATH}" \
-  protoc \
-  --proto_path="${KUBE_REMOTE_RUNTIME_ROOT}" \
-  --proto_path="${KUBE_ROOT}/vendor" \
-  --gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_ROOT}" "${KUBE_REMOTE_RUNTIME_ROOT}/api.proto"
+function generate_code() {
+	RUNTIME_API_VERSION="$1"
+	KUBE_REMOTE_RUNTIME_PATH="${KUBE_REMOTE_RUNTIME_ROOT}/${RUNTIME_API_VERSION}"
+	protoc \
+	--proto_path="${KUBE_REMOTE_RUNTIME_PATH}" \
+	--proto_path="${KUBE_ROOT}/vendor" \
+	--gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_PATH}" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
 
-# Update boilerplate for the generated file.
-cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp"
-mv "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.tmp" "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go"
+	# Update boilerplate for the generated file.
+	cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go.tmp"
+	mv "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go.tmp" "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go"
 
-# Run gofmt to clean up the generated code.
-kube::golang::verify_go_version
-gofmt -l -s -w "${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go"
+	# Run gofmt to clean up the generated code.
+	kube::golang::verify_go_version
+	gofmt -l -s -w "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go"
+}
+
+for v in "${runtime_versions[@]}"; do
+	generate_code "${v}"
+done

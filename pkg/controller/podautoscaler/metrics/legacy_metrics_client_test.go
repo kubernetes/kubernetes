@@ -17,13 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,11 +41,11 @@ import (
 
 var fixedTimestamp = time.Date(2015, time.November, 10, 12, 30, 0, 0, time.UTC)
 
-func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
+func (w fakeResponseWrapper) DoRaw(context.Context) ([]byte, error) {
 	return w.raw, nil
 }
 
-func (w fakeResponseWrapper) Stream() (io.ReadCloser, error) {
+func (w fakeResponseWrapper) Stream(context.Context) (io.ReadCloser, error) {
 	return nil, nil
 }
 
@@ -221,7 +222,7 @@ func (tc *testCase) runTest(t *testing.T) {
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector, "")
 		tc.verifyResults(t, info, timestamp, err)
 	} else {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector, tc.metricSelector)

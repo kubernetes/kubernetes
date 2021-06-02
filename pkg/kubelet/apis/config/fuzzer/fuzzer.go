@@ -24,11 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.
@@ -37,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
 		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
+			obj.EnableServer = true
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false
 			obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
@@ -58,14 +59,19 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
+			obj.KernelMemcgNotification = false
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
+			obj.MemoryManagerPolicy = v1beta1.NoneMemoryManagerPolicy
 			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
+			obj.NodeStatusMaxImages = 50
+			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
+			obj.TopologyManagerScope = kubeletconfig.ContainerTopologyManagerScope
 			obj.QOSReserved = map[string]string{
 				"memory": "50%",
 			}
@@ -94,6 +100,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
+			obj.AllowedUnsafeSysctls = []string{}
+			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
+			if obj.Logging.Format == "" {
+				obj.Logging.Format = "text"
+			}
+			obj.EnableSystemLogHandler = true
 		},
 	}
 }

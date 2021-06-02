@@ -21,17 +21,21 @@ import (
 	"strings"
 	"testing"
 
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	apiserverstorage "k8s.io/apiserver/pkg/storage"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface, *storagebackend.Config) {
+func newStorage(t *testing.T) (*Etcd, *etcd3testing.EtcdTestServer, allocator.Interface, *storagebackend.Config) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
-	etcd := NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
+	etcd, err := NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
+	if err != nil {
+		t.Fatalf("unexpected error creating etcd: %v", err)
+	}
 	return etcd, server, mem, etcdStorage
 }
 
@@ -77,7 +81,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.storage.Get(context.TODO(), key(), "", allocation, false); err != nil {
+	if err := storage.storage.Get(context.TODO(), key(), apiserverstorage.GetOptions{}, allocation); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.Range != "rangeSpecValue" {
@@ -91,8 +95,67 @@ func TestStore(t *testing.T) {
 	}
 
 	other = allocator.NewAllocationMap(100, "rangeSpecValue")
-	otherStorage := NewEtcd(other, "/ranges/serviceips", api.Resource("serviceipallocations"), config)
+	otherStorage, err := NewEtcd(other, "/ranges/serviceips", api.Resource("serviceipallocations"), config)
+	if err != nil {
+		t.Fatalf("unexpected error creating etcd: %v", err)
+	}
 	if ok, err := otherStorage.Allocate(2); ok || err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Test that one item is allocated in storage but is not allocated locally
+// When try to allocate it, it should fail despite it's free in the local bitmap
+// bot not in the storage
+func TestAllocatedStorageButReleasedLocally(t *testing.T) {
+	storage, server, backing, _ := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allocate an item in the storage
+	if _, err := storage.Allocate(2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Release the item in the local bitmap
+	// emulating it's out of sync with the storage
+	err := backing.Release(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// It should fail trying to allocate it deespite it's free
+	// in the local bitmap because it's not in the storage
+	ok, err := storage.Allocate(2)
+	if ok || err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+// Test that one item is free in storage but is  allocated locally
+// When try to allocate it, it should succeed despite it's allocated
+// in the local bitmap bot not in the storage
+func TestAllocatedLocallyButReleasedStorage(t *testing.T) {
+	storage, server, backing, _ := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allocate an item in the local bitmap only but not in the storage
+	// emulating it's out of sync with the storage
+	if _, err := backing.Allocate(2); err != nil {
+		t.Fatal(err)
+	}
+
+	// It should be able to allocate it
+	// because it's free in the storage
+	ok, err := storage.Allocate(2)
+	if !ok || err != nil {
+		t.Fatal(err)
+	}
+
 }

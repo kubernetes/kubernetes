@@ -44,5 +44,25 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				np.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeIngress}
 			}
 		},
+		func(path *networking.HTTPIngressPath, c fuzz.Continue) {
+			c.FuzzNoCustom(path) // fuzz self without calling this function again
+			pathTypes := []networking.PathType{networking.PathTypeExact, networking.PathTypePrefix, networking.PathTypeImplementationSpecific}
+			path.PathType = &pathTypes[c.Rand.Intn(len(pathTypes))]
+		},
+		func(p *networking.ServiceBackendPort, c fuzz.Continue) {
+			c.FuzzNoCustom(p)
+			// clear one of the fields
+			if c.RandBool() {
+				p.Name = ""
+				if p.Number == 0 {
+					p.Number = 1
+				}
+			} else {
+				p.Number = 0
+				if p.Name == "" {
+					p.Name = "portname"
+				}
+			}
+		},
 	}
 }

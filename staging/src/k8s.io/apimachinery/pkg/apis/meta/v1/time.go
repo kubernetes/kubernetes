@@ -19,8 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"time"
-
-	fuzz "github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -153,6 +151,16 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
+// ToUnstructured implements the value.UnstructuredConverter interface.
+func (t Time) ToUnstructured() interface{} {
+	if t.IsZero() {
+		return nil
+	}
+	buf := make([]byte, 0, len(time.RFC3339))
+	buf = t.UTC().AppendFormat(buf, time.RFC3339)
+	return string(buf)
+}
+
 // OpenAPISchemaType is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
 //
@@ -172,16 +180,3 @@ func (t Time) MarshalQueryParameter() (string, error) {
 
 	return t.UTC().Format(time.RFC3339), nil
 }
-
-// Fuzz satisfies fuzz.Interface.
-func (t *Time) Fuzz(c fuzz.Continue) {
-	if t == nil {
-		return
-	}
-	// Allow for about 1000 years of randomness.  Leave off nanoseconds
-	// because JSON doesn't represent them so they can't round-trip
-	// properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 0)
-}
-
-var _ fuzz.Interface = &Time{}

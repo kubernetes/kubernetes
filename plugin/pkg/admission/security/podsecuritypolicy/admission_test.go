@@ -17,6 +17,7 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -83,7 +84,7 @@ type TestAuthorizer struct {
 	allowedAPIGroupName string
 }
 
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	if t.usernameToNamespaceToAllowedPSPs == nil {
 		return authorizer.DecisionAllow, "", nil
 	}
@@ -479,7 +480,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 	pod := &v1.Pod{}
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-	err := plugin.Admit(attrs, nil)
+	err := plugin.Admit(context.TODO(), attrs, nil)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail mutating admission")
 	}
@@ -487,7 +488,7 @@ func TestFailClosedOnInvalidPod(t *testing.T) {
 		t.Errorf("expected type error on Admit but got: %v", err)
 	}
 
-	err = plugin.Validate(attrs, nil)
+	err = plugin.Validate(context.TODO(), attrs, nil)
 	if err == nil {
 		t.Fatalf("expected versioned pod object to fail validating admission")
 	}
@@ -629,6 +630,7 @@ func TestAdmitCaps(t *testing.T) {
 
 func TestAdmitVolumes(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(kapi.VolumeSource{})
 
@@ -1114,16 +1116,16 @@ func TestAdmitAppArmor(t *testing.T) {
 	unconstrainedPSP := restrictivePSP()
 	defaultedPSP := restrictivePSP()
 	defaultedPSP.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaDefaultProfileAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	appArmorPSP := restrictivePSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	appArmorDefaultPSP := restrictivePSP()
 	appArmorDefaultPSP.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + "," + v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 
 	tests := map[string]struct {
@@ -1141,18 +1143,18 @@ func TestAdmitAppArmor(t *testing.T) {
 			expectedProfile:    "",
 		},
 		"unconstrained with profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileRuntimeDefault),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileRuntimeDefault),
 			psp:                unconstrainedPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"unconstrained with default profile": {
 			pod:                goodPod(),
 			psp:                defaultedPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"AppArmor enforced with no profile": {
 			pod:                goodPod(),
@@ -1165,17 +1167,17 @@ func TestAdmitAppArmor(t *testing.T) {
 			psp:                appArmorDefaultPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"AppArmor enforced with good profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "foo"),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileNamePrefix + "foo"),
 			psp:                appArmorDefaultPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileNamePrefix + "foo",
+			expectedProfile:    v1.AppArmorBetaProfileNamePrefix + "foo",
 		},
 		"AppArmor enforced with local profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "bar"),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileNamePrefix + "bar"),
 			psp:                appArmorPSP,
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
@@ -1785,7 +1787,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, nil, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
-	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(attrs, nil)
+	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(context.TODO(), attrs, nil)
 
 	if shouldPassAdmit && err != nil {
 		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)
@@ -1813,7 +1815,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 		t.Errorf("%s: expected errors on Admit but received none", testCaseName)
 	}
 
-	err = plugin.Validate(attrs, nil)
+	err = plugin.Validate(context.TODO(), attrs, nil)
 	psp := ""
 	if shouldPassAdmit && op == kadmission.Create {
 		psp = expectedPSP
@@ -2248,7 +2250,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{Name: userName})
 
-			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
+			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(context.Background(), attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
@@ -2341,7 +2343,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &metav1.UpdateOptions{}, false, &user.DefaultInfo{Name: "test"})
 
-			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
+			_, pspName, validationErrs, err := plugin.computeSecurityContext(context.Background(), attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
 			assert.Equal(t, tc.expectedPSP, pspName)

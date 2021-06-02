@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,13 +40,17 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // This file contains the controller base functionality, i.e. framework to
@@ -66,6 +72,7 @@ type ControllerParameters struct {
 	NodeInformer              coreinformers.NodeInformer
 	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
+	FilteredDialOptions       *proxyutil.FilteredDialOptions
 }
 
 // NewController creates a new PersistentVolume controller
@@ -73,7 +80,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
-		broadcaster.StartLogging(klog.Infof)
+		broadcaster.StartStructuredLogging(0)
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: p.KubeClient.CoreV1().Events("")})
 		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
@@ -97,7 +104,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	// Prober is nil because PV is not aware of Flexvolume.
 	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, controller); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
 	p.VolumeInformer.Informer().AddEventHandler(
@@ -123,9 +130,23 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	controller.podLister = p.PodInformer.Lister()
+	controller.podIndexer = p.PodInformer.Informer().GetIndexer()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	controller.NodeLister = p.NodeInformer.Lister()
 	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+
+	// This custom indexer will index pods by its PVC keys. Then we don't need
+	// to iterate all pods every time to find pods which reference given PVC.
+	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
+	}
+
+	csiTranslator := csitrans.New()
+	controller.translator = csiTranslator
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+
+	controller.filteredDialOptions = p.FilteredDialOptions
+
 	return controller, nil
 }
 
@@ -208,8 +229,11 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 
 // deleteVolume runs in worker thread and handles "volume deleted" event.
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
-	_ = ctrl.volumes.store.Delete(volume)
-	klog.V(4).Infof("volume %q deleted", volume.Name)
+	if err := ctrl.volumes.store.Delete(volume); err != nil {
+		klog.Errorf("volume %q deletion encountered : %v", volume.Name, err)
+	} else {
+		klog.V(4).Infof("volume %q deleted", volume.Name)
+	}
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
 	// end of timestamp cache entry lifecycle, "RecordMetric" will do the clean
@@ -253,7 +277,9 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 // Unit test [5-5] [5-6] [5-7]
 // deleteClaim runs in worker thread and handles "claim deleted" event.
 func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeClaim) {
-	_ = ctrl.claims.Delete(claim)
+	if err := ctrl.claims.Delete(claim); err != nil {
+		klog.Errorf("claim %q deletion encountered : %v", claim.Name, err)
+	}
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
 	// clean any possible unfinished provision start timestamp from cache
@@ -282,7 +308,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting persistent volume controller")
 	defer klog.Infof("Shutting down persistent volume controller")
 
-	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 
@@ -292,9 +318,92 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
 
-	metrics.Register(ctrl.volumes.store, ctrl.claims)
+	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
 	<-stopCh
+}
+
+func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	// TODO: update[Claim|Volume]MigrationAnnotations can be optimized to not
+	// copy the claim/volume if no modifications are required. Though this
+	// requires some refactoring as well as an interesting change in the
+	// semantics of the function which may be undesirable. If no copy is made
+	// when no modifications are required this function could sometimes return a
+	// copy of the volume and sometimes return a ref to the original
+	claimClone := claim.DeepCopy()
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	if !modified {
+		return claimClone, nil
+	}
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	_, err = ctrl.storeClaimUpdate(newClaim)
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	return newClaim, nil
+}
+
+func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	volumeClone := volume.DeepCopy()
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, pvutil.AnnDynamicallyProvisioned)
+	if !modified {
+		return volumeClone, nil
+	}
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	_, err = ctrl.storeVolumeUpdate(newVol)
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	return newVol, nil
+
+}
+
+// updateMigrationAnnotations takes an Annotations map and checks for a
+// provisioner name using the provisionerKey. It will then add a
+// "pv.kubernetes.io/migrated-to" annotation if migration with the CSI
+// driver name for that provisioner is "on" based on feature flags, it will also
+// remove the annotation is migration is "off" for that provisioner in rollback
+// scenarios. Returns true if the annotations map was modified and false otherwise.
+func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, provisionerKey string) bool {
+	var csiDriverName string
+	var err error
+
+	if ann == nil {
+		// No annotations so we can't get the provisioner and don't know whether
+		// this is migrated - no change
+		return false
+	}
+	provisioner, ok := ann[provisionerKey]
+	if !ok {
+		// Volume not dynamically provisioned. Ignore
+		return false
+	}
+
+	migratedToDriver := ann[pvutil.AnnMigratedTo]
+	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
+		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
+		if err != nil {
+			klog.Errorf("Could not update volume migration annotations. Migration enabled for plugin %s but could not find corresponding driver name: %v", provisioner, err)
+			return false
+		}
+		if migratedToDriver != csiDriverName {
+			ann[pvutil.AnnMigratedTo] = csiDriverName
+			return true
+		}
+	} else {
+		if migratedToDriver != "" {
+			// Migration annotation exists but the driver isn't migrated currently
+			delete(ann, pvutil.AnnMigratedTo)
+			return true
+		}
+	}
+	return false
 }
 
 // volumeWorker processes items from volumeQueue. It must run only once,
@@ -449,7 +558,8 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
 	}
@@ -485,11 +595,11 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bool, error) {
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
-		return false, fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return false, fmt.Errorf("couldn't get key for object %+v: %w", obj, err)
 	}
 	oldObj, found, err := store.Get(obj)
 	if err != nil {
-		return false, fmt.Errorf("Error finding %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error finding %s %q in controller cache: %w", className, objName, err)
 	}
 
 	objAccessor, err := meta.Accessor(obj)
@@ -501,7 +611,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 		// This is a new object
 		klog.V(4).Infof("storeObjectUpdate: adding %s %q, version %s", className, objName, objAccessor.GetResourceVersion())
 		if err = store.Add(obj); err != nil {
-			return false, fmt.Errorf("Error adding %s %q to controller cache: %v", className, objName, err)
+			return false, fmt.Errorf("error adding %s %q to controller cache: %w", className, objName, err)
 		}
 		return true, nil
 	}
@@ -513,11 +623,11 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
 	}
 	oldObjResourceVersion, err := strconv.ParseInt(oldObjAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
 	}
 
 	// Throw away only older version, let the same version pass - we do want to
@@ -529,7 +639,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	klog.V(4).Infof("storeObjectUpdate updating %s %q with version %s", className, objName, objAccessor.GetResourceVersion())
 	if err = store.Update(obj); err != nil {
-		return false, fmt.Errorf("Error updating %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error updating %s %q in controller cache: %w", className, objName, err)
 	}
 	return true, nil
 }

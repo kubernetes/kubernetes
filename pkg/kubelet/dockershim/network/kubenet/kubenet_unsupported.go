@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!dockerless
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -30,7 +30,7 @@ type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 }
 
-func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
+func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	return &kubenetNetworkPlugin{}
 }
 

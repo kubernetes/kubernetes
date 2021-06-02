@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit/validation"
 	"k8s.io/apiserver/pkg/audit"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -73,8 +73,13 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	}
 
 	// Ensure the policy file contained an apiVersion and kind.
-	if !apiGroupVersionSet[schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}] {
+	gv := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+	if !apiGroupVersionSet[gv] {
 		return nil, fmt.Errorf("unknown group version field %v in policy", gvk)
+	}
+
+	if gv != auditv1.SchemeGroupVersion {
+		klog.Warningf("%q is deprecated and will be removed in a future release, use %q instead", gv, auditv1.SchemeGroupVersion)
 	}
 
 	if err := validation.ValidatePolicy(policy); err != nil {
@@ -85,6 +90,7 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	if policyCnt == 0 {
 		return nil, fmt.Errorf("loaded illegal policy with 0 rules")
 	}
-	klog.V(4).Infof("Loaded %d audit policy rules", policyCnt)
+
+	klog.V(4).InfoS("Load audit policy rules success", "policyCnt", policyCnt)
 	return policy, nil
 }

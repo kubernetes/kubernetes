@@ -86,17 +86,18 @@ func TestConstantMaps(t *testing.T) {
 		if strings.HasPrefix(declName, "VersionTLS") {
 			discoveredVersions[declName] = true
 		}
-		if strings.HasPrefix(declName, "TLS_RSA_") || strings.HasPrefix(declName, "TLS_ECDHE_") {
+		if strings.HasPrefix(declName, "TLS_") && !strings.HasPrefix(declName, "TLS_FALLBACK_") {
 			discoveredCiphers[declName] = true
 		}
 	}
 
+	acceptedCiphers := allCiphers()
 	for k := range discoveredCiphers {
-		if _, ok := ciphers[k]; !ok {
+		if _, ok := acceptedCiphers[k]; !ok {
 			t.Errorf("discovered cipher tls.%s not in ciphers map", k)
 		}
 	}
-	for k := range ciphers {
+	for k := range acceptedCiphers {
 		if _, ok := discoveredCiphers[k]; !ok {
 			t.Errorf("ciphers map has %s not in tls package", k)
 		}

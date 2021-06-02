@@ -55,19 +55,24 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,Event
 
+// DEPRECATED - This group version of Event is deprecated by audit.k8s.io/v1/Event. See the release notes for
+// more information.
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
@@ -144,6 +149,9 @@ type Event struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,EventList
 
 // EventList is a list of audit Events.
 type EventList struct {
@@ -155,7 +163,12 @@ type EventList struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,Policy
 
+// DEPRECATED - This group version of Policy is deprecated by audit.k8s.io/v1/Policy. See the release notes for
+// more information.
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
@@ -177,6 +190,9 @@ type Policy struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:replacement=audit.k8s.io,v1,PolicyList
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {

@@ -20,18 +20,18 @@ import (
 	"os"
 	"testing"
 
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // e2eService manages e2e services in current process.
 type e2eServices struct {
 	rmDirs []string
 	// statically linked e2e services
-	etcdServer   *etcdtesting.EtcdTestServer
+	etcdServer   *etcd3testing.EtcdTestServer
 	etcdStorage  *storagebackend.Config
 	apiServer    *APIServer
 	nsController *NamespaceController
@@ -110,7 +110,7 @@ func (es *e2eServices) stop(t *testing.T) {
 // startEtcd starts the embedded etcd instance or returns an error.
 func (es *e2eServices) startEtcd(t *testing.T) error {
 	klog.Info("Starting etcd")
-	server, etcdStorage := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	es.etcdServer = server
 	es.etcdStorage = etcdStorage
 	return nil

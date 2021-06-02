@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"k8s.io/klog"
+	"go.etcd.io/etcd/clientv3"
+	"k8s.io/klog/v2"
 )
 
 const (

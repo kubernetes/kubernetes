@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/debian-base:v1.0.0
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 USER 1234

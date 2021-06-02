@@ -26,43 +26,81 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
+	ingressclassstore "k8s.io/kubernetes/pkg/registry/networking/ingressclass/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
 type RESTStorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(networking.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
 	if apiResourceConfigSource.VersionEnabled(networkingapiv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
 	if apiResourceConfigSource.VersionEnabled(networkingapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1beta1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
-	return apiGroupInfo, true
+	return apiGroupInfo, true, nil
 }
 
-func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// networkpolicies
-	networkPolicyStorage := networkpolicystore.NewREST(restOptionsGetter)
+	networkPolicyStorage, err := networkpolicystore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
 	storage["networkpolicies"] = networkPolicyStorage
 
-	return storage
-}
-
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
 	// ingresses
-	ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
+	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
 	storage["ingresses"] = ingressStorage
 	storage["ingresses/status"] = ingressStatusStorage
-	return storage
+
+	// ingressclasses
+	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingressclasses"] = ingressClassStorage
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+	// ingresses
+	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingresses"] = ingressStorage
+	storage["ingresses/status"] = ingressStatusStorage
+
+	// ingressclasses
+	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingressclasses"] = ingressClassStorage
+
+	return storage, nil
 }
 
 func (p RESTStorageProvider) GroupName() string {

@@ -30,7 +30,7 @@ import (
 func TestPodResourceLimitsDefaulting(t *testing.T) {
 	tk := newTestKubelet(t, true)
 	defer tk.Cleanup()
-	tk.kubelet.nodeInfo = &testNodeInfo{
+	tk.kubelet.nodeLister = &testNodeLister{
 		nodes: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{

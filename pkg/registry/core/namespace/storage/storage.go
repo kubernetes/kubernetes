@@ -23,8 +23,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -32,13 +32,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rest implements a RESTStorage for namespaces
@@ -58,7 +57,7 @@ type FinalizeREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
 		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
@@ -68,6 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
+		ResetFieldsStrategy: namespace.Strategy,
 		ReturnDeletedObject: true,
 
 		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
@@ -76,16 +76,18 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = namespace.StatusStrategy
+	statusStore.ResetFieldsStrategy = namespace.StatusStrategy
 
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
+	finalizeStore.ResetFieldsStrategy = namespace.FinalizeStrategy
 
-	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
+	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -118,10 +120,6 @@ func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 
 func (r *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return r.store.Watch(ctx, options)
-}
-
-func (r *REST) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	return r.store.Export(ctx, name, opts)
 }
 
 // Delete enforces life-cycle rules for namespace termination
@@ -178,7 +176,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
 				}
-				if err := deleteValidation(existingNamespace); err != nil {
+				if err := deleteValidation(ctx, existingNamespace); err != nil {
 					return nil, err
 				}
 				// Set the deletion timestamp if needed
@@ -222,6 +220,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 				return existingNamespace, nil
 			}),
 			dryrun.IsDryRun(options.DryRun),
+			nil,
 		)
 
 		if err != nil {
@@ -238,8 +237,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
-		return nil, false, err
+		return namespace, false, nil
 	}
 	return r.store.Delete(ctx, name, deleteValidation, options)
 }
@@ -255,7 +253,9 @@ func ShouldDeleteNamespaceDuringUpdate(ctx context.Context, key string, obj, exi
 }
 
 func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {
+	//lint:ignore SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
+		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents
 	}
 	if options.PropagationPolicy != nil {
@@ -265,7 +265,9 @@ func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalize
 }
 
 func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
+	//lint:ignore SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
+		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents == false
 	}
 	if options.PropagationPolicy != nil {
@@ -274,7 +276,7 @@ func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDele
 	return haveDeleteDependentsFinalizer
 }
 
-func (e *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (e *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return e.store.ConvertToTable(ctx, object, tableOptions)
 }
 
@@ -292,6 +294,10 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 	return r.store.StorageVersion()
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -308,6 +314,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -317,4 +327,9 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *FinalizeREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

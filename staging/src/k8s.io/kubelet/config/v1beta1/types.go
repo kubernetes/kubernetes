@@ -17,8 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -54,6 +55,31 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy = "restricted"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy = "best-effort"
+	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
+	// of NUMA alignment of a pod's CPU and device resources.
+	NoneTopologyManagerPolicy = "none"
+	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNumaNodeTopologyManagerPolicy = "single-numa-node"
+	// ContainerTopologyManagerScope represents that
+	// topology policy is applied on a per-container basis.
+	ContainerTopologyManagerScope = "container"
+	// PodTopologyManagerScope represents that
+	// topology policy is applied on a per-pod basis.
+	PodTopologyManagerScope = "pod"
+	// NoneMemoryManagerPolicy is a memory manager none policy, under the none policy
+	// the memory manager will not pin containers memory of guaranteed pods
+	NoneMemoryManagerPolicy = "None"
+	// StaticMemoryManagerPolicy is a memory manager static policy, under the static policy
+	// the memory manager will try to pin containers memory of guaranteed pods to the smallest
+	// possible sub-set of NUMA nodes
+	StaticMemoryManagerPolicy = "Static"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -62,6 +88,12 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// enableServer enables Kubelet's secured server.
+	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: true
+	EnableServer *bool `json:"enableServer,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -159,8 +191,7 @@ type KubeletConfiguration struct {
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
 	// rotateCertificates enables client certificate rotation. The Kubelet will request a
 	// new certificate from the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletClientCertificate feature
-	// must be enabled.
+	// certificate signing requests.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// disabling it may disrupt the Kubelet's ability to authenticate with the API server
 	// after the current certificate expires.
@@ -309,15 +340,15 @@ type KubeletConfiguration struct {
 	// status to master if node status does not change. Kubelet will ignore this
 	// frequency and post node status immediately if any change is detected. It is
 	// only used when node lease feature is enabled. nodeStatusReportFrequency's
-	// default value is 1m. But if nodeStatusUpdateFrequency is set explicitly,
+	// default value is 5m. But if nodeStatusUpdateFrequency is set explicitly,
 	// nodeStatusReportFrequency's default value will be set to
 	// nodeStatusUpdateFrequency for backward compatibility.
-	// Default: "1m"
+	// Default: "5m"
 	// +optional
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
 	// when the NodeLease feature is enabled. This feature provides an indicator of node
-	// health by having the Kublet create and periodically renew a lease, named after the node,
+	// health by having the Kubelet create and periodically renew a lease, named after the node,
 	// in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy.
 	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval
 	// may be set based on the lease duration.
@@ -399,7 +430,7 @@ type KubeletConfiguration struct {
 	// Requires the CPUManager feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
 	// reboot. It is safest to keep this value the same as the local config.
-	// Default: "none"
+	// Default: "None"
 	// +optional
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
 	// CPU Manager reconciliation period.
@@ -409,6 +440,26 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
+	// MemoryManagerPolicy is the name of the policy to use by memory manager.
+	// Requires the MemoryManager feature gate to be enabled.
+	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
+	// reboot. It is safest to keep this value the same as the local config.
+	// Default: "none"
+	// +optional
+	MemoryManagerPolicy string `json:"memoryManagerPolicy,omitempty"`
+	// TopologyManagerPolicy is the name of the policy to use.
+	// Policies other than "none" require the TopologyManager feature gate to be enabled.
+	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
+	// reboot. It is safest to keep this value the same as the local config.
+	// Default: "none"
+	// +optional
+	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
+	// TopologyManagerScope represents the scope of topology hint generation
+	// that topology manager requests and hint providers generate.
+	// "pod" scope requires the TopologyManager feature gate to be enabled.
+	// Default: "container"
+	// +optional
+	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
 	// qosReserved is a set of resource name to percentage pairs that specify
 	// the minimum percentage of a resource reserved for exclusive use by the
 	// guaranteed QoS tier.
@@ -457,7 +508,6 @@ type KubeletConfiguration struct {
 	// +optional
 	PodCIDR string `json:"podCIDR,omitempty"`
 	// PodPidsLimit is the maximum number of pids in any pod.
-	// Requires the SupportPodPidsLimit feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// lowering it may prevent container processes from forking after the change.
 	// Default: -1
@@ -471,6 +521,11 @@ type KubeletConfiguration struct {
 	// Default: "/etc/resolv.conf"
 	// +optional
 	ResolverConfig string `json:"resolvConf,omitempty"`
+	// RunOnce causes the Kubelet to check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	// Default: false
+	// +optional
+	RunOnce bool `json:"runOnce,omitempty"`
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -485,6 +540,13 @@ type KubeletConfiguration struct {
 	// Default: "100ms"
 	// +optional
 	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// Note: If -1 is specified, no cap will be applied. If 0 is specified, no image is returned.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// different values can be reported on node status.
+	// Default: 50
+	// +optional
+	NodeStatusMaxImages *int32 `json:"nodeStatusMaxImages,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may impact the ability of the Kubelet to interact with the node's filesystem.
@@ -691,6 +753,18 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	KubeReserved map[string]string `json:"kubeReserved,omitempty"`
+	// This ReservedSystemCPUs option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	// Default: ""
+	// +optional
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
@@ -718,6 +792,78 @@ type KubeletConfiguration struct {
 	// Default: ["pods"]
 	// +optional
 	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
+	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
+	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// Default: []
+	// +optional
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that changing
+	// the volumePluginDir may disrupt workloads relying on third party volume plugins.
+	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	// +optional
+	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with cloud providers.
+	// Default: ""
+	// +optional
+	ProviderID string `json:"providerID,omitempty"`
+	// kernelMemcgNotification, if set, the kubelet will integrate with the kernel memcg notification
+	// to determine if memory eviction thresholds are crossed rather than polling.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the way Kubelet interacts with the kernel.
+	// Default: false
+	// +optional
+	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
+	// Logging specifies the options of logging.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	// Defaults:
+	//   Format: text
+	// + optional
+	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	// enableSystemLogHandler enables system logs via web interface host:port/logs/
+	// Default: true
+	// +optional
+	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
+	// Default: "0s"
+	// +featureGate=GracefulNodeShutdown
+	// +optional
+	ShutdownGracePeriod metav1.Duration `json:"shutdownGracePeriod,omitempty"`
+	// ShutdownGracePeriodCriticalPods specifies the duration used to terminate critical pods during a node shutdown. This should be less than ShutdownGracePeriod.
+	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
+	// Default: "0s"
+	// +featureGate=GracefulNodeShutdown
+	// +optional
+	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
+	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
+	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
+	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
+	// the memory manager will assume that only 9Gi is available for allocation.
+	// You can specify a different amount of NUMA node and memory types.
+	// You can omit this parameter at all, but you should be aware that the amount of reserved memory from all NUMA nodes
+	// should be equal to the amount of memory specified by the node allocatable features(https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable).
+	// If at least one node allocatable parameter has a non-zero value, you will need to specify at least one NUMA node.
+	// Also, avoid specifying:
+	// 1. Duplicates, the same NUMA node, and memory type, but with a different value.
+	// 2. zero limits for any memory type.
+	// 3. NUMAs nodes IDs that do not exist under the machine.
+	// 4. memory types except for memory and hugepages-<size>
+	// Default: nil
+	// +optional
+	ReservedMemory []MemoryReservation `json:"reservedMemory,omitempty"`
+	// enableProfilingHandler enables profiling via web interface host:port/debug/pprof/
+	// Default: true
+	// +optional
+	EnableProfilingHandler *bool `json:"enableProfilingHandler,omitempty"`
+	// enableDebugFlagsHandler enables flags endpoint via web interface host:port/debug/flags/v
+	// Default: true
+	// +optional
+	EnableDebugFlagsHandler *bool `json:"enableDebugFlagsHandler,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -797,4 +943,10 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
+}
+
+// MemoryReservation specifies the memory reservation of different types for each NUMA node
+type MemoryReservation struct {
+	NumaNode int32           `json:"numaNode"`
+	Limits   v1.ResourceList `json:"limits"`
 }

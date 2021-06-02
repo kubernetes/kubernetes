@@ -113,7 +113,7 @@ type TmpfsOptions struct {
 	// TODO(stevvooe): There are several more tmpfs flags, specified in the
 	// daemon, that are accepted. Only the most basic are added for now.
 	//
-	// From docker/docker/pkg/mount/flags.go:
+	// From https://github.com/moby/sys/blob/mount/v0.1.1/mount/flags.go#L47-L56
 	//
 	// var validFlags = map[string]bool{
 	// 	"":          true,

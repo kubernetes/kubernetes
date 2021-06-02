@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 func TestCustomMetrics(t *testing.T) {

@@ -156,19 +156,15 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 `
 
 var checkImpl = `
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 `
 
 var clientsetInterfaceImplTemplate = `
 // $.GroupGoName$$.Version$ retrieves the $.GroupGoName$$.Version$Client
 func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
-}
-`
-
-var clientsetInterfaceDefaultVersionImpl = `
-// $.GroupGoName$ retrieves the $.GroupGoName$$.Version$Client
-func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
 	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
 }
 `

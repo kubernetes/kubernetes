@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,7 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
@@ -96,7 +97,7 @@ func NewController(
 	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
 	klog.V(4).Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 
@@ -273,7 +274,7 @@ func (c *Controller) syncHandler(key string) error {
 	deployment, err := c.deploymentsLister.Deployments(foo.Namespace).Get(deploymentName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(newDeployment(foo))
+		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(context.TODO(), newDeployment(foo), metav1.CreateOptions{})
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -284,7 +285,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// If the Deployment is not controlled by this Foo resource, we should log
-	// a warning to the event recorder and ret
+	// a warning to the event recorder and return error msg.
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
@@ -296,11 +297,11 @@ func (c *Controller) syncHandler(key string) error {
 	// should update the Deployment resource.
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
 		klog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(newDeployment(foo))
+		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(context.TODO(), newDeployment(foo), metav1.UpdateOptions{})
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
-	// attempt processing again later. THis could have been caused by a
+	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
 		return err
@@ -327,7 +328,7 @@ func (c *Controller) updateFooStatus(foo *samplev1alpha1.Foo, deployment *appsv1
 	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
-	_, err := c.sampleclientset.SamplecontrollerV1alpha1().Foos(foo.Namespace).Update(fooCopy)
+	_, err := c.sampleclientset.SamplecontrollerV1alpha1().Foos(foo.Namespace).Update(context.TODO(), fooCopy, metav1.UpdateOptions{})
 	return err
 }
 

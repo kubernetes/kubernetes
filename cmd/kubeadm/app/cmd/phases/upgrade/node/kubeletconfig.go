@@ -23,22 +23,20 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	kubeletConfigLongDesc = normalizer.LongDesc(`
+	kubeletConfigLongDesc = cmdutil.LongDesc(`
 		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the KuberneteVersion field in the kubeadm-config
-		ConfigMap to determine what the _desired_ kubelet version is, but the user can override this by using the
-		--kubelet-version parameter.
+		ConfigMap to determine what the _desired_ kubelet version is.
 		`)
 )
 
@@ -52,7 +50,6 @@ func NewKubeletConfigPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.DryRun,
 			options.KubeconfigPath,
-			options.KubeletVersion,
 		},
 	}
 	return phase
@@ -67,7 +64,6 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 
 		// otherwise, retrieve all the info required for kubelet config upgrade
 		cfg := data.Cfg()
-		client := data.Client()
 		dryRun := data.DryRun()
 
 		// Set up the kubelet directory to use. If dry-running, this will return a fake directory
@@ -76,24 +72,10 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return err
 		}
 
-		// Gets the target kubelet version.
-		// by default kubelet version is expected to be equal to ClusterConfiguration.KubernetesVersion, but
-		// users can specify a different kubelet version (this is a legacy of the original implementation
-		// of `kubeam upgrade node config` which we are preserving in order to don't break GA contract)
-		kubeletVersionStr := cfg.ClusterConfiguration.KubernetesVersion
-		if data.KubeletVersion() != "" && data.KubeletVersion() != kubeletVersionStr {
-			kubeletVersionStr = data.KubeletVersion()
-			fmt.Printf("[upgrade] Using kubelet config version %s, while kubernetes-version is %s\n", kubeletVersionStr, cfg.ClusterConfiguration.KubernetesVersion)
-		}
-
-		// Parse the desired kubelet version
-		kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-		if err != nil {
-			return err
-		}
-
 		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
-		if err := kubeletphase.DownloadConfig(client, kubeletVersion, kubeletDir); err != nil {
+
+		// Store the kubelet component configuration.
+		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
 			return err
 		}
 

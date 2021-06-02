@@ -18,6 +18,7 @@ package kubeletconfig
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"path/filepath"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilpanic "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/panic"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
@@ -98,7 +98,7 @@ func NewController(dynamicConfigDir string, transform TransformFunc) *Controller
 // or returns an error if no valid configuration could be produced. Bootstrap should be called synchronously before StartSync.
 // If the pre-existing local configuration should be used, Bootstrap returns a nil config.
 func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
-	utillog.Infof("starting controller")
+	klog.InfoS("Kubelet config controller starting controller")
 
 	// ensure the filesystem is initialized
 	if err := cc.initializeDynamicConfigDir(); err != nil {
@@ -148,7 +148,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	// or something else scary
 
 	// log the reason and error details for the failure to load the assigned config
-	utillog.Errorf(fmt.Sprintf("%s, error: %v", reason, err))
+	klog.ErrorS(err, "Kubelet config controller", "reason", reason)
 
 	// set status to indicate the failure with the assigned config
 	cc.configStatus.SetError(reason)
@@ -194,7 +194,7 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 
 	// status sync worker
 	statusSyncLoopFunc := utilpanic.HandlePanic(func() {
-		utillog.Infof("starting status sync loop")
+		klog.InfoS("Kubelet config controller starting status sync loop")
 		wait.JitterUntil(func() {
 			cc.configStatus.Sync(client, nodeName)
 		}, 10*time.Second, 0.2, true, wait.NeverStop)
@@ -204,7 +204,7 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 	if err != nil {
 		return fmt.Errorf(errFmt, err)
 	} else if assignedSource == nil {
-		utillog.Infof("local source is assigned, will not start remote config source informer")
+		klog.InfoS("Kubelet config controller local source is assigned, will not start remote config source informer")
 	} else {
 		cc.remoteConfigSourceInformer = assignedSource.Informer(client, cache.ResourceEventHandlerFuncs{
 			AddFunc:    cc.onAddRemoteConfigSourceEvent,
@@ -215,7 +215,7 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 	}
 	remoteConfigSourceInformerFunc := utilpanic.HandlePanic(func() {
 		if cc.remoteConfigSourceInformer != nil {
-			utillog.Infof("starting remote config source informer")
+			klog.InfoS("Kubelet config controller starting remote config source informer")
 			cc.remoteConfigSourceInformer.Run(wait.NeverStop)
 		}
 	})
@@ -223,12 +223,12 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 	cc.nodeInformer = newSharedNodeInformer(client, nodeName,
 		cc.onAddNodeEvent, cc.onUpdateNodeEvent, cc.onDeleteNodeEvent)
 	nodeInformerFunc := utilpanic.HandlePanic(func() {
-		utillog.Infof("starting Node informer")
+		klog.InfoS("Kubelet config controller starting Node informer")
 		cc.nodeInformer.Run(wait.NeverStop)
 	})
 	// config sync worker
 	configSyncLoopFunc := utilpanic.HandlePanic(func() {
-		utillog.Infof("starting Kubelet config sync loop")
+		klog.InfoS("Kubelet config controller starting Kubelet config sync loop")
 		wait.JitterUntil(func() {
 			cc.syncConfigSource(client, eventClient, nodeName)
 		}, 10*time.Second, 0.2, true, wait.NeverStop)
@@ -264,7 +264,7 @@ func (cc *Controller) loadConfig(source checkpoint.RemoteConfigSource) (*kubelet
 
 // initializeDynamicConfigDir makes sure that the storage layers for various controller components are set up correctly
 func (cc *Controller) initializeDynamicConfigDir() error {
-	utillog.Infof("ensuring filesystem is set up correctly")
+	klog.InfoS("Kubelet config controller ensuring filesystem is set up correctly")
 	// initializeDynamicConfigDir local checkpoint storage location
 	return cc.checkpointStore.Initialize()
 }
@@ -273,10 +273,10 @@ func (cc *Controller) initializeDynamicConfigDir() error {
 func (cc *Controller) checkTrial(duration time.Duration) {
 	// when the trial period is over, the assigned config becomes the last-known-good
 	if trial, err := cc.inTrial(duration); err != nil {
-		utillog.Errorf("failed to check trial period for assigned config, error: %v", err)
+		klog.ErrorS(err, "Kubelet config controller failed to check trial period for assigned config")
 	} else if !trial {
 		if err := cc.graduateAssignedToLastKnownGood(); err != nil {
-			utillog.Errorf("failed to set last-known-good to assigned config, error: %v", err)
+			klog.ErrorS(err, "failed to set last-known-good to assigned config")
 		}
 	}
 }
@@ -319,6 +319,6 @@ func (cc *Controller) graduateAssignedToLastKnownGood() error {
 	}
 	// update the status to reflect the new last-known-good config
 	cc.configStatus.SetLastKnownGood(assigned.NodeConfigSource())
-	utillog.Infof("updated last-known-good config to %s, UID: %s, ResourceVersion: %s", assigned.APIPath(), assigned.UID(), assigned.ResourceVersion())
+	klog.InfoS("Kubelet config controller updated last-known-good config to new checkpointStore", "apiPath", assigned.APIPath(), "checkpointUID", assigned.UID(), "resourceVersion", assigned.ResourceVersion())
 	return nil
 }

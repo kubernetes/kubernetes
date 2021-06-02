@@ -2,19 +2,20 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate/testing
   - k8s.io/kubernetes/pkg/apis/core
   - k8s.io/kubernetes/pkg/features
   - k8s.io/kubernetes/pkg/fieldpath
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
   - k8s.io/utils/pointer
+  - k8s.io/utils/net
   - k8s.io/klog
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.
   - k8s.io/kubernetes/pkg/apis/apps
   - k8s.io/kubernetes/pkg/api/legacyscheme
-  - k8s.io/kubernetes/pkg/api/testapi
   - k8s.io/api/apps/v1
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
@@ -44,7 +45,7 @@
 
 - baseImportPath: "./vendor/k8s.io/code-generator/"
   ignoredSubTrees:
-  - "./vendor/k8s.io/code-generator/_test"
+  - "./vendor/k8s.io/code-generator/examples"
   allowedImports:
   - k8s.io/gengo
   - k8s.io/code-generator
@@ -55,6 +56,8 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/component-base
+  - k8s.io/client-go
+  - k8s.io/client-go/tools/
   - k8s.io/klog
   - k8s.io/utils
 
@@ -123,6 +126,20 @@
   - k8s.io/klog
   - k8s.io/utils
 
+- baseImportPath: "./vendor/k8s.io/kubectl/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/cli-runtime
+  - k8s.io/client-go
+  - k8s.io/component-base
+  - k8s.io/component-helpers
+  - k8s.io/kubectl
+  - k8s.io/kube-openapi
+  - k8s.io/metrics
+  - k8s.io/utils
+  - k8s.io/klog
+
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
   allowedImports:
   - k8s.io/api
@@ -131,6 +148,7 @@
   - k8s.io/client-go
   - k8s.io/code-generator
   - k8s.io/component-base
+  - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
   - k8s.io/klog
 
@@ -164,7 +182,9 @@
 - baseImportPath: "./vendor/k8s.io/kube-controller-manager/"
   allowedImports:
   - k8s.io/apimachinery
+  - k8s.io/cloud-provider
   - k8s.io/component-base
+  - k8s.io/controller-manager
   - k8s.io/klog
   - k8s.io/utils
 
@@ -177,9 +197,11 @@
 
 - baseImportPath: "./vendor/k8s.io/kube-scheduler/"
   allowedImports:
+  - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/component-base
   - k8s.io/klog
+  - k8s.io/kube-scheduler
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kubelet/"
@@ -187,19 +209,25 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/klog
+  - k8s.io/component-base
+  - k8s.io/kubelet
 
 - baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/cluster-bootstrap
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/cloud-provider/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/cloud-provider
+  - k8s.io/component-base
+  - k8s.io/controller-manager
   - k8s.io/klog
   - k8s.io/utils
 
@@ -212,19 +240,34 @@
   - k8s.io/csi-translation-lib
   - k8s.io/klog
   - k8s.io/legacy-cloud-providers
+  - k8s.io/mount-utils
   - k8s.io/utils
-
-- baseImportPath: "./vendor/k8s.io/node-api/"
-  allowedImports:
-  - k8s.io/apimachinery
-  - k8s.io/client-go
-  - k8s.io/code-generator
-  - k8s.io/node-api
+  - k8s.io/apiserver/pkg/util/feature
+  - k8s.io/component-base/featuregate
+  - k8s.io/component-base/metrics
+  - k8s.io/component-base/metrics/legacyregistry
 
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/klog
-  - k8s.io/cloud-provider
   - k8s.io/csi-translation-lib
+
+- baseImportPath: "./vendor/k8s.io/component-helpers/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/component-helpers
+  - k8s.io/klog
+  - k8s.io/utils
+
+- baseImportPath: "./vendor/k8s.io/pod-security-admission/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/klog
+  - k8s.io/pod-security-admission
+  - k8s.io/utils

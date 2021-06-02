@@ -1,31 +1,33 @@
 [![Build Status](https://travis-ci.org/miekg/dns.svg?branch=master)](https://travis-ci.org/miekg/dns)
+[![Code Coverage](https://img.shields.io/codecov/c/github/miekg/dns/master.svg)](https://codecov.io/github/miekg/dns?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/miekg/dns)](https://goreportcard.com/report/miekg/dns)
+[![](https://godoc.org/github.com/miekg/dns?status.svg)](https://godoc.org/github.com/miekg/dns)
 
 # Alternative (more granular) approach to a DNS library
 
 > Less is more.
 
-Complete and usable DNS library. All widely used Resource Records are
-supported, including the DNSSEC types. It follows a lean and mean philosophy.
-If there is stuff you should know as a DNS programmer there isn't a convenience
-function for it. Server side and client side programming is supported, i.e. you
+Complete and usable DNS library. All Resource Records are supported, including the DNSSEC types.
+It follows a lean and mean philosophy. If there is stuff you should know as a DNS programmer there
+isn't a convenience function for it. Server side and client side programming is supported, i.e. you
 can build servers and resolvers with it.
 
-We try to keep the "master" branch as sane as possible and at the bleeding edge
-of standards, avoiding breaking changes wherever reasonable. We support the last
-two versions of Go, currently: 1.5 and 1.6.
+We try to keep the "master" branch as sane as possible and at the bleeding edge of standards,
+avoiding breaking changes wherever reasonable. We support the last two versions of Go.
 
 # Goals
 
 * KISS;
 * Fast;
-* Small API, if its easy to code in Go, don't make a function for it.
+* Small API. If it's easy to code in Go, don't make a function for it.
 
 # Users
 
 A not-so-up-to-date-list-that-may-be-actually-current:
 
-* https://cloudflare.com
+* https://github.com/coredns/coredns
 * https://github.com/abh/geodns
+* https://github.com/baidu/bfe
 * http://www.statdns.com/
 * http://www.dnsinspect.com/
 * https://github.com/chuangbo/jianbing-dictionary-dns
@@ -39,53 +41,68 @@ A not-so-up-to-date-list-that-may-be-actually-current:
 * https://github.com/StalkR/dns-reverse-proxy
 * https://github.com/tianon/rawdns
 * https://mesosphere.github.io/mesos-dns/
-* https://pulse.turbobytes.com/
-* https://play.google.com/store/apps/details?id=com.turbobytes.dig
 * https://github.com/fcambus/statzone
 * https://github.com/benschw/dns-clb-go
-* https://github.com/corny/dnscheck for http://public-dns.info/
-* https://namesmith.io
+* https://github.com/corny/dnscheck for <http://public-dns.info/>
 * https://github.com/miekg/unbound
 * https://github.com/miekg/exdns
 * https://dnslookup.org
 * https://github.com/looterz/grimd
 * https://github.com/phamhongviet/serf-dns
+* https://github.com/mehrdadrad/mylg
+* https://github.com/bamarni/dockness
+* https://github.com/fffaraz/microdns
+* https://github.com/ipdcode/hades <https://jd.com>
+* https://github.com/StackExchange/dnscontrol/
+* https://www.dnsperf.com/
+* https://dnssectest.net/
+* https://github.com/oif/apex
+* https://github.com/jedisct1/dnscrypt-proxy
+* https://github.com/jedisct1/rpdns
+* https://github.com/xor-gate/sshfp
+* https://github.com/rs/dnstrace
+* https://blitiri.com.ar/p/dnss ([github mirror](https://github.com/albertito/dnss))
+* https://render.com
+* https://github.com/peterzen/goresolver
+* https://github.com/folbricht/routedns
+* https://domainr.com/
+* https://zonedb.org/
+* https://router7.org/
+* https://github.com/fortio/dnsping
 
 Send pull request if you want to be listed here.
 
 # Features
 
-* UDP/TCP queries, IPv4 and IPv6;
-* RFC 1035 zone file parsing ($INCLUDE, $ORIGIN, $TTL and $GENERATE (for all record types) are supported;
-* Fast:
-    * Reply speed around ~ 80K qps (faster hardware results in more qps);
-    * Parsing RRs ~ 100K RR/s, that's 5M records in about 50 seconds;
-* Server side programming (mimicking the net/http package);
-* Client side programming;
-* DNSSEC: signing, validating and key generation for DSA, RSA and ECDSA;
-* EDNS0, NSID, Cookies;
-* AXFR/IXFR;
-* TSIG, SIG(0);
-* DNS over TLS: optional encrypted connection between client and server;
-* DNS name compression;
-* Depends only on the standard library.
+* UDP/TCP queries, IPv4 and IPv6
+* RFC 1035 zone file parsing ($INCLUDE, $ORIGIN, $TTL and $GENERATE (for all record types) are supported
+* Fast
+* Server side programming (mimicking the net/http package)
+* Client side programming
+* DNSSEC: signing, validating and key generation for DSA, RSA, ECDSA and Ed25519
+* EDNS0, NSID, Cookies
+* AXFR/IXFR
+* TSIG, SIG(0)
+* DNS over TLS (DoT): encrypted connection between client and server over TCP
+* DNS name compression
 
 Have fun!
 
 Miek Gieben  -  2010-2012  -  <miek@miek.nl>
+DNS Authors 2012-
 
 # Building
 
-Building is done with the `go` tool. If you have setup your GOPATH
-correctly, the following should work:
+This library uses Go modules and uses semantic versioning. Building is done with the `go` tool, so
+the following should work:
 
     go get github.com/miekg/dns
     go build github.com/miekg/dns
 
 ## Examples
 
-A short "how to use the API" is at the beginning of doc.go (this also will show
-when you call `godoc github.com/miekg/dns`).
+A short "how to use the API" is at the beginning of doc.go (this also will show when you call `godoc
+github.com/miekg/dns`).
 
 Example programs can be found in the `github.com/miekg/exdns` repository.
 
@@ -109,6 +126,7 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 2915 - NAPTR record
 * 2929 - DNS IANA Considerations
 * 3110 - RSASHA1 DNS keys
+* 3123 - APL record
 * 3225 - DO bit (DNSSEC OK)
 * 340{1,2,3} - NAPTR record
 * 3445 - Limiting the scope of (DNS)KEY
@@ -135,17 +153,22 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 6844 - CAA record
 * 6891 - EDNS0 update
 * 6895 - DNS IANA considerations
+* 6944 - DNSSEC DNSKEY Algorithm Status
 * 6975 - Algorithm Understanding in DNSSEC
 * 7043 - EUI48/EUI64 records
 * 7314 - DNS (EDNS) EXPIRE Option
+* 7477 - CSYNC RR
+* 7828 - edns-tcp-keepalive EDNS0 Option
 * 7553 - URI record
-* 7858 - DNS over TLS: Initiation and Performance Considerations (draft)
-* 7873 - Domain Name System (DNS) Cookies (draft-ietf-dnsop-cookies)
-* xxxx - EDNS0 DNS Update Lease (draft)
+* 7858 - DNS over TLS: Initiation and Performance Considerations
+* 7871 - EDNS0 Client Subnet
+* 7873 - Domain Name System (DNS) Cookies
+* 8080 - EdDSA for DNSSEC
+* 8499 - DNS Terminology
 
-## Loosely based upon
+## Loosely Based Upon
 
-* `ldns`
-* `NSD`
-* `Net::DNS`
-* `GRONG`
+* ldns - <https://nlnetlabs.nl/projects/ldns/about/>
+* NSD - <https://nlnetlabs.nl/projects/nsd/about/>
+* Net::DNS - <http://www.net-dns.org/>
+* GRONG - <https://github.com/bortzmeyer/grong>

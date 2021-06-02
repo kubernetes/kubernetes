@@ -144,6 +144,7 @@ func (c *test) run(t *testing.T, fs utilfs.Filesystem) {
 	if err != nil {
 		t.Fatalf("error creating temporary directory for test: %v", err)
 	}
+	defer os.RemoveAll(dir)
 	c.write(t, fs, dir)
 	// if fn exists, check errors from fn, then check expected files
 	if c.fn != nil {

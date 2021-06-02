@@ -4,7 +4,7 @@ Purell is a tiny Go library to normalize URLs. It returns a pure URL. Pure-ell. 
 
 Based on the [wikipedia paper][wiki] and the [RFC 3986 document][rfc].
 
-[![build status](https://secure.travis-ci.org/PuerkitoBio/purell.png)](http://travis-ci.org/PuerkitoBio/purell)
+[![build status](https://travis-ci.org/PuerkitoBio/purell.svg?branch=master)](http://travis-ci.org/PuerkitoBio/purell)
 
 ## Install
 
@@ -12,6 +12,7 @@ Based on the [wikipedia paper][wiki] and the [RFC 3986 document][rfc].
 
 ## Changelog
 
+*    **v1.1.1** : Fix failing test due to Go1.12 changes (thanks to @ianlancetaylor).
 *    **2016-11-14 (v1.1.0)** : IDN: Conform to RFC 5895: Fold character width (thanks to @beeker1121).
 *    **2016-07-27 (v1.0.0)** : Normalize IDN to ASCII (thanks to @zenovich).
 *    **2015-02-08** : Add fix for relative paths issue ([PR #5][pr5]) and add fix for unnecessary encoding of reserved characters ([see issue #7][iss7]).

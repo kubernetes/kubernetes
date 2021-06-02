@@ -13,7 +13,7 @@ import "unicode"
 func Create(text string) string {
 	var anchorName []rune
 	var futureDash = false
-	for _, r := range []rune(text) {
+	for _, r := range text {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsNumber(r):
 			if futureDash && len(anchorName) > 0 {

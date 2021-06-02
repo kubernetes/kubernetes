@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -32,8 +32,8 @@ type Interface interface {
 	Stop()
 
 	// Returns a chan which will receive all the events. If an error occurs
-	// or Stop() is called, this channel will be closed, in which case the
-	// watch should be completely cleaned up.
+	// or Stop() is called, the implementation will close this channel and
+	// release any resources used by the watch.
 	ResultChan() <-chan Event
 }
 
@@ -46,7 +46,9 @@ const (
 	Deleted  EventType = "DELETED"
 	Bookmark EventType = "BOOKMARK"
 	Error    EventType = "ERROR"
+)
 
+var (
 	DefaultChanSize int32 = 100
 )
 
@@ -90,7 +92,7 @@ func (w emptyWatch) ResultChan() <-chan Event {
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
 	result  chan Event
-	Stopped bool
+	stopped bool
 	sync.Mutex
 }
 
@@ -110,24 +112,24 @@ func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
 func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
-	if !f.Stopped {
+	if !f.stopped {
 		klog.V(4).Infof("Stopping fake watcher.")
 		close(f.result)
-		f.Stopped = true
+		f.stopped = true
 	}
 }
 
 func (f *FakeWatcher) IsStopped() bool {
 	f.Lock()
 	defer f.Unlock()
-	return f.Stopped
+	return f.stopped
 }
 
 // Reset prepares the watcher to be reused.
 func (f *FakeWatcher) Reset() {
 	f.Lock()
 	defer f.Unlock()
-	f.Stopped = false
+	f.stopped = false
 	f.result = make(chan Event)
 }
 
@@ -274,7 +276,7 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 	}
 }
 
-// ProxyWatcher lets you wrap your channel in watch Interface. Threadsafe.
+// ProxyWatcher lets you wrap your channel in watch Interface. threadsafe.
 type ProxyWatcher struct {
 	result chan Event
 	stopCh chan struct{}

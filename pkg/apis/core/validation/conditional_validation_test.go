@@ -17,237 +17,261 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
-	"reflect"
+	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func TestValidatePodSCTP(t *testing.T) {
-	objectWithValue := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", Ports: []api.ContainerPort{{ContainerPort: 80, Protocol: api.ProtocolSCTP}}}},
-				InitContainers: []api.Container{{Name: "container2", Image: "testimage", Ports: []api.ContainerPort{{ContainerPort: 90, Protocol: api.ProtocolSCTP}}}},
+func TestValidateMixedProtocolLBService(t *testing.T) {
+	newLBServiceDifferentProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
 			},
-		}
+			Type: api.ServiceTypeLoadBalancer,
+		},
 	}
-	objectWithoutValue := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", Ports: []api.ContainerPort{{ContainerPort: 80, Protocol: api.ProtocolTCP}}}},
-				InitContainers: []api.Container{{Name: "container2", Image: "testimage", Ports: []api.ContainerPort{{ContainerPort: 90, Protocol: api.ProtocolTCP}}}},
+	newLBServiceSameProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolTCP,
+				},
 			},
-		}
+			Type: api.ServiceTypeLoadBalancer,
+		},
 	}
-
-	objectInfo := []struct {
-		description string
-		hasValue    bool
-		object      func() *api.Pod
+	newNonLBServiceDifferentProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
+			},
+			Type: api.ServiceTypeNodePort,
+		},
+	}
+	newNonLBServiceSameProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolUDP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
+			},
+			Type: api.ServiceTypeNodePort,
+		},
+	}
+	oldLBServiceDifferentProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
+			},
+			Type: api.ServiceTypeLoadBalancer,
+		},
+	}
+	oldLBServiceSameProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolTCP,
+				},
+			},
+			Type: api.ServiceTypeLoadBalancer,
+		},
+	}
+	oldNonLBServiceDifferentProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolTCP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
+			},
+			Type: api.ServiceTypeNodePort,
+		},
+	}
+	oldNonLBServiceSameProtocols := &api.Service{
+		Spec: api.ServiceSpec{
+			Ports: []api.ServicePort{
+				{
+					Protocol: api.ProtocolUDP,
+				},
+				{
+					Protocol: api.ProtocolUDP,
+				},
+			},
+			Type: api.ServiceTypeNodePort,
+		},
+	}
+	cases := map[string]struct {
+		oldService    *api.Service
+		newService    *api.Service
+		fgEnabled     bool
+		expectedError []string
 	}{
-		{
-			description: "has value",
-			hasValue:    true,
-			object:      objectWithValue,
+		"Old service is nil, new service has different protocols, feature gate false": {
+			oldService:    nil,
+			newService:    newLBServiceDifferentProtocols,
+			fgEnabled:     false,
+			expectedError: []string{`spec.ports: Invalid value: []core.ServicePort{core.ServicePort{Name:"", Protocol:"TCP", AppProtocol:(*string)(nil), Port:0, TargetPort:intstr.IntOrString{Type:0, IntVal:0, StrVal:""}, NodePort:0}, core.ServicePort{Name:"", Protocol:"UDP", AppProtocol:(*string)(nil), Port:0, TargetPort:intstr.IntOrString{Type:0, IntVal:0, StrVal:""}, NodePort:0}}: may not contain more than 1 protocol when type is 'LoadBalancer'`},
 		},
-		{
-			description: "does not have value",
-			hasValue:    false,
-			object:      objectWithoutValue,
+		"Old service is nil, new service has different protocols, feature gate true": {
+			oldService: nil,
+			newService: newLBServiceDifferentProtocols,
+			fgEnabled:  true,
 		},
-		{
-			description: "is nil",
-			hasValue:    false,
-			object:      func() *api.Pod { return nil },
+		"Old service is nil, new service does not have different protocols, feature gate false": {
+			oldService: nil,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"Old service is nil, new service does not have different protocols, feature gate true": {
+			oldService: nil,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"Old service is nil, new non-LB service has different protocols, feature gate false": {
+			oldService: nil,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  false,
+		},
+		"Old service is nil, new non-LB service has different protocols, feature gate true": {
+			oldService: nil,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  true,
+		},
+		"Old service is nil, new non-LB service does not have different protocols, feature gate false": {
+			oldService: nil,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"Old service is nil, new non-LB service does not have different protocols, feature gate true": {
+			oldService: nil,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"Non-LB services, both services have different protocols, feature gate false": {
+			oldService: oldNonLBServiceDifferentProtocols,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  false,
+		},
+		"Non-LB services, old service has same protocols, new service has different protocols, feature gate false": {
+			oldService: oldNonLBServiceSameProtocols,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  false,
+		},
+		"Non-LB services, old service has different protocols, new service has identical protocols, feature gate false": {
+			oldService: oldNonLBServiceDifferentProtocols,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"Non-LB services, both services have same protocols, feature gate false": {
+			oldService: oldNonLBServiceSameProtocols,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"Non-LB services, both services have different protocols, feature gate true": {
+			oldService: oldNonLBServiceDifferentProtocols,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  true,
+		},
+		"Non-LB services, old service has same protocols, new service has different protocols, feature gate true": {
+			oldService: oldNonLBServiceSameProtocols,
+			newService: newNonLBServiceDifferentProtocols,
+			fgEnabled:  true,
+		},
+		"Non-LB services, old service has different protocols, new service has identical protocols, feature gate true": {
+			oldService: oldNonLBServiceDifferentProtocols,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"Non-LB services, both services have same protocols, feature gate true": {
+			oldService: oldNonLBServiceSameProtocols,
+			newService: newNonLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"LB service, neither service has different protocols, feature gate false": {
+			oldService: oldLBServiceSameProtocols,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"LB service, old service does not have different protocols, new service has different protocols, feature gate false": {
+			oldService:    oldLBServiceSameProtocols,
+			newService:    newLBServiceDifferentProtocols,
+			fgEnabled:     false,
+			expectedError: []string{`spec.ports: Invalid value: []core.ServicePort{core.ServicePort{Name:"", Protocol:"TCP", AppProtocol:(*string)(nil), Port:0, TargetPort:intstr.IntOrString{Type:0, IntVal:0, StrVal:""}, NodePort:0}, core.ServicePort{Name:"", Protocol:"UDP", AppProtocol:(*string)(nil), Port:0, TargetPort:intstr.IntOrString{Type:0, IntVal:0, StrVal:""}, NodePort:0}}: may not contain more than 1 protocol when type is 'LoadBalancer'`},
+		},
+		"LB service, old service has different protocols, new service does not have different protocols, feature gate false": {
+			oldService: oldLBServiceDifferentProtocols,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  false,
+		},
+		"LB service, both services have different protocols, feature gate false": {
+			oldService: oldLBServiceDifferentProtocols,
+			newService: newLBServiceDifferentProtocols,
+			fgEnabled:  false,
+		},
+		"LB service, neither service has different protocols, feature gate true": {
+			oldService: oldLBServiceSameProtocols,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"LB service, old service has different protocols, new service does not have different protocols, feature gate true": {
+			oldService: oldLBServiceDifferentProtocols,
+			newService: newLBServiceSameProtocols,
+			fgEnabled:  true,
+		},
+		"LB service, old service does not have different protocols, new service has different protocols, feature gate true": {
+			oldService: oldLBServiceSameProtocols,
+			newService: newLBServiceDifferentProtocols,
+			fgEnabled:  true,
+		},
+		"LB service, both services have different protocols, feature gate true": {
+			oldService: oldLBServiceDifferentProtocols,
+			newService: newLBServiceDifferentProtocols,
+			fgEnabled:  true,
 		},
 	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range objectInfo {
-			for _, newPodInfo := range objectInfo {
-				oldPodHasValue, oldPod := oldPodInfo.hasValue, oldPodInfo.object()
-				newPodHasValue, newPod := newPodInfo.hasValue, newPodInfo.object()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
-					errs := ValidateConditionalPod(newPod, oldPod, nil)
-					// objects should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.object()))
-					}
-					if !reflect.DeepEqual(newPod, newPodInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.object()))
-					}
-
-					switch {
-					case enabled || oldPodHasValue || !newPodHasValue:
-						if len(errs) > 0 {
-							t.Errorf("unexpected errors: %v", errs)
-						}
-					default:
-						if len(errs) != 2 {
-							t.Errorf("expected 2 errors, got %v", errs)
-						}
-					}
-				})
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.fgEnabled)()
+			errs := validateMixedProtocolLBService(tc.newService, tc.oldService)
+			if len(errs) != len(tc.expectedError) {
+				t.Fatalf("unexpected number of errors: %v", errs)
 			}
-		}
-	}
-}
-
-func TestValidateServiceSCTP(t *testing.T) {
-	objectWithValue := func() *api.Service {
-		return &api.Service{
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{Protocol: api.ProtocolSCTP}},
-			},
-		}
-	}
-	objectWithoutValue := func() *api.Service {
-		return &api.Service{
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{Protocol: api.ProtocolTCP}},
-			},
-		}
-	}
-
-	objectInfo := []struct {
-		description string
-		hasValue    bool
-		object      func() *api.Service
-	}{
-		{
-			description: "has value",
-			hasValue:    true,
-			object:      objectWithValue,
-		},
-		{
-			description: "does not have value",
-			hasValue:    false,
-			object:      objectWithoutValue,
-		},
-		{
-			description: "is nil",
-			hasValue:    false,
-			object:      func() *api.Service { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldServiceInfo := range objectInfo {
-			for _, newServiceInfo := range objectInfo {
-				oldServiceHasValue, oldService := oldServiceInfo.hasValue, oldServiceInfo.object()
-				newServiceHasValue, newService := newServiceInfo.hasValue, newServiceInfo.object()
-				if newService == nil {
-					continue
+			for i := range errs {
+				if !strings.Contains(errs[i].Error(), tc.expectedError[i]) {
+					t.Errorf("unexpected error %d: %v", i, errs[i])
 				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldServiceInfo.description, newServiceInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
-					errs := ValidateConditionalService(newService, oldService)
-					// objects should never be changed
-					if !reflect.DeepEqual(oldService, oldServiceInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldService, oldServiceInfo.object()))
-					}
-					if !reflect.DeepEqual(newService, newServiceInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newService, newServiceInfo.object()))
-					}
-
-					switch {
-					case enabled || oldServiceHasValue || !newServiceHasValue:
-						if len(errs) > 0 {
-							t.Errorf("unexpected errors: %v", errs)
-						}
-					default:
-						if len(errs) != 1 {
-							t.Errorf("expected 1 error, got %v", errs)
-						}
-					}
-				})
 			}
-		}
-	}
-}
-
-func TestValidateEndpointsSCTP(t *testing.T) {
-	objectWithValue := func() *api.Endpoints {
-		return &api.Endpoints{
-			Subsets: []api.EndpointSubset{
-				{Ports: []api.EndpointPort{{Protocol: api.ProtocolSCTP}}},
-			},
-		}
-	}
-	objectWithoutValue := func() *api.Endpoints {
-		return &api.Endpoints{
-			Subsets: []api.EndpointSubset{
-				{Ports: []api.EndpointPort{{Protocol: api.ProtocolTCP}}},
-			},
-		}
-	}
-
-	objectInfo := []struct {
-		description string
-		hasValue    bool
-		object      func() *api.Endpoints
-	}{
-		{
-			description: "has value",
-			hasValue:    true,
-			object:      objectWithValue,
-		},
-		{
-			description: "does not have value",
-			hasValue:    false,
-			object:      objectWithoutValue,
-		},
-		{
-			description: "is nil",
-			hasValue:    false,
-			object:      func() *api.Endpoints { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldEndpointsInfo := range objectInfo {
-			for _, newEndpointsInfo := range objectInfo {
-				oldEndpointsHasValue, oldEndpoints := oldEndpointsInfo.hasValue, oldEndpointsInfo.object()
-				newEndpointsHasValue, newEndpoints := newEndpointsInfo.hasValue, newEndpointsInfo.object()
-				if newEndpoints == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldEndpointsInfo.description, newEndpointsInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
-					errs := ValidateConditionalEndpoints(newEndpoints, oldEndpoints)
-					// objects should never be changed
-					if !reflect.DeepEqual(oldEndpoints, oldEndpointsInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldEndpoints, oldEndpointsInfo.object()))
-					}
-					if !reflect.DeepEqual(newEndpoints, newEndpointsInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newEndpoints, newEndpointsInfo.object()))
-					}
-
-					switch {
-					case enabled || oldEndpointsHasValue || !newEndpointsHasValue:
-						if len(errs) > 0 {
-							t.Errorf("unexpected errors: %v", errs)
-						}
-					default:
-						if len(errs) != 1 {
-							t.Errorf("expected 1 error, got %v", errs)
-						}
-					}
-				})
-			}
-		}
+		})
 	}
 }

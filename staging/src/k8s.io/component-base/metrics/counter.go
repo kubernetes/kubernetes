@@ -17,12 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
-// counters. Counter implements both KubeCollector and CounterMetric.
+// counters. Counter implements both kubeCollector and CounterMetric.
 type Counter struct {
 	CounterMetric
 	*CounterOpts
@@ -30,21 +32,38 @@ type Counter struct {
 	selfCollector
 }
 
-// NewCounter returns an object which satisfies the KubeCollector and CounterMetric interfaces.
+// The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
+var _ Metric = &Counter{}
+
+// NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounter(opts *CounterOpts) *Counter {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	kc := &Counter{
 		CounterOpts: opts,
 		lazyMetric:  lazyMetric{},
 	}
 	kc.setPrometheusCounter(noop)
-	kc.lazyInit(kc)
+	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
+}
+
+func (c *Counter) Desc() *prometheus.Desc {
+	return c.metric.Desc()
+}
+
+func (c *Counter) Write(to *dto.Metric) error {
+	return c.metric.Write(to)
+}
+
+// Reset resets the underlying prometheus Counter to start counting from 0 again
+func (c *Counter) Reset() {
+	if !c.IsCreated() {
+		return
+	}
+	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
 }
 
 // setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
@@ -55,7 +74,7 @@ func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (c *Counter) DeprecatedVersion() *semver.Version {
-	return c.CounterOpts.DeprecatedVersion
+	return parseSemver(c.CounterOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying Counter. Until this method is called
@@ -73,8 +92,13 @@ func (c *Counter) initializeDeprecatedMetric() {
 	c.initializeMetric()
 }
 
+// WithContext allows the normal Counter metric to pass in context. The context is no-op now.
+func (c *Counter) WithContext(ctx context.Context) CounterMetric {
+	return c.CounterMetric
+}
+
 // CounterVec is the internal representation of our wrapping struct around prometheus
-// counterVecs. CounterVec implements both KubeCollector and CounterVecMetric.
+// counterVecs. CounterVec implements both kubeCollector and CounterVecMetric.
 type CounterVec struct {
 	*prometheus.CounterVec
 	*CounterOpts
@@ -82,28 +106,39 @@ type CounterVec struct {
 	originalLabels []string
 }
 
-// NewCounterVec returns an object which satisfies the KubeCollector and CounterVecMetric interfaces.
+// NewCounterVec returns an object which satisfies the kubeCollector and CounterVecMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
+	opts.StabilityLevel.setDefaults()
+
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
+
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv)
+	cv.lazyInit(cv, fqName)
 	return cv
 }
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *CounterVec) DeprecatedVersion() *semver.Version {
-	return v.CounterOpts.DeprecatedVersion
+	return parseSemver(v.CounterOpts.DeprecatedVersion)
+
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
 // the underlying counterVec is a no-op.
 func (v *CounterVec) initializeMetric() {
+	v.CounterOpts.annotateStabilityLevel()
 	v.CounterVec = prometheus.NewCounterVec(v.CounterOpts.toPromCounterOpts(), v.originalLabels)
 }
 
@@ -130,6 +165,9 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
@@ -137,9 +175,59 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new Counter is created IFF the counterVec has
 // been registered to a metrics registry.
-func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
+func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
+	}
 	return v.CounterVec.With(labels)
+}
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *CounterVec) Delete(labels map[string]string) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.CounterVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *CounterVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.CounterVec.Reset()
+}
+
+// WithContext returns wrapped CounterVec with context
+func (v *CounterVec) WithContext(ctx context.Context) *CounterVecWithContext {
+	return &CounterVecWithContext{
+		ctx:        ctx,
+		CounterVec: *v,
+	}
+}
+
+// CounterVecWithContext is the wrapper of CounterVec with context.
+type CounterVecWithContext struct {
+	CounterVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of CounterVec.WithLabelValues.
+func (vc *CounterVecWithContext) WithLabelValues(lvs ...string) CounterMetric {
+	return vc.CounterVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of CounterVec.With.
+func (vc *CounterVecWithContext) With(labels map[string]string) CounterMetric {
+	return vc.CounterVec.With(labels)
 }

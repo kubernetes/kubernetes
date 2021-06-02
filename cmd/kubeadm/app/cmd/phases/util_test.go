@@ -19,8 +19,8 @@ package phases
 import (
 	"testing"
 
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/component-base/version"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
 func TestSetKubernetesVersion(t *testing.T) {
@@ -39,7 +39,7 @@ func TestSetKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:   "default version is processed",
-			input:  kubeadmapiv1beta2.DefaultKubernetesVersion,
+			input:  kubeadmapiv1.DefaultKubernetesVersion,
 			output: ver,
 		},
 		{
@@ -51,7 +51,7 @@ func TestSetKubernetesVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta2.ClusterConfiguration{KubernetesVersion: test.input}
+			cfg := &kubeadmapiv1.ClusterConfiguration{KubernetesVersion: test.input}
 			SetKubernetesVersion(cfg)
 			if cfg.KubernetesVersion != test.output {
 				t.Fatalf("expected %q, got %q", test.output, cfg.KubernetesVersion)

@@ -46,6 +46,10 @@ type Compressor interface {
 	// coding header.  The result must be static; the result cannot change
 	// between calls.
 	Name() string
+	// EXPERIMENTAL: if a Compressor implements
+	// DecompressedSize(compressedBytes []byte) int, gRPC will call it
+	// to determine the size of the buffer allocated for the result of decompression.
+	// Return -1 to indicate unknown size.
 }
 
 var registeredCompressor = make(map[string]Compressor)
@@ -102,10 +106,10 @@ func RegisterCodec(codec Codec) {
 	if codec == nil {
 		panic("cannot register a nil Codec")
 	}
-	contentSubtype := strings.ToLower(codec.Name())
-	if contentSubtype == "" {
-		panic("cannot register Codec with empty string result for String()")
+	if codec.Name() == "" {
+		panic("cannot register Codec with empty string result for Name()")
 	}
+	contentSubtype := strings.ToLower(codec.Name())
 	registeredCodecs[contentSubtype] = codec
 }
 

@@ -22,13 +22,12 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
 const (
-	rsGracefulDeletePeriod = 15 * time.Minute
-	rsCheckDeleteInterval  = 1 * time.Minute
+	rsCheckDeleteInterval = 1 * time.Minute
 )
 
 // listItem stores real server information and the process time.
@@ -157,21 +156,21 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 }
 
 func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, error) {
-	klog.V(2).Infof("Trying to delete rs: %s", rsToDelete.String())
+	klog.V(5).Infof("Trying to delete rs: %s", rsToDelete.String())
 	rss, err := m.ipvs.GetRealServers(rsToDelete.VirtualServer)
 	if err != nil {
 		return false, err
 	}
 	for _, rs := range rss {
 		if rsToDelete.RealServer.Equal(rs) {
-			// For UDP traffic, no graceful termination, we immediately delete the RS
+			// For UDP and SCTP traffic, no graceful termination, we immediately delete the RS
 			//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
 			// For other protocols, don't delete until all connections have expired)
-			if rsToDelete.VirtualServer.Protocol != "udp" && rs.ActiveConn+rs.InactiveConn != 0 {
-				klog.Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
+			if utilipvs.IsRsGracefulTerminationNeeded(rsToDelete.VirtualServer.Protocol) && rs.ActiveConn+rs.InactiveConn != 0 {
+				klog.V(5).Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
 				return false, nil
 			}
-			klog.V(2).Infof("Deleting rs: %s", rsToDelete.String())
+			klog.V(5).Infof("Deleting rs: %s", rsToDelete.String())
 			err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
 			if err != nil {
 				return false, fmt.Errorf("Delete destination %q err: %v", rs.String(), err)

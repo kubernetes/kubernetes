@@ -25,6 +25,7 @@ import (
 // 2. evaluation of RoleBindings in the namespace requested - short circuit on match
 // 3. deny by default
 
+// APIGroupAll and these consts are default values for rbac authorization.
 const (
 	APIGroupAll    = "*"
 	ResourceAll    = "*"
@@ -42,7 +43,7 @@ const (
 // PolicyRule holds information that describes a policy rule, but does not contain information
 // about who the rule applies to or which namespace the rule applies to.
 type PolicyRule struct {
-	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
+	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule. '*' represents all verbs.
 	Verbs []string
 
 	// APIGroups is the name of the APIGroup that contains the resources.

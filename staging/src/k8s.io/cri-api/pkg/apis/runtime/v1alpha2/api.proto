@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
-syntax = 'proto3';
+syntax = "proto3";
 
 package runtime.v1alpha2;
 option go_package = "v1alpha2";
@@ -216,6 +216,13 @@ enum NamespaceMode {
     // For example, a container with a PID namespace of NODE expects to view
     // all of the processes on the host running the kubelet.
     NODE      = 2;
+    // TARGET targets the namespace of another container. When this is specified,
+    // a target_id must be specified in NamespaceOption and refer to a container
+    // previously created with NamespaceMode CONTAINER. This containers namespace
+    // will be made to match that of container target_id.
+    // For example, a container with a PID namespace of TARGET expects to view
+    // all of the processes that container target_id can view.
+    TARGET    = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -227,12 +234,16 @@ message NamespaceOption {
     // PID namespace for this container/sandbox.
     // Note: The CRI default is POD, but the v1.PodSpec default is CONTAINER.
     // The kubelet's runtime manager will set this to CONTAINER explicitly for v1 pods.
-    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE
+    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE, TARGET
     NamespaceMode pid = 2;
     // IPC namespace for this container/sandbox.
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // Target Container ID for NamespaceMode of TARGET. This container must have been
+    // previously created in the same pod. It is not possible to specify different targets
+    // for each namespace.
+    string target_id = 4;
 }
 
 // Int64Value is the wrapper of int64.
@@ -268,13 +279,37 @@ message LinuxSandboxSecurityContext {
     // This allows a sandbox to take additional security precautions if no
     // privileged containers are expected to be run.
     bool privileged = 6;
+    // Seccomp profile for the sandbox.
+    SecurityProfile seccomp = 9;
+    // AppArmor profile for the sandbox.
+    SecurityProfile apparmor = 10;
     // Seccomp profile for the sandbox, candidate values are:
     // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 7;
+    string seccomp_profile_path = 7 [deprecated=true];
+}
+
+// A security profile which can be used for sandboxes and containers.
+message SecurityProfile {
+    // Available profile types.
+    enum ProfileType {
+        // The container runtime default profile should be used.
+        RuntimeDefault = 0;
+        // Disable the feature for the sandbox or the container.
+        Unconfined = 1;
+        // A pre-defined profile on the node should be used.
+        Localhost = 2;
+    }
+    // Indicator which `ProfileType` should be applied.
+    ProfileType profile_type = 1;
+    // Indicates that a pre-defined profile on the node should be used.
+    // Must only be set if `ProfileType` is `Localhost`.
+    // For seccomp, it must be an absolute path to the seccomp profile.
+    // For AppArmor, this field is the AppArmor `<profile name>/`
+    string localhost_ref = 2;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
@@ -295,11 +330,11 @@ message LinuxPodSandboxConfig {
 // PodSandbox in its user interface for better user experience. For example,
 // the runtime can construct a unique PodSandboxName based on the metadata.
 message PodSandboxMetadata {
-    // Pod name of the sandbox. Same as the pod name in the PodSpec.
+    // Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
     string name = 1;
-    // Pod UID of the sandbox. Same as the pod UID in the PodSpec.
+    // Pod UID of the sandbox. Same as the pod UID in the Pod ObjectMeta.
     string uid = 2;
-    // Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+    // Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
     string namespace = 3;
     // Attempt number of creating the sandbox. Default: 0.
     uint32 attempt = 4;
@@ -357,6 +392,8 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // Optional configurations specific to Windows hosts.
+    WindowsPodSandboxConfig windows = 9;
 }
 
 message RunPodSandboxRequest {
@@ -366,7 +403,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
     string runtime_handler = 2;
 }
 
@@ -396,10 +433,17 @@ message PodSandboxStatusRequest {
     bool verbose = 2;
 }
 
+// PodIP represents an ip of a Pod
+message PodIP{
+    // an ip is a string representation of an IPv4 or an IPv6
+    string ip = 1;
+}
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
 message PodSandboxNetworkStatus {
     // IP address of the PodSandbox.
     string ip = 1;
+    // list of additional ips (not inclusive of PodSandboxNetworkStatus.Ip) of the PodSandBoxNetworkStatus
+    repeated PodIP additional_ips  = 2;
 }
 
 // Namespace contains paths to the namespaces.
@@ -505,11 +549,14 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
-// ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageID or imageDigest), but in the
-// future it will include more detailed information about the different image types.
+// ImageSpec is an internal representation of an image.
 message ImageSpec {
+    // Container's Image field (e.g. imageID or imageDigest).
     string image = 1;
+    // Unstructured key-value map holding arbitrary metadata.
+    // ImageSpec Annotations can be used to help the runtime target specific
+    // images in multi-arch images.
+    map<string, string> annotations = 2;
 }
 
 message KeyValue {
@@ -536,6 +583,19 @@ message LinuxContainerResources {
     string cpuset_cpus = 6;
     // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
     string cpuset_mems = 7;
+    // List of HugepageLimits to limit the HugeTLB usage of container per page size. Default: nil (not specified).
+    repeated HugepageLimit hugepage_limits = 8;
+}
+
+// HugepageLimit corresponds to the file`hugetlb.<hugepagesize>.limit_in_byte` in container level cgroup.
+// For example, `PageSize=1GB`, `Limit=1073741824` means setting `1073741824` bytes to hugetlb.1GB.limit_in_bytes.
+message HugepageLimit {
+    // The value of PageSize has the format <size><unit-prefix>B (2MB, 1GB),
+    // and must match the <hugepagesize> of the corresponding control file found in `hugetlb.<hugepagesize>.limit_in_bytes`.
+    // The values of <unit-prefix> are intended to be parsed using base 1024("1KB" = 1024, "1MB" = 1048576, etc).
+    string page_size = 1;
+    // limit in bytes of hugepagesize HugeTLB usage.
+    uint64 limit = 2;
 }
 
 // SELinuxOption are the labels to be applied to the container.
@@ -570,7 +630,7 @@ message LinuxContainerSecurityContext {
     // 1. All capabilities are added.
     // 2. Sensitive paths, such as kernel module paths within sysfs, are not masked.
     // 3. Any sysfs and procfs mounts are mounted RW.
-    // 4. Apparmor confinement is not applied.
+    // 4. AppArmor confinement is not applied.
     // 5. Seccomp restrictions are not applied.
     // 6. The device cgroup does not restrict access to any devices.
     // 7. All devices from the host's /dev are available within the container.
@@ -597,20 +657,6 @@ message LinuxContainerSecurityContext {
     // List of groups applied to the first process run in the container, in
     // addition to the container's primary GID.
     repeated int64 supplemental_groups = 8;
-    // AppArmor profile for the container, candidate values are:
-    // * runtime/default: equivalent to not specifying a profile.
-    // * unconfined: no profiles are loaded
-    // * localhost/<profile_name>: profile loaded on the node
-    //    (localhost) by name. The possible profile names are detailed at
-    //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
-    string apparmor_profile = 9;
-    // Seccomp profile for the container, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
-    // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 10;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
     bool no_new_privs = 11;
@@ -620,6 +666,24 @@ message LinuxContainerSecurityContext {
     // readonly_paths is a slice of paths that should be set as readonly by the
     // container runtime, this can be passed directly to the OCI spec.
     repeated string readonly_paths = 14;
+    // Seccomp profile for the container.
+    SecurityProfile seccomp = 15;
+    // AppArmor profile for the container.
+    SecurityProfile apparmor = 16;
+    // AppArmor profile for the container, candidate values are:
+    // * runtime/default: equivalent to not specifying a profile.
+    // * unconfined: no profiles are loaded
+    // * localhost/<profile_name>: profile loaded on the node
+    //    (localhost) by name. The possible profile names are detailed at
+    //    https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
+    string apparmor_profile = 9 [deprecated=true];
+    // Seccomp profile for the container, candidate values are:
+    // * runtime/default: the default profile for the container runtime
+    // * unconfined: unconfined profile, ie, no seccomp sandboxing
+    // * localhost/<full-path-to-profile>: the profile installed on the node.
+    //   <full-path-to-profile> is the full path of the profile.
+    // Default: "", which is identical with unconfined.
+    string seccomp_profile_path = 10 [deprecated=true];
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -631,6 +695,29 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// applied to a sandbox.
+// These settings will only apply to the sandbox container.
+message WindowsSandboxSecurityContext {
+    // User name to run the container process as. If specified, the user MUST
+    // exist in the container image and be resolved there by the runtime;
+    // otherwise, the runtime MUST return error.
+    string run_as_username = 1;
+
+    // The contents of the GMSA credential spec to use to run this container.
+    string credential_spec = 2;
+
+    // Indicates whether the container be asked to run as a HostProcess container.
+    bool host_process = 3;
+}
+
+// WindowsPodSandboxConfig holds platform-specific configurations for Windows
+// host platforms and Windows-based containers.
+message WindowsPodSandboxConfig {
+    // WindowsSandboxSecurityContext holds sandbox security attributes.
+    WindowsSandboxSecurityContext security_context = 1;
+}
+
 // WindowsContainerSecurityContext holds windows security configuration that will be applied to a container.
 message WindowsContainerSecurityContext {
     // User name to run the container process as. If specified, the user MUST
@@ -640,6 +727,9 @@ message WindowsContainerSecurityContext {
 
     // The contents of the GMSA credential spec to use to run this container.
     string credential_spec = 2;
+
+    // Indicates whether a container is to be run as a HostProcess container.
+    bool host_process = 3;
 }
 
 // WindowsContainerConfig contains platform-specific configuration for
@@ -751,8 +841,8 @@ message ContainerConfig {
 
     // Configuration specific to Linux containers.
     LinuxContainerConfig linux = 15;
-   // Configuration specific to Windows containers.
-   WindowsContainerConfig windows = 16;
+    // Configuration specific to Windows containers.
+    WindowsContainerConfig windows = 16;
 }
 
 message CreateContainerRequest {
@@ -922,6 +1012,12 @@ message UpdateContainerResourcesRequest {
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
+    // Resource configuration specific to Windows containers. 
+    WindowsContainerResources windows = 3;
+    // Unstructured key-value map holding arbitrary additional information for 
+    // container resources updating. This can be used for specifying experimental 
+    // resources to update or other options to use when updating the container.
+    map<string, string> annotations = 4;
 }
 
 message UpdateContainerResourcesResponse {}
@@ -1034,6 +1130,8 @@ message Image {
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
+    // ImageSpec for image which includes annotations
+    ImageSpec spec = 7;
 }
 
 message ListImagesResponse {

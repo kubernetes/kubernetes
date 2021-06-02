@@ -16,23 +16,25 @@
 
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 # Specifying KUBE_GCE_API_ENDPOINT will override the default GCE Compute API endpoint (https://www.googleapis.com/compute/v1/).
 # This endpoint has to be pointing to v1 api. For example, https://www.googleapis.com/compute/staging_v1/
-GCE_API_ENDPOINT=${KUBE_GCE_API_ENDPOINT:-}
-GCLOUD=gcloud
+export GCE_API_ENDPOINT=${KUBE_GCE_API_ENDPOINT:-}
+export GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-REGION=${ZONE%-*}
+export REGION=${ZONE%-*}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
+# TODO: Migrate to e2-standard machine family.
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
+# TODO: Migrate to e2-standard machine family.
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
-MASTER_DISK_TYPE=pd-ssd
+export MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-$(get-master-disk-size)}
 MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
@@ -40,6 +42,11 @@ NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS="${KUBE_NODE_LABELS:-}"
 WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
+NODE_LOCAL_SSDS_EPHEMERAL=${NODE_LOCAL_SSDS_EPHEMERAL:-}
+
+# KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
+# Firewalls and node templates are still created.
+KUBE_CREATE_NODES="${KUBE_CREATE_NODES:-true}"
 
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
@@ -49,7 +56,7 @@ NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 # Accelerators to be attached to each node. Format "type=<accelerator-type>,count=<accelerator-count>"
 # More information on available GPUs here - https://cloud.google.com/compute/docs/gpus/
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
-REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
+export REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
@@ -59,7 +66,7 @@ MIG_WAIT_UNTIL_STABLE_TIMEOUT=${MIG_WAIT_UNTIL_STABLE_TIMEOUT:-1800}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
-WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win1809}
+WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win2019}
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
     MASTER_OS_DISTRIBUTION="gci"
@@ -79,30 +86,44 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-73-11647-163-0}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
-MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
-NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1041-9}
+export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
+export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
+export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.
-KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
-CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
-CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
-CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
-LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
-if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-  CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
-  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
-  LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
-  KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS} --runtime-cgroups=/system.slice/containerd.service"
+export KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
+
+# Default container runtime
+export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
+# Default container runtime for windows
+export WINDOWS_CONTAINER_RUNTIME=${KUBE_WINDOWS_CONTAINER_RUNTIME:-docker}
+
+# Set default values with override
+if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
+  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-docker}
+  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
+elif [[ "${CONTAINER_RUNTIME}" == "containerd" ||  "${CONTAINER_RUNTIME}" == "remote" ]]; then
+  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
+  export LOG_DUMP_SYSTEMD_SERVICES=${LOG_DUMP_SYSTEMD_SERVICES:-containerd}
+  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
 fi
 
+# Ability to inject custom versions (Ubuntu OS images ONLY)
+# if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
+# is set to empty then we do not override the version(s) and just
+# use whatever is in the default installation of containerd package
+export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
+export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
+
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
-MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
+export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
-NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
+export NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
 # Enable network deletion by default (for kube-down), unless we're using 'default' network.
@@ -117,16 +138,17 @@ fi
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
-AGGREGATOR_MASTER_NAME="${INSTANCE_PREFIX}-aggregator"
-INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
-MASTER_TAG="${INSTANCE_PREFIX}-master"
-NODE_TAG="${INSTANCE_PREFIX}-minion"
+export AGGREGATOR_MASTER_NAME="${INSTANCE_PREFIX}-aggregator"
+export INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
+export MASTER_TAG="${INSTANCE_PREFIX}-master"
+export NODE_TAG="${INSTANCE_PREFIX}-minion"
 
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-$(get-cluster-ip-range)}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true or CREATE_CUSTOM_NETWORK=true.
 # It is the primary range in the subnet and is the range used for node instance IPs.
 NODE_IP_RANGE="$(get-node-ip-range)"
+export NODE_IP_RANGE
 
 # NOTE: Avoid giving nodes empty scopes, because kubelet needs a service account
 # in order to initialize properly.
@@ -138,44 +160,40 @@ EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume}"
 
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
-ALLOCATE_NODE_CIDRS=true
+export ALLOCATE_NODE_CIDRS=true
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
-ENABLE_DOCKER_REGISTRY_CACHE=true
+export ENABLE_DOCKER_REGISTRY_CACHE=true
 
 # Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
 #   glbc           - CE L7 Load Balancer Controller
-ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
-
-# Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none           - No cluster monitoring setup
-#   influxdb       - Heapster, InfluxDB, and Grafana
-#   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
-#   stackdriver    - Heapster, Google Cloud Monitoring (schema container), and Google Cloud Logging
-#   googleinfluxdb - Enable influxdb and google (except GCM)
-#   standalone     - Heapster only. Metrics available via Heapster REST API.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
-
-# Optional: Enable deploying separate prometheus stack for monitoring kubernetes cluster
-ENABLE_PROMETHEUS_MONITORING="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}"
+export ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
 # Optional: Enable Metrics Server. Metrics Server should be enable everywhere,
 # since it's a critical component, but in the first release we need a way to disable
 # this in case of stability issues.
 # TODO(piosz) remove this option once Metrics Server became a stable thing.
-ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
+export ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
 
 # Optional: Metadata agent to setup as part of the cluster bring up:
 #   none        - No metadata agent
 #   stackdriver - Stackdriver metadata agent
 # Metadata agent is a daemon set that provides metadata of kubernetes objects
 # running on the same node for exporting metrics and logs.
-ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
+export ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 
 # One special node out of NUM_NODES would be created of this type if specified.
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
+# Optional: Additional nodes would be created if their type and number is specified.
+# NUM_NODES would be lowered respectively.
+# Useful for running cluster-level addons that needs more resources than would fit
+# on small nodes, like network plugins.
+NUM_ADDITIONAL_NODES="${NUM_ADDITIONAL_NODES:-}"
+ADDITIONAL_MACHINE_TYPE="${ADDITIONAL_MACHINE_TYPE:-}"
+
+export MASTER_NODE_LABELS="${KUBE_MASTER_NODE_LABELS:-}"
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS:-}"
@@ -197,9 +215,9 @@ fi
 
 # Optional: Enable netd.
 ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
-CUSTOM_NETD_YAML="${KUBE_CUSTOM_NETD_YAML:-}"
-CUSTOM_CALICO_NODE_DAEMONSET_YAML="${KUBE_CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}"
-CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
+export CUSTOM_NETD_YAML="${KUBE_CUSTOM_NETD_YAML:-}"
+export CUSTOM_CALICO_NODE_DAEMONSET_YAML="${KUBE_CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}"
+export CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
 
 # To avoid running netd on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
@@ -208,8 +226,8 @@ if [[ ${ENABLE_NETD:-} == "true" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
 
-ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
-LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
+export ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
+export LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
 
 # Enable metadata concealment by firewalling pod traffic to the metadata server
 # and run a proxy daemonset on nodes.
@@ -220,19 +238,17 @@ METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # 
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
-  # TODO(liggitt): remove this in v1.16
-  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
-LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-gcp}" # options: elasticsearch, gcp
+export ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
+export LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-gcp}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
-ELASTICSEARCH_LOGGING_REPLICAS=1
+export ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
+export ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
@@ -243,14 +259,23 @@ fi
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
-  RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+  export RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+fi
+
+# If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
+if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
 fi
 
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
-if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+if [[ -n "${NODE_ACCELERATORS}" ]]; then
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+        FEATURE_GATES="DevicePlugins=true"
+    else
+        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -259,16 +284,16 @@ fi
 # Optional: Install cluster DNS.
 # Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.
 CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
-ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
-DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
-DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
-DNS_MEMORY_LIMIT="${KUBE_DNS_MEMORY_LIMIT:-170Mi}"
+export ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+export DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
+export DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
+export DNS_MEMORY_LIMIT="${KUBE_DNS_MEMORY_LIMIT:-170Mi}"
 
 # Optional: Enable DNS horizontal autoscaler
-ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
+export ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
 
 # Optional: Install Kubernetes UI
-ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+export ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Install node problem detector.
 #   none           - Not run node problem detector.
@@ -278,23 +303,24 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
   # Enable standalone mode by default for gci.
   ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-standalone}"
 else
-  ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}"
+  export ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}"
 fi
 NODE_PROBLEM_DETECTOR_VERSION="${NODE_PROBLEM_DETECTOR_VERSION:-}"
 NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
-CNI_VERSION="${CNI_VERSION:-}"
-CNI_SHA1="${CNI_SHA1:-}"
+CNI_HASH="${CNI_HASH:-}"
+CNI_TAR_PREFIX="${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}"
+CNI_STORAGE_URL_BASE="${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/k8s-artifacts-cni/release}"
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
 if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
-  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-}"
-  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-}"
-  AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-true}"
-  AUTOSCALER_EXPANDER_CONFIG="${KUBE_AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
+  export AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-}"
+  export AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-}"
+  export AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-true}"
+  export AUTOSCALER_EXPANDER_CONFIG="${KUBE_AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
 fi
 
 # Optional: Enable allocation of pod IPs using IP aliases.
@@ -306,29 +332,34 @@ fi
 #   new subnetwork will be created for the cluster.
 ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
 NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-RangeAllocator}
-if [ ${ENABLE_IP_ALIASES} = true ]; then
+if [ "${ENABLE_IP_ALIASES}" = true ]; then
   # Number of Pods that can run on this node.
   MAX_PODS_PER_NODE=${MAX_PODS_PER_NODE:-110}
   # Size of ranges allocated to each node.
-  IP_ALIAS_SIZE="/$(get-alias-range-size ${MAX_PODS_PER_NODE})"
+  IP_ALIAS_SIZE="/$(get-alias-range-size "${MAX_PODS_PER_NODE}")"
+  export IP_ALIAS_SIZE
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
   # If we're using custom network, use the subnet we already create for it as the one for ip-alias.
   # Note that this means SUBNETWORK would override KUBE_GCE_IP_ALIAS_SUBNETWORK in case of custom network.
   if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
-    IP_ALIAS_SUBNETWORK="${SUBNETWORK}"
+    export IP_ALIAS_SUBNETWORK="${SUBNETWORK}"
   fi
-  # Reserve the services IP space to avoid being allocated for other GCP resources.
-  SERVICE_CLUSTER_IP_SUBNETWORK=${KUBE_GCE_SERVICE_CLUSTER_IP_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-services}
-  NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-CloudAllocator}
+  export NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-CloudAllocator}
   SECONDARY_RANGE_NAME=${SECONDARY_RANGE_NAME:-}
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_IPAM_MODE"
   PROVIDER_VARS="${PROVIDER_VARS:-} SECONDARY_RANGE_NAME"
-elif [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
-  # Should not have MAX_PODS_PER_NODE set for route-based clusters.
-  echo -e "${color_red}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
-  exit 1
+else
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    # Should not have MAX_PODS_PER_NODE set for route-based clusters.
+    echo -e "${color_red:-}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
+  if [[ "$(get-num-nodes)" -gt 100 ]]; then
+    echo -e "${color_red:-}Cannot create cluster with more than 100 nodes for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
 fi
 
 # Enable GCE Alpha features.
@@ -348,7 +379,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
 if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
   ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
@@ -374,12 +405,12 @@ NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
 
-NON_MASQUERADE_CIDR="0.0.0.0/0"
+export NON_MASQUERADE_CIDR="0.0.0.0/0"
 
 # How should the kubelet configure hairpin mode?
 HAIRPIN_MODE="${HAIRPIN_MODE:-hairpin-veth}" # promiscuous-bridge, hairpin-veth, none
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
-E2E_STORAGE_TEST_ENVIRONMENT="${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}"
+export E2E_STORAGE_TEST_ENVIRONMENT="${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}"
 
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
 EVICTION_HARD="${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
@@ -389,6 +420,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
+
+# Optional: install volume snapshot CRDs
+ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
 
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
@@ -400,12 +434,19 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
+# Optional: Enable log rotation for k8s services
+ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-true}"
+PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_LOGROTATE_FILES"
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
 if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
 fi
+
+# Optional: Enable log rotation for pod logs
+ENABLE_POD_LOG="${ENABLE_POD_LOG:-false}"
+PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_POD_LOG"
 
 if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
@@ -417,8 +458,8 @@ fi
 
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
-FLUENTD_GCP_YAML_VERSION="v3.2.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.8}"
+export FLUENTD_GCP_YAML_VERSION="v3.2.0"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.17}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -450,14 +491,18 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"
 # Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 
+# Control whether the startup scripts manage the lifecycle of kube-proxy
+# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
+# regardless of the value of KUBE_PROXY_DAEMONSET.
+# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
+# as an addon daemonset.
+KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
+
+# Will be passed into the kube-proxy via `--detect-local-mode`
+DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-}"
+
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
-
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
 
 # Optional: enable certificate rotation of the kubelet certificates.
 ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
@@ -466,19 +511,55 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
 
-SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
-
-# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
-# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
-ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
-# Override default Node Termination Handler Image
-if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
-fi
+export SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
 
 # Taint Windows nodes by default to prevent Linux workloads from being
 # scheduled onto them.
 WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSchedule}"
 
 # Whether to set up a private GCE cluster, i.e. a cluster where nodes have only private IPs.
-GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
+export GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
+export GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM:-}"
+
+# When KUBE_ENABLE_KONNECTIVITY_SERVICE is enabled, the three variables below will
+# default to true to enable the konnectivity network proxy and start the required pods.
+# Their values can be overridden for more granular control of the proxy.
+
+# Optional: Whether to do the setup for the konnectivity service
+# Includes setting up kubeconfig, tokens, egress files, and firewall rules
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Optional: Whether to use konnectivity network proxy for all egress from apiserver.
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Optional: Whether to start the konnectivity server and agent pods.
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Proxy Protocol Mode determines the protocol to use to communicate between apiserver and network proxy.
+# Valid options are grpc and http-connect. Default is grpc.
+export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
+
+# Optional: Enable Windows CSI-Proxy
+export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
+
+# KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP decides whether
+# kube-apiserver is healthchecked on host IP instead of 127.0.0.1.
+export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
+
+# ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-5s}"
+
+# Optional: Install Pigz on Windows.
+# Pigz is a multi-core optimized version of unzip.exe.
+# It improves container image pull performance since most time is spent
+# unzipping the image layers to disk.
+export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
+
+# Enable Windows DSR (Direct Server Return)
+export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
+
+# Install Node Problem Detector (NPD) on Windows nodes.
+# NPD analyzes the host for problems that can disrupt workloads.
+export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
+export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
+# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
+# If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
+export TLS_CIPHER_SUITES=""

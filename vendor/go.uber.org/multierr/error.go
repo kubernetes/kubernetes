@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -99,8 +99,6 @@ var (
 	// Separator for single-line error messages.
 	_singlelineSeparator = []byte("; ")
 
-	_newline = []byte("\n")
-
 	// Prefix for multi-line messages
 	_multilinePrefix = []byte("the following errors occurred:")
 
@@ -132,7 +130,7 @@ type errorGroup interface {
 }
 
 // Errors returns a slice containing zero or more errors that the supplied
-// error is composed of. If the error is nil, the returned slice is empty.
+// error is composed of. If the error is nil, a nil slice is returned.
 //
 // 	err := multierr.Append(r.Close(), w.Close())
 // 	errors := multierr.Errors(err)
@@ -398,4 +396,54 @@ func Append(left error, right error) error {
 	// expensive logic.
 	errors := [2]error{left, right}
 	return fromSlice(errors[0:])
+}
+
+// AppendInto appends an error into the destination of an error pointer and
+// returns whether the error being appended was non-nil.
+//
+// 	var err error
+// 	multierr.AppendInto(&err, r.Close())
+// 	multierr.AppendInto(&err, w.Close())
+//
+// The above is equivalent to,
+//
+// 	err := multierr.Append(r.Close(), w.Close())
+//
+// As AppendInto reports whether the provided error was non-nil, it may be
+// used to build a multierr error in a loop more ergonomically. For example:
+//
+// 	var err error
+// 	for line := range lines {
+// 		var item Item
+// 		if multierr.AppendInto(&err, parse(line, &item)) {
+// 			continue
+// 		}
+// 		items = append(items, item)
+// 	}
+//
+// Compare this with a verison that relies solely on Append:
+//
+// 	var err error
+// 	for line := range lines {
+// 		var item Item
+// 		if parseErr := parse(line, &item); parseErr != nil {
+// 			err = multierr.Append(err, parseErr)
+// 			continue
+// 		}
+// 		items = append(items, item)
+// 	}
+func AppendInto(into *error, err error) (errored bool) {
+	if into == nil {
+		// We panic if 'into' is nil. This is not documented above
+		// because suggesting that the pointer must be non-nil may
+		// confuse users into thinking that the error that it points
+		// to must be non-nil.
+		panic("misuse of multierr.AppendInto: into pointer must not be nil")
+	}
+
+	if err == nil {
+		return false
+	}
+	*into = Append(*into, err)
+	return true
 }

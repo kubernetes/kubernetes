@@ -17,10 +17,19 @@ limitations under the License.
 package exec
 
 import (
-	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/utils/exec"
+	"bytes"
 
-	"k8s.io/klog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
+	"k8s.io/kubernetes/pkg/probe"
+
+	"k8s.io/klog/v2"
+	"k8s.io/utils/exec"
+)
+
+const (
+	maxReadLength = 10 * 1 << 10 // 10KB
 )
 
 // New creates a Prober.
@@ -39,7 +48,17 @@ type execProber struct{}
 // from executing a command. Returns the Result status, command output, and
 // errors if any.
 func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
-	data, err := e.CombinedOutput()
+	var dataBuffer bytes.Buffer
+	writer := ioutils.LimitWriter(&dataBuffer, maxReadLength)
+
+	e.SetStderr(writer)
+	e.SetStdout(writer)
+	err := e.Start()
+	if err == nil {
+		err = e.Wait()
+	}
+	data := dataBuffer.Bytes()
+
 	klog.V(4).Infof("Exec probe response: %q", string(data))
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
@@ -49,6 +68,16 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 			}
 			return probe.Failure, string(data), nil
 		}
+
+		timeoutErr, ok := err.(*TimeoutError)
+		if ok {
+			if utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
+				return probe.Failure, string(data), nil
+			}
+
+			klog.Warningf("Exec probe timed out after %s but ExecProbeTimeout feature gate was disabled", timeoutErr.Timeout())
+		}
+
 		return probe.Unknown, "", err
 	}
 	return probe.Success, string(data), nil

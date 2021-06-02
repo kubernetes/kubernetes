@@ -1,11 +1,15 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 // Package cmp determines equality of values.
 //
 // This package is intended to be a more powerful and safer alternative to
 // reflect.DeepEqual for comparing whether two values are semantically equal.
+// It is intended to only be used in tests, as performance is not a goal and
+// it may panic if it cannot compare the values. Its propensity towards
+// panicking means that its unsuitable for production environments where a
+// spurious panic may be fatal.
 //
 // The primary features of cmp are:
 //
@@ -22,8 +26,8 @@
 // equality is determined by recursively comparing the primitive kinds on both
 // values, much like reflect.DeepEqual. Unlike reflect.DeepEqual, unexported
 // fields are not compared by default; they result in panics unless suppressed
-// by using an Ignore option (see cmpopts.IgnoreUnexported) or explicitly compared
-// using the AllowUnexported option.
+// by using an Ignore option (see cmpopts.IgnoreUnexported) or explicitly
+// compared using the Exporter option.
 package cmp
 
 import (
@@ -62,8 +66,8 @@ import (
 //
 // Structs are equal if recursively calling Equal on all fields report equal.
 // If a struct contains unexported fields, Equal panics unless an Ignore option
-// (e.g., cmpopts.IgnoreUnexported) ignores that field or the AllowUnexported
-// option explicitly permits comparing the unexported field.
+// (e.g., cmpopts.IgnoreUnexported) ignores that field or the Exporter option
+// explicitly permits comparing the unexported field.
 //
 // Slices are equal if they are both nil or both non-nil, where recursively
 // calling Equal on all non-ignored slice or array elements report equal.
@@ -80,7 +84,58 @@ import (
 // Pointers and interfaces are equal if they are both nil or both non-nil,
 // where they have the same underlying concrete type and recursively
 // calling Equal on the underlying values reports equal.
+//
+// Before recursing into a pointer, slice element, or map, the current path
+// is checked to detect whether the address has already been visited.
+// If there is a cycle, then the pointed at values are considered equal
+// only if both addresses were previously visited in the same path step.
 func Equal(x, y interface{}, opts ...Option) bool {
+	s := newState(opts)
+	s.compareAny(rootStep(x, y))
+	return s.result.Equal()
+}
+
+// Diff returns a human-readable report of the differences between two values:
+// y - x. It returns an empty string if and only if Equal returns true for the
+// same input values and options.
+//
+// The output is displayed as a literal in pseudo-Go syntax.
+// At the start of each line, a "-" prefix indicates an element removed from x,
+// a "+" prefix to indicates an element added from y, and the lack of a prefix
+// indicates an element common to both x and y. If possible, the output
+// uses fmt.Stringer.String or error.Error methods to produce more humanly
+// readable outputs. In such cases, the string is prefixed with either an
+// 's' or 'e' character, respectively, to indicate that the method was called.
+//
+// Do not depend on this output being stable. If you need the ability to
+// programmatically interpret the difference, consider using a custom Reporter.
+func Diff(x, y interface{}, opts ...Option) string {
+	s := newState(opts)
+
+	// Optimization: If there are no other reporters, we can optimize for the
+	// common case where the result is equal (and thus no reported difference).
+	// This avoids the expensive construction of a difference tree.
+	if len(s.reporters) == 0 {
+		s.compareAny(rootStep(x, y))
+		if s.result.Equal() {
+			return ""
+		}
+		s.result = diff.Result{} // Reset results
+	}
+
+	r := new(defaultReporter)
+	s.reporters = append(s.reporters, reporter{r})
+	s.compareAny(rootStep(x, y))
+	d := r.String()
+	if (d == "") != s.result.Equal() {
+		panic("inconsistent difference and equality results")
+	}
+	return d
+}
+
+// rootStep constructs the first path step. If x and y have differing types,
+// then they are stored within an empty interface type.
+func rootStep(x, y interface{}) PathStep {
 	vx := reflect.ValueOf(x)
 	vy := reflect.ValueOf(y)
 
@@ -103,33 +158,7 @@ func Equal(x, y interface{}, opts ...Option) bool {
 		t = vx.Type()
 	}
 
-	s := newState(opts)
-	s.compareAny(&pathStep{t, vx, vy})
-	return s.result.Equal()
-}
-
-// Diff returns a human-readable report of the differences between two values.
-// It returns an empty string if and only if Equal returns true for the same
-// input values and options.
-//
-// The output is displayed as a literal in pseudo-Go syntax.
-// At the start of each line, a "-" prefix indicates an element removed from x,
-// a "+" prefix to indicates an element added to y, and the lack of a prefix
-// indicates an element common to both x and y. If possible, the output
-// uses fmt.Stringer.String or error.Error methods to produce more humanly
-// readable outputs. In such cases, the string is prefixed with either an
-// 's' or 'e' character, respectively, to indicate that the method was called.
-//
-// Do not depend on this output being stable. If you need the ability to
-// programmatically interpret the difference, consider using a custom Reporter.
-func Diff(x, y interface{}, opts ...Option) string {
-	r := new(defaultReporter)
-	eq := Equal(x, y, Options(opts), Reporter(r))
-	d := r.String()
-	if (d == "") != eq {
-		panic("inconsistent difference and equality results")
-	}
-	return d
+	return &pathStep{t, vx, vy}
 }
 
 type state struct {
@@ -137,6 +166,7 @@ type state struct {
 	// Calling statelessCompare must not result in observable changes to these.
 	result    diff.Result // The current result of comparison
 	curPath   Path        // The current path in the value tree
+	curPtrs   pointerPath // The current set of visited pointers
 	reporters []reporter  // Optional reporters
 
 	// recChecker checks for infinite cycles applying the same set of
@@ -148,13 +178,14 @@ type state struct {
 	dynChecker dynChecker
 
 	// These fields, once set by processOption, will not change.
-	exporters map[reflect.Type]bool // Set of structs with unexported field visibility
-	opts      Options               // List of all fundamental and filter options
+	exporters []exporter // List of exporters for structs with unexported fields
+	opts      Options    // List of all fundamental and filter options
 }
 
 func newState(opts []Option) *state {
 	// Always ensure a validator option exists to validate the inputs.
 	s := &state{opts: Options{validator{}}}
+	s.curPtrs.Init()
 	s.processOption(Options(opts))
 	return s
 }
@@ -174,13 +205,8 @@ func (s *state) processOption(opt Option) {
 			panic(fmt.Sprintf("cannot use an unfiltered option: %v", opt))
 		}
 		s.opts = append(s.opts, opt)
-	case visibleStructs:
-		if s.exporters == nil {
-			s.exporters = make(map[reflect.Type]bool)
-		}
-		for t := range opt {
-			s.exporters[t] = true
-		}
+	case exporter:
+		s.exporters = append(s.exporters, opt)
 	case reporter:
 		s.reporters = append(s.reporters, opt)
 	default:
@@ -192,9 +218,9 @@ func (s *state) processOption(opt Option) {
 // This function is stateless in that it does not alter the current result,
 // or output to any registered reporters.
 func (s *state) statelessCompare(step PathStep) diff.Result {
-	// We do not save and restore the curPath because all of the compareX
-	// methods should properly push and pop from the path.
-	// It is an implementation bug if the contents of curPath differs from
+	// We do not save and restore curPath and curPtrs because all of the
+	// compareX methods should properly push and pop from them.
+	// It is an implementation bug if the contents of the paths differ from
 	// when calling this function to when returning from it.
 
 	oldResult, oldReporters := s.result, s.reporters
@@ -216,9 +242,17 @@ func (s *state) compareAny(step PathStep) {
 	}
 	s.recChecker.Check(s.curPath)
 
-	// Obtain the current type and values.
+	// Cycle-detection for slice elements (see NOTE in compareSlice).
 	t := step.Type()
 	vx, vy := step.Values()
+	if si, ok := step.(SliceIndex); ok && si.isSlice && vx.IsValid() && vy.IsValid() {
+		px, py := vx.Addr(), vy.Addr()
+		if eq, visited := s.curPtrs.Push(px, py); visited {
+			s.report(eq, reportByCycle)
+			return
+		}
+		defer s.curPtrs.Pop(px, py)
+	}
 
 	// Rule 1: Check whether an option applies on this node in the value tree.
 	if s.tryOptions(t, vx, vy) {
@@ -342,7 +376,7 @@ func detectRaces(c chan<- reflect.Value, f reflect.Value, vs ...reflect.Value) {
 // assuming that T is assignable to R.
 // Otherwise, it returns the input value as is.
 func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
-	// TODO(dsnet): Workaround for reflect bug (https://golang.org/issue/22143).
+	// TODO(≥go1.10): Workaround for reflect bug (https://golang.org/issue/22143).
 	if !flags.AtLeastGo110 {
 		if v.Kind() == reflect.Interface && v.IsNil() && v.Type() != t {
 			return reflect.New(t).Elem()
@@ -352,8 +386,10 @@ func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
 }
 
 func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
+	var addr bool
 	var vax, vay reflect.Value // Addressable versions of vx and vy
 
+	var mayForce, mayForceInit bool
 	step := StructField{&structField{}}
 	for i := 0; i < t.NumField(); i++ {
 		step.typ = t.Field(i).Type
@@ -372,10 +408,18 @@ func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
 				// For retrieveUnexportedField to work, the parent struct must
 				// be addressable. Create a new copy of the values if
 				// necessary to make them addressable.
+				addr = vx.CanAddr() || vy.CanAddr()
 				vax = makeAddressable(vx)
 				vay = makeAddressable(vy)
 			}
-			step.mayForce = s.exporters[t]
+			if !mayForceInit {
+				for _, xf := range s.exporters {
+					mayForce = mayForce || xf(t)
+				}
+				mayForceInit = true
+			}
+			step.mayForce = mayForce
+			step.paddr = addr
 			step.pvx = vax
 			step.pvy = vay
 			step.field = t.Field(i)
@@ -391,9 +435,21 @@ func (s *state) compareSlice(t reflect.Type, vx, vy reflect.Value) {
 		return
 	}
 
-	// TODO: Support cyclic data structures.
+	// NOTE: It is incorrect to call curPtrs.Push on the slice header pointer
+	// since slices represents a list of pointers, rather than a single pointer.
+	// The pointer checking logic must be handled on a per-element basis
+	// in compareAny.
+	//
+	// A slice header (see reflect.SliceHeader) in Go is a tuple of a starting
+	// pointer P, a length N, and a capacity C. Supposing each slice element has
+	// a memory size of M, then the slice is equivalent to the list of pointers:
+	//	[P+i*M for i in range(N)]
+	//
+	// For example, v[:0] and v[:1] are slices with the same starting pointer,
+	// but they are clearly different values. Using the slice pointer alone
+	// violates the assumption that equal pointers implies equal values.
 
-	step := SliceIndex{&sliceIndex{pathStep: pathStep{typ: t.Elem()}}}
+	step := SliceIndex{&sliceIndex{pathStep: pathStep{typ: t.Elem()}, isSlice: isSlice}}
 	withIndexes := func(ix, iy int) SliceIndex {
 		if ix >= 0 {
 			step.vx, step.xkey = vx.Index(ix), ix
@@ -470,7 +526,12 @@ func (s *state) compareMap(t reflect.Type, vx, vy reflect.Value) {
 		return
 	}
 
-	// TODO: Support cyclic data structures.
+	// Cycle-detection for maps.
+	if eq, visited := s.curPtrs.Push(vx, vy); visited {
+		s.report(eq, reportByCycle)
+		return
+	}
+	defer s.curPtrs.Pop(vx, vy)
 
 	// We combine and sort the two map keys so that we can perform the
 	// comparisons in a deterministic order.
@@ -507,7 +568,12 @@ func (s *state) comparePtr(t reflect.Type, vx, vy reflect.Value) {
 		return
 	}
 
-	// TODO: Support cyclic data structures.
+	// Cycle-detection for pointers.
+	if eq, visited := s.curPtrs.Push(vx, vy); visited {
+		s.report(eq, reportByCycle)
+		return
+	}
+	defer s.curPtrs.Pop(vx, vy)
 
 	vx, vy = vx.Elem(), vy.Elem()
 	s.compareAny(Indirect{&indirect{pathStep{t.Elem(), vx, vy}}})

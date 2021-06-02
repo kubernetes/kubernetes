@@ -24,7 +24,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -247,7 +247,7 @@ func TestTokenCreation(t *testing.T) {
 					return func(core.Action) (bool, runtime.Object, error) {
 						i++
 						if i < 3 {
-							return true, nil, apierrors.NewForbidden(api.Resource("secrets"), "foo", errors.New("No can do"))
+							return true, nil, apierrors.NewForbidden(api.Resource("secrets"), "foo", errors.New("no can do"))
 						}
 						return false, nil, nil
 					}
@@ -278,7 +278,7 @@ func TestTokenCreation(t *testing.T) {
 				resource: "secrets",
 				reactor: func(t *testing.T) core.ReactionFunc {
 					return func(core.Action) (bool, runtime.Object, error) {
-						return true, nil, apierrors.NewForbidden(api.Resource("secrets"), "foo", errors.New("No can do"))
+						return true, nil, apierrors.NewForbidden(api.Resource("secrets"), "foo", errors.New("no can do"))
 					}
 				},
 			}},

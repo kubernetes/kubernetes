@@ -72,3 +72,16 @@ roleRef:
   kind: ClusterRole
   name: external-resizer-runner
   apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-snapshotter-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-snapshotter-runner
+  apiGroup: rbac.authorization.k8s.io

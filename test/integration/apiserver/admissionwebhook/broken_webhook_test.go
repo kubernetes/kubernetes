@@ -17,11 +17,12 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,13 +54,13 @@ func TestBrokenWebhook(t *testing.T) {
 	}
 
 	t.Logf("Creating Deployment to ensure apiserver is functional")
-	_, err = client.AppsV1().Deployments("default").Create(exampleDeployment(generateDeploymentName(0)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(0)), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}
 
 	t.Logf("Creating Broken Webhook that will block all operations on all objects")
-	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(brokenWebhookConfig(brokenWebhookName))
+	_, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), brokenWebhookConfig(brokenWebhookName), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to register broken webhook: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test whether the webhook blocks requests
 	t.Logf("Attempt to create Deployment which should fail due to the webhook")
-	_, err = client.AppsV1().Deployments("default").Create(exampleDeployment(generateDeploymentName(1)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(1)), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected the broken webhook to cause creating a deployment to fail, but it succeeded.")
 	}
@@ -89,13 +90,13 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test whether the webhook still blocks requests after restarting
 	t.Logf("Attempt again to create Deployment which should fail due to the webhook")
-	_, err = client.AppsV1().Deployments("default").Create(exampleDeployment(generateDeploymentName(2)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(2)), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("Expected the broken webhook to cause creating a deployment to fail, but it succeeded.")
 	}
 
 	t.Logf("Deleting the broken webhook to fix the cluster")
-	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(brokenWebhookName, nil)
+	err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), brokenWebhookName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete broken webhook: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestBrokenWebhook(t *testing.T) {
 
 	// test if the deleted webhook no longer blocks requests
 	t.Logf("Creating Deployment to ensure webhook is deleted")
-	_, err = client.AppsV1().Deployments("default").Create(exampleDeployment(generateDeploymentName(3)))
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), exampleDeployment(generateDeploymentName(3)), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}
@@ -148,19 +149,19 @@ func exampleDeployment(name string) *appsv1.Deployment {
 	}
 }
 
-func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+func brokenWebhookConfig(name string) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	var path string
-	failurePolicy := admissionregistrationv1beta1.Fail
-	return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
+	failurePolicy := admissionregistrationv1.Fail
+	return &admissionregistrationv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
 				Name: "broken-webhook.k8s.io",
-				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule: admissionregistrationv1beta1.Rule{
+				Rules: []admissionregistrationv1.RuleWithOperations{{
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{"*"},
 						APIVersions: []string{"*"},
 						Resources:   []string{"*/*"},
@@ -168,15 +169,17 @@ func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWe
 				}},
 				// This client config references a non existent service
 				// so it should always fail.
-				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-					Service: &admissionregistrationv1beta1.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: "default",
 						Name:      "invalid-webhook-service",
 						Path:      &path,
 					},
 					CABundle: nil,
 				},
-				FailurePolicy: &failurePolicy,
+				FailurePolicy:           &failurePolicy,
+				SideEffects:             &noSideEffects,
+				AdmissionReviewVersions: []string{"v1"},
 			},
 		},
 	}

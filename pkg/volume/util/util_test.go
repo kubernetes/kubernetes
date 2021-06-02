@@ -19,21 +19,22 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-
-	"reflect"
-	"strings"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
+	utilptr "k8s.io/utils/pointer"
 )
 
 var nodeLabels = map[string]string{
@@ -337,6 +338,119 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
 	if timeout != 4500 {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
+	}
+}
+
+func TestFsUserFrom(t *testing.T) {
+	tests := []struct {
+		desc       string
+		pod        *v1.Pod
+		wantFsUser *int64
+	}{
+		{
+			desc: "no runAsUser specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "some have runAsUser specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "all have runAsUser specified but not the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(999),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+				},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "all have runAsUser specified and the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+				},
+			},
+			wantFsUser: utilptr.Int64Ptr(1000),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			fsUser := FsUserFrom(test.pod)
+			if fsUser == nil && test.wantFsUser != nil {
+				t.Errorf("FsUserFrom(%v) = %v, want %d", test.pod, fsUser, *test.wantFsUser)
+			}
+			if fsUser != nil && test.wantFsUser == nil {
+				t.Errorf("FsUserFrom(%v) = %d, want %v", test.pod, *fsUser, test.wantFsUser)
+			}
+			if fsUser != nil && test.wantFsUser != nil && *fsUser != *test.wantFsUser {
+				t.Errorf("FsUserFrom(%v) = %d, want %d", test.pod, *fsUser, *test.wantFsUser)
+			}
+		})
 	}
 }
 
@@ -656,5 +770,225 @@ func TestMakeAbsolutePath(t *testing.T) {
 				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
 			}
 		}
+	}
+}
+
+func TestGetPodVolumeNames(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		expectedMounts  sets.String
+		expectedDevices sets.String
+	}{
+		{
+			name: "empty pod",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			expectedMounts:  sets.NewString(),
+			expectedDevices: sets.NewString(),
+		},
+		{
+			name: "pod with volumes",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+								{
+									Name: "vol2",
+								},
+							},
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol3",
+								},
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString("vol3", "vol4"),
+		},
+		{
+			name: "pod with init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainer",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+								{
+									Name: "vol2",
+								},
+							},
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol3",
+								},
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString("vol3", "vol4"),
+		},
+		{
+			name: "pod with multiple containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainer1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+						{
+							Name: "initContainer2",
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol2",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol3",
+								},
+							},
+						},
+						{
+							Name: "container2",
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol3"),
+			expectedDevices: sets.NewString("vol2", "vol4"),
+		},
+		{
+			name: "pod with ephemeral containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "debugger",
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name: "vol1",
+									},
+									{
+										Name: "vol2",
+									},
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mounts, devices := GetPodVolumeNames(test.pod)
+			if !mounts.Equal(test.expectedMounts) {
+				t.Errorf("Expected mounts: %q, got %q", mounts.List(), test.expectedMounts.List())
+			}
+			if !devices.Equal(test.expectedDevices) {
+				t.Errorf("Expected devices: %q, got %q", devices.List(), test.expectedDevices.List())
+			}
+		})
 	}
 }

@@ -18,7 +18,6 @@ package runtime
 
 import (
 	"fmt"
-	"net/url"
 	"reflect"
 	"strings"
 
@@ -102,12 +101,9 @@ func NewScheme() *Scheme {
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
-	utilruntime.Must(s.AddConversionFuncs(DefaultEmbeddedConversions()...))
-
-	// Enable map[string][]string conversions by default
-	utilruntime.Must(s.AddConversionFuncs(DefaultStringConversions...))
-	utilruntime.Must(s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
-	utilruntime.Must(s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
+	// Enable couple default conversions by default.
+	utilruntime.Must(RegisterEmbeddedConversions(s))
+	utilruntime.Must(RegisterStringConversions(s))
 	return s
 }
 
@@ -131,12 +127,6 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	}
 
 	return gvks[0].Kind
-}
-
-// fromScope gets the input version, desired output version, and desired Scheme
-// from a conversion.Scope.
-func (s *Scheme) fromScope(scope conversion.Scope) *Scheme {
-	return s
 }
 
 // Converter allows access to the converter for the scheme
@@ -211,6 +201,19 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 		}
 	}
 	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+
+	// if the type implements DeepCopyInto(<obj>), register a self-conversion
+	if m := reflect.ValueOf(obj).MethodByName("DeepCopyInto"); m.IsValid() && m.Type().NumIn() == 1 && m.Type().NumOut() == 0 && m.Type().In(0) == reflect.TypeOf(obj) {
+		if err := s.AddGeneratedConversionFunc(obj, obj, func(a, b interface{}, scope conversion.Scope) error {
+			// copy a to b
+			reflect.ValueOf(a).MethodByName("DeepCopyInto").Call([]reflect.Value{reflect.ValueOf(b)})
+			// clear TypeMeta to match legacy reflective conversion
+			b.(Object).GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	}
 }
 
 // KnownTypes returns the types known for the given version.
@@ -224,6 +227,32 @@ func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 		types[gvk.Kind] = t
 	}
 	return types
+}
+
+// VersionsForGroupKind returns the versions that a particular GroupKind can be converted to within the given group.
+// A GroupKind might be converted to a different group. That information is available in EquivalentResourceMapper.
+func (s *Scheme) VersionsForGroupKind(gk schema.GroupKind) []schema.GroupVersion {
+	availableVersions := []schema.GroupVersion{}
+	for gvk := range s.gvkToType {
+		if gk != gvk.GroupKind() {
+			continue
+		}
+
+		availableVersions = append(availableVersions, gvk.GroupVersion())
+	}
+
+	// order the return for stability
+	ret := []schema.GroupVersion{}
+	for _, version := range s.PrioritizedVersionsForGroup(gk.Group) {
+		for _, availableVersion := range availableVersions {
+			if version != availableVersion {
+				continue
+			}
+			ret = append(ret, availableVersion)
+		}
+	}
+
+	return ret
 }
 
 // AllKnownTypes returns the all known types.
@@ -296,55 +325,11 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
 }
 
-// Log sets a logger on the scheme. For test purposes only
-func (s *Scheme) Log(l conversion.DebugLogger) {
-	s.converter.Debug = l
-}
-
 // AddIgnoredConversionType identifies a pair of types that should be skipped by
 // conversion (because the data inside them is explicitly dropped during
 // conversion).
 func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
 	return s.converter.RegisterIgnoredConversion(from, to)
-}
-
-// AddConversionFuncs adds functions to the list of conversion functions. The given
-// functions should know how to convert between two of your API objects, or their
-// sub-objects. We deduce how to call these functions from the types of their two
-// parameters; see the comment for Converter.Register.
-//
-// Note that, if you need to copy sub-objects that didn't change, you can use the
-// conversion.Scope object that will be passed to your conversion function.
-// Additionally, all conversions started by Scheme will set the SrcVersion and
-// DestVersion fields on the Meta object. Example:
-//
-// s.AddConversionFuncs(
-//	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
-//		// You can depend on Meta() being non-nil, and this being set to
-//		// the source version, e.g., ""
-//		s.Meta().SrcVersion
-//		// You can depend on this being set to the destination version,
-//		// e.g., "v1".
-//		s.Meta().DestVersion
-//		// Call scope.Convert to copy sub-fields.
-//		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
-//		return nil
-//	},
-// )
-//
-// (For more detail about conversion functions, see Converter.Register's comment.)
-//
-// Also note that the default behavior, if you don't add a conversion function, is to
-// sanely copy fields that have the same names and same type names. It's OK if the
-// destination type has extra fields, but it must not remove any. So you only need to
-// add conversion functions for things with changed/removed fields.
-func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
-	for _, f := range conversionFuncs {
-		if err := s.converter.RegisterConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // AddConversionFunc registers a function that converts between a and b by passing objects of those
@@ -366,14 +351,6 @@ func (s *Scheme) AddGeneratedConversionFunc(a, b interface{}, fn conversion.Conv
 func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
 	s.fieldLabelConversionFuncs[gvk] = conversionFunc
 	return nil
-}
-
-// RegisterInputDefaults sets the provided field mapping function and field matching
-// as the defaults for the provided input type.  The fn may be nil, in which case no
-// mapping will happen by default. Use this method to register a mechanism for handling
-// a specific input type in conversion, such as a map[string]string to structs.
-func (s *Scheme) RegisterInputDefaults(in interface{}, fn conversion.FieldMappingFunc, defaultFlags conversion.FieldMatchingFlags) error {
-	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
 }
 
 // AddTypeDefaultingFunc registers a function that is passed a pointer to an
@@ -459,12 +436,9 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 		in = typed
 	}
 
-	flags, meta := s.generateConvertMeta(in)
+	meta := s.generateConvertMeta(in)
 	meta.Context = context
-	if flags == 0 {
-		flags = conversion.AllowDifferentFieldTypeNames
-	}
-	return s.converter.Convert(in, out, flags, meta)
+	return s.converter.Convert(in, out, meta)
 }
 
 // ConvertFieldLabel alters the given field label and value for an kind field selector from
@@ -561,9 +535,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		in = in.DeepCopyObject()
 	}
 
-	flags, meta := s.generateConvertMeta(in)
+	meta := s.generateConvertMeta(in)
 	meta.Context = target
-	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+	if err := s.converter.Convert(in, out, meta); err != nil {
 		return nil, err
 	}
 
@@ -591,7 +565,7 @@ func (s *Scheme) unstructuredToTyped(in Unstructured) (Object, error) {
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
+func (s *Scheme) generateConvertMeta(in interface{}) *conversion.Meta {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 

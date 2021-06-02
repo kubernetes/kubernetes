@@ -48,6 +48,7 @@ BASH_TARGETS="
 	update-codegen
 	update-generated-runtime
 	update-generated-device-plugin
+	update-generated-api-compatibility-data
 	update-generated-docs
 	update-generated-swagger-docs
 	update-openapi-spec

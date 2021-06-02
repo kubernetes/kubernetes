@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/vmware/govmomi/object"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Folder extends the govmomi Folder object

@@ -20,16 +20,18 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
 	// AllowAny is the wildcard used to allow any profile.
 	AllowAny = "*"
-	// The annotation key specifying the default seccomp profile.
+	// DefaultProfileAnnotationKey specifies the default seccomp profile.
 	DefaultProfileAnnotationKey = "seccomp.security.alpha.kubernetes.io/defaultProfileName"
-	// The annotation key specifying the allowed seccomp profiles.
+	// AllowedProfilesAnnotationKey specifies the allowed seccomp profiles.
 	AllowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
 )
 
@@ -66,6 +68,15 @@ func NewStrategy(pspAnnotations map[string]string) Strategy {
 				allowAnyProfile = true
 				continue
 			}
+			// With the graduation of seccomp to GA we automatically convert
+			// the deprecated seccomp profile annotation `docker/default` to
+			// `runtime/default`. This means that we now have to automatically
+			// allow `runtime/default` if a user specifies `docker/default` and
+			// vice versa in a PSP.
+			if p == v1.DeprecatedSeccompProfileDockerDefault || p == v1.SeccompProfileRuntimeDefault {
+				allowedProfiles[v1.SeccompProfileRuntimeDefault] = true
+				allowedProfiles[v1.DeprecatedSeccompProfileDockerDefault] = true
+			}
 			allowedProfiles[p] = true
 		}
 	}
@@ -83,6 +94,10 @@ func (s *strategy) Generate(annotations map[string]string, pod *api.Pod) (string
 		// Profile already set, nothing to do.
 		return annotations[api.SeccompPodAnnotationKey], nil
 	}
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+		// Profile field already set, translate to annotation
+		return podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile), nil
+	}
 	return s.defaultProfile, nil
 }
 
@@ -92,6 +107,10 @@ func (s *strategy) ValidatePod(pod *api.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 	podSpecFieldPath := field.NewPath("pod", "metadata", "annotations").Key(api.SeccompPodAnnotationKey)
 	podProfile := pod.Annotations[api.SeccompPodAnnotationKey]
+	// if the annotation is not set, see if the field is set and derive the corresponding annotation value
+	if len(podProfile) == 0 && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+		podProfile = podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
+	}
 
 	if !s.allowAnyProfile && len(s.allowedProfiles) == 0 && podProfile != "" {
 		allErrs = append(allErrs, field.Forbidden(podSpecFieldPath, "seccomp may not be set"))
@@ -141,9 +160,19 @@ func (s *strategy) profileAllowed(profile string) bool {
 
 // profileForContainer returns the container profile if set, otherwise the pod profile.
 func profileForContainer(pod *api.Pod, container *api.Container) string {
+	if container.SecurityContext != nil && container.SecurityContext.SeccompProfile != nil {
+		// derive the annotation value from the container field
+		return podutil.SeccompAnnotationForField(container.SecurityContext.SeccompProfile)
+	}
 	containerProfile, ok := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+container.Name]
 	if ok {
+		// return the existing container annotation
 		return containerProfile
 	}
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+		// derive the annotation value from the pod field
+		return podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
+	}
+	// return the existing pod annotation
 	return pod.Annotations[api.SeccompPodAnnotationKey]
 }

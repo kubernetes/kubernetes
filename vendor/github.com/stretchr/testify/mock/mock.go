@@ -65,6 +65,11 @@ type Call struct {
 	// reference. It's useful when mocking methods such as unmarshalers or
 	// decoders.
 	RunFn func(Arguments)
+
+	// PanicMsg holds msg to be used to mock panic on the function call
+	//  if the PanicMsg is set to a non nil string the function call will panic
+	// irrespective of other settings
+	PanicMsg *string
 }
 
 func newCall(parent *Mock, methodName string, callerInfo []string, methodArguments ...interface{}) *Call {
@@ -77,6 +82,7 @@ func newCall(parent *Mock, methodName string, callerInfo []string, methodArgumen
 		Repeatability:   0,
 		WaitFor:         nil,
 		RunFn:           nil,
+		PanicMsg:        nil,
 	}
 }
 
@@ -96,6 +102,18 @@ func (c *Call) Return(returnArguments ...interface{}) *Call {
 	defer c.unlock()
 
 	c.ReturnArguments = returnArguments
+
+	return c
+}
+
+// Panic specifies if the functon call should fail and the panic message
+//
+//    Mock.On("DoSomething").Panic("test panic")
+func (c *Call) Panic(msg string) *Call {
+	c.lock()
+	defer c.unlock()
+
+	c.PanicMsg = &msg
 
 	return c
 }
@@ -147,10 +165,10 @@ func (c *Call) After(d time.Duration) *Call {
 }
 
 // Run sets a handler to be called before returning. It can be used when
-// mocking a method such as unmarshalers that takes a pointer to a struct and
+// mocking a method (such as an unmarshaler) that takes a pointer to a struct and
 // sets properties in such struct
 //
-//    Mock.On("Unmarshal", AnythingOfType("*map[string]interface{}").Return().Run(func(args Arguments) {
+//    Mock.On("Unmarshal", AnythingOfType("*map[string]interface{}")).Return().Run(func(args Arguments) {
 //    	arg := args.Get(0).(*map[string]interface{})
 //    	arg["foo"] = "bar"
 //    })
@@ -176,6 +194,7 @@ func (c *Call) Maybe() *Call {
 //    Mock.
 //       On("MyMethod", 1).Return(nil).
 //       On("MyOtherMethod", 'a', 'b', 'c').Return(errors.New("Some Error"))
+//go:noinline
 func (c *Call) On(methodName string, arguments ...interface{}) *Call {
 	return c.Parent.On(methodName, arguments...)
 }
@@ -261,38 +280,69 @@ func (m *Mock) On(methodName string, arguments ...interface{}) *Call {
 // */
 
 func (m *Mock) findExpectedCall(method string, arguments ...interface{}) (int, *Call) {
-	for i, call := range m.ExpectedCalls {
-		if call.Method == method && call.Repeatability > -1 {
+	var expectedCall *Call
 
+	for i, call := range m.ExpectedCalls {
+		if call.Method == method {
 			_, diffCount := call.Arguments.Diff(arguments)
 			if diffCount == 0 {
-				return i, call
+				expectedCall = call
+				if call.Repeatability > -1 {
+					return i, call
+				}
 			}
-
 		}
 	}
-	return -1, nil
+
+	return -1, expectedCall
+}
+
+type matchCandidate struct {
+	call      *Call
+	mismatch  string
+	diffCount int
+}
+
+func (c matchCandidate) isBetterMatchThan(other matchCandidate) bool {
+	if c.call == nil {
+		return false
+	}
+	if other.call == nil {
+		return true
+	}
+
+	if c.diffCount > other.diffCount {
+		return false
+	}
+	if c.diffCount < other.diffCount {
+		return true
+	}
+
+	if c.call.Repeatability > 0 && other.call.Repeatability <= 0 {
+		return true
+	}
+	return false
 }
 
 func (m *Mock) findClosestCall(method string, arguments ...interface{}) (*Call, string) {
-	var diffCount int
-	var closestCall *Call
-	var err string
+	var bestMatch matchCandidate
 
 	for _, call := range m.expectedCalls() {
 		if call.Method == method {
 
 			errInfo, tempDiffCount := call.Arguments.Diff(arguments)
-			if tempDiffCount < diffCount || diffCount == 0 {
-				diffCount = tempDiffCount
-				closestCall = call
-				err = errInfo
+			tempCandidate := matchCandidate{
+				call:      call,
+				mismatch:  errInfo,
+				diffCount: tempDiffCount,
 			}
-
+			if tempCandidate.isBetterMatchThan(bestMatch) {
+				bestMatch = tempCandidate
+			}
 		}
 	}
 
-	return closestCall, err
+	return bestMatch.call, bestMatch.mismatch
 }
 
 func callString(method string, arguments Arguments, includeArgumentValues bool) string {
@@ -343,13 +393,17 @@ func (m *Mock) MethodCalled(methodName string, arguments ...interface{}) Argumen
 	found, call := m.findExpectedCall(methodName, arguments...)
 
 	if found < 0 {
+		// expected call found but it has already been called with repeatable times
+		if call != nil {
+			m.mutex.Unlock()
+			m.fail("\nassert: mock: The method has been called over %d times.\n\tEither do one more Mock.On(\"%s\").Return(...), or remove extra call.\n\tThis call was unexpected:\n\t\t%s\n\tat: %s", call.totalCalls, methodName, callString(methodName, arguments, true), assert.CallerInfo())
+		}
 		// we have to fail here - because we don't know what to do
 		// as the return arguments.  This is because:
 		//
 		//   a) this is a totally unexpected call to this method,
 		//   b) the arguments are not what was expected, or
 		//   c) the developer has forgotten to add an accompanying On...Return pair.
-
 		closestCall, mismatch := m.findClosestCall(methodName, arguments...)
 		m.mutex.Unlock()
 
@@ -381,6 +435,13 @@ func (m *Mock) MethodCalled(methodName string, arguments ...interface{}) Argumen
 		<-call.WaitFor
 	} else {
 		time.Sleep(call.waitTime)
+	}
+
+	m.mutex.Lock()
+	panicMsg := call.PanicMsg
+	m.mutex.Unlock()
+	if panicMsg != nil {
+		panic(*panicMsg)
 	}
 
 	m.mutex.Lock()
@@ -518,6 +579,45 @@ func (m *Mock) AssertNotCalled(t TestingT, methodName string, arguments ...inter
 	return true
 }
 
+// IsMethodCallable checking that the method can be called
+// If the method was called more than `Repeatability` return false
+func (m *Mock) IsMethodCallable(t TestingT, methodName string, arguments ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for _, v := range m.ExpectedCalls {
+		if v.Method != methodName {
+			continue
+		}
+		if len(arguments) != len(v.Arguments) {
+			continue
+		}
+		if v.Repeatability < v.totalCalls {
+			continue
+		}
+		if isArgsEqual(v.Arguments, arguments) {
+			return true
+		}
+	}
+	return false
+}
+
+// isArgsEqual compares arguments
+func isArgsEqual(expected Arguments, args []interface{}) bool {
+	if len(expected) != len(args) {
+		return false
+	}
+	for i, v := range args {
+		if !reflect.DeepEqual(expected[i], v) {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *Mock) methodWasCalled(methodName string, expected []interface{}) bool {
 	for _, call := range m.calls() {
 		if call.Method == methodName {
@@ -567,6 +667,23 @@ type AnythingOfTypeArgument string
 //	Assert(t, AnythingOfType("string"), AnythingOfType("int"))
 func AnythingOfType(t string) AnythingOfTypeArgument {
 	return AnythingOfTypeArgument(t)
+}
+
+// IsTypeArgument is a struct that contains the type of an argument
+// for use when type checking.  This is an alternative to AnythingOfType.
+// Used in Diff and Assert.
+type IsTypeArgument struct {
+	t interface{}
+}
+
+// IsType returns an IsTypeArgument object containing the type to check for.
+// You can provide a zero-value of the type to check.  This is an
+// alternative to AnythingOfType.  Used in Diff and Assert.
+//
+// For example:
+// Assert(t, IsType(""), IsType(0))
+func IsType(t interface{}) *IsTypeArgument {
+	return &IsTypeArgument{t: t}
 }
 
 // argumentMatcher performs custom argument matching, returning whether or
@@ -691,7 +808,7 @@ func (args Arguments) Diff(objects []interface{}) (string, int) {
 				output = fmt.Sprintf("%s\t%d: PASS:  %s matched by %s\n", output, i, actualFmt, matcher)
 			} else {
 				differences++
-				output = fmt.Sprintf("%s\t%d: PASS:  %s not matched by %s\n", output, i, actualFmt, matcher)
+				output = fmt.Sprintf("%s\t%d: FAIL:  %s not matched by %s\n", output, i, actualFmt, matcher)
 			}
 		} else if reflect.TypeOf(expected) == reflect.TypeOf((*AnythingOfTypeArgument)(nil)).Elem() {
 
@@ -702,6 +819,12 @@ func (args Arguments) Diff(objects []interface{}) (string, int) {
 				output = fmt.Sprintf("%s\t%d: FAIL:  type %s != type %s - %s\n", output, i, expected, reflect.TypeOf(actual).Name(), actualFmt)
 			}
 
+		} else if reflect.TypeOf(expected) == reflect.TypeOf((*IsTypeArgument)(nil)) {
+			t := expected.(*IsTypeArgument).t
+			if reflect.TypeOf(t) != reflect.TypeOf(actual) {
+				differences++
+				output = fmt.Sprintf("%s\t%d: FAIL:  type %s != type %s - %s\n", output, i, reflect.TypeOf(t).Name(), reflect.TypeOf(actual).Name(), actualFmt)
+			}
 		} else {
 
 			// normal checking
@@ -759,7 +882,7 @@ func (args Arguments) String(indexOrNil ...int) string {
 		// normal String() method - return a string representation of the args
 		var argsStr []string
 		for _, arg := range args {
-			argsStr = append(argsStr, fmt.Sprintf("%s", reflect.TypeOf(arg)))
+			argsStr = append(argsStr, fmt.Sprintf("%T", arg)) // handles nil nicely
 		}
 		return strings.Join(argsStr, ",")
 	} else if len(indexOrNil) == 1 {

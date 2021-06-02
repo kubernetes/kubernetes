@@ -10,14 +10,13 @@
 package hcsschema
 
 type ComputeSystem struct {
-
 	Owner string `json:"Owner,omitempty"`
 
 	SchemaVersion *Version `json:"SchemaVersion,omitempty"`
 
 	HostingSystemId string `json:"HostingSystemId,omitempty"`
 
-	HostedSystem *HostedSystem `json:"HostedSystem,omitempty"`
+	HostedSystem interface{} `json:"HostedSystem,omitempty"`
 
 	Container *Container `json:"Container,omitempty"`
 

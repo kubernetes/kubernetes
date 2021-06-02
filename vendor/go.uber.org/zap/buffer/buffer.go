@@ -23,7 +23,10 @@
 // package's zero-allocation formatters.
 package buffer // import "go.uber.org/zap/buffer"
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 const _size = 1024 // by default, create 1 KiB buffers
 
@@ -47,6 +50,11 @@ func (b *Buffer) AppendString(s string) {
 // AppendInt appends an integer to the underlying buffer (assuming base 10).
 func (b *Buffer) AppendInt(i int64) {
 	b.bs = strconv.AppendInt(b.bs, i, 10)
+}
+
+// AppendTime appends the time formatted using the specified layout.
+func (b *Buffer) AppendTime(t time.Time, layout string) {
+	b.bs = t.AppendFormat(b.bs, layout)
 }
 
 // AppendUint appends an unsigned integer to the underlying buffer (assuming

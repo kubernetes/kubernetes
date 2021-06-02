@@ -17,9 +17,11 @@ limitations under the License.
 package vclib
 
 import (
+	"fmt"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 // VolumeOptions specifies various options for a volume.
@@ -34,6 +36,7 @@ type VolumeOptions struct {
 	StoragePolicyID        string
 	SCSIControllerType     string
 	Zone                   []string
+	SelectedNode           *v1.Node
 }
 
 var (
@@ -88,21 +91,21 @@ func CheckControllerSupported(ctrlType string) bool {
 }
 
 // VerifyVolumeOptions checks if volumeOptions.SCIControllerType is valid controller type
-func (volumeOptions VolumeOptions) VerifyVolumeOptions() bool {
+func (volumeOptions VolumeOptions) VerifyVolumeOptions() error {
 	// Validate only if SCSIControllerType is set by user.
 	// Default value is set later in virtualDiskManager.Create and vmDiskManager.Create
 	if volumeOptions.SCSIControllerType != "" {
 		isValid := CheckControllerSupported(volumeOptions.SCSIControllerType)
 		if !isValid {
-			return false
+			return fmt.Errorf("invalid scsiControllerType: %s", volumeOptions.SCSIControllerType)
 		}
 	}
 	// ThinDiskType is the default, so skip the validation.
 	if volumeOptions.DiskFormat != ThinDiskType {
 		isValid := CheckDiskFormatSupported(volumeOptions.DiskFormat)
 		if !isValid {
-			return false
+			return fmt.Errorf("invalid diskFormat: %s", volumeOptions.DiskFormat)
 		}
 	}
-	return true
+	return nil
 }

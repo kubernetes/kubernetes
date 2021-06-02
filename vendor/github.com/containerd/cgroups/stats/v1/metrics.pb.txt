@@ -1,0 +1,758 @@
+file {
+  name: "github.com/containerd/cgroups/stats/v1/metrics.proto"
+  package: "io.containerd.cgroups.v1"
+  dependency: "gogoproto/gogo.proto"
+  message_type {
+    name: "Metrics"
+    field {
+      name: "hugetlb"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.HugetlbStat"
+      json_name: "hugetlb"
+    }
+    field {
+      name: "pids"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.PidsStat"
+      json_name: "pids"
+    }
+    field {
+      name: "cpu"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.CPUStat"
+      options {
+        65004: "CPU"
+      }
+      json_name: "cpu"
+    }
+    field {
+      name: "memory"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryStat"
+      json_name: "memory"
+    }
+    field {
+      name: "blkio"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOStat"
+      json_name: "blkio"
+    }
+    field {
+      name: "rdma"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.RdmaStat"
+      json_name: "rdma"
+    }
+    field {
+      name: "network"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.NetworkStat"
+      json_name: "network"
+    }
+    field {
+      name: "cgroup_stats"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.CgroupStats"
+      json_name: "cgroupStats"
+    }
+  }
+  message_type {
+    name: "HugetlbStat"
+    field {
+      name: "usage"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "usage"
+    }
+    field {
+      name: "max"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "max"
+    }
+    field {
+      name: "failcnt"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "failcnt"
+    }
+    field {
+      name: "pagesize"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pagesize"
+    }
+  }
+  message_type {
+    name: "PidsStat"
+    field {
+      name: "current"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "current"
+    }
+    field {
+      name: "limit"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "limit"
+    }
+  }
+  message_type {
+    name: "CPUStat"
+    field {
+      name: "usage"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.CPUUsage"
+      json_name: "usage"
+    }
+    field {
+      name: "throttling"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.Throttle"
+      json_name: "throttling"
+    }
+  }
+  message_type {
+    name: "CPUUsage"
+    field {
+      name: "total"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "total"
+    }
+    field {
+      name: "kernel"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "kernel"
+    }
+    field {
+      name: "user"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "user"
+    }
+    field {
+      name: "per_cpu"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_UINT64
+      options {
+        65004: "PerCPU"
+      }
+      json_name: "perCpu"
+    }
+  }
+  message_type {
+    name: "Throttle"
+    field {
+      name: "periods"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "periods"
+    }
+    field {
+      name: "throttled_periods"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "throttledPeriods"
+    }
+    field {
+      name: "throttled_time"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "throttledTime"
+    }
+  }
+  message_type {
+    name: "MemoryStat"
+    field {
+      name: "cache"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "cache"
+    }
+    field {
+      name: "rss"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      options {
+        65004: "RSS"
+      }
+      json_name: "rss"
+    }
+    field {
+      name: "rss_huge"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      options {
+        65004: "RSSHuge"
+      }
+      json_name: "rssHuge"
+    }
+    field {
+      name: "mapped_file"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "mappedFile"
+    }
+    field {
+      name: "dirty"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "dirty"
+    }
+    field {
+      name: "writeback"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "writeback"
+    }
+    field {
+      name: "pg_pg_in"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pgPgIn"
+    }
+    field {
+      name: "pg_pg_out"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pgPgOut"
+    }
+    field {
+      name: "pg_fault"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pgFault"
+    }
+    field {
+      name: "pg_maj_fault"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pgMajFault"
+    }
+    field {
+      name: "inactive_anon"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "inactiveAnon"
+    }
+    field {
+      name: "active_anon"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "activeAnon"
+    }
+    field {
+      name: "inactive_file"
+      number: 13
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "inactiveFile"
+    }
+    field {
+      name: "active_file"
+      number: 14
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "activeFile"
+    }
+    field {
+      name: "unevictable"
+      number: 15
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "unevictable"
+    }
+    field {
+      name: "hierarchical_memory_limit"
+      number: 16
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "hierarchicalMemoryLimit"
+    }
+    field {
+      name: "hierarchical_swap_limit"
+      number: 17
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "hierarchicalSwapLimit"
+    }
+    field {
+      name: "total_cache"
+      number: 18
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalCache"
+    }
+    field {
+      name: "total_rss"
+      number: 19
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      options {
+        65004: "TotalRSS"
+      }
+      json_name: "totalRss"
+    }
+    field {
+      name: "total_rss_huge"
+      number: 20
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      options {
+        65004: "TotalRSSHuge"
+      }
+      json_name: "totalRssHuge"
+    }
+    field {
+      name: "total_mapped_file"
+      number: 21
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalMappedFile"
+    }
+    field {
+      name: "total_dirty"
+      number: 22
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalDirty"
+    }
+    field {
+      name: "total_writeback"
+      number: 23
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalWriteback"
+    }
+    field {
+      name: "total_pg_pg_in"
+      number: 24
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalPgPgIn"
+    }
+    field {
+      name: "total_pg_pg_out"
+      number: 25
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalPgPgOut"
+    }
+    field {
+      name: "total_pg_fault"
+      number: 26
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalPgFault"
+    }
+    field {
+      name: "total_pg_maj_fault"
+      number: 27
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalPgMajFault"
+    }
+    field {
+      name: "total_inactive_anon"
+      number: 28
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalInactiveAnon"
+    }
+    field {
+      name: "total_active_anon"
+      number: 29
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalActiveAnon"
+    }
+    field {
+      name: "total_inactive_file"
+      number: 30
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalInactiveFile"
+    }
+    field {
+      name: "total_active_file"
+      number: 31
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalActiveFile"
+    }
+    field {
+      name: "total_unevictable"
+      number: 32
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "totalUnevictable"
+    }
+    field {
+      name: "usage"
+      number: 33
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryEntry"
+      json_name: "usage"
+    }
+    field {
+      name: "swap"
+      number: 34
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryEntry"
+      json_name: "swap"
+    }
+    field {
+      name: "kernel"
+      number: 35
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryEntry"
+      json_name: "kernel"
+    }
+    field {
+      name: "kernel_tcp"
+      number: 36
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryEntry"
+      options {
+        65004: "KernelTCP"
+      }
+      json_name: "kernelTcp"
+    }
+  }
+  message_type {
+    name: "MemoryEntry"
+    field {
+      name: "limit"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "limit"
+    }
+    field {
+      name: "usage"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "usage"
+    }
+    field {
+      name: "max"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "max"
+    }
+    field {
+      name: "failcnt"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "failcnt"
+    }
+  }
+  message_type {
+    name: "BlkIOStat"
+    field {
+      name: "io_service_bytes_recursive"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioServiceBytesRecursive"
+    }
+    field {
+      name: "io_serviced_recursive"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioServicedRecursive"
+    }
+    field {
+      name: "io_queued_recursive"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioQueuedRecursive"
+    }
+    field {
+      name: "io_service_time_recursive"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioServiceTimeRecursive"
+    }
+    field {
+      name: "io_wait_time_recursive"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioWaitTimeRecursive"
+    }
+    field {
+      name: "io_merged_recursive"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioMergedRecursive"
+    }
+    field {
+      name: "io_time_recursive"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "ioTimeRecursive"
+    }
+    field {
+      name: "sectors_recursive"
+      number: 8
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.BlkIOEntry"
+      json_name: "sectorsRecursive"
+    }
+  }
+  message_type {
+    name: "BlkIOEntry"
+    field {
+      name: "op"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "op"
+    }
+    field {
+      name: "device"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "device"
+    }
+    field {
+      name: "major"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "major"
+    }
+    field {
+      name: "minor"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "minor"
+    }
+    field {
+      name: "value"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "value"
+    }
+  }
+  message_type {
+    name: "RdmaStat"
+    field {
+      name: "current"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.RdmaEntry"
+      json_name: "current"
+    }
+    field {
+      name: "limit"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.RdmaEntry"
+      json_name: "limit"
+    }
+  }
+  message_type {
+    name: "RdmaEntry"
+    field {
+      name: "device"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "device"
+    }
+    field {
+      name: "hca_handles"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "hcaHandles"
+    }
+    field {
+      name: "hca_objects"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "hcaObjects"
+    }
+  }
+  message_type {
+    name: "NetworkStat"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "rx_bytes"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "rxBytes"
+    }
+    field {
+      name: "rx_packets"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "rxPackets"
+    }
+    field {
+      name: "rx_errors"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "rxErrors"
+    }
+    field {
+      name: "rx_dropped"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "rxDropped"
+    }
+    field {
+      name: "tx_bytes"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "txBytes"
+    }
+    field {
+      name: "tx_packets"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "txPackets"
+    }
+    field {
+      name: "tx_errors"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "txErrors"
+    }
+    field {
+      name: "tx_dropped"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "txDropped"
+    }
+  }
+  message_type {
+    name: "CgroupStats"
+    field {
+      name: "nr_sleeping"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrSleeping"
+    }
+    field {
+      name: "nr_running"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrRunning"
+    }
+    field {
+      name: "nr_stopped"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrStopped"
+    }
+    field {
+      name: "nr_uninterruptible"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrUninterruptible"
+    }
+    field {
+      name: "nr_io_wait"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrIoWait"
+    }
+  }
+  syntax: "proto3"
+}

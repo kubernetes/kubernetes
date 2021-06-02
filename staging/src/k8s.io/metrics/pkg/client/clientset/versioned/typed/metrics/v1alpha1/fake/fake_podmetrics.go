@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,7 +40,7 @@ var podmetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", 
 var podmetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1alpha1", Kind: "PodMetrics"}
 
 // Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
-func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.PodMetrics, err error) {
+func (c *FakePodMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), &v1alpha1.PodMetrics{})
 
@@ -49,7 +51,7 @@ func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1al
 }
 
 // List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
-func (c *FakePodMetricses) List(opts v1.ListOptions) (result *v1alpha1.PodMetricsList, err error) {
+func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodMetricsList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), &v1alpha1.PodMetricsList{})
 
@@ -71,7 +73,7 @@ func (c *FakePodMetricses) List(opts v1.ListOptions) (result *v1alpha1.PodMetric
 }
 
 // Watch returns a watch.Interface that watches the requested podMetricses.
-func (c *FakePodMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePodMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podmetricsesResource, c.ns, opts))
 

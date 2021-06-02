@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"flag"
 	"net"
 	"net/http"
@@ -25,8 +26,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
@@ -37,27 +38,31 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
-	MasterConfig            *master.Config
+	MasterConfig            *controlplane.Config
 	StartReplicationManager bool
 	// Client throttling qps
 	QPS float32
@@ -69,7 +74,7 @@ type Config struct {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
@@ -84,17 +89,17 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 
 // MasterReceiver can be used to provide the master to a custom incoming server function
 type MasterReceiver interface {
-	SetMaster(m *master.Master)
+	SetMaster(m *controlplane.Instance)
 }
 
 // MasterHolder implements
 type MasterHolder struct {
 	Initialized chan struct{}
-	M           *master.Master
+	M           *controlplane.Instance
 }
 
 // SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *master.Master) {
+func (h *MasterHolder) SetMaster(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -118,9 +123,9 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
-// startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
-	var m *master.Master
+// startApiserverOrDie starts a kubernetes master and an httpserver to handle api requests
+func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	var m *controlplane.Instance
 	var s *httptest.Server
 
 	// Ensure we log at least level 4
@@ -140,55 +145,72 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
-		m.GenericAPIServer.RunPreShutdownHooks()
+		if m != nil {
+			m.GenericAPIServer.RunPreShutdownHooks()
+		}
 		close(stopCh)
 		s.Close()
 	}
 
-	if masterConfig == nil {
-		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
+	if controlPlaneConfig == nil {
+		controlPlaneConfig = NewControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	}
 
 	// set the loopback client config
-	if masterConfig.GenericConfig.LoopbackClientConfig == nil {
-		masterConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{QPS: 50, Burst: 100, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+	if controlPlaneConfig.GenericConfig.LoopbackClientConfig == nil {
+		controlPlaneConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{QPS: 50, Burst: 100, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	}
-	masterConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
+	controlPlaneConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
 
-	privilegedLoopbackToken := uuid.NewRandom().String()
+	privilegedLoopbackToken := uuid.New().String()
 	// wrap any available authorizer
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
-		UID:    uuid.NewRandom().String(),
+		UID:    uuid.New().String(),
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
-	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
-	if masterConfig.GenericConfig.Authentication.Authenticator == nil {
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, controlPlaneConfig.GenericConfig.Authentication.APIAudiences)
+	if controlPlaneConfig.GenericConfig.Authentication.Authenticator == nil {
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
 	} else {
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authentication.Authenticator)
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, controlPlaneConfig.GenericConfig.Authentication.Authenticator)
 	}
 
-	if masterConfig.GenericConfig.Authorization.Authorizer != nil {
+	if controlPlaneConfig.GenericConfig.Authorization.Authorizer != nil {
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		masterConfig.GenericConfig.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorization.Authorizer)
+		controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, controlPlaneConfig.GenericConfig.Authorization.Authorizer)
 	} else {
-		masterConfig.GenericConfig.Authorization.Authorizer = alwaysAllow{}
+		controlPlaneConfig.GenericConfig.Authorization.Authorizer = alwaysAllow{}
 	}
 
-	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
+	controlPlaneConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
 
-	clientset, err := clientset.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
+	clientset, err := clientset.NewForConfig(controlPlaneConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
+	controlPlaneConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, controlPlaneConfig.GenericConfig.LoopbackClientConfig.Timeout)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
+		controlPlaneConfig.GenericConfig.FlowControl = utilflowcontrol.New(
+			controlPlaneConfig.ExtraConfig.VersionedInformers,
+			clientset.FlowcontrolV1beta1(),
+			controlPlaneConfig.GenericConfig.MaxRequestsInFlight+controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight,
+			controlPlaneConfig.GenericConfig.RequestTimeout/4,
+		)
+	}
+
+	if controlPlaneConfig.ExtraConfig.ServiceIPRange.IP == nil {
+		controlPlaneConfig.ExtraConfig.ServiceIPRange = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)}
+	}
+	m, err = controlPlaneConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
+		// We log the error first so that even if closeFn crashes, the error is shown
+		klog.Errorf("error in bringing up the master: %v", err)
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -202,7 +224,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	m.GenericAPIServer.PrepareRun()
 	m.GenericAPIServer.RunPostStartHooks(stopCh)
 
-	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
+	cfg := *controlPlaneConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
@@ -211,7 +233,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		result := privilegedClient.Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
@@ -229,17 +251,17 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	return m, s, closeFn
 }
 
-// NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
-func NewIntegrationTestMasterConfig() *master.Config {
-	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+// NewIntegrationTestControlPlaneConfig returns the master config appropriate for most integration tests.
+func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
+	return NewIntegrationTestControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// NewIntegrationTestControlPlaneConfigWithOptions returns the control plane config appropriate for most integration tests
 // configured with the provided options.
-func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
-	masterConfig := NewMasterConfigWithOptions(opts)
+func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+	masterConfig := NewControlPlaneConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving
 	masterConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
@@ -257,25 +279,25 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
-	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
+	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New().String(), nil))
 	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 	return etcdOptions
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *master.Config {
-	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+// NewControlPlaneConfig returns a basic control plane config.
+func NewControlPlaneConfig() *controlplane.Config {
+	return NewControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
-func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+// NewControlPlaneConfigWithOptions returns a basic control plane config configured with the provided options.
+func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
 	etcdOptions := DefaultEtcdOptions()
 	if opts.EtcdOptions != nil {
 		etcdOptions = opts.EtcdOptions
 	}
 
 	storageConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
+	storageConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	completedStorageConfig, err := storageConfig.Complete(etcdOptions)
 	if err != nil {
 		panic(err)
@@ -287,6 +309,12 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
+	if len(kubeVersion.Major) == 0 {
+		kubeVersion.Major = "1"
+	}
+	if len(kubeVersion.Minor) == 0 {
+		kubeVersion.Minor = "22"
+	}
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 
@@ -298,10 +326,10 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 		panic(err)
 	}
 
-	return &master.Config{
+	return &controlplane.Config{
 		GenericConfig: genericConfig,
-		ExtraConfig: master.ExtraConfig{
-			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+		ExtraConfig: controlplane.ExtraConfig{
+			APIResourceConfigSource: controlplane.DefaultAPIResourceConfigSource(),
 			StorageFactory:          storageFactory,
 			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 			APIServerServicePort:    443,
@@ -314,22 +342,22 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 type CloseFunc func()
 
 // RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
+func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
-		masterConfig = NewMasterConfig()
+		masterConfig = NewControlPlaneConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 	}
-	return startMasterOrDie(masterConfig, nil, nil)
+	return startApiserverOrDie(masterConfig, nil, nil)
 }
 
-// RunAMasterUsingServer starts up a master using the provided config on the specified server.
-func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
-	return startMasterOrDie(masterConfig, s, masterReceiver)
+// RunAnApiserverUsingServer starts up an instance using the provided config on the specified server.
+func RunAnApiserverUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	return startApiserverOrDie(controlPlaneConfig, s, masterReceiver)
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
-	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
+	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }

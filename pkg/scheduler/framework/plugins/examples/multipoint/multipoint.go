@@ -17,19 +17,21 @@ limitations under the License.
 package multipoint
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // CommunicatingPlugin is an example of a plugin that implements two
-// extension points. It communicates through pluginContext with another function.
+// extension points. It communicates through state with another function.
 type CommunicatingPlugin struct{}
 
-var _ = framework.ReservePlugin(CommunicatingPlugin{})
-var _ = framework.PrebindPlugin(CommunicatingPlugin{})
+var _ framework.ReservePlugin = CommunicatingPlugin{}
+var _ framework.PreBindPlugin = CommunicatingPlugin{}
 
-// Name is the name of the plug used in Registry and configurations.
+// Name is the name of the plugin used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -37,33 +39,53 @@ func (mc CommunicatingPlugin) Name() string {
 	return Name
 }
 
-// Reserve is the functions invoked by the framework at "reserve" extension point.
-func (mc CommunicatingPlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+type stateData struct {
+	data string
+}
+
+func (s *stateData) Clone() framework.StateData {
+	copy := &stateData{
+		data: s.data,
+	}
+	return copy
+}
+
+// Reserve is the function invoked by the framework at "reserve" extension point.
+func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
 	if pod.Name == "my-test-pod" {
-		pc.Lock()
-		pc.Write(framework.ContextKey(pod.Name), "never bind")
-		pc.Unlock()
+		state.Write(framework.StateKey(pod.Name), &stateData{data: "never bind"})
 	}
 	return nil
 }
 
-// Prebind is the functions invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+// Unreserve is the function invoked by the framework when any error happens
+// during "reserve" extension point or later.
+func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+	if pod.Name == "my-test-pod" {
+		// The pod is at the end of its lifecycle -- let's clean up the allocated
+		// resources. In this case, our clean up is simply deleting the key written
+		// in the Reserve operation.
+		state.Delete(framework.StateKey(pod.Name))
+	}
+}
+
+// PreBind is the function invoked by the framework at "prebind" extension point.
+func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
-	pc.RLock()
-	defer pc.RUnlock()
-	if v, e := pc.Read(framework.ContextKey(pod.Name)); e == nil && v == "never bind" {
-		return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+	if v, e := state.Read(framework.StateKey(pod.Name)); e == nil {
+		if value, ok := v.(*stateData); ok && value.data == "never bind" {
+			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+		}
 	}
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	return &CommunicatingPlugin{}, nil
 }

@@ -18,10 +18,17 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/prometheus/client_golang/prometheus"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+var (
+	labelValueAllowLists = map[string]*MetricLabelAllowList{}
+	allowListLock        sync.RWMutex
 )
 
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure
@@ -31,15 +38,27 @@ import (
 // Name must be set to a non-empty string. DeprecatedVersion is defined only
 // if the metric for which this options applies is, in fact, deprecated.
 type KubeOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       prometheus.Labels
-	DeprecatedVersion *semver.Version
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
+}
+
+// BuildFQName joins the given three name components by "_". Empty name
+// components are ignored. If the name parameter itself is empty, an empty
+// string is returned, no matter what. Metric implementations included in this
+// library use this function internally to generate the fully-qualified metric
+// name from the name component in their Opts. Users of the library will only
+// need this function if they implement their own Metric or instantiate a Desc
+// (with NewDesc) directly.
+func BuildFQName(namespace, subsystem, name string) string {
+	return prometheus.BuildFQName(namespace, subsystem, name)
 }
 
 // StabilityLevel represents the API guarantees for a given defined metric.
@@ -53,6 +72,16 @@ const (
 	// the deprecation policy outlined in by the control plane metrics stability KEP.
 	STABLE StabilityLevel = "STABLE"
 )
+
+// setDefaults takes 'ALPHA' in case of empty.
+func (sl *StabilityLevel) setDefaults() {
+	switch *sl {
+	case "":
+		*sl = ALPHA
+	default:
+		// no-op, since we have a StabilityLevel already
+	}
+}
 
 // CounterOpts is an alias for Opts. See there for doc comments.
 type CounterOpts KubeOpts
@@ -104,7 +133,7 @@ func (o *GaugeOpts) annotateStabilityLevel() {
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
+func (o *GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 	return prometheus.GaugeOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
@@ -119,16 +148,17 @@ func (o GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 // and can safely be left at their zero value, although it is strongly
 // encouraged to set a Help string.
 type HistogramOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       prometheus.Labels
-	Buckets           []float64
-	DeprecatedVersion *semver.Version
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Buckets              []float64
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -148,7 +178,7 @@ func (o *HistogramOpts) annotateStabilityLevel() {
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
+func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 	return prometheus.HistogramOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
@@ -165,19 +195,20 @@ func (o HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 // a help string and to explicitly set the Objectives field to the desired value
 // as the default value will change in the upcoming v0.10 of the library.
 type SummaryOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       prometheus.Labels
-	Objectives        map[float64]float64
-	MaxAge            time.Duration
-	AgeBuckets        uint32
-	BufCap            uint32
-	DeprecatedVersion *semver.Version
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Objectives           map[float64]float64
+	MaxAge               time.Duration
+	AgeBuckets           uint32
+	BufCap               uint32
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -195,18 +226,76 @@ func (o *SummaryOpts) annotateStabilityLevel() {
 	})
 }
 
+// Deprecated: DefObjectives will not be used as the default objectives in
+// v1.0.0 of the library. The default Summary will have no quantiles then.
+var (
+	defObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+)
+
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
+func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
+	// we need to retain existing quantile behavior for backwards compatibility,
+	// so let's do what prometheus used to do prior to v1.
+	objectives := o.Objectives
+	if objectives == nil {
+		objectives = defObjectives
+	}
 	return prometheus.SummaryOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
 		Help:        o.Help,
 		ConstLabels: o.ConstLabels,
-		Objectives:  o.Objectives,
+		Objectives:  objectives,
 		MaxAge:      o.MaxAge,
 		AgeBuckets:  o.AgeBuckets,
 		BufCap:      o.BufCap,
+	}
+}
+
+type MetricLabelAllowList struct {
+	labelToAllowList map[string]sets.String
+}
+
+func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, labelValueList []string) {
+	for index, value := range labelValueList {
+		name := labelNameList[index]
+		if allowValues, ok := allowList.labelToAllowList[name]; ok {
+			if !allowValues.Has(value) {
+				labelValueList[index] = "unexpected"
+			}
+		}
+	}
+}
+
+func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]string) {
+	for name, value := range labels {
+		if allowValues, ok := allowList.labelToAllowList[name]; ok {
+			if !allowValues.Has(value) {
+				labels[name] = "unexpected"
+			}
+		}
+	}
+}
+
+func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
+	allowListLock.Lock()
+	defer allowListLock.Unlock()
+	for metricLabelName, labelValues := range allowListMapping {
+		metricName := strings.Split(metricLabelName, ",")[0]
+		labelName := strings.Split(metricLabelName, ",")[1]
+		valueSet := sets.NewString(strings.Split(labelValues, ",")...)
+
+		allowList, ok := labelValueAllowLists[metricName]
+		if ok {
+			allowList.labelToAllowList[labelName] = valueSet
+		} else {
+			labelToAllowList := make(map[string]sets.String)
+			labelToAllowList[labelName] = valueSet
+			labelValueAllowLists[metricName] = &MetricLabelAllowList{
+				labelToAllowList,
+			}
+		}
 	}
 }

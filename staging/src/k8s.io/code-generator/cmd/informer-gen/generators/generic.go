@@ -35,6 +35,7 @@ type genericGenerator struct {
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions
 	groupGoNames         map[string]string
+	pluralExceptions     map[string]string
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type
 	filtered             bool
 }
@@ -50,14 +51,11 @@ func (g *genericGenerator) Filter(c *generator.Context, t *types.Type) bool {
 }
 
 func (g *genericGenerator) Namers(c *generator.Context) namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
 	return namer.NameSystems{
 		"raw":                namer.NewRawNamer(g.outputPackage, g.imports),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"resource":           codegennamer.NewTagOverrideNamer("resourceName", namer.NewAllLowercasePluralNamer(pluralExceptions)),
+		"allLowercasePlural": namer.NewAllLowercasePluralNamer(g.pluralExceptions),
+		"publicPlural":       namer.NewPublicPluralNamer(g.pluralExceptions),
+		"resource":           codegennamer.NewTagOverrideNamer("resourceName", namer.NewAllLowercasePluralNamer(g.pluralExceptions)),
 	}
 }
 
@@ -75,9 +73,11 @@ type group struct {
 
 type groupSort []group
 
-func (g groupSort) Len() int           { return len(g) }
-func (g groupSort) Less(i, j int) bool { return strings.ToLower(g[i].Name) < strings.ToLower(g[j].Name) }
-func (g groupSort) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g groupSort) Len() int { return len(g) }
+func (g groupSort) Less(i, j int) bool {
+	return strings.ToLower(g[i].Name) < strings.ToLower(g[j].Name)
+}
+func (g groupSort) Swap(i, j int) { g[i], g[j] = g[j], g[i] }
 
 type version struct {
 	Name      string

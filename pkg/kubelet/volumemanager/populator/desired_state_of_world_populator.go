@@ -21,13 +21,15 @@ caches in sync with the "ground truth".
 package populator
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,9 +41,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -53,8 +55,8 @@ import (
 type DesiredStateOfWorldPopulator interface {
 	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
-	// ReprocessPod removes the specified pod from the list of processedPods
-	// (if it exists) forcing it to be reprocessed. This is required to enable
+	// ReprocessPod sets value for the specified pod in processedPods
+	// to false, forcing it to be reprocessed. This is required to enable
 	// remounting volumes on pod updates (volumes like Downward API volumes
 	// depend on this behavior to ensure volume content is updated).
 	ReprocessPod(podName volumetypes.UniquePodName)
@@ -86,7 +88,10 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
-	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
+	keepTerminatedPodVolumes bool,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -101,6 +106,9 @@ func NewDesiredStateOfWorldPopulator(
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
+		volumePluginMgr:          volumePluginMgr,
 	}
 }
 
@@ -118,6 +126,9 @@ type desiredStateOfWorldPopulator struct {
 	keepTerminatedPodVolumes  bool
 	hasAddedPods              bool
 	hasAddedPodsLock          sync.RWMutex
+	csiMigratedPluginManager  csimigration.PluginManager
+	intreeToCSITranslator     csimigration.InTreeToCSITranslator
+	volumePluginMgr           *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -127,7 +138,7 @@ type processedPods struct {
 
 func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
-	klog.Infof("Desired state populator starts to run")
+	klog.InfoS("Desired state populator starts to run")
 	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {
 		done := sourcesReady.AllReady()
 		dswp.populatorLoop()
@@ -141,7 +152,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
-	dswp.deleteProcessedPod(podName)
+	dswp.markPodProcessingFailed(podName)
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
@@ -159,11 +170,7 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
 	// findAndRemoveDeletedPods() is called independently of the main
 	// populator loop.
 	if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
-		klog.V(5).Infof(
-			"Skipping findAndRemoveDeletedPods(). Not permitted until %v (getPodStatusRetryDuration %v).",
-			dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration),
-			dswp.getPodStatusRetryDuration)
-
+		klog.V(5).InfoS("Skipping findAndRemoveDeletedPods(). ", "nextRetryTime", dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration), "retryDuration", dswp.getPodStatusRetryDuration)
 		return
 	}
 
@@ -213,6 +220,20 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
+
+			// check if the attachability has changed for this volume
+			if volumeToMount.PluginIsAttachable {
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				// only this means the plugin is truly non-attachable
+				if err == nil && attachableVolumePlugin == nil {
+					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
+					// So the uniqueVolumeName should remain the same after the attachability change
+					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					klog.InfoS("Volume changes from attachable to non-attachable", "volumeName", volumeToMount.VolumeName)
+					continue
+				}
+			}
+
 			// Skip running pods
 			if !dswp.isPodTerminated(pod) {
 				continue
@@ -230,9 +251,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			var getPodsErr error
 			runningPods, getPodsErr = dswp.kubeContainerRuntime.GetPods(false)
 			if getPodsErr != nil {
-				klog.Errorf(
-					"kubeContainerRuntime.findAndRemoveDeletedPods returned error %v.",
-					getPodsErr)
+				klog.ErrorS(getPodsErr, "kubeContainerRuntime.findAndRemoveDeletedPods returned error")
 				continue
 			}
 
@@ -243,7 +262,11 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		runningContainers := false
 		for _, runningPod := range runningPods {
 			if runningPod.ID == volumeToMount.Pod.UID {
-				if len(runningPod.Containers) > 0 {
+				// runningPod.Containers only include containers in the running state,
+				// excluding containers in the creating process.
+				// By adding a non-empty judgment for runningPod.Sandboxes,
+				// ensure that all containers of the pod have been terminated.
+				if len(runningPod.Sandboxes) > 0 || len(runningPod.Containers) > 0 {
 					runningContainers = true
 				}
 
@@ -252,23 +275,30 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		}
 
 		if runningContainers {
-			klog.V(4).Infof(
-				"Pod %q still has one or more containers in the non-exited state. Therefore, it will not be removed from desired state.",
-				format.Pod(volumeToMount.Pod))
+			klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
 			continue
 		}
 		exists, _, _ := dswp.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		var volumeToMountSpecName string
+		if volumeToMount.VolumeSpec != nil {
+			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
+		}
 		if !exists && podExists {
-			klog.V(4).Infof(
-				volumeToMount.GenerateMsgDetailed(fmt.Sprintf("Actual state has not yet has this volume mounted information and pod (%q) still exists in pod manager, skip removing volume from desired state",
-					format.Pod(volumeToMount.Pod)), ""))
+			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 			continue
 		}
-		klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Removing volume from desired state", ""))
+		klog.V(4).InfoS("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)
+	}
+
+	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()
+	for _, podName := range podsWithError {
+		if _, podExists := dswp.podManager.GetPodByUID(types.UID(podName)); !podExists {
+			dswp.desiredStateOfWorld.PopPodErrors(podName)
+		}
 	}
 }
 
@@ -288,18 +318,22 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	allVolumesAdded := true
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+	mounts, devices := util.GetPodVolumeNames(pod)
 
+	expandInUsePV := utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes)
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
+		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
+			// Volume is not used in the pod, ignore it.
+			klog.V(4).InfoS("Skipping unused volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
+			continue
+		}
+
 		pvc, volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mountsMap, devicesMap)
+			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {
-			klog.Errorf(
-				"Error processing volume %q for pod %q: %v",
-				podVolume.Name,
-				format.Pod(pod),
-				err)
+			klog.ErrorS(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 			continue
 		}
@@ -308,22 +342,14 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
 			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
 		if err != nil {
-			klog.Errorf(
-				"Failed to add volume %q (specName: %q) for pod %q to desiredStateOfWorld. err=%v",
-				podVolume.Name,
-				volumeSpec.Name(),
-				uniquePodName,
-				err)
+			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
+		} else {
+			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 		}
 
-		klog.V(4).Infof(
-			"Added volume %q (volSpec=%q) for pod %q to desired state.",
-			podVolume.Name,
-			volumeSpec.Name(),
-			uniquePodName)
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+		if expandInUsePV {
 			dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec,
 				uniquePodName, mountedVolumesForPod, processedVolumesForFSResize)
 		}
@@ -335,6 +361,14 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		// New pod has been synced. Re-mount all volumes that need it
 		// (e.g. DownwardAPI)
 		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
+		// Remove any stored errors for the pod, everything went well in this processPodVolumes
+		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
+	} else if dswp.podHasBeenSeenOnce(uniquePodName) {
+		// For the Pod which has been processed at least once, even though some volumes
+		// may not have been reprocessed successfully this round, we still mark it as processed to avoid
+		// processing it at a very high frequency. The pod will be reprocessed when volume manager calls
+		// ReprocessPod() which is triggered by SyncPod.
+		dswp.markPodProcessed(uniquePodName)
 	}
 
 }
@@ -365,57 +399,23 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		// or online resize in subsequent loop(after we confirm it has been mounted).
 		return
 	}
-	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
-	if err != nil {
-		klog.Errorf("Check volume mode failed for volume %s(OuterVolumeSpecName %s): %v",
-			uniqueVolumeName, podVolume.Name, err)
-		return
-	}
-	if !fsVolume {
-		klog.V(5).Infof("Block mode volume needn't to check file system resize request")
-		return
-	}
 	if processedVolumesForFSResize.Has(string(uniqueVolumeName)) {
 		// File system resize operation is a global operation for volume,
 		// so we only need to check it once if more than one pod use it.
 		return
 	}
-	if mountedReadOnlyByPod(podVolume, pod) {
+	// volumeSpec.ReadOnly is the value that determines if volume could be formatted when being mounted.
+	// This is the same flag that determines filesystem resizing behaviour for offline resizing and hence
+	// we should use it here. This value comes from Pod.spec.volumes.persistentVolumeClaim.readOnly.
+	if volumeSpec.ReadOnly {
 		// This volume is used as read only by this pod, we don't perform resize for read only volumes.
-		klog.V(5).Infof("Skip file system resize check for volume %s in pod %s/%s "+
-			"as the volume is mounted as readonly", podVolume.Name, pod.Namespace, pod.Name)
+		klog.V(5).InfoS("Skip file system resize check for the volume, as the volume is mounted as readonly", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 		return
 	}
 	if volumeRequiresFSResize(pvc, volumeSpec.PersistentVolume) {
 		dswp.actualStateOfWorld.MarkFSResizeRequired(uniqueVolumeName, uniquePodName)
 	}
 	processedVolumesForFSResize.Insert(string(uniqueVolumeName))
-}
-
-func mountedReadOnlyByPod(podVolume v1.Volume, pod *v1.Pod) bool {
-	if podVolume.PersistentVolumeClaim.ReadOnly {
-		return true
-	}
-	for _, container := range pod.Spec.InitContainers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
-			return false
-		}
-	}
-	for _, container := range pod.Spec.Containers {
-		if !mountedReadOnlyByContainer(podVolume.Name, &container) {
-			return false
-		}
-	}
-	return true
-}
-
-func mountedReadOnlyByContainer(volumeName string, container *v1.Container) bool {
-	for _, volumeMount := range container.VolumeMounts {
-		if volumeMount.Name == volumeName && !volumeMount.ReadOnly {
-			return false
-		}
-	}
-	return true
 }
 
 func getUniqueVolumeName(
@@ -440,14 +440,32 @@ func volumeRequiresFSResize(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolu
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already
-// been processed by the populator
+// been processed/reprocessed by the populator. Otherwise, the volumes for this pod need to
+// be reprocessed.
 func (dswp *desiredStateOfWorldPopulator) podPreviouslyProcessed(
 	podName volumetypes.UniquePodName) bool {
 	dswp.pods.RLock()
 	defer dswp.pods.RUnlock()
 
-	_, exists := dswp.pods.processedPods[podName]
-	return exists
+	return dswp.pods.processedPods[podName]
+}
+
+// markPodProcessingFailed marks the specified pod from processedPods as false to indicate that it failed processing
+func (dswp *desiredStateOfWorldPopulator) markPodProcessingFailed(
+	podName volumetypes.UniquePodName) {
+	dswp.pods.Lock()
+	dswp.pods.processedPods[podName] = false
+	dswp.pods.Unlock()
+}
+
+// podHasBeenSeenOnce returns true if the pod has been seen by the popoulator
+// at least once.
+func (dswp *desiredStateOfWorldPopulator) podHasBeenSeenOnce(
+	podName volumetypes.UniquePodName) bool {
+	dswp.pods.RLock()
+	_, exist := dswp.pods.processedPods[podName]
+	dswp.pods.RUnlock()
+	return exist
 }
 
 // markPodProcessed records that the volumes for the specified pod have been
@@ -469,80 +487,101 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	delete(dswp.pods.processedPods, podName)
 }
 
-// createVolumeSpec creates and returns a mutatable volume.Spec object for the
+// createVolumeSpec creates and returns a mutable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, podName string, podNamespace string, mountsMap map[string]bool, devicesMap map[string]bool) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
-	if pvcSource :=
-		podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-		klog.V(5).Infof(
-			"Found PVC, ClaimName: %q/%q",
-			podNamespace,
-			pvcSource.ClaimName)
-
+	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
+	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
+	ephemeral := false
+	if pvcSource == nil &&
+		podVolume.VolumeSource.Ephemeral != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			// Provide an unambiguous error message that
+			// explains why the volume cannot be
+			// processed. If we just ignore the volume
+			// source, the error is just a vague "unknown
+			// volume source".
+			return nil, nil, "", fmt.Errorf(
+				"volume %s is a generic ephemeral volume, but that feature is disabled in kubelet",
+				podVolume.Name,
+			)
+		}
+		// Generic ephemeral inline volumes are handled the
+		// same way as a PVC reference. The only additional
+		// constraint (checked below) is that the PVC must be
+		// owned by the pod.
+		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: pod.Name + "-" + podVolume.Name,
+		}
+		ephemeral = true
+	}
+	if pvcSource != nil {
+		klog.V(5).InfoS("Found PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName))
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvc, err := dswp.getPVCExtractPV(
-			podNamespace, pvcSource.ClaimName)
+			pod.Namespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
+				"error processing PVC %s/%s: %v",
+				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
 		}
+		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
+			return nil, nil, "", fmt.Errorf(
+				"error processing PVC %s/%s: not the ephemeral PVC for the pod",
+				pod.Namespace,
+				pvcSource.ClaimName,
+			)
+		}
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
-
-		klog.V(5).Infof(
-			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID,
-			pvName)
-
+		klog.V(5).InfoS("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
 		// Fetch actual PV object
 		volumeSpec, volumeGidValue, err :=
 			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				podNamespace,
+				"error processing PVC %s/%s: %v",
+				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
 		}
-
-		klog.V(5).Infof(
-			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name(),
-			pvName,
-			podNamespace,
-			pvcSource.ClaimName,
-			pvcUID)
-
-		// TODO: remove feature gate check after no longer needed
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-			volumeMode, err := util.GetVolumeMode(volumeSpec)
+		klog.V(5).InfoS("Extracted volumeSpec from bound PV and PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName, "volumeSpecName", volumeSpec.Name())
+		migratable, err := dswp.csiMigratedPluginManager.IsMigratable(volumeSpec)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		if migratable {
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, pod.Namespace, dswp.intreeToCSITranslator)
 			if err != nil {
 				return nil, nil, "", err
 			}
-			// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem
-			if mountsMap[podVolume.Name] && volumeMode != v1.PersistentVolumeFilesystem {
-				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeMounts for pod %q/%q",
-					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
-			}
-			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
-			if devicesMap[podVolume.Name] && volumeMode != v1.PersistentVolumeBlock {
-				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeDevices for pod %q/%q",
-					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
-			}
+		}
+
+		// TODO: replace this with util.GetVolumeMode() when features.BlockVolume is removed.
+		// The function will return the right value then.
+		volumeMode := v1.PersistentVolumeFilesystem
+		if volumeSpec.PersistentVolume != nil && volumeSpec.PersistentVolume.Spec.VolumeMode != nil {
+			volumeMode = *volumeSpec.PersistentVolume.Spec.VolumeMode
+		}
+
+		// TODO: remove features.BlockVolume checks / comments after no longer needed
+		// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem.
+		// Do not check feature gate here to make sure even when the feature is disabled in kubelet,
+		// because controller-manager / API server can already contain block PVs / PVCs.
+		if mounts.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeFilesystem {
+			return nil, nil, "", fmt.Errorf(
+				"volume %s has volumeMode %s, but is specified in volumeMounts",
+				podVolume.Name,
+				volumeMode)
+		}
+		// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
+		if devices.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeBlock {
+			return nil, nil, "", fmt.Errorf(
+				"volume %s has volumeMode %s, but is specified in volumeDevices",
+				podVolume.Name,
+				volumeMode)
 		}
 		return pvc, volumeSpec, volumeGidValue, nil
 	}
@@ -550,7 +589,18 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	// Do not return the original volume object, since the source could mutate it
 	clonedPodVolume := podVolume.DeepCopy()
 
-	return nil, volume.NewSpecFromVolume(clonedPodVolume), "", nil
+	spec := volume.NewSpecFromVolume(clonedPodVolume)
+	migratable, err := dswp.csiMigratedPluginManager.IsMigratable(spec)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if migratable {
+		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, pod.Namespace, dswp.intreeToCSITranslator)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
+	return nil, spec, "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from
@@ -560,13 +610,9 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
 	pvc, err :=
-		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
-		return nil, fmt.Errorf(
-			"failed to fetch PVC %s/%s from API server. err=%v",
-			namespace,
-			claimName,
-			err)
+		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
@@ -579,21 +625,15 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		// It should happen only in very rare case when scheduler schedules
 		// a pod and user deletes a PVC that's used by it at the same time.
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			return nil, fmt.Errorf(
-				"can't start pod because PVC %s/%s is being deleted",
-				namespace,
-				claimName)
+			return nil, errors.New("PVC is being deleted")
 		}
 	}
 
-	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
-
-		return nil, fmt.Errorf(
-			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
-			namespace,
-			claimName,
-			pvc.Status.Phase,
-			pvc.Spec.VolumeName)
+	if pvc.Status.Phase != v1.ClaimBound {
+		return nil, errors.New("PVC is not bound")
+	}
+	if pvc.Spec.VolumeName == "" {
+		return nil, errors.New("PVC has empty pvc.Spec.VolumeName")
 	}
 
 	return pvc, nil
@@ -606,21 +646,21 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, string, error) {
-	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(name, metav1.GetOptions{})
+	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
-			"failed to fetch PV %q from API server. err=%v", name, err)
+			"failed to fetch PV %s from API server: %v", name, err)
 	}
 
 	if pv.Spec.ClaimRef == nil {
 		return nil, "", fmt.Errorf(
-			"found PV object %q but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
+			"found PV object %s but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
 			name)
 	}
 
 	if pv.Spec.ClaimRef.UID != expectedClaimUID {
 		return nil, "", fmt.Errorf(
-			"found PV object %q but its pv.Spec.ClaimRef.UID (%q) does not point to claim.UID (%q)",
+			"found PV object %s but its pv.Spec.ClaimRef.UID %s does not point to claim.UID %s",
 			name,
 			pv.Spec.ClaimRef.UID,
 			expectedClaimUID)
@@ -628,28 +668,6 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 
 	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
 	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
-}
-
-func (dswp *desiredStateOfWorldPopulator) makeVolumeMap(containers []v1.Container) (map[string]bool, map[string]bool) {
-	volumeDevicesMap := make(map[string]bool)
-	volumeMountsMap := make(map[string]bool)
-
-	for _, container := range containers {
-		if container.VolumeMounts != nil {
-			for _, mount := range container.VolumeMounts {
-				volumeMountsMap[mount.Name] = true
-			}
-		}
-		// TODO: remove feature gate check after no longer needed
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) &&
-			container.VolumeDevices != nil {
-			for _, device := range container.VolumeDevices {
-				volumeDevicesMap[device.Name] = true
-			}
-		}
-	}
-
-	return volumeMountsMap, volumeDevicesMap
 }
 
 func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {

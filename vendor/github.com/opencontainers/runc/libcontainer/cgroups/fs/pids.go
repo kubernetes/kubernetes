@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
@@ -18,24 +19,20 @@ func (s *PidsGroup) Name() string {
 	return "pids"
 }
 
-func (s *PidsGroup) Apply(d *cgroupData) error {
-	_, err := d.join("pids")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+func (s *PidsGroup) Apply(path string, d *cgroupData) error {
+	return join(path, d.pid)
 }
 
-func (s *PidsGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.PidsLimit != 0 {
+func (s *PidsGroup) Set(path string, r *configs.Resources) error {
+	if r.PidsLimit != 0 {
 		// "max" is the fallback value.
 		limit := "max"
 
-		if cgroup.Resources.PidsLimit > 0 {
-			limit = strconv.FormatInt(cgroup.Resources.PidsLimit, 10)
+		if r.PidsLimit > 0 {
+			limit = strconv.FormatInt(r.PidsLimit, 10)
 		}
 
-		if err := writeFile(path, "pids.max", limit); err != nil {
+		if err := fscommon.WriteFile(path, "pids.max", limit); err != nil {
 			return err
 		}
 	}
@@ -43,17 +40,16 @@ func (s *PidsGroup) Set(path string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func (s *PidsGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("pids"))
-}
-
 func (s *PidsGroup) GetStats(path string, stats *cgroups.Stats) error {
-	current, err := getCgroupParamUint(path, "pids.current")
+	if !cgroups.PathExists(path) {
+		return nil
+	}
+	current, err := fscommon.GetCgroupParamUint(path, "pids.current")
 	if err != nil {
 		return fmt.Errorf("failed to parse pids.current - %s", err)
 	}
 
-	maxString, err := getCgroupParamString(path, "pids.max")
+	maxString, err := fscommon.GetCgroupParamString(path, "pids.max")
 	if err != nil {
 		return fmt.Errorf("failed to parse pids.max - %s", err)
 	}
@@ -61,7 +57,7 @@ func (s *PidsGroup) GetStats(path string, stats *cgroups.Stats) error {
 	// Default if pids.max == "max" is 0 -- which represents "no limit".
 	var max uint64
 	if maxString != "max" {
-		max, err = parseUint(maxString, 10, 64)
+		max, err = fscommon.ParseUint(maxString, 10, 64)
 		if err != nil {
 			return fmt.Errorf("failed to parse pids.max - unable to parse %q as a uint from Cgroup file %q", maxString, filepath.Join(path, "pids.max"))
 		}

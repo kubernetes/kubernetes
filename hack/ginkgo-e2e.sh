@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script runs e2e tests on Google Cloud Platform.
+# Usage: `hack/ginkgo-e2e.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -37,6 +40,13 @@ GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
 
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
+
+# If set, the command executed will be:
+# - `dlv exec` if set to "delve"
+# - `gdb` if set to "gdb"
+# NOTE: for this to work the e2e.test binary has to be compiled with
+# make WHAT=test/e2e/e2e.test GOGCFLAGS="all=-N -l" GOLDFLAGS=""
+E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL:-}
 
 : "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"
 : "${KUBE_CONFIG_FILE:="config-test.sh"}"
@@ -74,7 +84,11 @@ else
     prepare-e2e
 
     detect-master >/dev/null
-    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
+
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-}"
+    if [[ -z "${KUBE_MASTER_URL:-}" && -n "${KUBE_MASTER_IP:-}" ]]; then
+      KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
+    fi
 
     auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
@@ -137,13 +151,24 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--noColor")
 fi
 
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-${KUBE_CONTAINER_RUNTIME:-}}
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
-# Add path for things like running kubectl binary. 
+# Add path for things like running kubectl binary.
 PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
-"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+
+# Choose the program to execute.
+program=("${ginkgo}")
+if [[ "${E2E_TEST_DEBUG_TOOL}" == "delve" ]]; then
+  program=("dlv" "exec")
+elif [[ "${E2E_TEST_DEBUG_TOOL}" == "gdb" ]]; then
+  program=("gdb")
+fi
+
+"${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
   --host="${KUBE_MASTER_URL}" \
@@ -162,11 +187,10 @@ export PATH
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
-  --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
-  --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
+  --docker-config-file="${DOCKER_CONFIG_FILE:-}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
-  ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
+  ${CONTAINER_RUNTIME:+"--container-runtime=${CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -25,7 +27,7 @@ import (
 
 	"google.golang.org/api/googleapi"
 	tpuapi "google.golang.org/api/tpu/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -33,7 +35,7 @@ import (
 // newTPUService returns a new tpuService using the client to communicate with
 // the Cloud TPU APIs.
 func newTPUService(client *http.Client) (*tpuService, error) {
-	s, err := tpuapi.New(client)
+	s, err := tpuapi.NewService(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -124,22 +126,32 @@ func (g *Cloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node, erro
 	mc := newTPUMetricContext("list", zone)
 
 	parent := getTPUParentName(g.projectID, zone)
-	response, err := g.tpuService.projects.Locations.Nodes.List(parent).Do()
+	var nodes []*tpuapi.Node
+	var accumulator = func(response *tpuapi.ListNodesResponse) error {
+		nodes = append(nodes, response.Nodes...)
+		return nil
+	}
+	err := g.tpuService.projects.Locations.Nodes.List(parent).Pages(ctx, accumulator)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
-	return response.Nodes, mc.Observe(nil)
+	return nodes, mc.Observe(nil)
 }
 
 // ListLocations returns the zones where Cloud TPUs are available.
 func (g *Cloud) ListLocations(ctx context.Context) ([]*tpuapi.Location, error) {
 	mc := newTPUMetricContext("list_locations", "")
 	parent := getTPUProjectURL(g.projectID)
-	response, err := g.tpuService.projects.Locations.List(parent).Do()
+	var locations []*tpuapi.Location
+	var accumulator = func(response *tpuapi.ListLocationsResponse) error {
+		locations = append(locations, response.Locations...)
+		return nil
+	}
+	err := g.tpuService.projects.Locations.List(parent).Pages(ctx, accumulator)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
-	return response.Locations, mc.Observe(nil)
+	return locations, mc.Observe(nil)
 }
 
 // waitForTPUOp checks whether the op is done every 30 seconds before the ctx

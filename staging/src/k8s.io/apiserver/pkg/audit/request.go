@@ -23,9 +23,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pborman/uuid"
-	"k8s.io/klog"
-
+	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +33,10 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -42,23 +44,20 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
+func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
-		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
+		RequestReceivedTimestamp: metav1.NewMicroTime(requestReceivedTimestamp),
 		Verb:                     attribs.GetVerb(),
 		RequestURI:               req.URL.RequestURI(),
 		UserAgent:                maybeTruncateUserAgent(req),
 		Level:                    level,
 	}
 
-	// prefer the id from the headers. If not available, create a new one.
-	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header.Get(auditinternal.HeaderAuditID)
-	if ids != "" {
-		ev.AuditID = types.UID(ids)
-	} else {
-		ev.AuditID = types.UID(uuid.NewRandom().String())
+	auditID, found := request.AuditIDFrom(req.Context())
+	if !found {
+		auditID = types.UID(uuid.New().String())
 	}
+	ev.AuditID = auditID
 
 	ips := utilnet.SourceIPs(req)
 	ev.SourceIPs = make([]string, len(ips))
@@ -68,9 +67,9 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	if user := attribs.GetUser(); user != nil {
 		ev.User.Username = user.GetName()
-		ev.User.Extra = map[string]auditinternal.ExtraValue{}
+		ev.User.Extra = map[string]authnv1.ExtraValue{}
 		for k, v := range user.GetExtra() {
-			ev.User.Extra[k] = auditinternal.ExtraValue(v)
+			ev.User.Extra[k] = authnv1.ExtraValue(v)
 		}
 		ev.User.Groups = user.GetGroups()
 		ev.User.UID = user.GetUID()
@@ -87,6 +86,10 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 		}
 	}
 
+	for _, kv := range auditAnnotationsFrom(req.Context()) {
+		LogAnnotation(ev, kv.key, kv.value)
+	}
+
 	return ev, nil
 }
 
@@ -95,14 +98,14 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
-	ae.ImpersonatedUser = &auditinternal.UserInfo{
+	ae.ImpersonatedUser = &authnv1.UserInfo{
 		Username: user.GetName(),
 	}
 	ae.ImpersonatedUser.Groups = user.GetGroups()
 	ae.ImpersonatedUser.UID = user.GetUID()
-	ae.ImpersonatedUser.Extra = map[string]auditinternal.ExtraValue{}
+	ae.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
 	for k, v := range user.GetExtra() {
-		ae.ImpersonatedUser.Extra[k] = auditinternal.ExtraValue(v)
+		ae.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
 	}
 }
 
@@ -228,16 +231,6 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 		return
 	}
 	ae.Annotations[key] = value
-}
-
-// LogAnnotations fills in the Annotations according to the annotations map.
-func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
-	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
-		return
-	}
-	for key, value := range annotations {
-		LogAnnotation(ae, key, value)
-	}
 }
 
 // truncate User-Agent if too long, otherwise return it directly.

@@ -7,8 +7,8 @@ https://docs.docker.com/engine/reference/api/
 Usage
 
 You use the library by creating a client object and calling methods on it. The
-client can be created either from environment variables with NewEnvClient, or
-configured manually with NewClient.
+client can be created either from environment variables with NewClientWithOpts(client.FromEnv),
+or configured manually with NewClient().
 
 For example, to list running containers (the equivalent of "docker ps"):
 
@@ -81,6 +81,15 @@ type Client struct {
 	customHTTPHeaders map[string]string
 	// manualOverride is set to true when the version was set by users.
 	manualOverride bool
+
+	// negotiateVersion indicates if the client should automatically negotiate
+	// the API version to use when making requests. API version negotiation is
+	// performed on the first request, after which negotiated is set to "true"
+	// so that subsequent requests do not re-negotiate.
+	negotiateVersion bool
+
+	// negotiated indicates that API version negotiation took place
+	negotiated bool
 }
 
 // CheckRedirect specifies the policy for dealing with redirect responses:
@@ -107,7 +116,7 @@ func CheckRedirect(req *http.Request, via []*http.Request) error {
 // It won't send any version information if the version number is empty. It is
 // highly recommended that you set a version or your client may break if the
 // server is upgraded.
-func NewClientWithOpts(ops ...func(*Client) error) (*Client, error) {
+func NewClientWithOpts(ops ...Opt) (*Client, error) {
 	client, err := defaultHTTPClient(DefaultDockerHost)
 	if err != nil {
 		return nil, err
@@ -169,8 +178,11 @@ func (cli *Client) Close() error {
 
 // getAPIPath returns the versioned request path to call the api.
 // It appends the query parameters to the path if they are not empty.
-func (cli *Client) getAPIPath(p string, query url.Values) string {
+func (cli *Client) getAPIPath(ctx context.Context, p string, query url.Values) string {
 	var apiPath string
+	if cli.negotiateVersion && !cli.negotiated {
+		cli.NegotiateAPIVersion(ctx)
+	}
 	if cli.version != "" {
 		v := strings.TrimPrefix(cli.version, "v")
 		apiPath = path.Join(cli.basePath, "/v"+v, p)
@@ -186,19 +198,31 @@ func (cli *Client) ClientVersion() string {
 }
 
 // NegotiateAPIVersion queries the API and updates the version to match the
-// API version. Any errors are silently ignored.
+// API version. Any errors are silently ignored. If a manual override is in place,
+// either through the `DOCKER_API_VERSION` environment variable, or if the client
+// was initialized with a fixed version (`opts.WithVersion(xx)`), no negotiation
+// will be performed.
 func (cli *Client) NegotiateAPIVersion(ctx context.Context) {
-	ping, _ := cli.Ping(ctx)
-	cli.NegotiateAPIVersionPing(ping)
+	if !cli.manualOverride {
+		ping, _ := cli.Ping(ctx)
+		cli.negotiateAPIVersionPing(ping)
+	}
 }
 
 // NegotiateAPIVersionPing updates the client version to match the Ping.APIVersion
-// if the ping version is less than the default version.
+// if the ping version is less than the default version.  If a manual override is
+// in place, either through the `DOCKER_API_VERSION` environment variable, or if
+// the client was initialized with a fixed version (`opts.WithVersion(xx)`), no
+// negotiation is performed.
 func (cli *Client) NegotiateAPIVersionPing(p types.Ping) {
-	if cli.manualOverride {
-		return
+	if !cli.manualOverride {
+		cli.negotiateAPIVersionPing(p)
 	}
+}
 
+// negotiateAPIVersionPing queries the API and updates the version to match the
+// API version. Any errors are silently ignored.
+func (cli *Client) negotiateAPIVersionPing(p types.Ping) {
 	// try the latest version before versioning headers existed
 	if p.APIVersion == "" {
 		p.APIVersion = "1.24"
@@ -213,6 +237,12 @@ func (cli *Client) NegotiateAPIVersionPing(p types.Ping) {
 	if versions.LessThan(p.APIVersion, cli.version) {
 		cli.version = p.APIVersion
 	}
+
+	// Store the results, so that automatic API version negotiation (if enabled)
+	// won't be performed on the next request.
+	if cli.negotiateVersion {
+		cli.negotiated = true
+	}
 }
 
 // DaemonHost returns the host address used by the client
@@ -222,7 +252,8 @@ func (cli *Client) DaemonHost() string {
 
 // HTTPClient returns a copy of the HTTP client bound to the server
 func (cli *Client) HTTPClient() *http.Client {
-	return &*cli.client
+	c := *cli.client
+	return &c
 }
 
 // ParseHostURL parses a url string, validates the string is a host url, and

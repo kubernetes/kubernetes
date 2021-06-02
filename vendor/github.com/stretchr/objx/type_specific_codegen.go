@@ -1,7 +1,7 @@
 package objx
 
 /*
-	Inter (interface{} and []interface{})
+   Inter (interface{} and []interface{})
 */
 
 // Inter gets the value as a interface{}, returns the optionalDefault
@@ -126,257 +126,7 @@ func (v *Value) CollectInter(collector func(int, interface{}) interface{}) *Valu
 }
 
 /*
-	MSI (map[string]interface{} and []map[string]interface{})
-*/
-
-// MSI gets the value as a map[string]interface{}, returns the optionalDefault
-// value or a system default object if the value is the wrong type.
-func (v *Value) MSI(optionalDefault ...map[string]interface{}) map[string]interface{} {
-	if s, ok := v.data.(map[string]interface{}); ok {
-		return s
-	}
-	if len(optionalDefault) == 1 {
-		return optionalDefault[0]
-	}
-	return nil
-}
-
-// MustMSI gets the value as a map[string]interface{}.
-//
-// Panics if the object is not a map[string]interface{}.
-func (v *Value) MustMSI() map[string]interface{} {
-	return v.data.(map[string]interface{})
-}
-
-// MSISlice gets the value as a []map[string]interface{}, returns the optionalDefault
-// value or nil if the value is not a []map[string]interface{}.
-func (v *Value) MSISlice(optionalDefault ...[]map[string]interface{}) []map[string]interface{} {
-	if s, ok := v.data.([]map[string]interface{}); ok {
-		return s
-	}
-	if len(optionalDefault) == 1 {
-		return optionalDefault[0]
-	}
-	return nil
-}
-
-// MustMSISlice gets the value as a []map[string]interface{}.
-//
-// Panics if the object is not a []map[string]interface{}.
-func (v *Value) MustMSISlice() []map[string]interface{} {
-	return v.data.([]map[string]interface{})
-}
-
-// IsMSI gets whether the object contained is a map[string]interface{} or not.
-func (v *Value) IsMSI() bool {
-	_, ok := v.data.(map[string]interface{})
-	return ok
-}
-
-// IsMSISlice gets whether the object contained is a []map[string]interface{} or not.
-func (v *Value) IsMSISlice() bool {
-	_, ok := v.data.([]map[string]interface{})
-	return ok
-}
-
-// EachMSI calls the specified callback for each object
-// in the []map[string]interface{}.
-//
-// Panics if the object is the wrong type.
-func (v *Value) EachMSI(callback func(int, map[string]interface{}) bool) *Value {
-	for index, val := range v.MustMSISlice() {
-		carryon := callback(index, val)
-		if !carryon {
-			break
-		}
-	}
-	return v
-}
-
-// WhereMSI uses the specified decider function to select items
-// from the []map[string]interface{}.  The object contained in the result will contain
-// only the selected items.
-func (v *Value) WhereMSI(decider func(int, map[string]interface{}) bool) *Value {
-	var selected []map[string]interface{}
-	v.EachMSI(func(index int, val map[string]interface{}) bool {
-		shouldSelect := decider(index, val)
-		if !shouldSelect {
-			selected = append(selected, val)
-		}
-		return true
-	})
-	return &Value{data: selected}
-}
-
-// GroupMSI uses the specified grouper function to group the items
-// keyed by the return of the grouper.  The object contained in the
-// result will contain a map[string][]map[string]interface{}.
-func (v *Value) GroupMSI(grouper func(int, map[string]interface{}) string) *Value {
-	groups := make(map[string][]map[string]interface{})
-	v.EachMSI(func(index int, val map[string]interface{}) bool {
-		group := grouper(index, val)
-		if _, ok := groups[group]; !ok {
-			groups[group] = make([]map[string]interface{}, 0)
-		}
-		groups[group] = append(groups[group], val)
-		return true
-	})
-	return &Value{data: groups}
-}
-
-// ReplaceMSI uses the specified function to replace each map[string]interface{}s
-// by iterating each item.  The data in the returned result will be a
-// []map[string]interface{} containing the replaced items.
-func (v *Value) ReplaceMSI(replacer func(int, map[string]interface{}) map[string]interface{}) *Value {
-	arr := v.MustMSISlice()
-	replaced := make([]map[string]interface{}, len(arr))
-	v.EachMSI(func(index int, val map[string]interface{}) bool {
-		replaced[index] = replacer(index, val)
-		return true
-	})
-	return &Value{data: replaced}
-}
-
-// CollectMSI uses the specified collector function to collect a value
-// for each of the map[string]interface{}s in the slice.  The data returned will be a
-// []interface{}.
-func (v *Value) CollectMSI(collector func(int, map[string]interface{}) interface{}) *Value {
-	arr := v.MustMSISlice()
-	collected := make([]interface{}, len(arr))
-	v.EachMSI(func(index int, val map[string]interface{}) bool {
-		collected[index] = collector(index, val)
-		return true
-	})
-	return &Value{data: collected}
-}
-
-/*
-	ObjxMap ((Map) and [](Map))
-*/
-
-// ObjxMap gets the value as a (Map), returns the optionalDefault
-// value or a system default object if the value is the wrong type.
-func (v *Value) ObjxMap(optionalDefault ...(Map)) Map {
-	if s, ok := v.data.((Map)); ok {
-		return s
-	}
-	if len(optionalDefault) == 1 {
-		return optionalDefault[0]
-	}
-	return New(nil)
-}
-
-// MustObjxMap gets the value as a (Map).
-//
-// Panics if the object is not a (Map).
-func (v *Value) MustObjxMap() Map {
-	return v.data.((Map))
-}
-
-// ObjxMapSlice gets the value as a [](Map), returns the optionalDefault
-// value or nil if the value is not a [](Map).
-func (v *Value) ObjxMapSlice(optionalDefault ...[](Map)) [](Map) {
-	if s, ok := v.data.([](Map)); ok {
-		return s
-	}
-	if len(optionalDefault) == 1 {
-		return optionalDefault[0]
-	}
-	return nil
-}
-
-// MustObjxMapSlice gets the value as a [](Map).
-//
-// Panics if the object is not a [](Map).
-func (v *Value) MustObjxMapSlice() [](Map) {
-	return v.data.([](Map))
-}
-
-// IsObjxMap gets whether the object contained is a (Map) or not.
-func (v *Value) IsObjxMap() bool {
-	_, ok := v.data.((Map))
-	return ok
-}
-
-// IsObjxMapSlice gets whether the object contained is a [](Map) or not.
-func (v *Value) IsObjxMapSlice() bool {
-	_, ok := v.data.([](Map))
-	return ok
-}
-
-// EachObjxMap calls the specified callback for each object
-// in the [](Map).
-//
-// Panics if the object is the wrong type.
-func (v *Value) EachObjxMap(callback func(int, Map) bool) *Value {
-	for index, val := range v.MustObjxMapSlice() {
-		carryon := callback(index, val)
-		if !carryon {
-			break
-		}
-	}
-	return v
-}
-
-// WhereObjxMap uses the specified decider function to select items
-// from the [](Map).  The object contained in the result will contain
-// only the selected items.
-func (v *Value) WhereObjxMap(decider func(int, Map) bool) *Value {
-	var selected [](Map)
-	v.EachObjxMap(func(index int, val Map) bool {
-		shouldSelect := decider(index, val)
-		if !shouldSelect {
-			selected = append(selected, val)
-		}
-		return true
-	})
-	return &Value{data: selected}
-}
-
-// GroupObjxMap uses the specified grouper function to group the items
-// keyed by the return of the grouper.  The object contained in the
-// result will contain a map[string][](Map).
-func (v *Value) GroupObjxMap(grouper func(int, Map) string) *Value {
-	groups := make(map[string][](Map))
-	v.EachObjxMap(func(index int, val Map) bool {
-		group := grouper(index, val)
-		if _, ok := groups[group]; !ok {
-			groups[group] = make([](Map), 0)
-		}
-		groups[group] = append(groups[group], val)
-		return true
-	})
-	return &Value{data: groups}
-}
-
-// ReplaceObjxMap uses the specified function to replace each (Map)s
-// by iterating each item.  The data in the returned result will be a
-// [](Map) containing the replaced items.
-func (v *Value) ReplaceObjxMap(replacer func(int, Map) Map) *Value {
-	arr := v.MustObjxMapSlice()
-	replaced := make([](Map), len(arr))
-	v.EachObjxMap(func(index int, val Map) bool {
-		replaced[index] = replacer(index, val)
-		return true
-	})
-	return &Value{data: replaced}
-}
-
-// CollectObjxMap uses the specified collector function to collect a value
-// for each of the (Map)s in the slice.  The data returned will be a
-// []interface{}.
-func (v *Value) CollectObjxMap(collector func(int, Map) interface{}) *Value {
-	arr := v.MustObjxMapSlice()
-	collected := make([]interface{}, len(arr))
-	v.EachObjxMap(func(index int, val Map) bool {
-		collected[index] = collector(index, val)
-		return true
-	})
-	return &Value{data: collected}
-}
-
-/*
-	Bool (bool and []bool)
+   Bool (bool and []bool)
 */
 
 // Bool gets the value as a bool, returns the optionalDefault
@@ -501,7 +251,7 @@ func (v *Value) CollectBool(collector func(int, bool) interface{}) *Value {
 }
 
 /*
-	Str (string and []string)
+   Str (string and []string)
 */
 
 // Str gets the value as a string, returns the optionalDefault
@@ -626,7 +376,7 @@ func (v *Value) CollectStr(collector func(int, string) interface{}) *Value {
 }
 
 /*
-	Int (int and []int)
+   Int (int and []int)
 */
 
 // Int gets the value as a int, returns the optionalDefault
@@ -751,7 +501,7 @@ func (v *Value) CollectInt(collector func(int, int) interface{}) *Value {
 }
 
 /*
-	Int8 (int8 and []int8)
+   Int8 (int8 and []int8)
 */
 
 // Int8 gets the value as a int8, returns the optionalDefault
@@ -876,7 +626,7 @@ func (v *Value) CollectInt8(collector func(int, int8) interface{}) *Value {
 }
 
 /*
-	Int16 (int16 and []int16)
+   Int16 (int16 and []int16)
 */
 
 // Int16 gets the value as a int16, returns the optionalDefault
@@ -1001,7 +751,7 @@ func (v *Value) CollectInt16(collector func(int, int16) interface{}) *Value {
 }
 
 /*
-	Int32 (int32 and []int32)
+   Int32 (int32 and []int32)
 */
 
 // Int32 gets the value as a int32, returns the optionalDefault
@@ -1126,7 +876,7 @@ func (v *Value) CollectInt32(collector func(int, int32) interface{}) *Value {
 }
 
 /*
-	Int64 (int64 and []int64)
+   Int64 (int64 and []int64)
 */
 
 // Int64 gets the value as a int64, returns the optionalDefault
@@ -1251,7 +1001,7 @@ func (v *Value) CollectInt64(collector func(int, int64) interface{}) *Value {
 }
 
 /*
-	Uint (uint and []uint)
+   Uint (uint and []uint)
 */
 
 // Uint gets the value as a uint, returns the optionalDefault
@@ -1376,7 +1126,7 @@ func (v *Value) CollectUint(collector func(int, uint) interface{}) *Value {
 }
 
 /*
-	Uint8 (uint8 and []uint8)
+   Uint8 (uint8 and []uint8)
 */
 
 // Uint8 gets the value as a uint8, returns the optionalDefault
@@ -1501,7 +1251,7 @@ func (v *Value) CollectUint8(collector func(int, uint8) interface{}) *Value {
 }
 
 /*
-	Uint16 (uint16 and []uint16)
+   Uint16 (uint16 and []uint16)
 */
 
 // Uint16 gets the value as a uint16, returns the optionalDefault
@@ -1626,7 +1376,7 @@ func (v *Value) CollectUint16(collector func(int, uint16) interface{}) *Value {
 }
 
 /*
-	Uint32 (uint32 and []uint32)
+   Uint32 (uint32 and []uint32)
 */
 
 // Uint32 gets the value as a uint32, returns the optionalDefault
@@ -1751,7 +1501,7 @@ func (v *Value) CollectUint32(collector func(int, uint32) interface{}) *Value {
 }
 
 /*
-	Uint64 (uint64 and []uint64)
+   Uint64 (uint64 and []uint64)
 */
 
 // Uint64 gets the value as a uint64, returns the optionalDefault
@@ -1876,7 +1626,7 @@ func (v *Value) CollectUint64(collector func(int, uint64) interface{}) *Value {
 }
 
 /*
-	Uintptr (uintptr and []uintptr)
+   Uintptr (uintptr and []uintptr)
 */
 
 // Uintptr gets the value as a uintptr, returns the optionalDefault
@@ -2001,7 +1751,7 @@ func (v *Value) CollectUintptr(collector func(int, uintptr) interface{}) *Value 
 }
 
 /*
-	Float32 (float32 and []float32)
+   Float32 (float32 and []float32)
 */
 
 // Float32 gets the value as a float32, returns the optionalDefault
@@ -2126,7 +1876,7 @@ func (v *Value) CollectFloat32(collector func(int, float32) interface{}) *Value 
 }
 
 /*
-	Float64 (float64 and []float64)
+   Float64 (float64 and []float64)
 */
 
 // Float64 gets the value as a float64, returns the optionalDefault
@@ -2251,7 +2001,7 @@ func (v *Value) CollectFloat64(collector func(int, float64) interface{}) *Value 
 }
 
 /*
-	Complex64 (complex64 and []complex64)
+   Complex64 (complex64 and []complex64)
 */
 
 // Complex64 gets the value as a complex64, returns the optionalDefault
@@ -2376,7 +2126,7 @@ func (v *Value) CollectComplex64(collector func(int, complex64) interface{}) *Va
 }
 
 /*
-	Complex128 (complex128 and []complex128)
+   Complex128 (complex128 and []complex128)
 */
 
 // Complex128 gets the value as a complex128, returns the optionalDefault

@@ -23,10 +23,10 @@ import (
 	"os"
 	"strings"
 
-	mangen "github.com/cpuguy83/go-md2man/md2man"
+	mangen "github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	ccmapp "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
+	kubectlcmd "k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -34,7 +34,6 @@ import (
 	schapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeadmapp "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
-	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 func main() {
@@ -73,13 +72,6 @@ func main() {
 		genMarkdown(controllermanager, "", outDir)
 		for _, c := range controllermanager.Commands() {
 			genMarkdown(c, "kube-controller-manager", outDir)
-		}
-	case "cloud-controller-manager":
-		//generate manpage for cloud-controller-manager
-		controllermanager := ccmapp.NewCloudControllerManagerCommand()
-		genMarkdown(controllermanager, "", outDir)
-		for _, c := range controllermanager.Commands() {
-			genMarkdown(c, "cloud-controller-manager", outDir)
 		}
 	case "kube-proxy":
 		// generate manpage for kube-proxy

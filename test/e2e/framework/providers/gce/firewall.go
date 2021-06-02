@@ -25,12 +25,11 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
@@ -76,7 +75,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
 	fw.TargetTags = []string{nodeTag}
-	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
+	fw.SourceRanges = gcecloud.L4LoadBalancerSrcRanges()
 	healthCheckPort := gcecloud.GetNodesHealthCheckPort()
 	if !isNodesHealthCheck {
 		healthCheckPort = svc.Spec.HealthCheckNodePort
@@ -217,7 +216,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-http-alt",
+		Name:         nodeTag + "-http-alt",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{
@@ -232,7 +231,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-nodeports",
+		Name:         nodeTag + "-nodeports",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{
@@ -396,7 +395,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 
 // WaitForFirewallRule waits for the specified firewall existence
 func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
-	e2elog.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
+	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error
 

@@ -1,32 +1,30 @@
-default:
-  deps: [test]
+version: '2'
 
-dl-deps:
-  desc: Downloads cli dependencies
-  cmds:
-    - go get -u github.com/golang/lint/golint
-    - go get -u github.com/golang/dep/cmd/dep
+env:
+  GOFLAGS: -mod=vendor
 
-update-deps:
-  desc: Updates dependencies
-  cmds:
-    - dep ensure
-    - dep ensure -update
+tasks:
+  default:
+    deps: [test]
 
-lint:
-  desc: Runs golint
-  cmds:
-    - go fmt $(go list ./... | grep -v /vendor/)
-    - go vet $(go list ./... | grep -v /vendor/)
-    - golint $(ls *.go | grep -v "doc.go")
-  silent: true
+  lint:
+    desc: Checks code style
+    cmds:
+      - gofmt -d -s *.go
+      - go vet ./...
+    silent: true
 
-test:
-  desc: Runs go tests
-  cmds:
-    - go test -race  .
+  lint-fix:
+    desc: Fixes code style
+    cmds:
+      - gofmt -w -s *.go
 
-test-coverage:
-  desc: Runs go tests and calucates test coverage
-  cmds:
-    - go test -coverprofile=c.out .
+  test:
+    desc: Runs go tests
+    cmds:
+      - go test -race  ./...
+
+  test-coverage:
+    desc: Runs go tests and calucates test coverage
+    cmds:
+      - go test -race -coverprofile=c.out ./...

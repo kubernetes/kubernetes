@@ -21,15 +21,16 @@ import (
 	"os"
 
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -95,11 +96,7 @@ func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
 }
 
-func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
-func (plugin *portworxVolumePlugin) RequiresRemount() bool {
+func (plugin *portworxVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -331,7 +328,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 		return err
 	}
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil
@@ -386,8 +383,7 @@ func (d *portworxVolumeDeleter) Delete() error {
 
 type portworxVolumeProvisioner struct {
 	*portworxVolume
-	options   volume.VolumeOptions
-	namespace string
+	options volume.VolumeOptions
 }
 
 var _ volume.Provisioner = &portworxVolumeProvisioner{}

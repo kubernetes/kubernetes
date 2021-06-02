@@ -17,12 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Summary is our internal representation for our wrapping struct around prometheus
-// summaries. Summary implements both KubeCollector and ObserverMetric
+// summaries. Summary implements both kubeCollector and ObserverMetric
 //
 // DEPRECATED: as per the metrics overhaul KEP
 type Summary struct {
@@ -37,16 +38,14 @@ type Summary struct {
 //
 // DEPRECATED: as per the metrics overhaul KEP
 func NewSummary(opts *SummaryOpts) *Summary {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	s := &Summary{
 		SummaryOpts: opts,
 		lazyMetric:  lazyMetric{},
 	}
 	s.setPrometheusSummary(noopMetric{})
-	s.lazyInit(s)
+	s.lazyInit(s, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return s
 }
 
@@ -58,7 +57,7 @@ func (s *Summary) setPrometheusSummary(summary prometheus.Summary) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (s *Summary) DeprecatedVersion() *semver.Version {
-	return s.SummaryOpts.DeprecatedVersion
+	return parseSemver(s.SummaryOpts.DeprecatedVersion)
 }
 
 // initializeMetric invokes the actual prometheus.Summary object instantiation
@@ -76,6 +75,11 @@ func (s *Summary) initializeDeprecatedMetric() {
 	s.initializeMetric()
 }
 
+// WithContext allows the normal Summary metric to pass in context. The context is no-op now.
+func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
+	return s.ObserverMetric
+}
+
 // SummaryVec is the internal representation of our wrapping struct around prometheus
 // summaryVecs.
 //
@@ -87,28 +91,33 @@ type SummaryVec struct {
 	originalLabels []string
 }
 
-// NewSummaryVec returns an object which satisfies KubeCollector and wraps the
+// NewSummaryVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.SummaryVec object. However, the object returned will not measure
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 //
 // DEPRECATED: as per the metrics overhaul KEP
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
+	opts.StabilityLevel.setDefaults()
+
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
 	}
+	allowListLock.RUnlock()
+
 	v := &SummaryVec{
 		SummaryOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v)
+	v.lazyInit(v, fqName)
 	return v
 }
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *SummaryVec) DeprecatedVersion() *semver.Version {
-	return v.SummaryOpts.DeprecatedVersion
+	return parseSemver(v.SummaryOpts.DeprecatedVersion)
 }
 
 func (v *SummaryVec) initializeMetric() {
@@ -137,6 +146,9 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.SummaryVec.WithLabelValues(lvs...)
 }
 
@@ -144,9 +156,59 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new ObserverMetric is created IFF the summaryVec has
 // been registered to a metrics registry.
-func (v *SummaryVec) With(labels prometheus.Labels) ObserverMetric {
+func (v *SummaryVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
+	}
 	return v.SummaryVec.With(labels)
+}
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *SummaryVec) Delete(labels map[string]string) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.SummaryVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *SummaryVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.SummaryVec.Reset()
+}
+
+// WithContext returns wrapped SummaryVec with context
+func (v *SummaryVec) WithContext(ctx context.Context) *SummaryVecWithContext {
+	return &SummaryVecWithContext{
+		ctx:        ctx,
+		SummaryVec: *v,
+	}
+}
+
+// SummaryVecWithContext is the wrapper of SummaryVec with context.
+type SummaryVecWithContext struct {
+	SummaryVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of SummaryVec.WithLabelValues.
+func (vc *SummaryVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
+	return vc.SummaryVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of SummaryVec.With.
+func (vc *SummaryVecWithContext) With(labels map[string]string) ObserverMetric {
+	return vc.SummaryVec.With(labels)
 }

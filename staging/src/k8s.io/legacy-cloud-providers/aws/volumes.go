@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -22,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	csimigration "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -101,7 +103,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		// This should never happen but if it does it could mean there was a race and instance
 		// has been deleted
 		if err != nil {
-			fetchErr := fmt.Errorf("Error fetching instance %s for volume %s", instanceID, diskName)
+			fetchErr := fmt.Errorf("error fetching instance %s for volume %s", instanceID, diskName)
 			klog.Warning(fetchErr)
 			return awsDiskInfo, false, fetchErr
 		}

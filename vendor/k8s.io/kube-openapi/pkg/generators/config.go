@@ -24,7 +24,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/kube-openapi/cmd/openapi-gen/args"
 )

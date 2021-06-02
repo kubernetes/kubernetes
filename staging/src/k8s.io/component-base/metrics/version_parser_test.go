@@ -17,8 +17,11 @@ limitations under the License.
 package metrics
 
 import (
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestVersionParsing(t *testing.T) {
@@ -45,9 +48,7 @@ func TestVersionParsing(t *testing.T) {
 				GitVersion: test.versionString,
 			}
 			parsedV := parseVersion(version)
-			if test.expectedVersion != parsedV.String() {
-				t.Errorf("Got %v, wanted %v", parsedV.String(), test.expectedVersion)
-			}
+			assert.Equalf(t, test.expectedVersion, parsedV.String(), "Got %v, wanted %v", parsedV.String(), test.expectedVersion)
 		})
 	}
 }

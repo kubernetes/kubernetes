@@ -19,12 +19,17 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+	json "encoding/json"
+	"fmt"
+
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -38,7 +43,7 @@ var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRole"}
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1alpha1.ClusterRole{})
 	if obj == nil {
@@ -48,7 +53,7 @@ func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1al
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &v1alpha1.ClusterRoleList{})
 	if obj == nil {
@@ -69,13 +74,13 @@ func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRo
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Create(clusterRole *v1alpha1.ClusterRole) (result *v1alpha1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.CreateOptions) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1alpha1.ClusterRole{})
 	if obj == nil {
@@ -85,7 +90,7 @@ func (c *FakeClusterRoles) Create(clusterRole *v1alpha1.ClusterRole) (result *v1
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Update(clusterRole *v1alpha1.ClusterRole) (result *v1alpha1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.UpdateOptions) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1alpha1.ClusterRole{})
 	if obj == nil {
@@ -95,24 +100,45 @@ func (c *FakeClusterRoles) Update(clusterRole *v1alpha1.ClusterRole) (result *v1
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &v1alpha1.ClusterRole{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
+func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterRoleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *FakeClusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &v1alpha1.ClusterRole{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterRole), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterRole.
+func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *rbacv1alpha1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRole, err error) {
+	if clusterRole == nil {
+		return nil, fmt.Errorf("clusterRole provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterRole)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterRole.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}

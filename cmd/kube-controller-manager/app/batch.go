@@ -22,19 +22,20 @@ package app
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
 		return nil, false, nil
 	}
-	go job.NewJobController(
+	go job.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
@@ -43,8 +44,19 @@ func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}] {
 		return nil, false, nil
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CronJobControllerV2) {
+		cj2c, err := cronjob.NewControllerV2(ctx.InformerFactory.Batch().V1().Jobs(),
+			ctx.InformerFactory.Batch().V1().CronJobs(),
+			ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
+		)
+		if err != nil {
+			return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
+		}
+		go cj2c.Run(int(ctx.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), ctx.Stop)
+		return nil, true, nil
 	}
 	cjc, err := cronjob.NewController(
 		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),

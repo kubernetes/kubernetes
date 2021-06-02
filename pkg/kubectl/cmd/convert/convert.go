@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,12 +28,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/validation"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var (
@@ -137,14 +137,6 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
-
-	// Convert must be removed from kubectl, since kubectl can not depend on
-	// Kubernetes "internal" dependencies. These "internal" dependencies can
-	// not be removed from convert. Another way to convert a resource is to
-	// "kubectl apply" it to the cluster, then "kubectl get" at the desired version.
-	// Another possible solution is to make convert a plugin.
-	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
-
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
@@ -186,7 +178,7 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	internalVersionJSONEncoder := unstructured.JSONFallbackEncoder{Encoder: internalEncoder}
+	internalVersionJSONEncoder := unstructured.NewJSONFallbackEncoder(internalEncoder)
 	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
 	if err != nil {
 		return err

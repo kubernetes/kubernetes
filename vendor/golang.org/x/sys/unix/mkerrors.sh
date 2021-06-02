@@ -44,6 +44,7 @@ includes_AIX='
 #include <sys/stropts.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
+#include <sys/select.h>
 #include <sys/termio.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -55,13 +56,19 @@ includes_Darwin='
 #define _DARWIN_C_SOURCE
 #define KERNEL
 #define _DARWIN_USE_64_BIT_INODE
+#define __APPLE_USE_RFC_3542
 #include <stdint.h>
 #include <sys/attr.h>
+#include <sys/clonefile.h>
+#include <sys/kern_control.h>
 #include <sys/types.h>
 #include <sys/event.h>
 #include <sys/ptrace.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/sockio.h>
+#include <sys/sys_domain.h>
 #include <sys/sysctl.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
@@ -80,6 +87,7 @@ includes_Darwin='
 includes_DragonFly='
 #include <sys/types.h>
 #include <sys/event.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/stat.h>
@@ -90,6 +98,7 @@ includes_DragonFly='
 #include <sys/ioctl.h>
 #include <net/bpf.h>
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -102,8 +111,12 @@ includes_FreeBSD='
 #include <sys/capsicum.h>
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/disk.h>
 #include <sys/event.h>
+#include <sys/sched.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/sockio.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
@@ -179,48 +192,71 @@ struct ltchars {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
+#include <sys/timerfd.h>
+#include <sys/uio.h>
 #include <sys/xattr.h>
+#include <linux/bpf.h>
+#include <linux/can.h>
+#include <linux/can/error.h>
+#include <linux/can/raw.h>
+#include <linux/capability.h>
+#include <linux/cryptouser.h>
+#include <linux/devlink.h>
+#include <linux/dm-ioctl.h>
 #include <linux/errqueue.h>
+#include <linux/ethtool_netlink.h>
+#include <linux/falloc.h>
+#include <linux/fanotify.h>
+#include <linux/filter.h>
+#include <linux/fs.h>
+#include <linux/fscrypt.h>
+#include <linux/fsverity.h>
+#include <linux/genetlink.h>
+#include <linux/hdreg.h>
+#include <linux/hidraw.h>
+#include <linux/icmp.h>
+#include <linux/icmpv6.h>
 #include <linux/if.h>
+#include <linux/if_addr.h>
 #include <linux/if_alg.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_ppp.h>
 #include <linux/if_tun.h>
 #include <linux/if_packet.h>
-#include <linux/if_addr.h>
-#include <linux/falloc.h>
-#include <linux/filter.h>
-#include <linux/fs.h>
+#include <linux/if_xdp.h>
+#include <linux/input.h>
 #include <linux/kexec.h>
 #include <linux/keyctl.h>
+#include <linux/loop.h>
+#include <linux/lwtunnel.h>
 #include <linux/magic.h>
 #include <linux/memfd.h>
 #include <linux/module.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netlink.h>
 #include <linux/net_namespace.h>
+#include <linux/nsfs.h>
 #include <linux/perf_event.h>
+#include <linux/pps.h>
+#include <linux/ptrace.h>
 #include <linux/random.h>
 #include <linux/reboot.h>
+#include <linux/rtc.h>
 #include <linux/rtnetlink.h>
-#include <linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/seccomp.h>
-#include <linux/sockios.h>
-#include <linux/wait.h>
-#include <linux/icmpv6.h>
 #include <linux/serial.h>
-#include <linux/can.h>
-#include <linux/vm_sockets.h>
+#include <linux/sockios.h>
 #include <linux/taskstats.h>
-#include <linux/genetlink.h>
+#include <linux/tipc.h>
+#include <linux/vm_sockets.h>
+#include <linux/wait.h>
 #include <linux/watchdog.h>
-#include <linux/hdreg.h>
-#include <linux/rtc.h>
-#include <linux/if_xdp.h>
+
 #include <mtd/ubi-user.h>
 #include <net/route.h>
 
@@ -259,6 +295,27 @@ struct ltchars {
 #define FS_KEY_DESC_PREFIX              "fscrypt:"
 #define FS_KEY_DESC_PREFIX_SIZE         8
 #define FS_MAX_KEY_SIZE                 64
+
+// The code generator produces -0x1 for (~0), but an unsigned value is necessary
+// for the tipc_subscr timeout __u32 field.
+#undef TIPC_WAIT_FOREVER
+#define TIPC_WAIT_FOREVER 0xffffffff
+
+// Copied from linux/l2tp.h
+// Including linux/l2tp.h here causes conflicts between linux/in.h
+// and netinet/in.h included via net/route.h above.
+#define IPPROTO_L2TP		115
+
+// Copied from linux/hid.h.
+// Keep in sync with the size of the referenced fields.
+#define _HIDIOCGRAWNAME_LEN	128 // sizeof_field(struct hid_device, name)
+#define _HIDIOCGRAWPHYS_LEN	64  // sizeof_field(struct hid_device, phys)
+#define _HIDIOCGRAWUNIQ_LEN	64  // sizeof_field(struct hid_device, uniq)
+
+#define _HIDIOCGRAWNAME		HIDIOCGRAWNAME(_HIDIOCGRAWNAME_LEN)
+#define _HIDIOCGRAWPHYS		HIDIOCGRAWPHYS(_HIDIOCGRAWPHYS_LEN)
+#define _HIDIOCGRAWUNIQ		HIDIOCGRAWUNIQ(_HIDIOCGRAWUNIQ_LEN)
+
 '
 
 includes_NetBSD='
@@ -268,6 +325,8 @@ includes_NetBSD='
 #include <sys/extattr.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/sched.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
@@ -294,6 +353,8 @@ includes_OpenBSD='
 #include <sys/event.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/select.h>
+#include <sys/sched.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/stat.h>
@@ -330,9 +391,11 @@ includes_OpenBSD='
 includes_SunOS='
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/stat.h>
+#include <sys/stream.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
@@ -342,10 +405,11 @@ includes_SunOS='
 #include <net/if_arp.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <netinet/icmp6.h>
 #include <netinet/in.h>
-#include <termios.h>
 #include <netinet/ip.h>
 #include <netinet/ip_mroute.h>
+#include <termios.h>
 '
 
 
@@ -400,6 +464,8 @@ ccflags="$@"
 		$2 !~ /^EPROC_/ &&
 		$2 !~ /^EQUIV_/ &&
 		$2 !~ /^EXPR_/ &&
+		$2 !~ /^EVIOC/ &&
+		$2 !~ /^EV_/ &&
 		$2 ~ /^E[A-Z0-9_]+$/ ||
 		$2 ~ /^B[0-9_]+$/ ||
 		$2 ~ /^(OLD|NEW)DEV$/ ||
@@ -422,6 +488,7 @@ ccflags="$@"
 		$2 == "XCASE" ||
 		$2 == "ALTWERASE" ||
 		$2 == "NOKERNINFO" ||
+		$2 == "NFDBITS" ||
 		$2 ~ /^PAR/ ||
 		$2 ~ /^SIG[^_]/ ||
 		$2 ~ /^O[CNPFPL][A-Z]+[^_][A-Z]+$/ ||
@@ -431,10 +498,12 @@ ccflags="$@"
 		$2 ~ /^TC[IO](ON|OFF)$/ ||
 		$2 ~ /^IN_/ ||
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
-		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|EVFILT|NOTE|EV|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR)_/ ||
+		$2 ~ /^LO_(KEY|NAME)_SIZE$/ ||
+		$2 ~ /^LOOP_(CLR|CTL|GET|SET)_/ ||
+		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL)_/ ||
 		$2 ~ /^TP_STATUS_/ ||
 		$2 ~ /^FALLOC_/ ||
-		$2 == "ICMPV6_FILTER" ||
+		$2 ~ /^ICMPV?6?_(FILTER|SEC)/ ||
 		$2 == "SOMAXCONN" ||
 		$2 == "NAME_MAX" ||
 		$2 == "IFNAMSIZ" ||
@@ -444,38 +513,50 @@ ccflags="$@"
 		$2 ~ /^SYSCTL_VERS/ ||
 		$2 !~ "MNT_BITS" &&
 		$2 ~ /^(MS|MNT|UMOUNT)_/ ||
+		$2 ~ /^NS_GET_/ ||
 		$2 ~ /^TUN(SET|GET|ATTACH|DETACH)/ ||
-		$2 ~ /^(O|F|[ES]?FD|NAME|S|PTRACE|PT)_/ ||
+		$2 ~ /^(O|F|[ES]?FD|NAME|S|PTRACE|PT|TFD)_/ ||
 		$2 ~ /^KEXEC_/ ||
 		$2 ~ /^LINUX_REBOOT_CMD_/ ||
 		$2 ~ /^LINUX_REBOOT_MAGIC[12]$/ ||
 		$2 ~ /^MODULE_INIT_/ ||
 		$2 !~ "NLA_TYPE_MASK" &&
+		$2 !~ /^RTC_VL_(ACCURACY|BACKUP|DATA)/ &&
 		$2 ~ /^(NETLINK|NLM|NLMSG|NLA|IFA|IFAN|RT|RTC|RTCF|RTN|RTPROT|RTNH|ARPHRD|ETH_P|NETNSA)_/ ||
+		$2 ~ /^FIORDCHK$/ ||
 		$2 ~ /^SIOC/ ||
 		$2 ~ /^TIOC/ ||
 		$2 ~ /^TCGET/ ||
 		$2 ~ /^TCSET/ ||
 		$2 ~ /^TC(FLSH|SBRKP?|XONC)$/ ||
 		$2 !~ "RTF_BITS" &&
-		$2 ~ /^(IFF|IFT|NET_RT|RTM|RTF|RTV|RTA|RTAX)_/ ||
+		$2 ~ /^(IFF|IFT|NET_RT|RTM(GRP)?|RTF|RTV|RTA|RTAX)_/ ||
 		$2 ~ /^BIOC/ ||
+		$2 ~ /^DIOC/ ||
 		$2 ~ /^RUSAGE_(SELF|CHILDREN|THREAD)/ ||
 		$2 ~ /^RLIMIT_(AS|CORE|CPU|DATA|FSIZE|LOCKS|MEMLOCK|MSGQUEUE|NICE|NOFILE|NPROC|RSS|RTPRIO|RTTIME|SIGPENDING|STACK)|RLIM_INFINITY/ ||
 		$2 ~ /^PRIO_(PROCESS|PGRP|USER)/ ||
 		$2 ~ /^CLONE_[A-Z_]+/ ||
-		$2 !~ /^(BPF_TIMEVAL)$/ &&
+		$2 !~ /^(BPF_TIMEVAL|BPF_FIB_LOOKUP_[A-Z]+)$/ &&
 		$2 ~ /^(BPF|DLT)_/ ||
 		$2 ~ /^(CLOCK|TIMER)_/ ||
 		$2 ~ /^CAN_/ ||
 		$2 ~ /^CAP_/ ||
+		$2 ~ /^CP_/ ||
+		$2 ~ /^CPUSTATES$/ ||
+		$2 ~ /^CTLIOCGINFO$/ ||
 		$2 ~ /^ALG_/ ||
-		$2 ~ /^FS_(POLICY_FLAGS|KEY_DESC|ENCRYPTION_MODE|[A-Z0-9_]+_KEY_SIZE|IOC_(GET|SET)_ENCRYPTION)/ ||
+		$2 ~ /^FI(CLONE|DEDUPERANGE)/ ||
+		$2 ~ /^FS_(POLICY_FLAGS|KEY_DESC|ENCRYPTION_MODE|[A-Z0-9_]+_KEY_SIZE)/ ||
+		$2 ~ /^FS_IOC_.*(ENCRYPTION|VERITY|[GS]ETFLAGS)/ ||
+		$2 ~ /^FS_VERITY_/ ||
+		$2 ~ /^FSCRYPT_/ ||
+		$2 ~ /^DM_/ ||
 		$2 ~ /^GRND_/ ||
 		$2 ~ /^RND/ ||
 		$2 ~ /^KEY_(SPEC|REQKEY_DEFL)_/ ||
 		$2 ~ /^KEYCTL_/ ||
-		$2 ~ /^PERF_EVENT_IOC_/ ||
+		$2 ~ /^PERF_/ ||
 		$2 ~ /^SECCOMP_MODE_/ ||
 		$2 ~ /^SPLICE_/ ||
 		$2 ~ /^SYNC_FILE_RANGE_/ ||
@@ -494,13 +575,24 @@ ccflags="$@"
 		$2 ~ /^XATTR_(CREATE|REPLACE|NO(DEFAULT|FOLLOW|SECURITY)|SHOWCOMPRESSION)/ ||
 		$2 ~ /^ATTR_(BIT_MAP_COUNT|(CMN|VOL|FILE)_)/ ||
 		$2 ~ /^FSOPT_/ ||
-		$2 ~ /^WDIOC_/ ||
+		$2 ~ /^WDIO[CFS]_/ ||
 		$2 ~ /^NFN/ ||
 		$2 ~ /^XDP_/ ||
+		$2 ~ /^RWF_/ ||
 		$2 ~ /^(HDIO|WIN|SMART)_/ ||
+		$2 ~ /^CRYPTO_/ ||
+		$2 ~ /^TIPC_/ ||
+		$2 !~  "DEVLINK_RELOAD_LIMITS_VALID_MASK" &&
+		$2 ~ /^DEVLINK_/ ||
+		$2 ~ /^ETHTOOL_/ ||
+		$2 ~ /^LWTUNNEL_IP/ ||
 		$2 !~ "WMESGLEN" &&
 		$2 ~ /^W[A-Z0-9]+$/ ||
 		$2 ~/^PPPIOC/ ||
+		$2 ~ /^FAN_|FANOTIFY_/ ||
+		$2 == "HID_MAX_DESCRIPTOR_SIZE" ||
+		$2 ~ /^_?HIDIOC/ ||
+		$2 ~ /^BUS_(USB|HIL|BLUETOOTH|VIRTUAL)$/ ||
 		$2 ~ /^BLK[A-Z]*(GET$|SET$|BUF$|PART$|SIZE)/ {printf("\t%s = C.%s\n", $2, $2)}
 		$2 ~ /^__WCOREFLAG$/ {next}
 		$2 ~ /^__W[A-Z0-9]+$/ {printf("\t%s = C.%s\n", substr($2,3), $2)}
@@ -538,6 +630,7 @@ echo '#include <signal.h>' | $CC -x c - -E -dM $ccflags |
 echo '// mkerrors.sh' "$@"
 echo '// Code generated by the command above; see README.md. DO NOT EDIT.'
 echo
+echo "//go:build ${GOARCH} && ${GOOS}"
 echo "// +build ${GOARCH},${GOOS}"
 echo
 go tool cgo -godefs -- "$@" _const.go >_error.out

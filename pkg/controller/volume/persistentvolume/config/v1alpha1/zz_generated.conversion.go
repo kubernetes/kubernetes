@@ -21,6 +21,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -42,16 +44,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*v1.GroupResource), b.(*v1alpha1.GroupResource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), (*config.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(a.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), b.(*config.PersistentVolumeBinderControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.PersistentVolumeBinderControllerConfiguration)(nil), (*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(a.(*config.PersistentVolumeBinderControllerConfiguration), b.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -115,12 +107,20 @@ func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_confi
 	if err := Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
+	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
+	if err := v1.Convert_Pointer_bool_To_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *config.PersistentVolumeBinderControllerConfiguration, out *v1alpha1.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	if err := Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
+		return err
+	}
+	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
+	if err := v1.Convert_bool_To_Pointer_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
 		return err
 	}
 	return nil

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -56,18 +56,27 @@ var _ cloudprovider.Clusters = (*Cloud)(nil)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {
+	DisableInstances     bool
+	DisableRoutes        bool
+	DisableLoadBalancers bool
+	DisableZones         bool
+	DisableClusters      bool
+
 	Exists bool
 	Err    error
 
+	EnableInstancesV2       bool
 	ExistsByProviderID      bool
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	MetadataErr             error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
 	addressesMux  sync.Mutex
 	ExtID         map[types.NodeName]string
+	ExtIDErr      map[types.NodeName]error
 	InstanceTypes map[types.NodeName]string
 	Machines      []types.NodeName
 	NodeResources *v1.NodeResources
@@ -79,6 +88,7 @@ type Cloud struct {
 	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
+	ProviderID    map[types.NodeName]string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
@@ -122,7 +132,7 @@ func (f *Cloud) Master(ctx context.Context, name string) (string, error) {
 
 // Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Clusters() (cloudprovider.Clusters, bool) {
-	return f, true
+	return f, !f.DisableClusters
 }
 
 // ProviderName returns the cloud provider ID.
@@ -141,24 +151,34 @@ func (f *Cloud) HasClusterID() bool {
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
 func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return f, true
+	return f, !f.DisableLoadBalancers
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
-	return f, true
+	return f, !f.DisableInstances
+}
+
+// InstancesV2 returns a fake implementation of InstancesV2.
+//
+// Actually it just returns f itself.
+func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	if f.EnableInstancesV2 {
+		return f, true
+	}
+	return nil, false
 }
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Zones() (cloudprovider.Zones, bool) {
-	return f, true
+	return f, !f.DisableZones
 }
 
 // Routes returns a routes interface along with whether the interface is supported.
 func (f *Cloud) Routes() (cloudprovider.Routes, bool) {
-	return f, true
+	return f, !f.DisableRoutes
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
@@ -204,6 +224,8 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 // It adds an entry "update" into the internal method call record.
 func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
 	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
 	return f.Err
 }
@@ -252,9 +274,17 @@ func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return f.Addresses, f.Err
 }
 
-// InstanceID returns the cloud provider ID of the node with the specified Name.
+// InstanceID returns the cloud provider ID of the node with the specified Name, unless an entry
+// for the node exists in ExtIDError, in which case it returns the desired error (to facilitate
+// testing of error handling).
 func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
+
+	err, ok := f.ExtIDErr[nodeName]
+	if ok {
+		return "", err
+	}
+
 	return f.ExtID[nodeName], nil
 }
 
@@ -281,6 +311,40 @@ func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-shutdown-by-provider-id")
 	return f.NodeShutdown, f.ErrShutdownByProviderID
+}
+
+// InstanceExists returns true if the instance corresponding to a node still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (f *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-exists")
+	return f.ExistsByProviderID, f.ErrByProviderID
+}
+
+// InstanceShutdown returns true if the instances is in safe state to detach volumes
+func (f *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-shutdown")
+	return f.NodeShutdown, f.ErrShutdownByProviderID
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	f.addCall("instance-metadata-by-provider-id")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
+
+	providerID := ""
+	id, ok := f.ProviderID[types.NodeName(node.Name)]
+	if ok {
+		providerID = id
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
+		NodeAddresses: f.Addresses,
+		Zone:          f.Zone.FailureDomain,
+		Region:        f.Zone.Region,
+	}, f.MetadataErr
 }
 
 // List is a test-spy implementation of Instances.List.
@@ -343,7 +407,7 @@ func (f *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("create-route")
-	name := clusterName + "-" + nameHint
+	name := clusterName + "-" + string(route.TargetNode) + "-" + route.DestinationCIDR
 	if _, exists := f.RouteMap[name]; exists {
 		f.Err = fmt.Errorf("route %q already exists", name)
 		return f.Err
@@ -362,11 +426,21 @@ func (f *Cloud) DeleteRoute(ctx context.Context, clusterName string, route *clou
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("delete-route")
-	name := route.Name
-	if _, exists := f.RouteMap[name]; !exists {
-		f.Err = fmt.Errorf("no route found with name %q", name)
+	name := ""
+	for key, saved := range f.RouteMap {
+		if route.DestinationCIDR == saved.Route.DestinationCIDR &&
+			route.TargetNode == saved.Route.TargetNode &&
+			clusterName == saved.ClusterName {
+			name = key
+			break
+		}
+	}
+
+	if len(name) == 0 {
+		f.Err = fmt.Errorf("no route found for node:%v with DestinationCIDR== %v", route.TargetNode, route.DestinationCIDR)
 		return f.Err
 	}
+
 	delete(f.RouteMap, name)
 	return nil
 }

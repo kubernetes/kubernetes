@@ -55,6 +55,12 @@ func AddressesFromNodes(nodes []string) ([]string, error) {
 			return nil, newInvalidNodeError(errInvalidHostName)
 		}
 
+		// Given input like "http://localhost:8080:8383", url.Parse() will
+		// return host as "localhost:8000", which isn't a vaild DNS name.
+		if strings.Contains(host, ":") {
+			return nil, newInvalidNodeError(errInvalidHostName)
+		}
+
 		port := url.Port()
 		if port == "" {
 			port = DefaultDialPort

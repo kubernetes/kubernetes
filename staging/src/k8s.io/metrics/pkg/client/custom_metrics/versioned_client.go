@@ -17,12 +17,13 @@ limitations under the License.
 package custom_metrics
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 
@@ -32,10 +33,7 @@ import (
 	"k8s.io/metrics/pkg/client/custom_metrics/scheme"
 )
 
-var (
-	codecs           = serializer.NewCodecFactory(scheme.Scheme)
-	versionConverter = NewMetricConverter()
-)
+var versionConverter = NewMetricConverter()
 
 type customMetricsClient struct {
 	client  rest.Interface
@@ -56,6 +54,9 @@ func NewForVersion(client rest.Interface, mapper meta.RESTMapper, version schema
 func NewForVersionForConfig(c *rest.Config, mapper meta.RESTMapper, version schema.GroupVersion) (CustomMetricsClient, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	configShallowCopy.APIPath = "/apis"
@@ -112,14 +113,18 @@ func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string,
 		Namespace(namespace).
 		Name(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -150,14 +155,18 @@ func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		Name(name).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -189,14 +198,18 @@ func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		Name(v1beta1.AllObjects).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	return res, nil
 }
 
@@ -224,14 +237,18 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		Name(name).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	if len(res.Items) != 1 {
 		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
 	}
@@ -259,13 +276,17 @@ func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		Name(v1beta1.AllObjects).
 		SubResource(metricName).
 		VersionedParams(params, scheme.ParameterCodec).
-		Do()
+		Do(context.TODO())
 
 	metricObj, err := versionConverter.ConvertResultToVersion(result, v1beta2.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	res := metricObj.(*v1beta2.MetricValueList)
+	var res *v1beta2.MetricValueList
+	var ok bool
+	if res, ok = metricObj.(*v1beta2.MetricValueList); !ok {
+		return nil, fmt.Errorf("the custom metrics API server didn't return MetricValueList, the type is %v", reflect.TypeOf(metricObj))
+	}
 	return res, nil
 }

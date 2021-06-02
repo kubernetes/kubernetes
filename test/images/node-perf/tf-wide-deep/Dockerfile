@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
@@ -32,6 +33,6 @@ RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
 && rm -f v1.9.0.tar.gz
 
 WORKDIR $HOME/models-1.9.0/official/wide_deep
-ENV PYTHONPATH $PYTHONPATH:$HOME/models-1.9.0
+ENV PYTHONPATH=$PYTHONPATH:$HOME/models-1.9.0
 
 ENTRYPOINT python ./wide_deep.py

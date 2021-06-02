@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -153,13 +153,14 @@ func TestV1beta2StatefulSetUpdateStrategyConversion(t *testing.T) {
 
 func TestV1beta2RollingUpdateDaemonSetConversion(t *testing.T) {
 	intorstr := intstr.FromInt(1)
+	maxSurge := intstr.FromInt(0)
 	testcases := map[string]struct {
 		rollingUpdateDs1 *apps.RollingUpdateDaemonSet
 		rollingUpdateDs2 *v1beta2.RollingUpdateDaemonSet
 	}{
 		"RollingUpdateDaemonSet Conversion 2": {
-			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr},
-			rollingUpdateDs2: &v1beta2.RollingUpdateDaemonSet{MaxUnavailable: &intorstr},
+			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr, MaxSurge: maxSurge},
+			rollingUpdateDs2: &v1beta2.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 		},
 	}
 

@@ -17,9 +17,12 @@ limitations under the License.
 package vclib
 
 import (
+	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 // Cloud Provider API constants
@@ -42,46 +45,102 @@ const (
 	OperationCreateVolumeWithRawVSANPolicy = "CreateVolumeWithRawVSANPolicyOperation"
 )
 
+var vCenterMetric *vcenterMetric
+
+func init() {
+	vCenterMetric = &vcenterMetric{
+		vCenterInfos: make(map[string]types.AboutInfo),
+		mux:          sync.Mutex{},
+	}
+}
+
 // vsphereAPIMetric is for recording latency of Single API Call.
-var vsphereAPIMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_vsphere_api_request_duration_seconds",
-		Help: "Latency of vsphere api call",
+var vsphereAPIMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "cloudprovider_vsphere_api_request_duration_seconds",
+		Help:           "Latency of vsphere api call",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"request"},
 )
 
-var vsphereAPIErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_vsphere_api_request_errors",
-		Help: "vsphere Api errors",
+var vsphereAPIErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "cloudprovider_vsphere_api_request_errors",
+		Help:           "vsphere Api errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"request"},
 )
 
 // vsphereOperationMetric is for recording latency of vSphere Operation which invokes multiple APIs to get the task done.
-var vsphereOperationMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_vsphere_operation_duration_seconds",
-		Help: "Latency of vsphere operation call",
+var vsphereOperationMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "cloudprovider_vsphere_operation_duration_seconds",
+		Help:           "Latency of vsphere operation call",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"operation"},
 )
 
-var vsphereOperationErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_vsphere_operation_errors",
-		Help: "vsphere operation errors",
+var vsphereOperationErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "cloudprovider_vsphere_operation_errors",
+		Help:           "vsphere operation errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"operation"},
 )
+
+var vsphereVersion = metrics.NewDesc(
+	"cloudprovider_vsphere_vcenter_versions",
+	"Versions for connected vSphere vCenters",
+	[]string{"hostname", "version", "build"}, nil,
+	metrics.ALPHA, "")
 
 // RegisterMetrics registers all the API and Operation metrics
 func RegisterMetrics() {
-	prometheus.MustRegister(vsphereAPIMetric)
-	prometheus.MustRegister(vsphereAPIErrorMetric)
-	prometheus.MustRegister(vsphereOperationMetric)
-	prometheus.MustRegister(vsphereOperationErrorMetric)
+	legacyregistry.MustRegister(vsphereAPIMetric)
+	legacyregistry.MustRegister(vsphereAPIErrorMetric)
+	legacyregistry.MustRegister(vsphereOperationMetric)
+	legacyregistry.MustRegister(vsphereOperationErrorMetric)
+	legacyregistry.CustomMustRegister(vCenterMetric)
+}
+
+type vcenterMetric struct {
+	metrics.BaseStableCollector
+
+	mux          sync.Mutex
+	vCenterInfos map[string]types.AboutInfo
+}
+
+func (collector *vcenterMetric) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- vsphereVersion
+}
+
+func (collector *vcenterMetric) CollectWithStability(ch chan<- metrics.Metric) {
+	collector.mux.Lock()
+	defer collector.mux.Unlock()
+
+	for vCenter, info := range collector.vCenterInfos {
+		ch <- metrics.NewLazyMetricWithTimestamp(time.Now(),
+			metrics.NewLazyConstMetric(vsphereVersion,
+				metrics.GaugeValue,
+				float64(1),
+				vCenter,
+				info.Version,
+				info.Build))
+	}
+}
+
+func (collector *vcenterMetric) setAbout(server string, info types.AboutInfo) {
+	collector.mux.Lock()
+	defer collector.mux.Unlock()
+	collector.vCenterInfos[server] = info
+}
+
+func setVCenterInfoMetric(connection *VSphereConnection) {
+	vCenterMetric.setAbout(connection.Hostname, connection.Client.ServiceContent.About)
 }
 
 // RecordvSphereMetric records the vSphere API and Operation metrics
@@ -96,17 +155,17 @@ func RecordvSphereMetric(actionName string, requestTime time.Time, err error) {
 
 func recordvSphereAPIMetric(actionName string, requestTime time.Time, err error) {
 	if err != nil {
-		vsphereAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+		vsphereAPIErrorMetric.With(metrics.Labels{"request": actionName}).Inc()
 	} else {
-		vsphereAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
+		vsphereAPIMetric.With(metrics.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
 	}
 }
 
 func recordvSphereOperationMetric(actionName string, requestTime time.Time, err error) {
 	if err != nil {
-		vsphereOperationErrorMetric.With(prometheus.Labels{"operation": actionName}).Inc()
+		vsphereOperationErrorMetric.With(metrics.Labels{"operation": actionName}).Inc()
 	} else {
-		vsphereOperationMetric.With(prometheus.Labels{"operation": actionName}).Observe(calculateTimeTaken(requestTime))
+		vsphereOperationMetric.With(metrics.Labels{"operation": actionName}).Observe(calculateTimeTaken(requestTime))
 	}
 }
 

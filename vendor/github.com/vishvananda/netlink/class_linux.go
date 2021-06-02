@@ -1,13 +1,34 @@
 package netlink
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
 
-// NOTE: function is in here because it uses other linux functions
+// Internal tc_stats representation in Go struct.
+// This is for internal uses only to deserialize the payload of rtattr.
+// After the deserialization, this should be converted into the canonical stats
+// struct, ClassStatistics, in case of statistics of a class.
+// Ref: struct tc_stats { ... }
+type tcStats struct {
+	Bytes      uint64 // Number of enqueued bytes
+	Packets    uint32 // Number of enqueued packets
+	Drops      uint32 // Packets dropped because of lack of resources
+	Overlimits uint32 // Number of throttle events when this flow goes out of allocated bandwidth
+	Bps        uint32 // Current flow byte rate
+	Pps        uint32 // Current flow packet rate
+	Qlen       uint32
+	Backlog    uint32
+}
+
+// NewHtbClass NOTE: function is in here because it uses other linux functions
 func NewHtbClass(attrs ClassAttrs, cattrs HtbClassAttrs) *HtbClass {
 	mtu := 1600
 	rate := cattrs.Rate / 8
@@ -50,7 +71,7 @@ func ClassDel(class Class) error {
 // ClassDel will delete a class from the system.
 // Equivalent to: `tc class del $class`
 func (h *Handle) ClassDel(class Class) error {
-	return h.classModify(syscall.RTM_DELTCLASS, 0, class)
+	return h.classModify(unix.RTM_DELTCLASS, 0, class)
 }
 
 // ClassChange will change a class in place
@@ -64,7 +85,7 @@ func ClassChange(class Class) error {
 // Equivalent to: `tc class change $class`
 // The parent and handle MUST NOT be changed.
 func (h *Handle) ClassChange(class Class) error {
-	return h.classModify(syscall.RTM_NEWTCLASS, 0, class)
+	return h.classModify(unix.RTM_NEWTCLASS, 0, class)
 }
 
 // ClassReplace will replace a class to the system.
@@ -82,7 +103,7 @@ func ClassReplace(class Class) error {
 // If a class already exist with this parent/handle pair, the class is changed.
 // If a class does not already exist with this parent/handle, a new class is created.
 func (h *Handle) ClassReplace(class Class) error {
-	return h.classModify(syscall.RTM_NEWTCLASS, syscall.NLM_F_CREATE, class)
+	return h.classModify(unix.RTM_NEWTCLASS, unix.NLM_F_CREATE, class)
 }
 
 // ClassAdd will add a class to the system.
@@ -95,14 +116,14 @@ func ClassAdd(class Class) error {
 // Equivalent to: `tc class add $class`
 func (h *Handle) ClassAdd(class Class) error {
 	return h.classModify(
-		syscall.RTM_NEWTCLASS,
-		syscall.NLM_F_CREATE|syscall.NLM_F_EXCL,
+		unix.RTM_NEWTCLASS,
+		unix.NLM_F_CREATE|unix.NLM_F_EXCL,
 		class,
 	)
 }
 
 func (h *Handle) classModify(cmd, flags int, class Class) error {
-	req := h.newNetlinkRequest(cmd, flags|syscall.NLM_F_ACK)
+	req := h.newNetlinkRequest(cmd, flags|unix.NLM_F_ACK)
 	base := class.Attrs()
 	msg := &nl.TcMsg{
 		Family:  nl.FAMILY_ALL,
@@ -112,12 +133,12 @@ func (h *Handle) classModify(cmd, flags int, class Class) error {
 	}
 	req.AddData(msg)
 
-	if cmd != syscall.RTM_DELTCLASS {
+	if cmd != unix.RTM_DELTCLASS {
 		if err := classPayload(req, class); err != nil {
 			return err
 		}
 	}
-	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	return err
 }
 
@@ -125,7 +146,9 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 	req.AddData(nl.NewRtAttr(nl.TCA_KIND, nl.ZeroTerminated(class.Type())))
 
 	options := nl.NewRtAttr(nl.TCA_OPTIONS, nil)
-	if htb, ok := class.(*HtbClass); ok {
+	switch class.Type() {
+	case "htb":
+		htb := class.(*HtbClass)
 		opt := nl.TcHtbCopt{}
 		opt.Buffer = htb.Buffer
 		opt.Cbuffer = htb.Cbuffer
@@ -141,18 +164,27 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 		var rtab [256]uint32
 		var ctab [256]uint32
 		tcrate := nl.TcRateSpec{Rate: uint32(htb.Rate)}
-		if CalcRtable(&tcrate, rtab, cellLog, uint32(mtu), linklayer) < 0 {
+		if CalcRtable(&tcrate, rtab[:], cellLog, uint32(mtu), linklayer) < 0 {
 			return errors.New("HTB: failed to calculate rate table")
 		}
 		opt.Rate = tcrate
 		tcceil := nl.TcRateSpec{Rate: uint32(htb.Ceil)}
-		if CalcRtable(&tcceil, ctab, ccellLog, uint32(mtu), linklayer) < 0 {
+		if CalcRtable(&tcceil, ctab[:], ccellLog, uint32(mtu), linklayer) < 0 {
 			return errors.New("HTB: failed to calculate ceil rate table")
 		}
 		opt.Ceil = tcceil
-		nl.NewRtAttrChild(options, nl.TCA_HTB_PARMS, opt.Serialize())
-		nl.NewRtAttrChild(options, nl.TCA_HTB_RTAB, SerializeRtab(rtab))
-		nl.NewRtAttrChild(options, nl.TCA_HTB_CTAB, SerializeRtab(ctab))
+		options.AddRtAttr(nl.TCA_HTB_PARMS, opt.Serialize())
+		options.AddRtAttr(nl.TCA_HTB_RTAB, SerializeRtab(rtab))
+		options.AddRtAttr(nl.TCA_HTB_CTAB, SerializeRtab(ctab))
+	case "hfsc":
+		hfsc := class.(*HfscClass)
+		opt := nl.HfscCopt{}
+		opt.Rsc.Set(hfsc.Rsc.Attrs())
+		opt.Fsc.Set(hfsc.Fsc.Attrs())
+		opt.Usc.Set(hfsc.Usc.Attrs())
+		options.AddRtAttr(nl.TCA_HFSC_RSC, nl.SerializeHfscCurve(&opt.Rsc))
+		options.AddRtAttr(nl.TCA_HFSC_FSC, nl.SerializeHfscCurve(&opt.Fsc))
+		options.AddRtAttr(nl.TCA_HFSC_USC, nl.SerializeHfscCurve(&opt.Usc))
 	}
 	req.AddData(options)
 	return nil
@@ -169,7 +201,7 @@ func ClassList(link Link, parent uint32) ([]Class, error) {
 // Equivalent to: `tc class show`.
 // Generally returns nothing if link and parent are not specified.
 func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
-	req := h.newNetlinkRequest(syscall.RTM_GETTCLASS, syscall.NLM_F_DUMP)
+	req := h.newNetlinkRequest(unix.RTM_GETTCLASS, unix.NLM_F_DUMP)
 	msg := &nl.TcMsg{
 		Family: nl.FAMILY_ALL,
 		Parent: parent,
@@ -181,7 +213,7 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWTCLASS)
+	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTCLASS)
 	if err != nil {
 		return nil, err
 	}
@@ -196,9 +228,10 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 		}
 
 		base := ClassAttrs{
-			LinkIndex: int(msg.Ifindex),
-			Handle:    msg.Handle,
-			Parent:    msg.Parent,
+			LinkIndex:  int(msg.Ifindex),
+			Handle:     msg.Handle,
+			Parent:     msg.Parent,
+			Statistics: nil,
 		}
 
 		var class Class
@@ -210,6 +243,8 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 				switch classType {
 				case "htb":
 					class = &HtbClass{}
+				case "hfsc":
+					class = &HfscClass{}
 				default:
 					class = &GenericClass{ClassType: classType}
 				}
@@ -224,6 +259,26 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 					if err != nil {
 						return nil, err
 					}
+				case "hfsc":
+					data, err := nl.ParseRouteAttr(attr.Value)
+					if err != nil {
+						return nil, err
+					}
+					_, err = parseHfscClassData(class, data)
+					if err != nil {
+						return nil, err
+					}
+				}
+			// For backward compatibility.
+			case nl.TCA_STATS:
+				base.Statistics, err = parseTcStats(attr.Value)
+				if err != nil {
+					return nil, err
+				}
+			case nl.TCA_STATS2:
+				base.Statistics, err = parseTcStats2(attr.Value)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
@@ -251,4 +306,79 @@ func parseHtbClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, erro
 		}
 	}
 	return detailed, nil
+}
+
+func parseHfscClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, error) {
+	hfsc := class.(*HfscClass)
+	detailed := false
+	for _, datum := range data {
+		m1, d, m2 := nl.DeserializeHfscCurve(datum.Value).Attrs()
+		switch datum.Attr.Type {
+		case nl.TCA_HFSC_RSC:
+			hfsc.Rsc = ServiceCurve{m1: m1, d: d, m2: m2}
+		case nl.TCA_HFSC_FSC:
+			hfsc.Fsc = ServiceCurve{m1: m1, d: d, m2: m2}
+		case nl.TCA_HFSC_USC:
+			hfsc.Usc = ServiceCurve{m1: m1, d: d, m2: m2}
+		}
+	}
+	return detailed, nil
+}
+
+func parseTcStats(data []byte) (*ClassStatistics, error) {
+	buf := &bytes.Buffer{}
+	buf.Write(data)
+	native := nl.NativeEndian()
+	tcStats := &tcStats{}
+	if err := binary.Read(buf, native, tcStats); err != nil {
+		return nil, err
+	}
+
+	stats := NewClassStatistics()
+	stats.Basic.Bytes = tcStats.Bytes
+	stats.Basic.Packets = tcStats.Packets
+	stats.Queue.Qlen = tcStats.Qlen
+	stats.Queue.Backlog = tcStats.Backlog
+	stats.Queue.Drops = tcStats.Drops
+	stats.Queue.Overlimits = tcStats.Overlimits
+	stats.RateEst.Bps = tcStats.Bps
+	stats.RateEst.Pps = tcStats.Pps
+
+	return stats, nil
+}
+
+func parseGnetStats(data []byte, gnetStats interface{}) error {
+	buf := &bytes.Buffer{}
+	buf.Write(data)
+	native := nl.NativeEndian()
+	return binary.Read(buf, native, gnetStats)
+}
+
+func parseTcStats2(data []byte) (*ClassStatistics, error) {
+	rtAttrs, err := nl.ParseRouteAttr(data)
+	if err != nil {
+		return nil, err
+	}
+	stats := NewClassStatistics()
+	for _, datum := range rtAttrs {
+		switch datum.Attr.Type {
+		case nl.TCA_STATS_BASIC:
+			if err := parseGnetStats(datum.Value, stats.Basic); err != nil {
+				return nil, fmt.Errorf("Failed to parse ClassStatistics.Basic with: %v\n%s",
+					err, hex.Dump(datum.Value))
+			}
+		case nl.TCA_STATS_QUEUE:
+			if err := parseGnetStats(datum.Value, stats.Queue); err != nil {
+				return nil, fmt.Errorf("Failed to parse ClassStatistics.Queue with: %v\n%s",
+					err, hex.Dump(datum.Value))
+			}
+		case nl.TCA_STATS_RATE_EST:
+			if err := parseGnetStats(datum.Value, stats.RateEst); err != nil {
+				return nil, fmt.Errorf("Failed to parse ClassStatistics.RateEst with: %v\n%s",
+					err, hex.Dump(datum.Value))
+			}
+		}
+	}
+
+	return stats, nil
 }

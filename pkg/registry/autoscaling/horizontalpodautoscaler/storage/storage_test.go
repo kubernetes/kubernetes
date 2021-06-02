@@ -33,11 +33,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, autoscaling.GroupName)
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -45,7 +45,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "horizontalpodautoscalers",
 	}
-	horizontalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
+	horizontalPodAutoscalerStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return horizontalPodAutoscalerStorage, statusStorage, server
 }
 
@@ -202,9 +205,12 @@ func TestUpdateStatus(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	autosclaerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	autoscalerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
 	// only compare the meaningful update b/c we can't compare due to metadata
-	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autosclaerOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autosclaerOut))
+	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autoscalerOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autoscalerOut))
 	}
 }

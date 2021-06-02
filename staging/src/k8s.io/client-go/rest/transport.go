@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 
+	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
 )
@@ -61,9 +62,10 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
 	conf := &transport.Config{
-		UserAgent:     c.UserAgent,
-		Transport:     c.Transport,
-		WrapTransport: c.WrapTransport,
+		UserAgent:          c.UserAgent,
+		Transport:          c.Transport,
+		WrapTransport:      c.WrapTransport,
+		DisableCompression: c.DisableCompression,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,
@@ -73,6 +75,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			CertData:   c.CertData,
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
+			NextProtos: c.NextProtos,
 		},
 		Username:        c.Username,
 		Password:        c.Password,
@@ -83,7 +86,8 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
-		Dial: c.Dial,
+		Dial:  c.Dial,
+		Proxy: c.Proxy,
 	}
 
 	if c.ExecProvider != nil && c.AuthProvider != nil {
@@ -91,7 +95,15 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 	}
 
 	if c.ExecProvider != nil {
-		provider, err := exec.GetAuthenticator(c.ExecProvider)
+		var cluster *clientauthentication.Cluster
+		if c.ExecProvider.ProvideClusterInfo {
+			var err error
+			cluster, err = ConfigToExecCluster(c)
+			if err != nil {
+				return nil, err
+			}
+		}
+		provider, err := exec.GetAuthenticator(c.ExecProvider, cluster)
 		if err != nil {
 			return nil, err
 		}

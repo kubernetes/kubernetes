@@ -1,0 +1,84 @@
+- name: apiserver_request_duration_seconds
+  help: Response latency distribution in seconds for each verb, dry run value, group,
+    version, resource, subresource, scope and component.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.15
+  - 0.2
+  - 0.25
+  - 0.3
+  - 0.35
+  - 0.4
+  - 0.45
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 1
+  - 1.25
+  - 1.5
+  - 1.75
+  - 2
+  - 2.5
+  - 3
+  - 3.5
+  - 4
+  - 4.5
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 15
+  - 20
+  - 25
+  - 30
+  - 40
+  - 50
+  - 60
+- name: apiserver_request_total
+  help: Counter of apiserver requests broken out for each verb, dry run value, group,
+    version, resource, scope, component, and HTTP response code.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - code
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+- name: apiserver_requested_deprecated_apis
+  help: Gauge of deprecated APIs that have been requested, broken out by API group,
+    version, resource, subresource, and removed_release.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - group
+  - removed_release
+  - resource
+  - subresource
+  - version
+- name: apiserver_storage_objects
+  help: Number of stored objects at the time of last check split by kind.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - resource

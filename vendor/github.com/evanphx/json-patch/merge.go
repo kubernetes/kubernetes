@@ -307,13 +307,16 @@ func matchesValue(av, bv interface{}) bool {
 		return true
 	case map[string]interface{}:
 		bt := bv.(map[string]interface{})
-		for key := range at {
-			if !matchesValue(at[key], bt[key]) {
-				return false
-			}
+		if len(bt) != len(at) {
+			return false
 		}
 		for key := range bt {
-			if !matchesValue(at[key], bt[key]) {
+			av, aOK := at[key]
+			bv, bOK := bt[key]
+			if aOK != bOK {
+				return false
+			}
+			if !matchesValue(av, bv) {
 				return false
 			}
 		}

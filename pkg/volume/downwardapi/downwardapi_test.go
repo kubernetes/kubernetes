@@ -47,7 +47,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -58,7 +58,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != downwardAPIPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -229,7 +229,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	volumeSpec := &v1.Volume{

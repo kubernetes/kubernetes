@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN apk add --no-cache openssl nginx-mod-http-lua nginx-mod-http-lua-upstream
+COPY install-deps.sh /
+RUN ["sh", "-c", "/install-deps.sh"]
 RUN mkdir -p /run/nginx
 
 ADD nginx.conf /etc/nginx/nginx.conf

@@ -21,10 +21,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -34,6 +35,7 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
+// InitNodeE2ERemote initializes the node e2e test suite.
 func InitNodeE2ERemote() TestSuite {
 	// TODO: Register flags.
 	return &NodeE2ERemote{}
@@ -97,28 +99,62 @@ func prependCOSMounterFlag(args, host, workspace string) (string, error) {
 // prependMemcgNotificationFlag prepends the flag for enabling memcg
 // notification to args and returns the result.
 func prependMemcgNotificationFlag(args string) string {
-	return "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
+	return "--kubelet-flags=--kernel-memcg-notification=true " + args
 }
 
-// updateOSSpecificKubeletFlags updates the Kubelet args with OS specific
-// settings.
-func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) {
-	output, err := SSH(host, "cat", "/etc/os-release")
+// osSpecificActions takes OS specific actions required for the node tests
+func osSpecificActions(args, host, workspace string) (string, error) {
+	output, err := getOSDistribution(host)
 	if err != nil {
 		return "", fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	switch {
-	case strings.Contains(output, "ID=gci"), strings.Contains(output, "ID=cos"):
+	case strings.Contains(output, "fedora"), strings.Contains(output, "rhcos"),
+		strings.Contains(output, "centos"), strings.Contains(output, "rhel"):
+		return args, setKubeletSELinuxLabels(host, workspace)
+	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
 		return prependCOSMounterFlag(args, host, workspace)
-	case strings.Contains(output, "ID=ubuntu"):
+	case strings.Contains(output, "ubuntu"):
 		return prependMemcgNotificationFlag(args), nil
 	}
 	return args, nil
 }
 
+// setKubeletSELinuxLabels set the appropriate SELinux labels for the
+// kubelet on Fedora CoreOS distribution
+func setKubeletSELinuxLabels(host, workspace string) error {
+	cmd := getSSHCommand(" && ",
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "kubelet")),
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "e2e_node.test")),
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "ginkgo")),
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "mounter")),
+		fmt.Sprintf("/usr/bin/chcon -R -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "cni", "bin/")),
+	)
+	output, err := SSH(host, "sh", "-c", cmd)
+	if err != nil {
+		return fmt.Errorf("Unable to apply SELinux labels. Err: %v, Output:\n%s", err, output)
+	}
+	return nil
+}
+
+func getOSDistribution(host string) (string, error) {
+	output, err := SSH(host, "cat", "/etc/os-release")
+	if err != nil {
+		return "", fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
+	}
+
+	var re = regexp.MustCompile(`(?m)^ID="?(\w+)"?`)
+	subMatch := re.FindStringSubmatch(output)
+	if len(subMatch) > 0 {
+		return subMatch[1], nil
+	}
+
+	return "", fmt.Errorf("Unable to parse os-release for the host, %s", host)
+}
+
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	// TODO(random-liu): Do this in cloud init after we remove containervm test.
 	if err := setupCNI(host, workspace); err != nil {
@@ -133,7 +169,7 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 
-	testArgs, err := updateOSSpecificKubeletFlags(testArgs, host, workspace)
+	testArgs, err := osSpecificActions(testArgs, host, workspace)
 	if err != nil {
 		return "", err
 	}
@@ -147,8 +183,8 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, host, results, junitFilePrefix, imageDesc, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --runtime-config=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, runtimeConfig, host, results, junitFilePrefix, imageDesc, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }

@@ -28,7 +28,27 @@ type CSRSigningControllerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
+
+	// kubeletServingSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kubelet-serving signer
+	KubeletServingSignerConfiguration CSRSigningConfiguration
+	// kubeletClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client-kubelet
+	KubeletClientSignerConfiguration CSRSigningConfiguration
+	// kubeAPIServerClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client
+	KubeAPIServerClientSignerConfiguration CSRSigningConfiguration
+	// legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown
+	LegacyUnknownSignerConfiguration CSRSigningConfiguration
+
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
+}
+
+// CSRSigningConfiguration holds information about a particular CSR signer
+type CSRSigningConfiguration struct {
+	// certFile is the filename containing a PEM-encoded
+	// X509 CA certificate used to issue certificates
+	CertFile string
+	// keyFile is the filename containing a PEM-encoded
+	// RSA or ECDSA private key used to issue certificates
+	KeyFile string
 }

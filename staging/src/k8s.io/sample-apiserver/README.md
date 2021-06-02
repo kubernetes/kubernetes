@@ -55,7 +55,7 @@ Note, however, that if you intend to
 [generate code](#changes-to-the-types) then you will also need the
 code-generator repo to exist in an old-style location.  One easy way
 to do this is to use the command `go mod vendor` to create and
-popdulate the `vendor` directory.
+populate the `vendor` directory.
 
 ### A Note on kubernetes/kubernetes
 
@@ -119,7 +119,7 @@ docker push MYPREFIX/kube-sample-apiserver:MYTAG
 
 ### Deploy into a Kubernetes Cluster
 
-Edit `artifacts/example/rc.yaml`, updating the pod template's image
+Edit `artifacts/example/deployment.yaml`, updating the pod template's image
 reference to match what you pushed and setting the `imagePullPolicy`
 to something suitable.  Then call:
 
@@ -186,20 +186,20 @@ only this superuser group is authorized.
 5. Use curl to access the server using the client certificate in p12 format for authentication:
 
    ``` shell
-   curl -fv -k --cert client.p12:password \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+   curl -fv -k --cert-type P12 --cert client.p12:password \
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
    Or use wget:
    ``` shell
    wget -O- --no-check-certificate \
       --certificate client.crt --private-key client.key \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
    Note: Recent OSX versions broke client certs with curl. On Mac try `brew install httpie` and then:
 
    ``` shell
    http --verify=no --cert client.crt --cert-key client.key \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```

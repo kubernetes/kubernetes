@@ -95,10 +95,10 @@ type AdmissionRequest struct {
 	Operation Operation
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
-	// Object is the object from the incoming request prior to default values being applied
+	// Object is the object from the incoming request.
 	// +optional
 	Object runtime.Object
-	// OldObject is the existing object. Only populated for UPDATE requests.
+	// OldObject is the existing object. Only populated for DELETE and UPDATE requests.
 	// +optional
 	OldObject runtime.Object
 	// DryRun indicates that modifications will definitely not be persisted for this request.
@@ -138,6 +138,12 @@ type AdmissionResponse struct {
 	// the admission webhook to add additional context to the audit log for this request.
 	// +optional
 	AuditAnnotations map[string]string
+	// warnings is a list of warning messages to return to the requesting API client.
+	// Warning messages describe a problem the client making the API request should correct or be aware of.
+	// Limit warnings to 120 characters if possible.
+	// Warnings over 256 characters and large numbers of warnings may be truncated.
+	// +optional
+	Warnings []string
 }
 
 // PatchType is the type of patch being used to represent the mutated object

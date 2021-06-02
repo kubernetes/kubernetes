@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks commonly misspelled English words in all files in the
+# working directory by client9/misspell package.
+# Usage: `hack/verify-spelling.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -25,8 +29,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install tools we need, but only from vendor/...
-go install k8s.io/kubernetes/vendor/github.com/client9/misspell/cmd/misspell
+# Install tools we need
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install github.com/client9/misspell/cmd/misspell
+popd >/dev/null
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures

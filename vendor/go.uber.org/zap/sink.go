@@ -136,7 +136,7 @@ func newFileSink(u *url.URL) (Sink, error) {
 	case "stderr":
 		return nopCloserSink{os.Stderr}, nil
 	}
-	return os.OpenFile(u.Path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	return os.OpenFile(u.Path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 }
 
 func normalizeScheme(s string) (string, error) {

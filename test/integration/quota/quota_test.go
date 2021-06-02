@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
+	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -40,10 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
-	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -75,9 +75,9 @@ func TestQuota(t *testing.T) {
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAnApiserverUsingServer(masterConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quotaed", s, t)
@@ -102,7 +102,7 @@ func TestQuota(t *testing.T) {
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 	informersStarted := make(chan struct{})
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -113,7 +113,7 @@ func TestQuota(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -151,12 +151,12 @@ func TestQuota(t *testing.T) {
 }
 
 func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
-	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
+	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(quota); err != nil {
+	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -210,12 +210,12 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		},
 	}
 
-	w, err := clientset.CoreV1().ReplicationControllers(namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
+	w, err := clientset.CoreV1().ReplicationControllers(namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.CoreV1().ReplicationControllers(namespace).Create(rc); err != nil {
+	if _, err := clientset.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -239,7 +239,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		return false, nil
 	})
 	if err != nil {
-		pods, _ := clientset.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
+		pods, _ := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
 		t.Fatalf("unexpected error: %v, ended with %v pods", err, len(pods.Items))
 	}
 }
@@ -275,9 +275,9 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAnApiserverUsingServer(masterConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quota", s, t)
@@ -300,7 +300,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 	informersStarted := make(chan struct{})
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -311,7 +311,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientset.CoreV1().Pods(ns.Name).Create(pod); err == nil {
+	if _, err := clientset.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
 		t.Fatalf("expected error for insufficient quota")
 	}
 
@@ -362,7 +362,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
-		if _, err := clientset.CoreV1().Pods(ns.Name).Create(pod); err == nil {
+		if _, err := clientset.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
 			return true, nil
 		}
 		return false, nil

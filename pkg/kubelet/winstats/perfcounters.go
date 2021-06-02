@@ -34,6 +34,10 @@ const (
 	// Perf counters are updated every second. This is the same as the default cadvisor collection period
 	// see https://github.com/google/cadvisor/blob/master/docs/runtime_options.md#housekeeping
 	perfCounterUpdatePeriod = 1 * time.Second
+	// defaultCachePeriod is the default cache period for each cpuUsage.
+	// This matches with the cadvisor setting and the time interval we use for containers.
+	// see https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/cadvisor/cadvisor_linux.go#L63
+	defaultCachePeriod = 10 * time.Second
 )
 
 type perfCounter struct {
@@ -48,11 +52,6 @@ func newPerfCounter(counter string) (*perfCounter, error) {
 	ret := win_pdh.PdhOpenQuery(0, 0, &queryHandle)
 	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, errors.New("unable to open query through DLL call")
-	}
-
-	ret = win_pdh.PdhValidatePath(counter)
-	if ret != win_pdh.ERROR_SUCCESS {
-		return nil, fmt.Errorf("unable to valid path to counter. Error code is %x", ret)
 	}
 
 	ret = win_pdh.PdhAddEnglishCounter(queryHandle, counter, 0, &counterHandle)

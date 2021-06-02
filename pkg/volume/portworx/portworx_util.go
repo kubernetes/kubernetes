@@ -17,6 +17,7 @@ limitations under the License.
 package portworx
 
 import (
+	"context"
 	"fmt"
 
 	osdapi "github.com/libopenstorage/openstorage/api"
@@ -24,11 +25,11 @@ import (
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
 	volumeapi "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -59,7 +60,10 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GiB
-	requestGiB := volumehelpers.RoundUpToGiB(capacity)
+	requestGiB, err := volumehelpers.RoundUpToGiB(capacity)
+	if err != nil {
+		return "", 0, nil, err
+	}
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -210,7 +214,11 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	newSizeInBytes := uint64(volumehelpers.RoundUpToGiB(newSize) * volumehelpers.GiB)
+	tBytes, err := volumehelpers.RoundUpToB(newSize)
+	if err != nil {
+		return err
+	}
+	newSizeInBytes := uint64(tBytes)
 	if vol.Spec.Size >= newSizeInBytes {
 		klog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
 			"requested size: %d. Skipping resize.", spec.Name(), vol.Spec.Size, newSizeInBytes)
@@ -352,20 +360,20 @@ func lookupPXAPIPortFromService(svc *v1.Service) int32 {
 func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		err := fmt.Errorf("Failed to get kubeclient when creating portworx client")
+		err := fmt.Errorf("failed to get kubeclient when creating portworx client")
 		klog.Errorf(err.Error())
 		return nil, err
 	}
 
 	opts := metav1.GetOptions{}
-	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
+	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(context.TODO(), pxServiceName, opts)
 	if err != nil {
 		klog.Errorf("Failed to get service. Err: %v", err)
 		return nil, err
 	}
 
 	if svc == nil {
-		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
+		err = fmt.Errorf("service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}

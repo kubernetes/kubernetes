@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
@@ -546,16 +546,6 @@ func TestValidateImageGCPolicy(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestImageCacheReturnCopiedList(t *testing.T) {
-	cache := &imageCache{}
-	testList := []container.Image{{ID: "1"}, {ID: "2"}}
-	cache.set(testList)
-	list := cache.get()
-	assert.Len(t, list, 2)
-	list[0].ID = "3"
-	assert.Equal(t, cache.get(), testList)
 }
 
 func uint64Ptr(i uint64) *uint64 {

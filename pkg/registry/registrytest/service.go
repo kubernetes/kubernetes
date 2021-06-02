@@ -117,10 +117,3 @@ func (r *ServiceRegistry) WatchServices(ctx context.Context, options *metaintern
 
 	return nil, r.Err
 }
-
-func (r *ServiceRegistry) ExportService(ctx context.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.Service, r.Err
-}

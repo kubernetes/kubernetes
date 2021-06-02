@@ -22,19 +22,21 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 )
 
 func TestDriverParameter(t *testing.T) {
 	expected := &driverDefinition{
-		DriverInfo: testsuites.DriverInfo{
+		DriverInfo: storageframework.DriverInfo{
 			Name: "foo.example.com",
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "10Gi",
+			},
 		},
-		ShortName: "foo",
-		ClaimSize: "5Gi",
 	}
 	testcases := []struct {
 		name     string
@@ -64,7 +66,7 @@ func TestDriverParameter(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		actual, err := testDriverParameter{}.loadDriverDefinition(testcase.filename)
+		actual, err := loadDriverDefinition(testcase.filename)
 		if testcase.err == "" {
 			assert.NoError(t, err, testcase.name)
 		} else {

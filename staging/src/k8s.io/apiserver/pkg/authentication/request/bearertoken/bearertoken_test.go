@@ -42,6 +42,28 @@ func TestAuthenticateRequest(t *testing.T) {
 	}
 }
 
+func TestAuthenticateRequestIncludingValueAfterToken(t *testing.T) {
+	testCases := []struct {
+		Req *http.Request
+	}{
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token a"}}}},
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token a b c"}}}},
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token   a"}}}},
+	}
+	for i, testCase := range testCases {
+		auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			if token != "token" {
+				t.Errorf("unexpected token: %s", token)
+			}
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+		}))
+		resp, ok, err := auth.AuthenticateRequest(testCase.Req)
+		if !ok || resp == nil || err != nil {
+			t.Errorf("%d: expected valid user", i)
+		}
+	}
+}
+
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, nil

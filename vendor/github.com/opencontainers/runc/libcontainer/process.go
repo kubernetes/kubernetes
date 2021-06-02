@@ -76,6 +76,8 @@ type Process struct {
 	Init bool
 
 	ops processOperations
+
+	LogLevel string
 }
 
 // Wait waits for the process to exit.

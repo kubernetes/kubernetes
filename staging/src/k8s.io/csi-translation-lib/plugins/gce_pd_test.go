@@ -17,11 +17,13 @@ limitations under the License.
 package plugins
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NewStorageClass(params map[string]string, allowedTopologies []v1.TopologySelectorTerm) *storage.StorageClass {
@@ -72,7 +74,7 @@ func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 		},
 		{
 			name:       "some translated topology",
-			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomain, []string{"foo"})),
+			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelFailureDomainBetaZone, []string{"foo"})),
 			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
 		},
 		{
@@ -97,110 +99,81 @@ func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 	}
 }
 
-func TestTranslateAllowedTopologies(t *testing.T) {
+func TestRepairVolumeHandle(t *testing.T) {
 	testCases := []struct {
-		name            string
-		topology        []v1.TopologySelectorTerm
-		expectedToplogy []v1.TopologySelectorTerm
-		expErr          bool
+		name                 string
+		volumeHandle         string
+		nodeID               string
+		expectedVolumeHandle string
+		expectedErr          bool
 	}{
 		{
-			name:     "no translation",
-			topology: generateToplogySelectors(GCEPDTopologyKey, []string{"foo", "bar"}),
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
+			name:                 "fully specified",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, "foo", "bar", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "foo", "bar", "baz"),
 		},
 		{
-			name: "translate",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "failure-domain.beta.kubernetes.io/zone",
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
+			name:                 "fully specified (regional)",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, "foo", "us-central1-c", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "foo", "us-central1-c", "baz"),
 		},
 		{
-			name: "combo",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "failure-domain.beta.kubernetes.io/zone",
-							Values: []string{"foo", "bar"},
-						},
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"boo", "baz"},
-						},
-					},
-				},
-			},
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"boo", "baz"},
-						},
-					},
-				},
-			},
+			name:                 "no project",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, "bar", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "bing", "bar", "baz"),
 		},
 		{
-			name: "some other key",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "test",
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-			expErr: true,
+			name:                 "no project or zone",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "bing", "bada", "baz"),
+		},
+		{
+			name:                 "no project or region",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, UnspecifiedValue, "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "bing", "us-central1", "baz"),
+		},
+		{
+			name:                 "no project (regional)",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, "us-west1", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "bing", "us-west1", "baz"),
+		},
+		{
+			name:         "invalid handle",
+			volumeHandle: "foo",
+			nodeID:       fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedErr:  true,
+		},
+		{
+			name:         "invalid node ID",
+			volumeHandle: fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, "us-west1", "baz"),
+			nodeID:       "foo",
+			expectedErr:  true,
 		},
 	}
-
+	g := NewGCEPersistentDiskCSITranslator()
 	for _, tc := range testCases {
-		t.Logf("Running test: %v", tc.name)
-		gotTop, err := translateAllowedTopologies(tc.topology)
-		if err != nil && !tc.expErr {
-			t.Errorf("Did not expect an error, got: %v", err)
-		}
-		if err == nil && tc.expErr {
-			t.Errorf("Expected an error but did not get one")
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			gotVolumeHandle, err := g.RepairVolumeHandle(tc.volumeHandle, tc.nodeID)
+			if err != nil && !tc.expectedErr {
+				if !tc.expectedErr {
+					t.Fatalf("Got error: %v, but expected none", err)
+				}
+				return
+			}
+			if err == nil && tc.expectedErr {
+				t.Fatal("Got no error, but expected one")
+			}
 
-		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {
-			t.Errorf("Expected topology: %v, but got: %v", tc.expectedToplogy, gotTop)
-		}
+			if gotVolumeHandle != tc.expectedVolumeHandle {
+				t.Fatalf("Got volume handle %s, but expected %s", gotVolumeHandle, tc.expectedVolumeHandle)
+			}
+		})
 	}
 }
 
@@ -211,18 +184,16 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 		expAccessModes []v1.PersistentVolumeAccessMode
 	}{
 		{
-			name: "multiple normals",
+			name: "ROX",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadOnlyMany,
-				v1.ReadWriteOnce,
 			},
 			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadOnlyMany,
-				v1.ReadWriteOnce,
 			},
 		},
 		{
-			name: "one normal",
+			name: "RWO",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
@@ -231,13 +202,52 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 			},
 		},
 		{
-			name: "some readwritemany",
+			name: "RWX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWO, ROX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+				v1.ReadWriteOnce,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWO, RWX",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadWriteMany,
 			},
 			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWX, ROX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+				v1.ReadOnlyMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWX, ROX, RWO",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
 		},
@@ -251,5 +261,95 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 		if !reflect.DeepEqual(tc.expAccessModes, got) {
 			t.Fatalf("Expected access modes: %v, instead got: %v", tc.expAccessModes, got)
 		}
+	}
+}
+
+func TestInlineReadOnly(t *testing.T) {
+	g := NewGCEPersistentDiskCSITranslator()
+	pv, err := g.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   "foo",
+				ReadOnly: true,
+			},
+		},
+	}, "")
+	if err != nil {
+		t.Fatalf("Failed to translate in tree inline volume to CSI: %v", err)
+	}
+
+	if pv == nil || pv.Spec.PersistentVolumeSource.CSI == nil {
+		t.Fatal("PV or volume source unexpectedly nil")
+	}
+
+	if !pv.Spec.PersistentVolumeSource.CSI.ReadOnly {
+		t.Error("PV readonly value not true")
+	}
+
+	ams := pv.Spec.AccessModes
+	if len(ams) != 1 {
+		t.Errorf("got am %v, expected length of 1", ams)
+	}
+
+	if ams[0] != v1.ReadOnlyMany {
+		t.Errorf("got am %v, expected access mode of ReadOnlyMany", ams[0])
+	}
+}
+
+func TestTranslateInTreePVToCSIVolIDFmt(t *testing.T) {
+	g := NewGCEPersistentDiskCSITranslator()
+	pdName := "pd-name"
+	tests := []struct {
+		desc               string
+		topologyLabelKey   string
+		topologyLabelValue string
+		wantVolId          string
+	}{
+		{
+			desc:               "beta topology key zonal",
+			topologyLabelKey:   v1.LabelFailureDomainBetaZone,
+			topologyLabelValue: "us-east1-a",
+			wantVolId:          "projects/UNSPECIFIED/zones/us-east1-a/disks/pd-name",
+		},
+		{
+			desc:               "v1 topology key zonal",
+			topologyLabelKey:   v1.LabelTopologyZone,
+			topologyLabelValue: "us-east1-a",
+			wantVolId:          "projects/UNSPECIFIED/zones/us-east1-a/disks/pd-name",
+		},
+		{
+			desc:               "beta topology key regional",
+			topologyLabelKey:   v1.LabelFailureDomainBetaZone,
+			topologyLabelValue: "us-central1-a__us-central1-c",
+			wantVolId:          "projects/UNSPECIFIED/regions/us-central1/disks/pd-name",
+		},
+		{
+			desc:               "v1 topology key regional",
+			topologyLabelKey:   v1.LabelTopologyZone,
+			topologyLabelValue: "us-central1-a__us-central1-c",
+			wantVolId:          "projects/UNSPECIFIED/regions/us-central1/disks/pd-name",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			translatedPV, err := g.TranslateInTreePVToCSI(&v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{tc.topologyLabelKey: tc.topologyLabelValue},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: pdName,
+						},
+					},
+				},
+			})
+			if err != nil {
+				t.Errorf("got error translating in-tree PV to CSI: %v", err)
+			}
+			if got := translatedPV.Spec.PersistentVolumeSource.CSI.VolumeHandle; got != tc.wantVolId {
+				t.Errorf("got translated volume handle: %q, want %q", got, tc.wantVolId)
+			}
+		})
 	}
 }

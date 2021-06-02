@@ -14,25 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilio "k8s.io/utils/io"
 )
 
 type podEventType int
@@ -60,12 +59,13 @@ type sourceFile struct {
 	watchEvents    chan *watchEvent
 }
 
+// NewSourceFile watches a config file for changes.
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
 	config := newSourceFile(path, nodeName, period, updates)
-	klog.V(1).Infof("Watching path %q", path)
+	klog.V(1).InfoS("Watching path", "path", path)
 	config.run()
 }
 
@@ -95,17 +95,17 @@ func (s *sourceFile) run() {
 	go func() {
 		// Read path immediately to speed up startup.
 		if err := s.listConfig(); err != nil {
-			klog.Errorf("Unable to read config path %q: %v", s.path, err)
+			klog.ErrorS(err, "Unable to read config path", "path", s.path)
 		}
 		for {
 			select {
 			case <-listTicker.C:
 				if err := s.listConfig(); err != nil {
-					klog.Errorf("Unable to read config path %q: %v", s.path, err)
+					klog.ErrorS(err, "Unable to read config path", "path", s.path)
 				}
 			case e := <-s.watchEvents:
 				if err := s.consumeWatchEvent(e); err != nil {
-					klog.Errorf("Unable to process watch event: %v", err)
+					klog.ErrorS(err, "Unable to process watch event")
 				}
 			}
 		}
@@ -173,31 +173,32 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			klog.Errorf("Can't get metadata for %q: %v", path, err)
+			klog.ErrorS(err, "Could not get metadata", "path", path)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			klog.Errorf("Not recursing into manifest path %q", path)
+			klog.ErrorS(nil, "Provided manifest path is a directory, not recursing into manifest path", "path", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					klog.Errorf("Can't process manifest file %q: %v", path, err)
+					klog.ErrorS(err, "Could not process manifest file", "path", path)
 				}
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			klog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
+			klog.ErrorS(nil, "Manifest path is not a directory or file", "path", path, "mode", statInfo.Mode())
 		}
 	}
 	return pods, nil
 }
 
+// extractFromFile parses a file for Pod configuration information.
 func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
-	klog.V(3).Infof("Reading config file %q", filename)
+	klog.V(3).InfoS("Reading config file", "path", filename)
 	defer func() {
 		if err == nil && pod != nil {
 			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)
@@ -215,7 +216,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := utilio.ReadAtMost(file, maxConfigLength)
 	if err != nil {
 		return pod, err
 	}
@@ -232,7 +233,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file.\n", filename, podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {

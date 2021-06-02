@@ -19,12 +19,16 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,14 +41,15 @@ type ConfigMapsGetter interface {
 
 // ConfigMapInterface has methods to work with ConfigMap resources.
 type ConfigMapInterface interface {
-	Create(*v1.ConfigMap) (*v1.ConfigMap, error)
-	Update(*v1.ConfigMap) (*v1.ConfigMap, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error)
-	List(opts metav1.ListOptions) (*v1.ConfigMapList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error)
+	Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (*v1.ConfigMap, error)
+	Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (*v1.ConfigMap, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ConfigMap, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ConfigMapList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error)
+	Apply(ctx context.Context, configMap *corev1.ConfigMapApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -63,20 +68,20 @@ func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
 }
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string, options metav1.GetOptions) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
-func (c *configMaps) List(opts metav1.ListOptions) (result *v1.ConfigMapList, err error) {
+func (c *configMaps) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ConfigMapList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +92,13 @@ func (c *configMaps) List(opts metav1.ListOptions) (result *v1.ConfigMapList, er
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested configMaps.
-func (c *configMaps) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *configMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,71 +109,100 @@ func (c *configMaps) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Create(configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("configmaps").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(configMap).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Update(configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(configMap.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(configMap).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
-func (c *configMaps) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *configMaps) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *configMaps) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *configMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("configmaps").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied configMap.
+func (c *configMaps) Apply(ctx context.Context, configMap *corev1.ConfigMapApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ConfigMap, err error) {
+	if configMap == nil {
+		return nil, fmt.Errorf("configMap provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(configMap)
+	if err != nil {
+		return nil, err
+	}
+	name := configMap.Name
+	if name == nil {
+		return nil, fmt.Errorf("configMap.Name must be provided to Apply")
+	}
+	result = &v1.ConfigMap{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("configmaps").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
 		Into(result)
 	return
 }

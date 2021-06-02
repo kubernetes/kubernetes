@@ -18,8 +18,11 @@ limitations under the License.
 package types
 
 import (
+	"errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/mount-utils"
 )
 
 // UniquePodName defines the type to key pods off of
@@ -33,22 +36,128 @@ type UniquePVCName types.UID
 type GeneratedOperations struct {
 	// Name of operation - could be used for resetting shared exponential backoff
 	OperationName     string
-	OperationFunc     func() (eventErr error, detailedErr error)
+	OperationFunc     func() (context OperationContext)
 	EventRecorderFunc func(*error)
-	CompleteFunc      func(*error)
+	CompleteFunc      func(CompleteFuncParam)
+}
+
+type OperationContext struct {
+	EventErr    error
+	DetailedErr error
+	Migrated    bool
+}
+
+func NewOperationContext(eventErr, detailedErr error, migrated bool) OperationContext {
+	return OperationContext{
+		EventErr:    eventErr,
+		DetailedErr: detailedErr,
+		Migrated:    migrated,
+	}
+}
+
+type CompleteFuncParam struct {
+	Err      *error
+	Migrated *bool
 }
 
 // Run executes the operations and its supporting functions
 func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
+	var context OperationContext
 	if o.CompleteFunc != nil {
-		defer o.CompleteFunc(&detailedErr)
+		c := CompleteFuncParam{
+			Err:      &context.DetailedErr,
+			Migrated: &context.Migrated,
+		}
+		defer o.CompleteFunc(c)
 	}
 	if o.EventRecorderFunc != nil {
 		defer o.EventRecorderFunc(&eventErr)
 	}
 	// Handle panic, if any, from operationFunc()
 	defer runtime.RecoverFromPanic(&detailedErr)
-	return o.OperationFunc()
+
+	context = o.OperationFunc()
+	return context.EventErr, context.DetailedErr
+}
+
+// FailedPrecondition error indicates CSI operation returned failed precondition
+// error
+type FailedPrecondition struct {
+	msg string
+}
+
+func (err *FailedPrecondition) Error() string {
+	return err.msg
+}
+
+// NewFailedPreconditionError returns a new FailedPrecondition error instance
+func NewFailedPreconditionError(msg string) *FailedPrecondition {
+	return &FailedPrecondition{msg: msg}
+}
+
+// IsFailedPreconditionError checks if given error is of type that indicates
+// operation failed with precondition
+func IsFailedPreconditionError(err error) bool {
+	var failedPreconditionError *FailedPrecondition
+	return errors.As(err, &failedPreconditionError)
+}
+
+// TransientOperationFailure indicates operation failed with a transient error
+// and may fix itself when retried.
+type TransientOperationFailure struct {
+	msg string
+}
+
+func (err *TransientOperationFailure) Error() string {
+	return err.msg
+}
+
+// NewTransientOperationFailure creates an instance of TransientOperationFailure error
+func NewTransientOperationFailure(msg string) *TransientOperationFailure {
+	return &TransientOperationFailure{msg: msg}
+}
+
+// UncertainProgressError indicates operation failed with a non-final error
+// and operation may be in-progress in background.
+type UncertainProgressError struct {
+	msg string
+}
+
+func (err *UncertainProgressError) Error() string {
+	return err.msg
+}
+
+// NewUncertainProgressError creates an instance of UncertainProgressError type
+func NewUncertainProgressError(msg string) *UncertainProgressError {
+	return &UncertainProgressError{msg: msg}
+}
+
+// IsOperationFinishedError checks if given error is of type that indicates
+// operation is finished with a FINAL error.
+func IsOperationFinishedError(err error) bool {
+	if _, ok := err.(*UncertainProgressError); ok {
+		return false
+	}
+	if _, ok := err.(*TransientOperationFailure); ok {
+		return false
+	}
+	return true
+}
+
+// IsFilesystemMismatchError checks if mount failed because requested filesystem
+// on PVC and actual filesystem on disk did not match
+func IsFilesystemMismatchError(err error) bool {
+	mountError := mount.MountError{}
+	return errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch
+}
+
+// IsUncertainProgressError checks if given error is of type that indicates
+// operation might be in-progress in background.
+func IsUncertainProgressError(err error) bool {
+	if _, ok := err.(*UncertainProgressError); ok {
+		return true
+	}
+	return false
 }
 
 const (

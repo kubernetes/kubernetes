@@ -47,7 +47,7 @@ const (
 // integer value. The value can be any valid integer.
 type PriorityClass struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
@@ -69,7 +69,7 @@ type PriorityClass struct {
 	Description string
 
 	// PreemptionPolicy it the Policy for preempting pods with lower priority.
-	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// This field is beta-level.
 	// +optional
 	PreemptionPolicy *core.PreemptionPolicy
 }
@@ -80,7 +80,7 @@ type PriorityClass struct {
 type PriorityClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 

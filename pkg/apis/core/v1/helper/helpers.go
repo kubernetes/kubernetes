@@ -17,13 +17,11 @@ limitations under the License.
 package helper
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -85,6 +83,45 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 	return resource.ParseQuantity(pageSize)
 }
 
+// HugePageUnitSizeFromByteSize returns hugepage size has the format.
+// `size` must be guaranteed to divisible into the largest units that can be expressed.
+// <size><unit-prefix>B (1024 = "1KB", 1048576 = "1MB", etc).
+func HugePageUnitSizeFromByteSize(size int64) (string, error) {
+	// hugePageSizeUnitList is borrowed from opencontainers/runc/libcontainer/cgroups/utils.go
+	var hugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	idx := 0
+	len := len(hugePageSizeUnitList) - 1
+	for size%1024 == 0 && idx < len {
+		size /= 1024
+		idx++
+	}
+	if size > 1024 && idx < len {
+		return "", fmt.Errorf("size: %d%s must be guaranteed to divisible into the largest units", size, hugePageSizeUnitList[idx])
+	}
+	return fmt.Sprintf("%d%s", size, hugePageSizeUnitList[idx]), nil
+}
+
+// IsHugePageMedium returns true if the volume medium is in 'HugePages[-size]' format
+func IsHugePageMedium(medium v1.StorageMedium) bool {
+	if medium == v1.StorageMediumHugePages {
+		return true
+	}
+	return strings.HasPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+}
+
+// HugePageSizeFromMedium returns the page size for the specified huge page medium.
+// If the specified input is not a valid huge page medium an error is returned.
+func HugePageSizeFromMedium(medium v1.StorageMedium) (resource.Quantity, error) {
+	if !IsHugePageMedium(medium) {
+		return resource.Quantity{}, fmt.Errorf("medium: %s is not a hugepage medium", medium)
+	}
+	if medium == v1.StorageMediumHugePages {
+		return resource.Quantity{}, fmt.Errorf("medium: %s doesn't have size information", medium)
+	}
+	pageSize := strings.TrimPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+	return resource.ParseQuantity(pageSize)
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
@@ -92,22 +129,19 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+// IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
 func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// Extended and Hugepages resources
-func IsScalarResourceName(name v1.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
-}
-
-// this function aims to check if the service's ClusterIP is set or not
+// IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
+// LoadBalancerStatusEqual evaluates the given load balancers' ingress IP addresses
+// and hostnames and returns true if equal or false if otherwise
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -135,16 +169,6 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 	return true
 }
 
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusDeepCopy(lb *v1.LoadBalancerStatus) *v1.LoadBalancerStatus {
-	c := &v1.LoadBalancerStatus{}
-	c.Ingress = make([]v1.LoadBalancerIngress, len(lb.Ingress))
-	for i := range lb.Ingress {
-		c.Ingress[i] = lb.Ingress[i]
-	}
-	return c
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
@@ -162,7 +186,7 @@ func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString returns an array of AccessModes from a string created by GetAccessModesAsString
 func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []v1.PersistentVolumeAccessMode{}
@@ -200,72 +224,6 @@ func containsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.Persisten
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
-	if len(nsm) == 0 {
-		return labels.Nothing(), nil
-	}
-	selector := labels.NewSelector()
-	for _, expr := range nsm {
-		var op selection.Operator
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			op = selection.In
-		case v1.NodeSelectorOpNotIn:
-			op = selection.NotIn
-		case v1.NodeSelectorOpExists:
-			op = selection.Exists
-		case v1.NodeSelectorOpDoesNotExist:
-			op = selection.DoesNotExist
-		case v1.NodeSelectorOpGt:
-			op = selection.GreaterThan
-		case v1.NodeSelectorOpLt:
-			op = selection.LessThan
-		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	return selector, nil
-}
-
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
-	if len(nsm) == 0 {
-		return fields.Nothing(), nil
-	}
-
-	selectors := []fields.Selector{}
-	for _, expr := range nsm {
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
-
-		case v1.NodeSelectorOpNotIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
-
-		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
-		}
-	}
-
-	return fields.AndSelectors(selectors...), nil
-}
-
 // NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
 func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorRequirement, terms []v1.NodeSelectorTerm) bool {
 	for _, req := range reqs {
@@ -277,39 +235,6 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 			}
 		}
 	}
-	return false
-}
-
-// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
-// nil or empty term matches no objects.
-func MatchNodeSelectorTerms(
-	nodeSelectorTerms []v1.NodeSelectorTerm,
-	nodeLabels labels.Set,
-	nodeFields fields.Set,
-) bool {
-	for _, req := range nodeSelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
-			continue
-		}
-
-		if len(req.MatchExpressions) != 0 {
-			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-			if err != nil || !labelSelector.Matches(nodeLabels) {
-				continue
-			}
-		}
-
-		if len(req.MatchFields) != 0 {
-			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
-			if err != nil || !fieldSelector.Matches(nodeFields) {
-				continue
-			}
-		}
-
-		return true
-	}
-
 	return false
 }
 
@@ -391,39 +316,7 @@ func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
 	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
 }
 
-// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) bool {
-	for i := range tolerations {
-		if tolerations[i].ToleratesTaint(taint) {
-			return true
-		}
-	}
-	return false
-}
-
-type taintsFilterFunc func(*v1.Taint) bool
-
-// TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
-// all the taints that apply to the filter in given taint list.
-func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v1.Taint, applyFilter taintsFilterFunc) bool {
-	if len(taints) == 0 {
-		return true
-	}
-
-	for i := range taints {
-		if applyFilter != nil && !applyFilter(&taints[i]) {
-			continue
-		}
-
-		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+// GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
 		return true, []v1.Toleration{}
@@ -446,42 +339,6 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 		}
 	}
 	return true, result
-}
-
-func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
-	var avoidPods v1.AvoidPods
-	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[v1.PreferAvoidPodsAnnotationKey]), &avoidPods)
-		if err != nil {
-			return avoidPods, err
-		}
-	}
-	return avoidPods, nil
-}
-
-// GetPersistentVolumeClass returns StorageClassName.
-func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
-	// Use beta annotation first
-	if class, found := volume.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
-	return volume.Spec.StorageClassName
-}
-
-// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
-// requested, it returns "".
-func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
-	if claim.Spec.StorageClassName != nil {
-		return *claim.Spec.StorageClassName
-	}
-
-	return ""
 }
 
 // ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements

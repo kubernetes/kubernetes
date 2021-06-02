@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
@@ -81,7 +81,7 @@ func (ps *Plugins) Register(name string, plugin Factory) {
 		ps.registry = map[string]Factory{}
 	}
 
-	klog.V(1).Infof("Registered admission plugin %q", name)
+	klog.V(1).InfoS("Registered admission plugin", "plugin", name)
 	ps.registry[name] = plugin
 }
 

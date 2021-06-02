@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -32,4 +33,18 @@ func ParseTimeout(duration string) (time.Duration, error) {
 		return requestTimeout, nil
 	}
 	return 0, fmt.Errorf("Invalid timeout value. Timeout must be a single integer in seconds, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
+}
+
+func parseProxyURL(proxyURL string) (*url.URL, error) {
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse: %v", proxyURL)
+	}
+
+	switch u.Scheme {
+	case "http", "https", "socks5":
+	default:
+		return nil, fmt.Errorf("unsupported scheme %q, must be http, https, or socks5", u.Scheme)
+	}
+	return u, nil
 }

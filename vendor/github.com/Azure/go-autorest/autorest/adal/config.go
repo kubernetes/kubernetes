@@ -15,8 +15,13 @@ package adal
 //  limitations under the License.
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+)
+
+const (
+	activeDirectoryEndpointTemplate = "%s/oauth2/%s%s"
 )
 
 // OAuthConfig represents the endpoints needed
@@ -60,7 +65,6 @@ func NewOAuthConfigWithAPIVersion(activeDirectoryEndpoint, tenantID string, apiV
 		}
 		api = fmt.Sprintf("?api-version=%s", *apiVersion)
 	}
-	const activeDirectoryEndpointTemplate = "%s/oauth2/%s%s"
 	u, err := url.Parse(activeDirectoryEndpoint)
 	if err != nil {
 		return nil, err
@@ -88,4 +92,60 @@ func NewOAuthConfigWithAPIVersion(activeDirectoryEndpoint, tenantID string, apiV
 		TokenEndpoint:      *tokenURL,
 		DeviceCodeEndpoint: *deviceCodeURL,
 	}, nil
+}
+
+// MultiTenantOAuthConfig provides endpoints for primary and aulixiary tenant IDs.
+type MultiTenantOAuthConfig interface {
+	PrimaryTenant() *OAuthConfig
+	AuxiliaryTenants() []*OAuthConfig
+}
+
+// OAuthOptions contains optional OAuthConfig creation arguments.
+type OAuthOptions struct {
+	APIVersion string
+}
+
+func (c OAuthOptions) apiVersion() string {
+	if c.APIVersion != "" {
+		return fmt.Sprintf("?api-version=%s", c.APIVersion)
+	}
+	return "1.0"
+}
+
+// NewMultiTenantOAuthConfig creates an object that support multitenant OAuth configuration.
+// See https://docs.microsoft.com/en-us/azure/azure-resource-manager/authenticate-multi-tenant for more information.
+func NewMultiTenantOAuthConfig(activeDirectoryEndpoint, primaryTenantID string, auxiliaryTenantIDs []string, options OAuthOptions) (MultiTenantOAuthConfig, error) {
+	if len(auxiliaryTenantIDs) == 0 || len(auxiliaryTenantIDs) > 3 {
+		return nil, errors.New("must specify one to three auxiliary tenants")
+	}
+	mtCfg := multiTenantOAuthConfig{
+		cfgs: make([]*OAuthConfig, len(auxiliaryTenantIDs)+1),
+	}
+	apiVer := options.apiVersion()
+	pri, err := NewOAuthConfigWithAPIVersion(activeDirectoryEndpoint, primaryTenantID, &apiVer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OAuthConfig for primary tenant: %v", err)
+	}
+	mtCfg.cfgs[0] = pri
+	for i := range auxiliaryTenantIDs {
+		aux, err := NewOAuthConfig(activeDirectoryEndpoint, auxiliaryTenantIDs[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OAuthConfig for tenant '%s': %v", auxiliaryTenantIDs[i], err)
+		}
+		mtCfg.cfgs[i+1] = aux
+	}
+	return mtCfg, nil
+}
+
+type multiTenantOAuthConfig struct {
+	// first config in the slice is the primary tenant
+	cfgs []*OAuthConfig
+}
+
+func (m multiTenantOAuthConfig) PrimaryTenant() *OAuthConfig {
+	return m.cfgs[0]
+}
+
+func (m multiTenantOAuthConfig) AuxiliaryTenants() []*OAuthConfig {
+	return m.cfgs[1:]
 }

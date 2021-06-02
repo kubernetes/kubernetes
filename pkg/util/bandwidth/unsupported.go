@@ -27,7 +27,7 @@ import (
 type unsupportedShaper struct {
 }
 
-// NewTCShaper makes a new unsupportedShapper for the given interface
+// NewTCShaper makes a new unsupportedShaper for the given interface
 func NewTCShaper(iface string) Shaper {
 	return &unsupportedShaper{}
 }

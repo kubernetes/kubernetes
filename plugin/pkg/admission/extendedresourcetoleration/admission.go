@@ -17,6 +17,7 @@ limitations under the License.
 package extendedresourcetoleration
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -56,7 +57,7 @@ type plugin struct {
 // a toleration with key "example.com/device", operator "Exists" and effect "NoSchedule".
 // The rationale for this is described in:
 // https://github.com/kubernetes/kubernetes/issues/55080
-func (p *plugin) Admit(attributes admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *plugin) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != core.Resource("pods") {
 		return nil

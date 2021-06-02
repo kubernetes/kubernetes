@@ -22,9 +22,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	"k8s.io/kubernetes/pkg/features"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -108,19 +111,16 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 		pod.Spec.RuntimeClassName = s.psp.Spec.RuntimeClass.DefaultRuntimeClassName
 	}
 
-	for i := range pod.Spec.InitContainers {
-		if err := s.mutateContainer(pod, &pod.Spec.InitContainers[i]); err != nil {
-			return err
+	var retErr error
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
+		retErr = s.mutateContainer(pod, c)
+		if retErr != nil {
+			return false
 		}
-	}
+		return true
+	})
 
-	for i := range pod.Spec.Containers {
-		if err := s.mutateContainer(pod, &pod.Spec.Containers[i]); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return retErr
 }
 
 // mutateContainer sets the default values of the required but not filled fields.
@@ -140,15 +140,12 @@ func (s *simpleProvider) mutateContainer(pod *api.Pod, container *api.Container)
 		sc.SetRunAsUser(uid)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
-		if sc.RunAsGroup() == nil {
-			gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
-			if err != nil {
-				return err
-			}
-			sc.SetRunAsGroup(gid)
+	if sc.RunAsGroup() == nil {
+		gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
+		if err != nil {
+			return err
 		}
-
+		sc.SetRunAsGroup(gid)
 	}
 
 	if sc.SELinuxOptions() == nil {
@@ -239,15 +236,10 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
 	}
 
-	fldPath := field.NewPath("spec", "initContainers")
-	for i := range pod.Spec.InitContainers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.InitContainers[i], fldPath.Index(i))...)
-	}
-
-	fldPath = field.NewPath("spec", "containers")
-	for i := range pod.Spec.Containers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.Containers[i], fldPath.Index(i))...)
-	}
+	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
+		allErrs = append(allErrs, s.validateContainer(pod, c, p)...)
+		return true
+	})
 
 	return allErrs
 }
@@ -265,7 +257,7 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 				continue
 			}
 
-			if !allowsAllVolumeTypes && !allowedVolumes.Has(string(fsType)) {
+			if !allowsAllVolumeTypes && !allowsVolumeType(allowedVolumes, fsType, v) {
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "volumes").Index(i), string(fsType),
 					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
@@ -281,26 +273,14 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 						fmt.Sprintf("is not allowed to be used")))
 				} else if mustBeReadOnly {
 					// Ensure all the VolumeMounts that use this volume are read-only
-					for i, c := range pod.Spec.InitContainers {
-						for j, cv := range c.VolumeMounts {
+					pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
+						for i, cv := range c.VolumeMounts {
 							if cv.Name == v.Name && !cv.ReadOnly {
-								allErrs = append(allErrs, field.Invalid(
-									field.NewPath("spec", "initContainers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
-									cv.ReadOnly, "must be read-only"),
-								)
+								allErrs = append(allErrs, field.Invalid(p.Child("volumeMounts").Index(i).Child("readOnly"), cv.ReadOnly, "must be read-only"))
 							}
 						}
-					}
-					for i, c := range pod.Spec.Containers {
-						for j, cv := range c.VolumeMounts {
-							if cv.Name == v.Name && !cv.ReadOnly {
-								allErrs = append(allErrs, field.Invalid(
-									field.NewPath("spec", "containers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
-									cv.ReadOnly, "must be read-only"),
-								)
-							}
-						}
-					}
+						return true
+					})
 				}
 
 			case policy.FlexVolume:
@@ -354,14 +334,12 @@ func (s *simpleProvider) validateContainer(pod *api.Pod, container *api.Containe
 
 	scPath := containerPath.Child("securityContext")
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(scPath, pod, container, sc.RunAsNonRoot(), sc.RunAsUser())...)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
-		var runAsGroups []int64
-		if sc.RunAsGroup() != nil {
-			runAsGroups = []int64{*sc.RunAsGroup()}
-		}
-		allErrs = append(allErrs, s.strategies.RunAsGroupStrategy.Validate(scPath, pod, runAsGroups)...)
+	var runAsGroups []int64
+	if sc.RunAsGroup() != nil {
+		runAsGroups = []int64{*sc.RunAsGroup()}
 	}
+	allErrs = append(allErrs, s.strategies.RunAsGroupStrategy.Validate(scPath, pod, runAsGroups)...)
+
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(scPath.Child("seLinuxOptions"), pod, container, sc.SELinuxOptions())...)
 	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)
@@ -466,4 +444,16 @@ func validateRuntimeClassName(actual *string, validNames []string) field.ErrorLi
 		}
 	}
 	return field.ErrorList{field.Invalid(field.NewPath("spec", "runtimeClassName"), *actual, "")}
+}
+
+func allowsVolumeType(allowedVolumes sets.String, fsType policy.FSType, volume api.Volume) bool {
+	if allowedVolumes.Has(string(fsType)) {
+		return true
+	}
+
+	// if secret volume is allowed, all the projected volume sources that projected service account token volumes expose are allowed, regardless of psp.
+	if allowedVolumes.Has(string(policy.Secret)) && fsType == policy.Projected && psputil.IsOnlyServiceAccountTokenSources(volume.VolumeSource.Projected) {
+		return true
+	}
+	return false
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,8 +35,10 @@ import (
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -61,6 +61,13 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/configz"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/version"
+	"k8s.io/component-base/version/verflag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -76,32 +83,27 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/configz"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
-	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
-	nsutil "k8s.io/kubernetes/pkg/volume/util/nsenter"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/nsenter"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -117,7 +119,8 @@ func NewKubeletCommand() *cobra.Command {
 	kubeletConfig, err := options.NewKubeletConfiguration()
 	// programmer error
 	if err != nil {
-		klog.Fatal(err)
+		klog.ErrorS(err, "Failed to create a new kubelet configuration")
+		os.Exit(1)
 	}
 
 	cmd := &cobra.Command{
@@ -152,21 +155,24 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		Run: func(cmd *cobra.Command, args []string) {
 			// initial flag parse, since we disable cobra's flag parsing
 			if err := cleanFlagSet.Parse(args); err != nil {
+				klog.ErrorS(err, "Failed to parse kubelet flag")
 				cmd.Usage()
-				klog.Fatal(err)
+				os.Exit(1)
 			}
 
 			// check if there are non-flag arguments in the command line
 			cmds := cleanFlagSet.Args()
 			if len(cmds) > 0 {
+				klog.ErrorS(nil, "Unknown command", "command", cmds[0])
 				cmd.Usage()
-				klog.Fatalf("unknown command: %s", cmds[0])
+				os.Exit(1)
 			}
 
 			// short-circuit on help
 			help, err := cleanFlagSet.GetBool("help")
 			if err != nil {
-				klog.Fatal(`"help" flag is non-bool, programmer error, please correct`)
+				klog.InfoS(`"help" flag is non-bool, programmer error, please correct`)
+				os.Exit(1)
 			}
 			if help {
 				cmd.Help()
@@ -175,44 +181,54 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// short-circuit on verflag
 			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cleanFlagSet)
+			cliflag.PrintFlags(cleanFlagSet)
 
 			// set feature gates from initial flags-based config
 			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-				klog.Fatal(err)
+				klog.ErrorS(err, "Failed to set feature gates from initial flags-based config")
+				os.Exit(1)
 			}
 
 			// validate the initial KubeletFlags
 			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
-				klog.Fatal(err)
+				klog.ErrorS(err, "Failed to validate kubelet flags")
+				os.Exit(1)
 			}
 
 			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
-				klog.Warning("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
+				klog.InfoS("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
 			}
 
 			// load kubelet config file, if provided
 			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
 				kubeletConfig, err = loadConfigFile(configFile)
 				if err != nil {
-					klog.Fatal(err)
+					klog.ErrorS(err, "Failed to load kubelet config file", "path", configFile)
+					os.Exit(1)
 				}
 				// We must enforce flag precedence by re-parsing the command line into the new object.
 				// This is necessary to preserve backwards-compatibility across binary upgrades.
 				// See issue #56171 for more details.
 				if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
-					klog.Fatal(err)
+					klog.ErrorS(err, "Failed to precedence kubeletConfigFlag")
+					os.Exit(1)
 				}
 				// update feature gates based on new config
 				if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-					klog.Fatal(err)
+					klog.ErrorS(err, "Failed to set feature gates from initial flags-based config")
+					os.Exit(1)
 				}
 			}
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
-				klog.Fatal(err)
+				klog.ErrorS(err, "Failed to validate kubelet configuration", "path", kubeletConfig)
+				os.Exit(1)
+			}
+
+			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup) != 0) {
+				klog.InfoS("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
 			// use dynamic kubelet config, if enabled
@@ -228,7 +244,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 						return kubeletConfigFlagPrecedence(kc, args)
 					})
 				if err != nil {
-					klog.Fatal(err)
+					klog.ErrorS(err, "Failed to bootstrap a configuration controller", "dynamicConfigDir", dynamicConfigDir)
+					os.Exit(1)
 				}
 				// If we should just use our existing, local config, the controller will return a nil config
 				if dynamicKubeletConfig != nil {
@@ -236,7 +253,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 					// Note: flag precedence was already enforced in the controller, prior to validation,
 					// by our above transform function. Now we simply update feature gates from the new config.
 					if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-						klog.Fatal(err)
+						klog.ErrorS(err, "Failed to set feature gates from initial flags-based config")
+						os.Exit(1)
 					}
 				}
 			}
@@ -248,29 +266,33 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
-			kubeletDeps, err := UnsecuredDependencies(kubeletServer)
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 			if err != nil {
-				klog.Fatal(err)
+				klog.ErrorS(err, "Failed to construct kubelet dependencies")
+				os.Exit(1)
 			}
 
 			// add the kubelet config controller to kubeletDeps
 			kubeletDeps.KubeletConfigController = kubeletConfigController
 
-			// set up stopCh here in order to be reused by kubelet and docker shim
-			stopCh := genericapiserver.SetupSignalHandler()
-
-			// start the experimental docker shim, if enabled
-			if kubeletServer.KubeletFlags.ExperimentalDockershim {
-				if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig, stopCh); err != nil {
-					klog.Fatal(err)
-				}
-				return
+			if err := checkPermissions(); err != nil {
+				klog.ErrorS(err, "kubelet running with insufficient permissions")
 			}
+			// set up signal context here in order to be reused by kubelet and docker shim
+			ctx := genericapiserver.SetupSignalContext()
+
+			// make the kubelet's config safe for logging
+			config := kubeletServer.KubeletConfiguration.DeepCopy()
+			for k := range config.StaticPodURLHeader {
+				config.StaticPodURLHeader[k] = []string{"<masked>"}
+			}
+			// log the kubelet's config for inspection
+			klog.V(5).InfoS("KubeletConfiguration", "configuration", kubeletServer.KubeletConfiguration)
 
 			// run the kubelet
-			klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
-			if err := Run(kubeletServer, kubeletDeps, stopCh); err != nil {
-				klog.Fatal(err)
+			if err := Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate); err != nil {
+				klog.ErrorS(err, "Failed to run kubelet")
+				os.Exit(1)
 			}
 		},
 	}
@@ -363,7 +385,7 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
-func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, error) {
+func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.FeatureGate) (*kubelet.Dependencies, error) {
 	// Initialize the TLS Options
 	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
@@ -372,46 +394,37 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 
 	mounter := mount.New(s.ExperimentalMounterPath)
 	subpather := subpath.New(mounter)
+	hu := hostutil.NewHostUtil()
 	var pluginRunner = exec.New()
-	if s.Containerized {
-		klog.V(2).Info("Running kubelet in containerized mode")
-		ne, err := nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
-		if err != nil {
-			return nil, err
-		}
-		mounter = nsutil.NewMounter(s.RootDirectory, ne)
-		// NSenter only valid on Linux
-		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
-		// an exec interface which can use nsenter for flex plugin calls
-		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
-		if err != nil {
-			return nil, err
-		}
-	}
 
-	var dockerClientConfig *dockershim.ClientConfig
+	var dockerOptions *kubelet.DockerOptions
 	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
-		dockerClientConfig = &dockershim.ClientConfig{
+		dockerOptions = &kubelet.DockerOptions{
 			DockerEndpoint:            s.DockerEndpoint,
 			RuntimeRequestTimeout:     s.RuntimeRequestTimeout.Duration,
 			ImagePullProgressDeadline: s.ImagePullProgressDeadline.Duration,
 		}
 	}
 
+	plugins, err := ProbeVolumePlugins(featureGate)
+	if err != nil {
+		return nil, err
+	}
 	return &kubelet.Dependencies{
 		Auth:                nil, // default does not enforce auth[nz]
 		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
 		Cloud:               nil, // cloud provider might start background processes
 		ContainerManager:    nil,
-		DockerClientConfig:  dockerClientConfig,
+		DockerOptions:       dockerOptions,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
 		EventClient:         nil,
+		HostUtil:            hu,
 		Mounter:             mounter,
 		Subpather:           subpather,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
-		VolumePlugins:       ProbeVolumePlugins(),
+		VolumePlugins:       plugins,
 		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
 }
@@ -420,24 +433,19 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 // The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
 // Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
-func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan struct{}) error {
+func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
+	logOption := logs.NewOptions()
+	logOption.LogFormat = s.Logging.Format
+	logOption.LogSanitization = s.Logging.Sanitization
+	logOption.Apply()
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
-	if err := initForOS(s.KubeletFlags.WindowsService); err != nil {
-		return fmt.Errorf("failed OS init: %v", err)
+	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
+	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
+		return fmt.Errorf("failed OS init: %w", err)
 	}
-	if err := run(s, kubeDeps, stopCh); err != nil {
-		return fmt.Errorf("failed to run Kubelet: %v", err)
+	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
+		return fmt.Errorf("failed to run Kubelet: %w", err)
 	}
-	return nil
-}
-
-func checkPermissions() error {
-	if uid := os.Getuid(); uid != 0 {
-		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
-	}
-	// TODO: Check if kubelet is running in the `initial` user namespace.
-	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
 	return nil
 }
 
@@ -457,11 +465,11 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) error {
 	cz, err := configz.New("kubeletconfig")
 	if err != nil {
-		klog.Errorf("unable to register configz: %s", err)
+		klog.ErrorS(err, "Failed to register configz")
 		return err
 	}
 	if err := setConfigz(cz, kc); err != nil {
-		klog.Errorf("unable to register config: %s", err)
+		klog.ErrorS(err, "Failed to register config")
 		return err
 	}
 	return nil
@@ -474,16 +482,38 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
-	eventBroadcaster.StartLogging(klog.V(3).Infof)
+	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
-		klog.V(4).Infof("Sending events to api server.")
+		klog.V(4).InfoS("Sending events to api server")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
 	} else {
-		klog.Warning("No api server defined - no events will be sent to API server.")
+		klog.InfoS("No api server defined - no events will be sent to API server")
 	}
 }
 
-func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan struct{}) (err error) {
+func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
+	emptyCPUSet := cpuset.NewCPUSet()
+
+	if cpus == "" {
+		return emptyCPUSet, nil
+	}
+
+	topo, err := topology.Discover(machineInfo)
+	if err != nil {
+		return emptyCPUSet, fmt.Errorf("unable to discover CPU topology info: %s", err)
+	}
+	reservedCPUSet, err := cpuset.Parse(cpus)
+	if err != nil {
+		return emptyCPUSet, fmt.Errorf("unable to parse reserved-cpus list: %s", err)
+	}
+	allCPUSet := topo.CPUDetails.CPUs()
+	if !reservedCPUSet.IsSubsetOf(allCPUSet) {
+		return emptyCPUSet, fmt.Errorf("reserved-cpus: %s is not a subset of online-cpus: %s", cpus, allCPUSet.String())
+	}
+	return reservedCPUSet, nil
+}
+
+func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -500,12 +530,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	}
 	done := make(chan struct{})
 	if s.LockFilePath != "" {
-		klog.Infof("acquiring file lock on %q", s.LockFilePath)
+		klog.InfoS("Acquiring file lock", "path", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
-			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
+			return fmt.Errorf("unable to acquire file lock on %q: %w", s.LockFilePath, err)
 		}
 		if s.ExitOnLockContention {
-			klog.Infof("watching for inotify events for: %v", s.LockFilePath)
+			klog.InfoS("Watching for inotify events", "path", s.LockFilePath)
 			if err := watchForLockfileContention(s.LockFilePath, done); err != nil {
 				return err
 			}
@@ -515,7 +545,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	// Register current configuration with /configz endpoint
 	err = initConfigz(&s.KubeletConfiguration)
 	if err != nil {
-		klog.Errorf("unable to register KubeletConfiguration with configz, error: %v", err)
+		klog.ErrorS(err, "Failed to register kubelet configuration with configz")
+	}
+
+	if len(s.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
 	}
 
 	// About to get clients and such, detect standaloneMode
@@ -525,7 +559,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	}
 
 	if kubeDeps == nil {
-		kubeDeps, err = UnsecuredDependencies(s)
+		kubeDeps, err = UnsecuredDependencies(s, featureGate)
 		if err != nil {
 			return err
 		}
@@ -533,14 +567,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	if kubeDeps.Cloud == nil {
 		if !cloudprovider.IsExternal(s.CloudProvider) {
+			cloudprovider.DeprecationWarningForProvider(s.CloudProvider)
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
 			}
-			if cloud == nil {
-				klog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				klog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			if cloud != nil {
+				klog.V(2).InfoS("Successfully initialized cloud provider", "cloudProvider", s.CloudProvider, "cloudConfigFile", s.CloudConfigFile)
 			}
 			kubeDeps.Cloud = cloud
 		}
@@ -561,10 +594,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		kubeDeps.KubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
-		klog.Warningf("standalone mode, no API client")
+		klog.InfoS("Standalone mode, no API client")
 
 	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
-		clientConfig, closeAllConns, err := buildKubeletClientConfig(s, nodeName)
+		clientConfig, closeAllConns, err := buildKubeletClientConfig(ctx, s, nodeName)
 		if err != nil {
 			return err
 		}
@@ -575,7 +608,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet client: %w", err)
 		}
 
 		// make a separate client for events
@@ -584,58 +617,48 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		eventClientConfig.Burst = int(s.EventBurst)
 		kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet event client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet event client: %w", err)
 		}
 
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-		// if the NodeLease feature is enabled, the timeout is the minimum of the lease duration and status update frequency
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-			leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
-			if heartbeatClientConfig.Timeout > leaseTimeout {
-				heartbeatClientConfig.Timeout = leaseTimeout
-			}
+		// The timeout is the minimum of the lease duration and status update frequency
+		leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
+		if heartbeatClientConfig.Timeout > leaseTimeout {
+			heartbeatClientConfig.Timeout = leaseTimeout
 		}
+
 		heartbeatClientConfig.QPS = float32(-1)
 		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet heartbeat client: %v", err)
-		}
-	}
-
-	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
-		kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
-		if err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName)); err != nil {
-			return err
+			return fmt.Errorf("failed to initialize kubelet heartbeat client: %w", err)
 		}
 	}
 
 	if kubeDeps.Auth == nil {
-		auth, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+		auth, runAuthenticatorCAReload, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}
 		kubeDeps.Auth = auth
+		runAuthenticatorCAReload(ctx.Done())
 	}
 
 	var cgroupRoots []string
-
-	cgroupRoots = append(cgroupRoots, cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver))
+	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, s.CgroupDriver)
+	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
 	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
 	if err != nil {
-		return fmt.Errorf("failed to get the kubelet's cgroup: %v", err)
-	}
-	if kubeletCgroup != "" {
+		klog.InfoS("Failed to get the kubelet's cgroup. Kubelet system container metrics may be missing.", "err", err)
+	} else if kubeletCgroup != "" {
 		cgroupRoots = append(cgroupRoots, kubeletCgroup)
 	}
 
 	runtimeCgroup, err := cm.GetRuntimeContainer(s.ContainerRuntime, s.RuntimeCgroups)
 	if err != nil {
-		return fmt.Errorf("failed to get the container runtime's cgroup: %v", err)
-	}
-	if runtimeCgroup != "" {
+		klog.InfoS("Failed to get the container runtime's cgroup. Runtime system container metrics may be missing.", "err", err)
+	} else if runtimeCgroup != "" {
 		// RuntimeCgroups is optional, so ignore if it isn't specified
 		cgroupRoots = append(cgroupRoots, runtimeCgroup)
 	}
@@ -658,9 +681,31 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
-			klog.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+			klog.InfoS("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
 			s.CgroupRoot = "/"
 		}
+
+		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
+		if err != nil {
+			return err
+		}
+		reservedSystemCPUs, err := getReservedCPUs(machineInfo, s.ReservedSystemCPUs)
+		if err != nil {
+			return err
+		}
+		if reservedSystemCPUs.Size() > 0 {
+			// at cmd option validation phase it is tested either --system-reserved-cgroup or --kube-reserved-cgroup is specified, so overwrite should be ok
+			klog.InfoS("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved and SystemReserved", "kubeReservedCPUs", s.KubeReserved, "systemReservedCPUs", s.SystemReserved)
+			if s.KubeReserved != nil {
+				delete(s.KubeReserved, "cpu")
+			}
+			if s.SystemReserved == nil {
+				s.SystemReserved = make(map[string]string)
+			}
+			s.SystemReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
+			klog.InfoS("After cpu setting is overwritten", "kubeReservedCPUs", s.KubeReserved, "systemReservedCPUs", s.SystemReserved)
+		}
+
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
 			return err
@@ -703,14 +748,19 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
+					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
-				QOSReserved:                           *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
-				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalPodPidsLimit:              s.PodPidsLimit,
-				EnforceCPULimits:                      s.CPUCFSQuota,
-				CPUCFSQuotaPeriod:                     s.CPUCFSQuotaPeriod.Duration,
+				QOSReserved:                             *experimentalQOSReserved,
+				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
+				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
+				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
+				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
+				ExperimentalPodPidsLimit:                s.PodPidsLimit,
+				EnforceCPULimits:                        s.CPUCFSQuota,
+				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
+				ExperimentalTopologyManagerPolicy:       s.TopologyManagerPolicy,
+				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
@@ -721,22 +771,35 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 	}
 
-	if err := checkPermissions(); err != nil {
-		klog.Error(err)
-	}
-
 	utilruntime.ReallyCrash = s.ReallyCrashForTesting
-
-	rand.Seed(time.Now().UnixNano())
 
 	// TODO(vmarmol): Do this through container config.
 	oomAdjuster := kubeDeps.OOMAdjuster
 	if err := oomAdjuster.ApplyOOMScoreAdj(0, int(s.OOMScoreAdj)); err != nil {
-		klog.Warning(err)
+		klog.InfoS("Failed to ApplyOOMScoreAdj", "err", err)
+	}
+
+	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration,
+		kubeDeps, &s.ContainerRuntimeOptions,
+		s.ContainerRuntime,
+		s.RuntimeCgroups,
+		s.RemoteRuntimeEndpoint,
+		s.RemoteImageEndpoint,
+		s.NonMasqueradeCIDR)
+	if err != nil {
+		return err
 	}
 
 	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil {
 		return err
+	}
+
+	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
+		kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
+		if err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName)); err != nil {
+			return err
+		}
 	}
 
 	if s.HealthzPort > 0 {
@@ -745,7 +808,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
 			if err != nil {
-				klog.Errorf("Starting healthz server failed: %v", err)
+				klog.ErrorS(err, "Failed to start healthz server")
 			}
 		}, 5*time.Second, wait.NeverStop)
 	}
@@ -760,7 +823,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	select {
 	case <-done:
 		break
-	case <-stopCh:
+	case <-ctx.Done():
 		break
 	}
 
@@ -769,8 +832,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 // buildKubeletClientConfig constructs the appropriate client config for the kubelet depending on whether
 // bootstrapping is enabled or client certificate rotation is enabled.
-func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName) (*restclient.Config, func(), error) {
-	if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nodeName types.NodeName) (*restclient.Config, func(), error) {
+	if s.RotateCertificates {
 		// Rules for client rotation and the handling of kube config files:
 		//
 		// 1. If the client provides only a kubeconfig file, we must use that as the initial client
@@ -788,7 +851,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		// which provides a high powered kubeconfig on the master with cert/key data, we must
 		// bootstrap the cert manager with the contents of the initial client config.
 
-		klog.Infof("Client rotation is on, will bootstrap in background")
+		klog.InfoS("Client rotation is on, will bootstrap in background")
 		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
 		if err != nil {
 			return nil, nil, err
@@ -804,6 +867,23 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 			return nil, nil, err
 		}
 
+		legacyregistry.RawMustRegister(metrics.NewGaugeFunc(
+			metrics.GaugeOpts{
+				Subsystem: kubeletmetrics.KubeletSubsystem,
+				Name:      "certificate_manager_client_ttl_seconds",
+				Help: "Gauge of the TTL (time-to-live) of the Kubelet's client certificate. " +
+					"The value is in seconds until certificate expiry (negative if already expired). " +
+					"If client certificate is invalid or unused, the value will be +INF.",
+				StabilityLevel: metrics.ALPHA,
+			},
+			func() float64 {
+				if c := clientCertificateManager.Current(); c != nil && c.Leaf != nil {
+					return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+				}
+				return math.Inf(1)
+			},
+		))
+
 		// the rotating transport will use the cert from the cert manager instead of these files
 		transportConfig := restclient.AnonymousClientConfig(clientConfig)
 
@@ -815,14 +895,14 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 			return nil, nil, err
 		}
 
-		klog.V(2).Info("Starting client certificate rotation.")
+		klog.V(2).InfoS("Starting client certificate rotation")
 		clientCertificateManager.Start()
 
 		return transportConfig, closeAllConns, nil
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
-		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(ctx, s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -832,7 +912,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid kubeconfig: %v", err)
+		return nil, nil, fmt.Errorf("invalid kubeconfig: %w", err)
 	}
 
 	kubeClientConfigOverrides(s, clientConfig)
@@ -857,7 +937,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 // if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
 // write out).
 func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
-	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+	newClientsetFn := func(current *tls.Certificate) (clientset.Interface, error) {
 		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
 		// to always fall back to the external bootstrap credentials when such credentials are
@@ -866,11 +946,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		if current != nil {
 			config = clientConfig
 		}
-		client, err := clientset.NewForConfig(config)
-		if err != nil {
-			return nil, err
-		}
-		return client.CertificatesV1beta1().CertificateSigningRequests(), nil
+		return clientset.NewForConfig(config)
 	}
 
 	return kubeletcertificate.NewKubeletClientCertificateManager(
@@ -885,7 +961,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 
 		clientConfig.CertFile,
 		clientConfig.KeyFile,
-		newClientFn,
+		newClientsetFn,
 	)
 }
 
@@ -910,10 +986,10 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 	nodeName, err := instances.CurrentNodeName(context.TODO(), hostname)
 	if err != nil {
-		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
+		return "", fmt.Errorf("error fetching current node name from cloud provider: %w", err)
 	}
 
-	klog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+	klog.V(2).InfoS("Cloud provider determined current node", "nodeName", klog.KRef("", string(nodeName)))
 
 	return nodeName, nil
 }
@@ -936,7 +1012,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			}
 			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
 			if err != nil {
-				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+				return nil, fmt.Errorf("unable to generate self signed cert: %w", err)
 			}
 
 			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
@@ -947,13 +1023,24 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 				return nil, err
 			}
 
-			klog.V(4).Infof("Using self-signed cert (%s, %s)", kc.TLSCertFile, kc.TLSPrivateKeyFile)
+			klog.V(4).InfoS("Using self-signed cert", "TLSCertFile", kc.TLSCertFile, "TLSPrivateKeyFile", kc.TLSPrivateKeyFile)
 		}
 	}
 
 	tlsCipherSuites, err := cliflag.TLSCipherSuites(kc.TLSCipherSuites)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(tlsCipherSuites) > 0 {
+		insecureCiphers := cliflag.InsecureTLSCiphers()
+		for i := 0; i < len(tlsCipherSuites); i++ {
+			for cipherName, cipherID := range insecureCiphers {
+				if tlsCipherSuites[i] == cipherID {
+					klog.InfoS("Use of insecure cipher detected.", "cipher", cipherName)
+				}
+			}
+		}
 	}
 
 	minTLSVersion, err := cliflag.TLSVersion(kc.TLSMinVersion)
@@ -973,7 +1060,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	if len(kc.Authentication.X509.ClientCAFile) > 0 {
 		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
 		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
+			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
 		}
 		// Specify allowed CAs for client certificates
 		tlsOptions.Config.ClientCAs = clientCAs
@@ -984,7 +1071,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	return tlsOptions, nil
 }
 
-// setContentTypeForClient sets the appropritae content type into the rest config
+// setContentTypeForClient sets the appropriate content type into the rest config
 // and handles defaulting AcceptContentTypes based on that input.
 func setContentTypeForClient(cfg *restclient.Config, contentType string) {
 	if len(contentType) == 0 {
@@ -1014,15 +1101,37 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	if err != nil {
 		return err
 	}
+	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
+
+	var nodeIPs []net.IP
+	if kubeServer.NodeIP != "" {
+		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
+			parsedNodeIP := net.ParseIP(strings.TrimSpace(ip))
+			if parsedNodeIP == nil {
+				klog.InfoS("Could not parse --node-ip ignoring", "IP", ip)
+			} else {
+				nodeIPs = append(nodeIPs, parsedNodeIP)
+			}
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && len(nodeIPs) > 1 {
+		return fmt.Errorf("dual-stack --node-ip %q not supported in a single-stack cluster", kubeServer.NodeIP)
+	} else if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && utilnet.IsIPv6(nodeIPs[0]) == utilnet.IsIPv6(nodeIPs[1])) {
+		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
+		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
+		return fmt.Errorf("dual-stack --node-ip %q cannot include '0.0.0.0' or '::'", kubeServer.NodeIP)
+	}
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
 	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
-	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)
+	klog.V(2).InfoS("Using root directory", "path", kubeServer.RootDirectory)
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
@@ -1032,20 +1141,21 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		kubeServer.ContainerRuntime,
-		kubeServer.RuntimeCgroups,
-		kubeServer.HostnameOverride,
-		kubeServer.NodeIP,
+		hostname,
+		hostnameOverridden,
+		nodeName,
+		nodeIPs,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
+		kubeServer.ImageCredentialProviderConfigFile,
+		kubeServer.ImageCredentialProviderBinDir,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.RemoteRuntimeEndpoint,
-		kubeServer.RemoteImageEndpoint,
 		kubeServer.ExperimentalMounterPath,
-		kubeServer.ExperimentalKernelMemcgNotification,
+		kubeServer.KernelMemcgNotification,
 		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,
 		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
 		kubeServer.MinimumGCAge,
@@ -1053,14 +1163,12 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.MaxContainerCount,
 		kubeServer.MasterServiceNamespace,
 		kubeServer.RegisterSchedulable,
-		kubeServer.NonMasqueradeCIDR,
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
 		kubeServer.SeccompProfileRoot,
-		kubeServer.BootstrapCheckpointPath,
 		kubeServer.NodeStatusMaxImages)
 	if err != nil {
-		return fmt.Errorf("failed to create kubelet: %v", err)
+		return fmt.Errorf("failed to create kubelet: %w", err)
 	}
 
 	// NewMainKubelet should have set up a pod source config if one didn't exist
@@ -1070,34 +1178,33 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	podCfg := kubeDeps.PodConfig
 
-	rlimit.RlimitNumFiles(uint64(kubeServer.MaxOpenFiles))
+	if err := rlimit.SetNumFiles(uint64(kubeServer.MaxOpenFiles)); err != nil {
+		klog.ErrorS(err, "Failed to set rlimit on max file handles")
+	}
 
 	// process pods and exit.
 	if runOnce {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
-			return fmt.Errorf("runonce failed: %v", err)
+			return fmt.Errorf("runonce failed: %w", err)
 		}
-		klog.Info("Started kubelet as runonce")
+		klog.InfoS("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableCAdvisorJSONEndpoints, kubeServer.EnableServer)
-		klog.Info("Started kubelet")
+		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)
+		klog.InfoS("Started kubelet")
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableCAdvisorJSONEndpoints, enableServer bool) {
+func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
-	go wait.Until(func() {
-		k.Run(podCfg.Updates())
-	}, 0, wait.NeverStop)
+	go k.Run(podCfg.Updates())
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
-
+		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), enableCAdvisorJSONEndpoints)
+		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
 		go k.ListenAndServePodResources()
@@ -1108,20 +1215,21 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
-	runtimeCgroups string,
-	hostnameOverride string,
-	nodeIP string,
+	hostname string,
+	hostnameOverridden bool,
+	nodeName types.NodeName,
+	nodeIPs []net.IP,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
 	rootDirectory string,
+	imageCredentialProviderConfigFile string,
+	imageCredentialProviderBinDir string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
 	experimentalMounterPath string,
-	experimentalKernelMemcgNotification bool,
+	kernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
@@ -1129,11 +1237,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	maxContainerCount int32,
 	masterServiceNamespace string,
 	registerSchedulable bool,
-	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string,
 	nodeStatusMaxImages int32) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
@@ -1142,20 +1248,21 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps,
 		crOptions,
 		containerRuntime,
-		runtimeCgroups,
-		hostnameOverride,
-		nodeIP,
+		hostname,
+		hostnameOverridden,
+		nodeName,
+		nodeIPs,
 		providerID,
 		cloudProvider,
 		certDirectory,
 		rootDirectory,
+		imageCredentialProviderConfigFile,
+		imageCredentialProviderBinDir,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		remoteRuntimeEndpoint,
-		remoteImageEndpoint,
 		experimentalMounterPath,
-		experimentalKernelMemcgNotification,
+		kernelMemcgNotification,
 		experimentalCheckNodeCapabilitiesBeforeMount,
 		experimentalNodeAllocatableIgnoreEvictionThreshold,
 		minimumGCAge,
@@ -1163,11 +1270,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		maxContainerCount,
 		masterServiceNamespace,
 		registerSchedulable,
-		nonMasqueradeCIDR,
 		keepTerminatedPodVolumes,
 		nodeLabels,
 		seccompProfileRoot,
-		bootstrapCheckpointPath,
 		nodeStatusMaxImages)
 	if err != nil {
 		return nil, err
@@ -1191,16 +1296,14 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		switch v1.ResourceName(k) {
 		// CPU, memory, local storage, and PID resources are supported.
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			if v1.ResourceName(k) != pidlimit.PIDs || utilfeature.DefaultFeatureGate.Enabled(features.SupportNodePidsLimit) {
-				q, err := resource.ParseQuantity(v)
-				if err != nil {
-					return nil, err
-				}
-				if q.Sign() == -1 {
-					return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-				}
-				rl[v1.ResourceName(k)] = q
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, err
 			}
+			if q.Sign() == -1 {
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+			rl[v1.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}
@@ -1226,54 +1329,7 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 	c := dynamickubeletconfig.NewController(dir, transform)
 	kc, err := c.Bootstrap()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)
+		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %w", err)
 	}
 	return kc, c, nil
-}
-
-// RunDockershim only starts the dockershim in current process. This is only used for cri validate testing purpose
-// TODO(random-liu): Move this to a separate binary.
-func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConfiguration, stopCh <-chan struct{}) error {
-	r := &f.ContainerRuntimeOptions
-
-	// Initialize docker client configuration.
-	dockerClientConfig := &dockershim.ClientConfig{
-		DockerEndpoint:            r.DockerEndpoint,
-		RuntimeRequestTimeout:     c.RuntimeRequestTimeout.Duration,
-		ImagePullProgressDeadline: r.ImagePullProgressDeadline.Duration,
-	}
-
-	// Initialize network plugin settings.
-	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:        kubeletconfiginternal.HairpinMode(c.HairpinMode),
-		NonMasqueradeCIDR:  f.NonMasqueradeCIDR,
-		PluginName:         r.NetworkPluginName,
-		PluginConfDir:      r.CNIConfDir,
-		PluginBinDirString: r.CNIBinDir,
-		MTU:                int(r.NetworkPluginMTU),
-	}
-
-	// Initialize streaming configuration. (Not using TLS now)
-	streamingConfig := &streaming.Config{
-		// Use a relative redirect (no scheme or host).
-		BaseURL:                         &url.URL{Path: "/cri/"},
-		StreamIdleTimeout:               c.StreamingConnectionIdleTimeout.Duration,
-		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
-		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
-		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
-	}
-
-	// Standalone dockershim will always start the local streaming server.
-	ds, err := dockershim.NewDockerService(dockerClientConfig, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, true /*startLocalStreamingServer*/)
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
-	if err := server.Start(); err != nil {
-		return err
-	}
-	<-stopCh
-	return nil
 }

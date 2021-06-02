@@ -58,12 +58,13 @@ const (
 // from either above or below, never both). There is thus no reason to expose the
 // operator in the Kubelet's public API. Instead, we internally map signal types to operators.
 var OpForSignal = map[Signal]ThresholdOperator{
-	SignalMemoryAvailable:   OpLessThan,
-	SignalNodeFsAvailable:   OpLessThan,
-	SignalNodeFsInodesFree:  OpLessThan,
-	SignalImageFsAvailable:  OpLessThan,
-	SignalImageFsInodesFree: OpLessThan,
-	SignalPIDAvailable:      OpLessThan,
+	SignalMemoryAvailable:            OpLessThan,
+	SignalNodeFsAvailable:            OpLessThan,
+	SignalNodeFsInodesFree:           OpLessThan,
+	SignalImageFsAvailable:           OpLessThan,
+	SignalImageFsInodesFree:          OpLessThan,
+	SignalAllocatableMemoryAvailable: OpLessThan,
+	SignalPIDAvailable:               OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity
@@ -93,7 +94,8 @@ type Threshold struct {
 // GetThresholdQuantity returns the expected quantity value for a thresholdValue
 func GetThresholdQuantity(value ThresholdValue, capacity *resource.Quantity) *resource.Quantity {
 	if value.Quantity != nil {
-		return value.Quantity.Copy()
+		res := value.Quantity.DeepCopy()
+		return &res
 	}
 	return resource.NewQuantity(int64(float64(capacity.Value())*float64(value.Percentage)), resource.BinarySI)
 }

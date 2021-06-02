@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!dockerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (r *streamingRuntime) portForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
@@ -41,18 +41,18 @@ func (r *streamingRuntime) portForward(podSandboxID string, port int32, stream i
 	containerPid := container.State.Pid
 	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: socat not found.")
+		return fmt.Errorf("unable to do port forwarding: socat not found")
 	}
 
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 
 	nsenterPath, lookupErr := exec.LookPath("nsenter")
 	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+		return fmt.Errorf("unable to do port forwarding: nsenter not found")
 	}
 
 	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
-	klog.V(4).Infof("executing port forwarding command: %s", commandString)
+	klog.V(4).InfoS("Executing port forwarding command", "command", commandString)
 
 	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream

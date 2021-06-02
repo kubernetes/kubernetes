@@ -24,23 +24,45 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	goruntime "runtime"
+	"strings"
 	"time"
 
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/klog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/klog/v2"
+)
+
+const (
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.
+	// Everyone chooses 30.
+	requestTimeoutUpperBound = 34 * time.Second
+	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
+	// duplicate owner reference entries.
+	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat indicates the duplication was observed
+	// after mutating admission.
+	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+	// For PATCH request the API server only dedups after mutating admission.
+	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -67,8 +89,14 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
+	Resource schema.GroupVersionResource
+	Kind     schema.GroupVersionKind
+
+	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
+	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
+	// Note that this does not enable multi-version support for reads from a single endpoint.
+	AcceptsGroupVersionDelegate rest.GroupVersionAcceptor
+
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
@@ -81,6 +109,17 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+// AcceptsGroupVersion returns true if the specified GroupVersion is allowed
+// in create and update requests.
+func (scope *RequestScope) AcceptsGroupVersion(gv schema.GroupVersion) bool {
+	// If there's a custom acceptor, delegate to it. This is extremely rare.
+	if scope.AcceptsGroupVersionDelegate != nil {
+		return scope.AcceptsGroupVersionDelegate.AcceptsGroupVersion(gv)
+	}
+	// Fall back to only allowing the singular Kind. This is the typical behavior.
+	return gv == scope.Kind.GroupVersion()
 }
 
 func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
@@ -161,14 +200,14 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = validatingAdmission.Validate(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -200,57 +239,6 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 
 func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
-}
-
-// resultFunc is a function that returns a rest result and can be run in a goroutine
-type resultFunc func() (runtime.Object, error)
-
-// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
-	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
-	ch := make(chan runtime.Object, 1)
-	errCh := make(chan error, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer func() {
-			panicReason := recover()
-			if panicReason != nil {
-				// Same as stdlib http server code. Manually allocate stack
-				// trace buffer size to prevent excessively large logs
-				const size = 64 << 10
-				buf := make([]byte, size)
-				buf = buf[:goruntime.Stack(buf, false)]
-				panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
-				// Propagate to parent goroutine
-				panicCh <- panicReason
-			}
-		}()
-
-		if result, err := fn(); err != nil {
-			errCh <- err
-		} else {
-			ch <- result
-		}
-	}()
-
-	select {
-	case result = <-ch:
-		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
-		}
-		return result, nil
-	case err = <-errCh:
-		return nil, err
-	case p := <-panicCh:
-		panic(p)
-	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
-	}
 }
 
 // transformDecodeError adds additional information into a bad-request api error when a decode fails.
@@ -314,10 +302,82 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
+// dedupOwnerReferences dedups owner references over the entire entry.
+// NOTE: We don't know enough about the existing cases of owner references
+// sharing the same UID but different fields. Nor do we know what might break.
+// In the future we may just dedup/reject owner references with the same UID.
+func dedupOwnerReferences(refs []metav1.OwnerReference) ([]metav1.OwnerReference, []string) {
+	var result []metav1.OwnerReference
+	var duplicates []string
+	seen := make(map[types.UID]struct{})
+	for _, ref := range refs {
+		_, ok := seen[ref.UID]
+		// Short-circuit if we haven't seen the UID before. Otherwise
+		// check the entire list we have so far.
+		if !ok || !hasOwnerReference(result, ref) {
+			seen[ref.UID] = struct{}{}
+			result = append(result, ref)
+		} else {
+			duplicates = append(duplicates, string(ref.UID))
+		}
+	}
+	return result, duplicates
+}
+
+// hasOwnerReference returns true if refs has an item equal to ref. The function
+// focuses on semantic equality instead of memory equality, to catch duplicates
+// with different pointer addresses. The function uses apiequality.Semantic
+// instead of implementing its own comparison, to tolerate API changes to
+// metav1.OwnerReference.
+// NOTE: This is expensive, but we accept it because we've made sure it only
+// happens to owner references containing duplicate UIDs, plus typically the
+// number of items in the list should be small.
+func hasOwnerReference(refs []metav1.OwnerReference, ref metav1.OwnerReference) bool {
+	for _, r := range refs {
+		if apiequality.Semantic.DeepEqual(r, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+// dedupOwnerReferencesAndAddWarning dedups owner references in the object metadata.
+// If duplicates are found, the function records a warning to the provided context.
+func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext context.Context, afterMutatingAdmission bool) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		// The object doesn't have metadata. Nothing we need to do here.
+		return
+	}
+	refs := accessor.GetOwnerReferences()
+	deduped, duplicates := dedupOwnerReferences(refs)
+	if len(duplicates) > 0 {
+		// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+		// For PATCH request the API server only dedups after mutating admission.
+		format := DuplicateOwnerReferencesWarningFormat
+		if afterMutatingAdmission {
+			format = DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat
+		}
+		warning.AddWarning(requestContext, "", fmt.Sprintf(format,
+			strings.Join(duplicates, ", ")))
+		accessor.SetOwnerReferences(deduped)
+	}
+}
+
 // setObjectSelfLink sets the self link of an object as needed.
 // TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		// Ensure that for empty lists we don't return <nil> items.
+		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	// We only generate list links on objects that implement ListInterface - historically we duck typed this
 	// check via reflection, but as we move away from reflection we require that you not only carry Items but
 	// ListMeta into order to be identified as a list.
@@ -334,7 +394,7 @@ func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Reques
 		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).InfoS("Unable to set self link on object", "error", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
@@ -392,17 +452,31 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	return data, nil
 }
 
-func parseTimeout(str string) time.Duration {
-	if str != "" {
-		timeout, err := time.ParseDuration(str)
-		if err == nil {
-			return timeout
-		}
-		klog.Errorf("Failed to parse %q: %v", str, err)
-	}
-	return 30 * time.Second
-}
-
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+type etcdError interface {
+	Code() grpccodes.Code
+	Error() string
+}
+
+type grpcError interface {
+	GRPCStatus() *grpcstatus.Status
+}
+
+func isTooLargeError(err error) bool {
+	if err != nil {
+		if etcdErr, ok := err.(etcdError); ok {
+			if etcdErr.Code() == grpccodes.InvalidArgument && etcdErr.Error() == "etcdserver: request is too large" {
+				return true
+			}
+		}
+		if grpcErr, ok := err.(grpcError); ok {
+			if grpcErr.GRPCStatus().Code() == grpccodes.ResourceExhausted && strings.Contains(grpcErr.GRPCStatus().Message(), "trying to send message larger than max") {
+				return true
+			}
+		}
+	}
+	return false
 }

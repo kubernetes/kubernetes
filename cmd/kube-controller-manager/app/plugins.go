@@ -23,7 +23,7 @@ import (
 
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// Cloud providers
 	cloudprovider "k8s.io/cloud-provider"
@@ -31,28 +31,20 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
-	"k8s.io/kubernetes/pkg/volume/azure_dd"
-	"k8s.io/kubernetes/pkg/volume/azure_file"
-	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
-	"k8s.io/kubernetes/pkg/volume/photon_pd"
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
-	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -64,25 +56,20 @@ import (
 // detach controller.
 // The list of plugins is manually compiled. This code and the plugin
 // initialization code for kubelet really, really need a through refactor.
-func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
+func ProbeAttachableVolumePlugins() ([]volume.VolumePlugin, error) {
+	var err error
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins, err = appendAttachableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-	}
-	return allPlugins
+	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	return allPlugins, nil
 }
 
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
@@ -93,29 +80,25 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+	var err error
 	allPlugins := []volume.VolumePlugin{}
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
-	return allPlugins
+	return allPlugins, nil
 }
 
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -151,26 +134,22 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 	// add rbd provisioner
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
+	var err error
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
+	if err != nil {
+		return allPlugins, err
+	}
 
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
-
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 
-	return allPlugins
+	return allPlugins, nil
 }
 
 // AttemptToLoadRecycler tries decoding a pod from a filepath for use as a recycler for a volume.

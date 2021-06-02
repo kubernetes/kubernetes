@@ -35,13 +35,6 @@ type Request interface {
 	AuthenticateRequest(req *http.Request) (*Response, bool, error)
 }
 
-// Password checks a username and password against a backing authentication
-// store and returns a Response or an error if the password could not be
-// checked.
-type Password interface {
-	AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error)
-}
-
 // TokenFunc is a function that implements the Token interface.
 type TokenFunc func(ctx context.Context, token string) (*Response, bool, error)
 
@@ -56,14 +49,6 @@ type RequestFunc func(req *http.Request) (*Response, bool, error)
 // AuthenticateRequest implements authenticator.Request.
 func (f RequestFunc) AuthenticateRequest(req *http.Request) (*Response, bool, error) {
 	return f(req)
-}
-
-// PasswordFunc is a function that implements the Password interface.
-type PasswordFunc func(ctx context.Context, user, password string) (*Response, bool, error)
-
-// AuthenticatePassword implements authenticator.Password.
-func (f PasswordFunc) AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error) {
-	return f(ctx, user, password)
 }
 
 // Response is the struct returned by authenticator interfaces upon successful

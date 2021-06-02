@@ -1,22 +1,12 @@
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/xml"
@@ -29,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gofrs/uuid"
 )
 
 var (
@@ -241,4 +233,17 @@ func getMetadataFromHeaders(header http.Header) map[string]string {
 	}
 
 	return metadata
+}
+
+// newUUID returns a new uuid using RFC 4122 algorithm.
+func newUUID() (uuid.UUID, error) {
+	u := [16]byte{}
+	// Set all bits to randomly (or pseudo-randomly) chosen values.
+	_, err := rand.Read(u[:])
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	u[8] = (u[8]&(0xff>>2) | (0x02 << 6)) // u.setVariant(ReservedRFC4122)
+	u[6] = (u[6] & 0xF) | (uuid.V4 << 4)  // u.setVersion(V4)
+	return uuid.FromBytes(u[:])
 }

@@ -47,7 +47,6 @@ import (
 
 const (
 	contentTypeHeader     = "Content-Type"
-	contentLengthHeader   = "Content-Length"
 	contentEncodingHeader = "Content-Encoding"
 	acceptEncodingHeader  = "Accept-Encoding"
 )
@@ -85,9 +84,31 @@ func Handler() http.Handler {
 // instrumentation. Use the InstrumentMetricHandler function to apply the same
 // kind of instrumentation as it is used by the Handler function.
 func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
-	var inFlightSem chan struct{}
+	var (
+		inFlightSem chan struct{}
+		errCnt      = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "promhttp_metric_handler_errors_total",
+				Help: "Total number of internal errors encountered by the promhttp metric handler.",
+			},
+			[]string{"cause"},
+		)
+	)
+
 	if opts.MaxRequestsInFlight > 0 {
 		inFlightSem = make(chan struct{}, opts.MaxRequestsInFlight)
+	}
+	if opts.Registry != nil {
+		// Initialize all possibilites that can occur below.
+		errCnt.WithLabelValues("gathering")
+		errCnt.WithLabelValues("encoding")
+		if err := opts.Registry.Register(errCnt); err != nil {
+			if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+				errCnt = are.ExistingCollector.(*prometheus.CounterVec)
+			} else {
+				panic(err)
+			}
+		}
 	}
 
 	h := http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
@@ -107,6 +128,7 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 			if opts.ErrorLog != nil {
 				opts.ErrorLog.Println("error gathering metrics:", err)
 			}
+			errCnt.WithLabelValues("gathering").Inc()
 			switch opts.ErrorHandling {
 			case PanicOnError:
 				panic(err)
@@ -122,7 +144,12 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 			}
 		}
 
-		contentType := expfmt.Negotiate(req.Header)
+		var contentType expfmt.Format
+		if opts.EnableOpenMetrics {
+			contentType = expfmt.NegotiateIncludingOpenMetrics(req.Header)
+		} else {
+			contentType = expfmt.Negotiate(req.Header)
+		}
 		header := rsp.Header()
 		header.Set(contentTypeHeader, string(contentType))
 
@@ -140,27 +167,40 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 
 		enc := expfmt.NewEncoder(w, contentType)
 
-		var lastErr error
-		for _, mf := range mfs {
-			if err := enc.Encode(mf); err != nil {
-				lastErr = err
-				if opts.ErrorLog != nil {
-					opts.ErrorLog.Println("error encoding and sending metric family:", err)
-				}
-				switch opts.ErrorHandling {
-				case PanicOnError:
-					panic(err)
-				case ContinueOnError:
-					// Handled later.
-				case HTTPErrorOnError:
-					httpError(rsp, err)
-					return
-				}
+		// handleError handles the error according to opts.ErrorHandling
+		// and returns true if we have to abort after the handling.
+		handleError := func(err error) bool {
+			if err == nil {
+				return false
 			}
+			if opts.ErrorLog != nil {
+				opts.ErrorLog.Println("error encoding and sending metric family:", err)
+			}
+			errCnt.WithLabelValues("encoding").Inc()
+			switch opts.ErrorHandling {
+			case PanicOnError:
+				panic(err)
+			case HTTPErrorOnError:
+				// We cannot really send an HTTP error at this
+				// point because we most likely have written
+				// something to rsp already. But at least we can
+				// stop sending.
+				return true
+			}
+			// Do nothing in all other cases, including ContinueOnError.
+			return false
 		}
 
-		if lastErr != nil {
-			httpError(rsp, lastErr)
+		for _, mf := range mfs {
+			if handleError(enc.Encode(mf)) {
+				return
+			}
+		}
+		if closer, ok := enc.(expfmt.Closer); ok {
+			// This in particular takes care of the final "# EOF\n" line for OpenMetrics.
+			if handleError(closer.Close()) {
+				return
+			}
 		}
 	})
 
@@ -232,14 +272,22 @@ type HandlerErrorHandling int
 // errors are encountered.
 const (
 	// Serve an HTTP status code 500 upon the first error
-	// encountered. Report the error message in the body.
+	// encountered. Report the error message in the body. Note that HTTP
+	// errors cannot be served anymore once the beginning of a regular
+	// payload has been sent. Thus, in the (unlikely) case that encoding the
+	// payload into the negotiated wire format fails, serving the response
+	// will simply be aborted. Set an ErrorLog in HandlerOpts to detect
+	// those errors.
 	HTTPErrorOnError HandlerErrorHandling = iota
 	// Ignore errors and try to serve as many metrics as possible.  However,
 	// if no metrics can be served, serve an HTTP status code 500 and the
 	// last error message in the body. Only use this in deliberate "best
-	// effort" metrics collection scenarios. It is recommended to at least
-	// log errors (by providing an ErrorLog in HandlerOpts) to not mask
-	// errors completely.
+	// effort" metrics collection scenarios. In this case, it is highly
+	// recommended to provide other means of detecting errors: By setting an
+	// ErrorLog in HandlerOpts, the errors are logged. By providing a
+	// Registry in HandlerOpts, the exposed metrics include an error counter
+	// "promhttp_metric_handler_errors_total", which can be used for
+	// alerts.
 	ContinueOnError
 	// Panic upon the first error encountered (useful for "crash only" apps).
 	PanicOnError
@@ -262,6 +310,18 @@ type HandlerOpts struct {
 	// logged regardless of the configured ErrorHandling provided ErrorLog
 	// is not nil.
 	ErrorHandling HandlerErrorHandling
+	// If Registry is not nil, it is used to register a metric
+	// "promhttp_metric_handler_errors_total", partitioned by "cause". A
+	// failed registration causes a panic. Note that this error counter is
+	// different from the instrumentation you get from the various
+	// InstrumentHandler... helpers. It counts errors that don't necessarily
+	// result in a non-2xx HTTP status code. There are two typical cases:
+	// (1) Encoding errors that only happen after streaming of the HTTP body
+	// has already started (and the status code 200 has been sent). This
+	// should only happen with custom collectors. (2) Collection errors with
+	// no effect on the HTTP status code because ErrorHandling is set to
+	// ContinueOnError.
+	Registry prometheus.Registerer
 	// If DisableCompression is true, the handler will never compress the
 	// response, even if requested by the client.
 	DisableCompression bool
@@ -280,6 +340,16 @@ type HandlerOpts struct {
 	// away). Until the implementation is improved, it is recommended to
 	// implement a separate timeout in potentially slow Collectors.
 	Timeout time.Duration
+	// If true, the experimental OpenMetrics encoding is added to the
+	// possible options during content negotiation. Note that Prometheus
+	// 2.5.0+ will negotiate OpenMetrics as first priority. OpenMetrics is
+	// the only way to transmit exemplars. However, the move to OpenMetrics
+	// is not completely transparent. Most notably, the values of "quantile"
+	// labels of Summaries and "le" labels of Histograms are formatted with
+	// a trailing ".0" if they would otherwise look like integer numbers
+	// (which changes the identity of the resulting series on the Prometheus
+	// server).
+	EnableOpenMetrics bool
 }
 
 // gzipAccepted returns whether the client will accept gzip-encoded content.
@@ -296,11 +366,9 @@ func gzipAccepted(header http.Header) bool {
 }
 
 // httpError removes any content-encoding header and then calls http.Error with
-// the provided error and http.StatusInternalServerErrer. Error contents is
-// supposed to be uncompressed plain text. However, same as with a plain
-// http.Error, any header settings will be void if the header has already been
-// sent. The error message will still be written to the writer, but it will
-// probably be of limited use.
+// the provided error and http.StatusInternalServerError. Error contents is
+// supposed to be uncompressed plain text. Same as with a plain http.Error, this
+// must not be called if the header or any payload has already been sent.
 func httpError(rsp http.ResponseWriter, err error) {
 	rsp.Header().Del(contentEncodingHeader)
 	http.Error(

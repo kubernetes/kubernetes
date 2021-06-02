@@ -25,7 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/serviceconfig"
 )
 
 const maxInt = int(^uint(0) >> 1)
@@ -56,6 +60,13 @@ type MethodConfig struct {
 	// MaxRespSize is the maximum allowed payload size for an individual response in a
 	// stream (server->client) in bytes.
 	MaxRespSize *int
+	// RetryPolicy configures retry options for the method.
+	retryPolicy *retryPolicy
+}
+
+type lbConfig struct {
+	name string
+	cfg  serviceconfig.LoadBalancingConfig
 }
 
 // ServiceConfig is provided by the service provider and contains parameters for how
@@ -65,16 +76,107 @@ type MethodConfig struct {
 // through name resolver, as specified here
 // https://github.com/grpc/grpc/blob/master/doc/service_config.md
 type ServiceConfig struct {
-	// LB is the load balancer the service providers recommends. The balancer specified
-	// via grpc.WithBalancer will override this.
+	serviceconfig.Config
+
+	// LB is the load balancer the service providers recommends. The balancer
+	// specified via grpc.WithBalancer will override this.  This is deprecated;
+	// lbConfigs is preferred.  If lbConfig and LB are both present, lbConfig
+	// will be used.
 	LB *string
-	// Methods contains a map for the methods in this service.
-	// If there is an exact match for a method (i.e. /service/method) in the map, use the corresponding MethodConfig.
-	// If there's no exact match, look for the default config for the service (/service/) and use the corresponding MethodConfig if it exists.
-	// Otherwise, the method has no MethodConfig to use.
+
+	// lbConfig is the service config's load balancing configuration.  If
+	// lbConfig and LB are both present, lbConfig will be used.
+	lbConfig *lbConfig
+
+	// Methods contains a map for the methods in this service.  If there is an
+	// exact match for a method (i.e. /service/method) in the map, use the
+	// corresponding MethodConfig.  If there's no exact match, look for the
+	// default config for the service (/service/) and use the corresponding
+	// MethodConfig if it exists.  Otherwise, the method has no MethodConfig to
+	// use.
 	Methods map[string]MethodConfig
 
-	stickinessMetadataKey *string
+	// If a retryThrottlingPolicy is provided, gRPC will automatically throttle
+	// retry attempts and hedged RPCs when the client’s ratio of failures to
+	// successes exceeds a threshold.
+	//
+	// For each server name, the gRPC client will maintain a token_count which is
+	// initially set to maxTokens, and can take values between 0 and maxTokens.
+	//
+	// Every outgoing RPC (regardless of service or method invoked) will change
+	// token_count as follows:
+	//
+	//   - Every failed RPC will decrement the token_count by 1.
+	//   - Every successful RPC will increment the token_count by tokenRatio.
+	//
+	// If token_count is less than or equal to maxTokens / 2, then RPCs will not
+	// be retried and hedged RPCs will not be sent.
+	retryThrottling *retryThrottlingPolicy
+	// healthCheckConfig must be set as one of the requirement to enable LB channel
+	// health check.
+	healthCheckConfig *healthCheckConfig
+	// rawJSONString stores service config json string that get parsed into
+	// this service config struct.
+	rawJSONString string
+}
+
+// healthCheckConfig defines the go-native version of the LB channel health check config.
+type healthCheckConfig struct {
+	// serviceName is the service name to use in the health-checking request.
+	ServiceName string
+}
+
+// retryPolicy defines the go-native version of the retry policy defined by the
+// service config here:
+// https://github.com/grpc/proposal/blob/master/A6-client-retries.md#integration-with-service-config
+type retryPolicy struct {
+	// MaxAttempts is the maximum number of attempts, including the original RPC.
+	//
+	// This field is required and must be two or greater.
+	maxAttempts int
+
+	// Exponential backoff parameters. The initial retry attempt will occur at
+	// random(0, initialBackoff). In general, the nth attempt will occur at
+	// random(0,
+	//   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
+	//
+	// These fields are required and must be greater than zero.
+	initialBackoff    time.Duration
+	maxBackoff        time.Duration
+	backoffMultiplier float64
+
+	// The set of status codes which may be retried.
+	//
+	// Status codes are specified as strings, e.g., "UNAVAILABLE".
+	//
+	// This field is required and must be non-empty.
+	// Note: a set is used to store this for easy lookup.
+	retryableStatusCodes map[codes.Code]bool
+}
+
+type jsonRetryPolicy struct {
+	MaxAttempts          int
+	InitialBackoff       string
+	MaxBackoff           string
+	BackoffMultiplier    float64
+	RetryableStatusCodes []codes.Code
+}
+
+// retryThrottlingPolicy defines the go-native version of the retry throttling
+// policy defined by the service config here:
+// https://github.com/grpc/proposal/blob/master/A6-client-retries.md#integration-with-service-config
+type retryThrottlingPolicy struct {
+	// The number of tokens starts at maxTokens. The token_count will always be
+	// between 0 and maxTokens.
+	//
+	// This field is required and must be greater than zero.
+	MaxTokens float64
+	// The amount of tokens to add on each successful RPC. Typically this will
+	// be some number between 0 and 1, e.g., 0.1.
+	//
+	// This field is required and must be greater than zero. Up to 3 decimal
+	// places are supported.
+	TokenRatio float64
 }
 
 func parseDuration(s *string) (*time.Duration, error) {
@@ -144,32 +246,80 @@ type jsonMC struct {
 	Timeout                 *string
 	MaxRequestMessageBytes  *int64
 	MaxResponseMessageBytes *int64
+	RetryPolicy             *jsonRetryPolicy
 }
+
+type loadBalancingConfig map[string]json.RawMessage
 
 // TODO(lyuxuan): delete this struct after cleaning up old service config implementation.
 type jsonSC struct {
-	LoadBalancingPolicy   *string
-	StickinessMetadataKey *string
-	MethodConfig          *[]jsonMC
+	LoadBalancingPolicy *string
+	LoadBalancingConfig *[]loadBalancingConfig
+	MethodConfig        *[]jsonMC
+	RetryThrottling     *retryThrottlingPolicy
+	HealthCheckConfig   *healthCheckConfig
 }
 
-func parseServiceConfig(js string) (ServiceConfig, error) {
+func init() {
+	internal.ParseServiceConfigForTesting = parseServiceConfig
+}
+func parseServiceConfig(js string) *serviceconfig.ParseResult {
+	if len(js) == 0 {
+		return &serviceconfig.ParseResult{Err: fmt.Errorf("no JSON service config provided")}
+	}
 	var rsc jsonSC
 	err := json.Unmarshal([]byte(js), &rsc)
 	if err != nil {
 		grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-		return ServiceConfig{}, err
+		return &serviceconfig.ParseResult{Err: err}
 	}
 	sc := ServiceConfig{
-		LB:      rsc.LoadBalancingPolicy,
-		Methods: make(map[string]MethodConfig),
-
-		stickinessMetadataKey: rsc.StickinessMetadataKey,
+		LB:                rsc.LoadBalancingPolicy,
+		Methods:           make(map[string]MethodConfig),
+		retryThrottling:   rsc.RetryThrottling,
+		healthCheckConfig: rsc.HealthCheckConfig,
+		rawJSONString:     js,
 	}
+	if rsc.LoadBalancingConfig != nil {
+		for i, lbcfg := range *rsc.LoadBalancingConfig {
+			if len(lbcfg) != 1 {
+				err := fmt.Errorf("invalid loadBalancingConfig: entry %v does not contain exactly 1 policy/config pair: %q", i, lbcfg)
+				grpclog.Warningf(err.Error())
+				return &serviceconfig.ParseResult{Err: err}
+			}
+			var name string
+			var jsonCfg json.RawMessage
+			for name, jsonCfg = range lbcfg {
+			}
+			builder := balancer.Get(name)
+			if builder == nil {
+				continue
+			}
+			sc.lbConfig = &lbConfig{name: name}
+			if parser, ok := builder.(balancer.ConfigParser); ok {
+				var err error
+				sc.lbConfig.cfg, err = parser.ParseConfig(jsonCfg)
+				if err != nil {
+					return &serviceconfig.ParseResult{Err: fmt.Errorf("error parsing loadBalancingConfig for policy %q: %v", name, err)}
+				}
+			} else if string(jsonCfg) != "{}" {
+				grpclog.Warningf("non-empty balancer configuration %q, but balancer does not implement ParseConfig", string(jsonCfg))
+			}
+			break
+		}
+		if sc.lbConfig == nil {
+			// We had a loadBalancingConfig field but did not encounter a
+			// supported policy.  The config is considered invalid in this
+			// case.
+			err := fmt.Errorf("invalid loadBalancingConfig: no supported policies found")
+			grpclog.Warningf(err.Error())
+			return &serviceconfig.ParseResult{Err: err}
+		}
+	}
+
 	if rsc.MethodConfig == nil {
-		return sc, nil
+		return &serviceconfig.ParseResult{Config: &sc}
 	}
-
 	for _, m := range *rsc.MethodConfig {
 		if m.Name == nil {
 			continue
@@ -177,12 +327,16 @@ func parseServiceConfig(js string) (ServiceConfig, error) {
 		d, err := parseDuration(m.Timeout)
 		if err != nil {
 			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-			return ServiceConfig{}, err
+			return &serviceconfig.ParseResult{Err: err}
 		}
 
 		mc := MethodConfig{
 			WaitForReady: m.WaitForReady,
 			Timeout:      d,
+		}
+		if mc.retryPolicy, err = convertRetryPolicy(m.RetryPolicy); err != nil {
+			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+			return &serviceconfig.ParseResult{Err: err}
 		}
 		if m.MaxRequestMessageBytes != nil {
 			if *m.MaxRequestMessageBytes > int64(maxInt) {
@@ -205,7 +359,54 @@ func parseServiceConfig(js string) (ServiceConfig, error) {
 		}
 	}
 
-	return sc, nil
+	if sc.retryThrottling != nil {
+		if mt := sc.retryThrottling.MaxTokens; mt <= 0 || mt > 1000 {
+			return &serviceconfig.ParseResult{Err: fmt.Errorf("invalid retry throttling config: maxTokens (%v) out of range (0, 1000]", mt)}
+		}
+		if tr := sc.retryThrottling.TokenRatio; tr <= 0 {
+			return &serviceconfig.ParseResult{Err: fmt.Errorf("invalid retry throttling config: tokenRatio (%v) may not be negative", tr)}
+		}
+	}
+	return &serviceconfig.ParseResult{Config: &sc}
+}
+
+func convertRetryPolicy(jrp *jsonRetryPolicy) (p *retryPolicy, err error) {
+	if jrp == nil {
+		return nil, nil
+	}
+	ib, err := parseDuration(&jrp.InitialBackoff)
+	if err != nil {
+		return nil, err
+	}
+	mb, err := parseDuration(&jrp.MaxBackoff)
+	if err != nil {
+		return nil, err
+	}
+
+	if jrp.MaxAttempts <= 1 ||
+		*ib <= 0 ||
+		*mb <= 0 ||
+		jrp.BackoffMultiplier <= 0 ||
+		len(jrp.RetryableStatusCodes) == 0 {
+		grpclog.Warningf("grpc: ignoring retry policy %v due to illegal configuration", jrp)
+		return nil, nil
+	}
+
+	rp := &retryPolicy{
+		maxAttempts:          jrp.MaxAttempts,
+		initialBackoff:       *ib,
+		maxBackoff:           *mb,
+		backoffMultiplier:    jrp.BackoffMultiplier,
+		retryableStatusCodes: make(map[codes.Code]bool),
+	}
+	if rp.maxAttempts > 5 {
+		// TODO(retry): Make the max maxAttempts configurable.
+		rp.maxAttempts = 5
+	}
+	for _, code := range jrp.RetryableStatusCodes {
+		rp.retryableStatusCodes[code] = true
+	}
+	return rp, nil
 }
 
 func min(a, b *int) *int {

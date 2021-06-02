@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -32,7 +34,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
@@ -41,18 +43,25 @@ import (
 // TODO(yankaiz): Create shared error types for both test/non-test codes.
 const (
 	eventReasonManualChange = "LoadBalancerManualChange"
-	eventMsgFirewallChange  = "Firewall change required by network admin"
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
-	errStrLbNoHosts         = "Cannot EnsureLoadBalancer() with no hosts"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
+	fakeSvcName             = "fakesvc"
 )
 
 func fakeLoadbalancerService(lbType string) *v1.Service {
+	return fakeLoadbalancerServiceHelper(lbType, ServiceAnnotationLoadBalancerType)
+}
+
+func fakeLoadBalancerServiceDeprecatedAnnotation(lbType string) *v1.Service {
+	return fakeLoadbalancerServiceHelper(lbType, deprecatedServiceAnnotationLoadBalancerType)
+}
+
+func fakeLoadbalancerServiceHelper(lbType string, annotationKey string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "",
-			Annotations: map[string]string{ServiceAnnotationLoadBalancerType: lbType},
+			Name:        fakeSvcName,
+			Annotations: map[string]string{annotationKey: lbType},
 		},
 		Spec: v1.ServiceSpec{
 			SessionAffinity: v1.ServiceAffinityClientIP,
@@ -60,12 +69,6 @@ func fakeLoadbalancerService(lbType string) *v1.Service {
 			Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
 		},
 	}
-}
-
-func fakeLoadbalancerServiceWithNEGs(lbType string) *v1.Service {
-	svc := fakeLoadbalancerService(lbType)
-	svc.Annotations[NEGAnnotation] = "{\"ilb\": true}"
-	return svc
 }
 
 var (
@@ -91,6 +94,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 					Tags: &compute.Tags{
 						Items: []string{name},
 					},
+					// add Instance.Zone, otherwise InstanceID() won't return a right instanceID.
+					Zone: zoneName,
 				},
 			)
 			if err != nil {
@@ -104,8 +109,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 					Labels: map[string]string{
-						v1.LabelHostname:          name,
-						v1.LabelZoneFailureDomain: zoneName,
+						v1.LabelHostname:              name,
+						v1.LabelFailureDomainBetaZone: zoneName,
 					},
 				},
 				Status: v1.NodeStatus{
@@ -204,7 +209,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
+		MakeFirewallName(lbName),
 		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
 	}
 
@@ -244,6 +249,11 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 	assert.Equal(t, backendServiceLink, fwdRule.BackendService)
 	// if no Subnetwork specified, defaults to the GCE NetworkURL
 	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
+
+	// Check that the IP address has been released. IP is only reserved until ensure function exits.
+	ip, err := gce.GetRegionAddress(lbName, gce.region)
+	require.Error(t, err)
+	assert.Nil(t, ip)
 }
 
 func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
@@ -282,6 +292,11 @@ func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 	healthcheck, err := gce.GetHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
+
+	// Check that the IP address has been released
+	ip, err := gce.GetRegionAddress(lbName, gce.region)
+	require.Error(t, err)
+	assert.Nil(t, ip)
 }
 
 func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {

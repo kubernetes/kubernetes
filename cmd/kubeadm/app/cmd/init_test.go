@@ -24,13 +24,12 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
-const (
-	testInitConfig = `---
-apiVersion: kubeadm.k8s.io/v1beta2
+var testInitConfig = fmt.Sprintf(`---
+apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
@@ -43,11 +42,10 @@ nodeRegistration:
     - c
     - d
 ---
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: %[1]s
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
@@ -83,13 +81,6 @@ func TestNewInitData(t *testing.T) {
 			name: "fail if unknown feature gates flag are passed",
 			flags: map[string]string{
 				options.FeatureGatesString: "unknown=true",
-			},
-			expectError: true,
-		},
-		{
-			name: "fail if deprecetes feature gates are set",
-			flags: map[string]string{
-				options.FeatureGatesString: fmt.Sprintf("%s=true", features.CoreDNS),
 			},
 			expectError: true,
 		},
@@ -162,7 +153,7 @@ func TestNewInitData(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external init option and inject it to the init cmd
 			initOptions := newInitOptions()
-			cmd := NewCmdInit(nil, initOptions)
+			cmd := newCmdInit(nil, initOptions)
 
 			// sets cmd flags (that will be reflected on the init options)
 			for f, v := range tc.flags {

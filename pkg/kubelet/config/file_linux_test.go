@@ -27,14 +27,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -91,7 +90,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
-					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+					if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
@@ -109,11 +108,16 @@ var (
 	testCases = []struct {
 		watchDir bool
 		symlink  bool
+		period   time.Duration
 	}{
-		{true, true},
-		{true, false},
-		{false, true},
-		{false, false},
+		// set the period to be long enough for the file to be changed
+		// and short enough to trigger the event
+		{true, true, 3 * time.Second},
+
+		// set the period to avoid periodic PodUpdate event
+		{true, false, 60 * time.Second},
+		{false, true, 60 * time.Second},
+		{false, false, 60 * time.Second},
 	}
 )
 
@@ -125,16 +129,15 @@ func TestWatchFileAdded(t *testing.T) {
 
 func TestWatchFileChanged(t *testing.T) {
 	for _, testCase := range testCases {
-		watchFileChanged(testCase.watchDir, testCase.symlink, t)
+		watchFileChanged(testCase.watchDir, testCase.symlink, testCase.period, t)
 	}
 }
 
 type testCase struct {
-	lock       *sync.Mutex
-	desc       string
-	linkedFile string
-	pod        runtime.Object
-	expected   kubetypes.PodUpdate
+	lock     *sync.Mutex
+	desc     string
+	pod      runtime.Object
+	expected kubetypes.PodUpdate
 }
 
 func getTestCases(hostname types.NodeName) []*testCase {
@@ -157,7 +160,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 				Spec: v1.PodSpec{
 					Containers:      []v1.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &v1.PodSecurityContext{},
-					SchedulerName:   api.DefaultSchedulerName,
+					SchedulerName:   v1.DefaultSchedulerName,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -189,7 +192,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						TerminationMessagePolicy: v1.TerminationMessageReadFile,
 					}},
 					SecurityContext:    &v1.PodSecurityContext{},
-					SchedulerName:      api.DefaultSchedulerName,
+					SchedulerName:      v1.DefaultSchedulerName,
 					EnableServiceLinks: &enableServiceLinks,
 				},
 				Status: v1.PodStatus{
@@ -201,12 +204,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 }
 
 func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
-	var versionedPod runtime.Object
-	err := legacyscheme.Scheme.Convert(&tc.pod, &versionedPod, nil)
-	if err != nil {
-		t.Fatalf("%s: error in versioning the pod: %v", tc.desc, err)
-	}
-	fileContents, err := runtime.Encode(testapi.Default.Codec(), versionedPod)
+	fileContents, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), tc.pod)
 	if err != nil {
 		t.Fatalf("%s: error in encoding the pod: %v", tc.desc, err)
 	}
@@ -282,7 +280,7 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 	}
 }
 
-func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
+func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -321,22 +319,23 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			}()
 
 			if watchDir {
-				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(dirName, hostname, period, ch)
 			} else {
-				NewSourceFile(file, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(file, hostname, period, ch)
 			}
+
+			// await fsnotify to be ready
+			time.Sleep(time.Second)
+
 			// expect an update by SourceFile.resetStoreFromPath()
 			expectUpdate(t, ch, testCase)
 
+			pod := testCase.pod.(*v1.Pod)
+			pod.Spec.Containers[0].Name = "image2"
+
+			testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
 			changeFile := func() {
 				// Edit the file content
-				testCase.lock.Lock()
-				defer testCase.lock.Unlock()
-
-				pod := testCase.pod.(*v1.Pod)
-				pod.Spec.Containers[0].Name = "image2"
-
-				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
 				if symlink {
 					file = testCase.writeToFile(linkedDirName, fileName, t)
 					return
@@ -376,13 +375,11 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
-				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+				if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 				}
 			}
 
-			testCase.lock.Lock()
-			defer testCase.lock.Unlock()
 			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}

@@ -1,65 +1,51 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - bowei
-  - rramkumar1
-  - MrHohn
-  - deads2k
-  - enisoc
-  - janetkuo
-  - liggitt
-  - mikedanese
-  - msau42
-  - ncdc
-  - pwittrock # for test/e2e/kubectl.go
-  - saad-ali
-  - shyamjvs
-  - smarterclayton
-  - sig-testing-reviewers
-  - sttts
-  - timothysc
-  - zmerlynn
-  - vishh
-  - xichengliudui
-  - andrewsykim
+  - aojea
   - neolit123
-  - stevesloka
   - johnSchnake
   - SataQiu
+  - tanjunchen
 approvers:
+  - alejandrox1
+  - andrewsykim
+  - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
+  - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
-  - rramkumar1
+  - dims
   - MrHohn
   - deads2k
   - enisoc
+  - enj
   - janetkuo
   - liggitt
   - mikedanese
   - msau42
-  - ncdc
+  - neolit123
   - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
-  - shyamjvs
+  - SataQiu
   - sig-testing-approvers
   - smarterclayton
+  - soltysh
   - sttts
   - timothysc
-  - vishh
 emeritus_approvers:
-  - enj
   - eparis
-  - erictune
   - foxish
   - gmarek
   - krousey
   - kow3ns
   - madhusudancs
   - marun
-  - soltysh
   - zmerlynn
   - MaciekPytel
+  - rramkumar1
+  - ncdc
+  - vishh
+  - shyamjvs
 
 labels:
 - area/test

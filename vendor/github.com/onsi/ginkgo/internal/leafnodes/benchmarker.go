@@ -17,7 +17,7 @@ type benchmarker struct {
 
 func newBenchmarker() *benchmarker {
 	return &benchmarker{
-		measurements: make(map[string]*types.SpecMeasurement, 0),
+		measurements: make(map[string]*types.SpecMeasurement),
 	}
 }
 

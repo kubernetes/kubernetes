@@ -5,7 +5,6 @@ package filters // import "github.com/docker/docker/api/types/filters"
 
 import (
 	"encoding/json"
-	"errors"
 	"regexp"
 	"strings"
 
@@ -37,39 +36,13 @@ func NewArgs(initialArgs ...KeyValuePair) Args {
 	return args
 }
 
-// ParseFlag parses a key=value string and adds it to an Args.
-//
-// Deprecated: Use Args.Add()
-func ParseFlag(arg string, prev Args) (Args, error) {
-	filters := prev
-	if len(arg) == 0 {
-		return filters, nil
+// Keys returns all the keys in list of Args
+func (args Args) Keys() []string {
+	keys := make([]string, 0, len(args.fields))
+	for k := range args.fields {
+		keys = append(keys, k)
 	}
-
-	if !strings.Contains(arg, "=") {
-		return filters, ErrBadFormat
-	}
-
-	f := strings.SplitN(arg, "=", 2)
-
-	name := strings.ToLower(strings.TrimSpace(f[0]))
-	value := strings.TrimSpace(f[1])
-
-	filters.Add(name, value)
-
-	return filters, nil
-}
-
-// ErrBadFormat is an error returned when a filter is not in the form key=value
-//
-// Deprecated: this error will be removed in a future version
-var ErrBadFormat = errors.New("bad format of filter (expected name=value)")
-
-// ToParam encodes the Args as args JSON encoded string
-//
-// Deprecated: use ToJSON
-func ToParam(a Args) (string, error) {
-	return ToJSON(a)
+	return keys
 }
 
 // MarshalJSON returns a JSON byte representation of the Args
@@ -93,7 +66,7 @@ func ToJSON(a Args) (string, error) {
 // then the encoded format will use an older legacy format where the values are a
 // list of strings, instead of a set.
 //
-// Deprecated: Use ToJSON
+// Deprecated: do not use in any new code; use ToJSON instead
 func ToParamWithVersion(version string, a Args) (string, error) {
 	if a.Len() == 0 {
 		return "", nil
@@ -105,13 +78,6 @@ func ToParamWithVersion(version string, a Args) (string, error) {
 	}
 
 	return ToJSON(a)
-}
-
-// FromParam decodes a JSON encoded string into Args
-//
-// Deprecated: use FromJSON
-func FromParam(p string) (Args, error) {
-	return FromJSON(p)
 }
 
 // FromJSON decodes a JSON encoded string into Args
@@ -188,7 +154,7 @@ func (args Args) Len() int {
 func (args Args) MatchKVList(key string, sources map[string]string) bool {
 	fieldValues := args.fields[key]
 
-	//do not filter if there is no filter set or cannot determine filter
+	// do not filter if there is no filter set or cannot determine filter
 	if len(fieldValues) == 0 {
 		return true
 	}
@@ -234,7 +200,7 @@ func (args Args) Match(field, source string) bool {
 // ExactMatch returns true if the source matches exactly one of the values.
 func (args Args) ExactMatch(key, source string) bool {
 	fieldValues, ok := args.fields[key]
-	//do not filter if there is no filter set or cannot determine filter
+	// do not filter if there is no filter set or cannot determine filter
 	if !ok || len(fieldValues) == 0 {
 		return true
 	}
@@ -247,7 +213,7 @@ func (args Args) ExactMatch(key, source string) bool {
 // matches exactly the value.
 func (args Args) UniqueExactMatch(key, source string) bool {
 	fieldValues := args.fields[key]
-	//do not filter if there is no filter set or cannot determine filter
+	// do not filter if there is no filter set or cannot determine filter
 	if len(fieldValues) == 0 {
 		return true
 	}
@@ -273,14 +239,6 @@ func (args Args) FuzzyMatch(key, source string) bool {
 		}
 	}
 	return false
-}
-
-// Include returns true if the key exists in the mapping
-//
-// Deprecated: use Contains
-func (args Args) Include(field string) bool {
-	_, ok := args.fields[field]
-	return ok
 }
 
 // Contains returns true if the key exists in the mapping

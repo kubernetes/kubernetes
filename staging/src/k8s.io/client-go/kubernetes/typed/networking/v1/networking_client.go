@@ -26,12 +26,22 @@ import (
 
 type NetworkingV1Interface interface {
 	RESTClient() rest.Interface
+	IngressesGetter
+	IngressClassesGetter
 	NetworkPoliciesGetter
 }
 
 // NetworkingV1Client is used to interact with features provided by the networking.k8s.io group.
 type NetworkingV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *NetworkingV1Client) Ingresses(namespace string) IngressInterface {
+	return newIngresses(c, namespace)
+}
+
+func (c *NetworkingV1Client) IngressClasses() IngressClassInterface {
+	return newIngressClasses(c)
 }
 
 func (c *NetworkingV1Client) NetworkPolicies(namespace string) NetworkPolicyInterface {

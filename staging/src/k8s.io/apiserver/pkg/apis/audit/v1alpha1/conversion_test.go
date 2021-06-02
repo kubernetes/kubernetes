@@ -39,8 +39,6 @@ func init() {
 }
 
 func TestConversionObjectReference(t *testing.T) {
-	scheme.Log(t)
-
 	testcases := []struct {
 		desc     string
 		old      *ObjectReference
@@ -96,8 +94,6 @@ func TestConversionObjectReference(t *testing.T) {
 }
 
 func TestConversionEventToInternal(t *testing.T) {
-	scheme.Log(t)
-
 	time1 := time.Now()
 	time2 := time.Now()
 	testcases := []struct {
@@ -162,8 +158,6 @@ func TestConversionEventToInternal(t *testing.T) {
 }
 
 func TestConversionInternalToEvent(t *testing.T) {
-	scheme.Log(t)
-
 	now := time.Now()
 	testcases := []struct {
 		desc     string

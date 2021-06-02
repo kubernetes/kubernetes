@@ -17,11 +17,12 @@ limitations under the License.
 package podtolerationrestriction
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +35,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -73,7 +73,7 @@ type Plugin struct {
 }
 
 // Admit checks the admission policy and triggers corresponding actions
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	}
 
 	pod := a.GetObject().(*api.Pod)
-	var finalTolerations []api.Toleration
+	var extraTolerations []api.Toleration
 	if a.GetOperation() == admission.Create {
 		ts, err := p.getNamespaceDefaultTolerations(a.GetNamespace())
 		if err != nil {
@@ -96,42 +96,25 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 			ts = p.pluginConfig.Default
 		}
 
-		if len(ts) > 0 {
-			if len(pod.Spec.Tolerations) > 0 {
-				if tolerations.IsConflict(ts, pod.Spec.Tolerations) {
-					return fmt.Errorf("namespace tolerations and pod tolerations conflict")
-				}
-
-				// modified pod tolerations = namespace tolerations + current pod tolerations
-				finalTolerations = tolerations.MergeTolerations(ts, pod.Spec.Tolerations)
-			} else {
-				finalTolerations = ts
-
-			}
-		} else {
-			finalTolerations = pod.Spec.Tolerations
-		}
-	} else {
-		finalTolerations = pod.Spec.Tolerations
+		extraTolerations = ts
 	}
 
 	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
-		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
-			{
-				Key:      schedulerapi.TaintNodeMemoryPressure,
-				Operator: api.TolerationOpExists,
-				Effect:   api.TaintEffectNoSchedule,
-			},
+		extraTolerations = append(extraTolerations, api.Toleration{
+			Key:      corev1.TaintNodeMemoryPressure,
+			Operator: api.TolerationOpExists,
+			Effect:   api.TaintEffectNoSchedule,
 		})
 	}
-	// Final merge of tolerations irrespective of pod type, if the user while creating pods gives
-	// conflicting tolerations(with same key+effect), the existing ones should be overwritten by latest one
-	pod.Spec.Tolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{})
-	return p.Validate(a, o)
+	// Final merge of tolerations irrespective of pod type.
+	if len(extraTolerations) > 0 {
+		pod.Spec.Tolerations = tolerations.MergeTolerations(pod.Spec.Tolerations, extraTolerations)
+	}
+	return p.Validate(ctx, a, o)
 }
 
 // Validate we can obtain a whitelist of tolerations
-func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -144,6 +127,7 @@ func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) 
 	pod := a.GetObject().(*api.Pod)
 	if len(pod.Spec.Tolerations) > 0 {
 		whitelist, err := p.getNamespaceTolerationsWhitelist(a.GetNamespace())
+		whitelistScope := "namespace"
 		if err != nil {
 			return err
 		}
@@ -152,12 +136,13 @@ func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) 
 		// fall back to cluster's whitelist of tolerations.
 		if whitelist == nil {
 			whitelist = p.pluginConfig.Whitelist
+			whitelistScope = "cluster"
 		}
 
 		if len(whitelist) > 0 {
 			// check if the merged pod tolerations satisfy its namespace whitelist
 			if !tolerations.VerifyAgainstWhitelist(pod.Spec.Tolerations, whitelist) {
-				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its namespace whitelist")
+				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its %s whitelist", whitelistScope)
 			}
 		}
 	}
@@ -222,7 +207,7 @@ func (p *Plugin) getNamespace(nsName string) (*corev1.Namespace, error) {
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.client.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
+		namespace, err = p.client.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, err

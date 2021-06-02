@@ -17,79 +17,70 @@ limitations under the License.
 package legacyregistry
 
 import (
-	"fmt"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"k8s.io/component-base/metrics"
-	"sync"
 )
 
-var globalRegistryFactory = metricsRegistryFactory{
-	registerQueue:     make([]metrics.KubeCollector, 0),
-	mustRegisterQueue: make([]metrics.KubeCollector, 0),
+var (
+	defaultRegistry = metrics.NewKubeRegistry()
+	// DefaultGatherer exposes the global registry gatherer
+	DefaultGatherer metrics.Gatherer = defaultRegistry
+	// Reset calls reset on the global registry
+	Reset = defaultRegistry.Reset
+	// MustRegister registers registerable metrics but uses the global registry.
+	MustRegister = defaultRegistry.MustRegister
+	// RawMustRegister registers prometheus collectors but uses the global registry, this
+	// bypasses the metric stability framework
+	//
+	// Deprecated
+	RawMustRegister = defaultRegistry.RawMustRegister
+
+	// Register registers a collectable metric but uses the global registry
+	Register = defaultRegistry.Register
+)
+
+func init() {
+	RawMustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	RawMustRegister(prometheus.NewGoCollector())
 }
 
-type metricsRegistryFactory struct {
-	globalRegistry    metrics.KubeRegistry
-	kubeVersion       *apimachineryversion.Info
-	registrationLock  sync.Mutex
-	registerQueue     []metrics.KubeCollector
-	mustRegisterQueue []metrics.KubeCollector
+// Handler returns an HTTP handler for the DefaultGatherer. It is
+// already instrumented with InstrumentHandler (using "prometheus" as handler
+// name).
+//
+// Deprecated: Please note the issues described in the doc comment of
+// InstrumentHandler. You might want to consider using promhttp.Handler instead.
+func Handler() http.Handler {
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
-// SetRegistryFactoryVersion sets the kubernetes version information for all
-// subsequent metrics registry initializations. Only the first call has an effect.
-// If a version is not set, then metrics registry creation will no-opt
-func SetRegistryFactoryVersion(ver apimachineryversion.Info) []error {
-	globalRegistryFactory.registrationLock.Lock()
-	defer globalRegistryFactory.registrationLock.Unlock()
-	if globalRegistryFactory.kubeVersion != nil {
-		if globalRegistryFactory.kubeVersion.String() != ver.String() {
-			panic(fmt.Sprintf("Cannot load a global registry more than once, had %s tried to load %s",
-				globalRegistryFactory.kubeVersion.String(),
-				ver.String()))
-		}
-		return nil
-	}
-	registrationErrs := make([]error, 0)
-	globalRegistryFactory.globalRegistry = metrics.NewKubeRegistry(ver)
-	globalRegistryFactory.kubeVersion = &ver
-	for _, c := range globalRegistryFactory.registerQueue {
-		err := globalRegistryFactory.globalRegistry.Register(c)
-		if err != nil {
-			registrationErrs = append(registrationErrs, err)
-		}
-	}
-	for _, c := range globalRegistryFactory.mustRegisterQueue {
-		globalRegistryFactory.globalRegistry.MustRegister(c)
-	}
-	return registrationErrs
+// HandlerWithReset returns an HTTP handler for the DefaultGatherer but invokes
+// registry reset if the http method is DELETE.
+func HandlerWithReset() http.Handler {
+	return promhttp.InstrumentMetricHandler(
+		prometheus.DefaultRegisterer,
+		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{}))
 }
 
-// Register registers a collectable metric, but it uses a global registry. Registration is deferred
-// until the global registry has a version to use.
-func Register(c metrics.KubeCollector) error {
-	globalRegistryFactory.registrationLock.Lock()
-	defer globalRegistryFactory.registrationLock.Unlock()
+// CustomRegister registers a custom collector but uses the global registry.
+func CustomRegister(c metrics.StableCollector) error {
+	err := defaultRegistry.CustomRegister(c)
 
-	if globalRegistryFactory.kubeVersion != nil {
-		return globalRegistryFactory.globalRegistry.Register(c)
-	}
-	globalRegistryFactory.registerQueue = append(globalRegistryFactory.registerQueue, c)
-	return nil
+	//TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
+	_ = prometheus.Register(c)
+
+	return err
 }
 
-// MustRegister works like Register but registers any number of
-// Collectors and panics upon the first registration that causes an
-// error. Registration is deferred  until the global registry has a version to use.
-func MustRegister(cs ...metrics.KubeCollector) {
-	globalRegistryFactory.registrationLock.Lock()
-	defer globalRegistryFactory.registrationLock.Unlock()
+// CustomMustRegister registers custom collectors but uses the global registry.
+func CustomMustRegister(cs ...metrics.StableCollector) {
+	defaultRegistry.CustomMustRegister(cs...)
 
-	if globalRegistryFactory.kubeVersion != nil {
-		globalRegistryFactory.globalRegistry.MustRegister(cs...)
-		return
-	}
 	for _, c := range cs {
-		globalRegistryFactory.mustRegisterQueue = append(globalRegistryFactory.mustRegisterQueue, c)
+		prometheus.MustRegister(c)
 	}
 }

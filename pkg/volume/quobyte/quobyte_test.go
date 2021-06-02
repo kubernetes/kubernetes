@@ -21,12 +21,13 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/mount-utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -39,10 +40,10 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/quobyte")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/quobyte" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -63,7 +64,7 @@ func TestGetAccessModes(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/quobyte")
 	if err != nil {
@@ -82,29 +83,29 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/quobyte")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, &mount.FakeMounter{})
-	volumePath := mounter.GetPath()
+	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Error("Got a nil Mounter")
+		t.Fatal("Got a nil Mounter")
 	}
 
+	volumePath := mounter.GetPath()
 	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
 	}
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new unmounter: %v", err)
 	}
@@ -178,7 +179,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	client := fake.NewSimpleClientset(pv, claim)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(quobytePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes

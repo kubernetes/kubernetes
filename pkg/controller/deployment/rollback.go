@@ -17,10 +17,12 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
-	"k8s.io/klog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -113,7 +115,7 @@ func (dc *DeploymentController) emitRollbackNormalEvent(d *apps.Deployment, mess
 func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(d *apps.Deployment) error {
 	klog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
 	setRollbackTo(d, nil)
-	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(d)
+	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
 	return err
 }
 

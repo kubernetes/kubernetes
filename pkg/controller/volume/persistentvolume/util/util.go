@@ -19,8 +19,9 @@ package persistentvolume
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -63,22 +64,42 @@ const (
 	// recognize dynamically provisioned PVs in its decisions).
 	AnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
+	// AnnMigratedTo annotation is added to a PVC and PV that is supposed to be
+	// dynamically provisioned/deleted by by its corresponding CSI driver
+	// through the CSIMigration feature flags. When this annotation is set the
+	// Kubernetes components will "stand-down" and the external-provisioner will
+	// act on the objects
+	AnnMigratedTo = "pv.kubernetes.io/migrated-to"
+
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
 	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
+// IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
+func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
+	// When feature VolumeScheduling enabled,
+	// Scheduler signal to the PV controller to start dynamic
+	// provisioning by setting the "AnnSelectedNode" annotation
+	// in the PVC
+	_, ok := claim.Annotations[AnnSelectedNode]
+	return ok
+}
+
 // IsDelayBindingMode checks if claim is in delay binding mode.
 func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelisters.StorageClassLister) (bool, error) {
-	className := v1helper.GetPersistentVolumeClaimClass(claim)
+	className := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	if className == "" {
 		return false, nil
 	}
 
 	class, err := classLister.Get(className)
 	if err != nil {
-		return false, nil
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
 	}
 
 	if class.VolumeBindingMode == nil {
@@ -112,7 +133,7 @@ func GetBindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolum
 
 		claimRef, err := reference.GetReference(scheme.Scheme, claim)
 		if err != nil {
-			return nil, false, fmt.Errorf("Unexpected error getting claim reference: %v", err)
+			return nil, false, fmt.Errorf("unexpected error getting claim reference: %w", err)
 		}
 		volumeClone.Spec.ClaimRef = claimRef
 		dirty = true
@@ -167,7 +188,7 @@ func FindMatchingVolume(
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	requestedClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -190,16 +211,16 @@ func FindMatchingVolume(
 			// Skip volumes in the excluded list
 			continue
 		}
+		if volume.Spec.ClaimRef != nil && !IsVolumeBoundToClaim(volume, claim) {
+			continue
+		}
 
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-
-		// check if volumeModes do not match (feature gate protected)
-		isMismatch, err := CheckVolumeModeMismatches(&claim.Spec, &volume.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
+		if volumeQty.Cmp(requestedQty) < 0 {
+			continue
 		}
 		// filter out mismatching volumeModes
-		if isMismatch {
+		if CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 			continue
 		}
 
@@ -214,6 +235,8 @@ func FindMatchingVolume(
 		if node != nil {
 			// Scheduler path, check that the PV NodeAffinity
 			// is satisfied by the node
+			// volumeutil.CheckNodeAffinity is the most expensive call in this loop.
+			// We should check cheaper conditions first or consider optimizing this function.
 			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
 			if err != nil {
 				nodeAffinityValid = false
@@ -221,13 +244,6 @@ func FindMatchingVolume(
 		}
 
 		if IsVolumeBoundToClaim(volume, claim) {
-			// this claim and volume are pre-bound; return
-			// the volume if the size request is satisfied,
-			// otherwise continue searching for a match
-			if volumeQty.Cmp(requestedQty) < 0 {
-				continue
-			}
-
 			// If PV node affinity is invalid, return no match.
 			// This means the prebound PV (and therefore PVC)
 			// is not suitable for this node.
@@ -247,7 +263,6 @@ func FindMatchingVolume(
 
 		// filter out:
 		// - volumes in non-available phase
-		// - volumes bound to another claim
 		// - volumes whose labels don't match the claim's selector, if specified
 		// - volumes in Class that is not requested
 		// - volumes whose NodeAffinity does not match the node
@@ -257,12 +272,10 @@ func FindMatchingVolume(
 			// them now has high chance of encountering unnecessary failures
 			// due to API conflicts.
 			continue
-		} else if volume.Spec.ClaimRef != nil {
-			continue
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
 		}
-		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+		if storagehelpers.GetPersistentVolumeClass(volume) != requestedClass {
 			continue
 		}
 		if !nodeAffinityValid {
@@ -277,11 +290,9 @@ func FindMatchingVolume(
 			}
 		}
 
-		if volumeQty.Cmp(requestedQty) >= 0 {
-			if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
-				smallestVolume = volume
-				smallestVolumeQty = volumeQty
-			}
+		if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
+			smallestVolume = volume
+			smallestVolumeQty = volumeQty
 		}
 	}
 
@@ -295,11 +306,7 @@ func FindMatchingVolume(
 
 // CheckVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
 // and PersistentVolumeClaims
-func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		return false, nil
-	}
-
+func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) bool {
 	// In HA upgrades, we cannot guarantee that the apiserver is on a version >= controller-manager.
 	// So we default a nil volumeMode to filesystem
 	requestedVolumeMode := v1.PersistentVolumeFilesystem
@@ -310,7 +317,7 @@ func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1
 	if pvSpec.VolumeMode != nil {
 		pvVolumeMode = *pvSpec.VolumeMode
 	}
-	return requestedVolumeMode != pvVolumeMode, nil
+	return requestedVolumeMode != pvVolumeMode
 }
 
 // CheckAccessModes returns true if PV satisfies all the PVC's requested AccessModes

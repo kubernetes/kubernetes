@@ -20,10 +20,13 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	"k8s.io/apiserver/pkg/apis/config/validation"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
@@ -43,8 +48,110 @@ const (
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
-	kmsPluginConnectionTimeout   = 3 * time.Second
+	kmsPluginHealthzNegativeTTL  = 3 * time.Second
+	kmsPluginHealthzPositiveTTL  = 20 * time.Second
 )
+
+type kmsPluginHealthzResponse struct {
+	err      error
+	received time.Time
+}
+
+type kmsPluginProbe struct {
+	name string
+	ttl  time.Duration
+	envelope.Service
+	lastResponse *kmsPluginHealthzResponse
+	l            *sync.Mutex
+}
+
+func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
+		return h.Check()
+	})
+}
+
+// GetKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
+func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthChecker, error) {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
+	}
+	defer f.Close()
+	var result []healthz.HealthChecker
+	probes, err := getKMSPluginProbes(f)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, p := range probes {
+		probe := p
+		result = append(result, probe.toHealthzCheck(i))
+	}
+	return result, nil
+}
+
+func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
+	var result []*kmsPluginProbe
+
+	configFileContents, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return result, fmt.Errorf("could not read content of encryption provider configuration: %v", err)
+	}
+
+	config, err := loadConfig(configFileContents)
+	if err != nil {
+		return result, fmt.Errorf("error while parsing encrypiton provider configuration: %v", err)
+	}
+
+	for _, r := range config.Resources {
+		for _, p := range r.Providers {
+			if p.KMS != nil {
+				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
+				if err != nil {
+					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
+				}
+
+				result = append(result, &kmsPluginProbe{
+					name:         p.KMS.Name,
+					ttl:          kmsPluginHealthzNegativeTTL,
+					Service:      s,
+					l:            &sync.Mutex{},
+					lastResponse: &kmsPluginHealthzResponse{},
+				})
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// Check encrypts and decrypts test data against KMS-Plugin's gRPC endpoint.
+func (h *kmsPluginProbe) Check() error {
+	h.l.Lock()
+	defer h.l.Unlock()
+
+	if (time.Since(h.lastResponse.received)) < h.ttl {
+		return h.lastResponse.err
+	}
+
+	p, err := h.Service.Encrypt([]byte("ping"))
+	if err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		h.ttl = kmsPluginHealthzNegativeTTL
+		return fmt.Errorf("failed to perform encrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+	}
+
+	if _, err := h.Service.Decrypt(p); err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		h.ttl = kmsPluginHealthzNegativeTTL
+		return fmt.Errorf("failed to perform decrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+	}
+
+	h.lastResponse = &kmsPluginHealthzResponse{err: nil, received: time.Now()}
+	h.ttl = kmsPluginHealthzPositiveTTL
+	return nil
+}
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
 func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Transformer, error) {
@@ -54,15 +161,14 @@ func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Tr
 	}
 	defer f.Close()
 
-	result, err := ParseEncryptionConfiguration(f)
+	result, err := parseEncryptionConfiguration(f)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing encryption provider configuration file %q: %v", filepath, err)
 	}
 	return result, nil
 }
 
-// ParseEncryptionConfiguration parses configuration data and returns the transformer overrides
-func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
+func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
 	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
@@ -77,7 +183,7 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 
 	// For each entry in the configuration
 	for _, resourceConfig := range config.Resources {
-		transformers, err := GetPrefixTransformers(&resourceConfig)
+		transformers, err := prefixTransformers(&resourceConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +204,6 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 
 }
 
-// loadConfig decodes data as a EncryptionConfiguration object.
 func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
@@ -113,102 +218,56 @@ func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
-	return config, nil
+
+	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
 }
 
 // The factory to create kms service. This is to make writing test easier.
 var envelopeServiceFactory = envelope.NewGRPCService
 
-// GetPrefixTransformers constructs and returns the appropriate prefix transformers for the passed resource using its configuration.
-func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.PrefixTransformer, error) {
+func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
-		found := false
+		var (
+			transformer value.PrefixTransformer
+			err         error
+		)
 
-		var transformer value.PrefixTransformer
-		var err error
-
-		if provider.AESGCM != nil {
-			transformer, err = GetAESPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
-			if err != nil {
-				return result, err
-			}
-			found = true
-		}
-
-		if provider.AESCBC != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-			transformer, err = GetAESPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
-			found = true
-		}
-
-		if provider.Secretbox != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-			transformer, err = GetSecretboxPrefixTransformer(provider.Secretbox)
-			found = true
-		}
-
-		if provider.Identity != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-			transformer = value.PrefixTransformer{
-				Transformer: identity.NewEncryptCheckTransformer(),
-				Prefix:      []byte{},
-			}
-			found = true
-		}
-
-		if provider.KMS != nil {
-			if found == true {
-				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-
-			// Ensure the endpoint is provided.
-			if len(provider.KMS.Endpoint) == 0 {
-				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
-			}
-
-			timeout := kmsPluginConnectionTimeout
-			if provider.KMS.Timeout != nil {
-				if provider.KMS.Timeout.Duration <= 0 {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, timeout should be a positive value", provider.KMS.Name)
-				}
-				timeout = provider.KMS.Timeout.Duration
-			}
-
-			// Get gRPC client service with endpoint.
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, timeout)
+		switch {
+		case provider.AESGCM != nil:
+			transformer, err = aesPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
+		case provider.AESCBC != nil:
+			transformer, err = aesPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
+		case provider.Secretbox != nil:
+			transformer, err = secretboxPrefixTransformer(provider.Secretbox)
+		case provider.KMS != nil:
+			var envelopeService envelope.Service
+			envelopeService, err = envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}
 
-			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
-			found = true
+			transformer, err = envelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
+		case provider.Identity != nil:
+			transformer = value.PrefixTransformer{
+				Transformer: identity.NewEncryptCheckTransformer(),
+				Prefix:      []byte{},
+			}
+		default:
+			return nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity")
 		}
 
 		if err != nil {
 			return result, err
 		}
 		result = append(result, transformer)
-
-		if found == false {
-			return result, fmt.Errorf("invalid provider configuration: at least one provider must be specified")
-		}
 	}
 	return result, nil
 }
 
-// BlockTransformerFunc takes an AES cipher block and returns a value transformer.
-type BlockTransformerFunc func(cipher.Block) value.Transformer
+type blockTransformerFunc func(cipher.Block) value.Transformer
 
-// GetAESPrefixTransformer returns a prefix transformer from the provided configuration.
-// Returns an AES transformer based on the provided prefix and block transformer.
-func GetAESPrefixTransformer(config *apiserverconfig.AESConfiguration, fn BlockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
+func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
 	var result value.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -255,8 +314,7 @@ func GetAESPrefixTransformer(config *apiserverconfig.AESConfiguration, fn BlockT
 	return result, nil
 }
 
-// GetSecretboxPrefixTransformer returns a prefix transformer from the provided configuration
-func GetSecretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) (value.PrefixTransformer, error) {
+func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) (value.PrefixTransformer, error) {
 	var result value.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -306,10 +364,8 @@ func GetSecretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguratio
 	return result, nil
 }
 
-// getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
-// envelopeService is used as the root of trust.
-func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(config.CacheSize), aestransformer.NewCBCTransformer)
+func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}

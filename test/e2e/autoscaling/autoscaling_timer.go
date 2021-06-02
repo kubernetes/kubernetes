@@ -17,27 +17,29 @@ limitations under the License.
 package autoscaling
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 
-	SIGDescribe("Autoscaling a service", func() {
+	ginkgo.Describe("Autoscaling a service", func() {
 		ginkgo.BeforeEach(func() {
 			// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
-			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-autoscaler-status", metav1.GetOptions{})
 			if err != nil {
-				framework.Skipf("test expects Cluster Autoscaler to be enabled")
+				e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 			}
 		})
 
@@ -50,7 +52,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Make sure there is only 1 node group, otherwise this test becomes useless.
 				nodeGroups := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")
 				if len(nodeGroups) != 1 {
-					framework.Skipf("test expects 1 node group, found %d", len(nodeGroups))
+					e2eskipper.Skipf("test expects 1 node group, found %d", len(nodeGroups))
 				}
 				nodeGroupName = nodeGroups[0]
 
@@ -58,13 +60,14 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodeGroupSize, err := framework.GroupSize(nodeGroupName)
 				framework.ExpectNoError(err)
 				if nodeGroupSize != nodesNum {
-					framework.Skipf("test expects %d nodes, found %d", nodesNum, nodeGroupSize)
+					e2eskipper.Skipf("test expects %d nodes, found %d", nodesNum, nodeGroupSize)
 				}
 
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
-				nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				nodes, err = e2enode.GetReadySchedulableNodes(f.ClientSet)
+				framework.ExpectNoError(err)
 				schedulableCount := len(nodes.Items)
-				gomega.Expect(schedulableCount).To(gomega.Equal(nodeGroupSize), "not all nodes are schedulable")
+				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
 			})
 
 			ginkgo.AfterEach(func() {
@@ -73,7 +76,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				if len(nodeGroupName) > 0 {
 					// Scale down back to only 'nodesNum' nodes, as expected at the start of the test.
 					framework.ExpectNoError(framework.ResizeGroup(nodeGroupName, nodesNum))
-					framework.ExpectNoError(framework.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
+					framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
 				}
 			})
 
@@ -93,15 +96,15 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's allocatable memory.
 				replicas := 1
-				resourceConsumer := common.NewDynamicResourceConsumer("resource-consumer", f.Namespace.Name, common.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter)
+				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer("resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter)
 				defer resourceConsumer.CleanUp()
 				resourceConsumer.WaitForReplicas(replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
 
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
 				targetCPUUtilizationPercent := int32(50)
-				hpa := common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
-				defer common.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
+				hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
+				defer e2eautoscaling.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
 				cpuLoad := 8 * cpuRequestMillis * int64(targetCPUUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))
 

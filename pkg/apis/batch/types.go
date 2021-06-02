@@ -27,17 +27,17 @@ import (
 type Job struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of a job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec JobSpec
 
 	// Current status of a job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status JobStatus
 }
@@ -48,7 +48,7 @@ type Job struct {
 type JobList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -62,12 +62,12 @@ type JobList struct {
 type JobTemplate struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Defines jobs that will be created from this template.
-	// https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Template JobTemplateSpec
 }
@@ -75,15 +75,31 @@ type JobTemplate struct {
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of the job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec JobSpec
 }
+
+// CompletionMode specifies how Pod completions of a Job are tracked.
+type CompletionMode string
+
+const (
+	// NonIndexedCompletion is a Job completion mode. In this mode, the Job is
+	// considered complete when there have been .spec.completions
+	// successfully completed Pods. Pod completions are homologous to each other.
+	NonIndexedCompletion CompletionMode = "NonIndexed"
+
+	// IndexedCompletion is a Job completion mode. In this mode, the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1).
+	// The Job is  considered complete when a Pod completes for each completion
+	// index.
+	IndexedCompletion CompletionMode = "Indexed"
+)
 
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
@@ -103,8 +119,11 @@ type JobSpec struct {
 	// +optional
 	Completions *int32
 
-	// Optional duration in seconds relative to the startTime that the job may be active
-	// before the system tries to terminate it; value must be positive integer
+	// Specifies the duration in seconds relative to the startTime that the job
+	// may be continuously active before the system tries to terminate it; value
+	// must be positive integer. If a Job is suspended (at creation or through an
+	// update), this timer will effectively be stopped and reset when the Job is
+	// resumed again.
 	// +optional
 	ActiveDeadlineSeconds *int64
 
@@ -149,24 +168,67 @@ type JobSpec struct {
 	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32
+
+	// CompletionMode specifies how Pod completions are tracked. It can be
+	// `NonIndexed` (default) or `Indexed`.
+	//
+	// `NonIndexed` means that the Job is considered complete when there have
+	// been .spec.completions successfully completed Pods. Each Pod completion is
+	// homologous to each other.
+	//
+	// `Indexed` means that the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1),
+	// available in the annotation batch.kubernetes.io/job-completion-index.
+	// The Job is considered complete when there is one successfully completed Pod
+	// for each index.
+	// When value is `Indexed`, .spec.completions must be specified and
+	// `.spec.parallelism` must be less than or equal to 10^5.
+	// In addition, The Pod name takes the form
+	// `$(job-name)-$(index)-$(random-string)`,
+	// the Pod hostname takes the form `$(job-name)-$(index)`.
+	//
+	// This field is beta-level. More completion modes can be added in the future.
+	// If the Job controller observes a mode that it doesn't recognize, the
+	// controller skips updates for the Job.
+	// +optional
+	CompletionMode *CompletionMode
+
+	// Suspend specifies whether the Job controller should create Pods or not. If
+	// a Job is created with suspend set to true, no Pods are created by the Job
+	// controller. If a Job is suspended after creation (i.e. the flag goes from
+	// false to true), the Job controller will delete all active Pods associated
+	// with this Job. Users must design their workload to gracefully handle this.
+	// Suspending a Job will reset the StartTime field of the Job, effectively
+	// resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
+	// requires the SuspendJob feature gate to be enabled; otherwise this field
+	// may not be set to true. Defaults to false.
+	// +optional
+	Suspend *bool
 }
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
 
-	// The latest available observations of an object's current state.
+	// The latest available observations of an object's current state. When a Job
+	// fails, one of the conditions will have type "Failed" and status true. When
+	// a Job is suspended, one of the conditions will have type "Suspended" and
+	// status true; when the Job is resumed, the status of this condition will
+	// become false. When a Job is completed, one of the conditions will have
+	// type "Complete" and status true.
 	// +optional
 	Conditions []JobCondition
 
-	// Represents time when the job was acknowledged by the job controller.
-	// It is not guaranteed to be set in happens-before order across separate operations.
-	// It is represented in RFC3339 form and is in UTC.
+	// Represents time when the job controller started processing a job. When a
+	// Job is created in the suspended state, this field is not set until the
+	// first time it is resumed. This field is reset every time a Job is resumed
+	// from suspension. It is represented in RFC3339 form and is in UTC.
 	// +optional
 	StartTime *metav1.Time
 
 	// Represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
+	// The completion time is only set when the job finishes successfully.
 	// +optional
 	CompletionTime *metav1.Time
 
@@ -181,6 +243,16 @@ type JobStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int32
+
+	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// "Indexed" in a text format. The indexes are represented as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// +optional
+	CompletedIndexes string
 }
 
 // JobConditionType is a valid value for JobCondition.Type
@@ -188,6 +260,8 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
+	// JobSuspended means the job has been suspended.
+	JobSuspended JobConditionType = "Suspended"
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
@@ -196,7 +270,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// Type of job condition.
 	Type JobConditionType
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus
@@ -220,17 +294,17 @@ type JobCondition struct {
 type CronJob struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Specification of the desired behavior of a cron job, including the schedule.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec CronJobSpec
 
 	// Current status of a cron job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status CronJobStatus
 }
@@ -241,7 +315,7 @@ type CronJob struct {
 type CronJobList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -269,7 +343,7 @@ type CronJobSpec struct {
 	ConcurrencyPolicy ConcurrencyPolicy
 
 	// This flag tells the controller to suspend subsequent executions, it does
-	// not apply to already started executions.  Defaults to false.
+	// not apply to already started executions. Defaults to false.
 	// +optional
 	Suspend *bool
 
@@ -314,4 +388,8 @@ type CronJobStatus struct {
 	// Information when was the last time the job was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time
+
+	// Information when was the last time the job successfully completed.
+	// +optional
+	LastSuccessfulTime *metav1.Time
 }

@@ -1,51 +1,17 @@
 language: go
+go_import_path: github.com/sirupsen/logrus
+git:
+  depth: 1
 env:
-  - GOMAXPROCS=4 GORACE=halt_on_error=1
-matrix:
-  include:
-    - go: 1.10.x
-      install:
-        - go get github.com/stretchr/testify/assert
-        - go get golang.org/x/crypto/ssh/terminal
-        - go get golang.org/x/sys/unix
-        - go get golang.org/x/sys/windows
-      script:
-        - go test -race -v ./...
-    - go: 1.11.x
-      env: GO111MODULE=on
-      install:
-        - go mod download
-      script:
-        - go test -race -v ./...
-    - go: 1.11.x
-      env: GO111MODULE=off
-      install:
-        - go get github.com/stretchr/testify/assert
-        - go get golang.org/x/crypto/ssh/terminal
-        - go get golang.org/x/sys/unix
-        - go get golang.org/x/sys/windows
-      script:
-        - go test -race -v ./...
-    - go: 1.10.x
-      install:
-        - go get github.com/stretchr/testify/assert
-        - go get golang.org/x/crypto/ssh/terminal
-        - go get golang.org/x/sys/unix
-        - go get golang.org/x/sys/windows
-      script:
-        - go test -race -v -tags appengine ./...
-    - go: 1.11.x
-      env: GO111MODULE=on
-      install:
-        - go mod download
-      script:
-        - go test -race -v -tags appengine ./...
-    - go: 1.11.x
-      env: GO111MODULE=off
-      install:
-        - go get github.com/stretchr/testify/assert
-        - go get golang.org/x/crypto/ssh/terminal
-        - go get golang.org/x/sys/unix
-        - go get golang.org/x/sys/windows
-      script:
-        - go test -race -v -tags appengine ./...
+  - GO111MODULE=on
+go: [1.13.x, 1.14.x]
+os: [linux, osx]
+install:
+  - ./travis/install.sh
+script:
+  - ./travis/cross_build.sh
+  - ./travis/lint.sh
+  - export GOMAXPROCS=4
+  - export GORACE=halt_on_error=1
+  - go test -race -v ./...
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then go test -race -v -tags appengine ./... ; fi

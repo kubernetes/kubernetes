@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -125,6 +125,9 @@ func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersBy
 func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
+	if numToKeep > 0 {
+		sort.Sort(byCreated(containers))
+	}
 	for i := len(containers) - 1; i >= numToKeep; i-- {
 		if containers[i].unknown {
 			// Containers in known state could be running, we should try
@@ -134,13 +137,13 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 				ID:   containers[i].id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, nil); err != nil {
-				klog.Errorf("Failed to stop container %q: %v", containers[i].id, err)
+			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
+				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
 		}
 		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
-			klog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
+			klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id)
 		}
 	}
 
@@ -151,8 +154,11 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 // removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
 // returns the resulting slice.
 func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
-	// Remove from oldest to newest (last to first).
 	numToKeep := len(sandboxes) - toRemove
+	if numToKeep > 0 {
+		sort.Sort(sandboxByCreated(sandboxes))
+	}
+	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
 		if !sandboxes[i].active {
 			cgc.removeSandbox(sandboxes[i].id)
@@ -162,16 +168,16 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 
 // removeSandbox removes the sandbox by sandboxID.
 func (cgc *containerGC) removeSandbox(sandboxID string) {
-	klog.V(4).Infof("Removing sandbox %q", sandboxID)
+	klog.V(4).InfoS("Removing sandbox", "sandboxID", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
+		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
 		return
 	}
 	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
+		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
 	}
 }
 
@@ -210,16 +216,11 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 		evictUnits[key] = append(evictUnits[key], containerInfo)
 	}
 
-	// Sort the containers by age.
-	for uid := range evictUnits {
-		sort.Sort(byCreated(evictUnits[uid]))
-	}
-
 	return evictUnits, nil
 }
 
 // evict all containers that are evictable
-func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
 	// Separate containers by evict units.
 	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
@@ -277,15 +278,15 @@ func (cgc *containerGC) evictSandboxes(evictTerminatedPods bool) error {
 		return err
 	}
 
+	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
+	if err != nil {
+		return err
+	}
+
 	// collect all the PodSandboxId of container
 	sandboxIDs := sets.NewString()
 	for _, container := range containers {
 		sandboxIDs.Insert(container.PodSandboxId)
-	}
-
-	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
-	if err != nil {
-		return err
 	}
 
 	sandboxesByPod := make(sandboxesByPodUID)
@@ -307,11 +308,6 @@ func (cgc *containerGC) evictSandboxes(evictTerminatedPods bool) error {
 		}
 
 		sandboxesByPod[podUID] = append(sandboxesByPod[podUID], sandboxInfo)
-	}
-
-	// Sort the sandboxes by age.
-	for uid := range sandboxesByPod {
-		sort.Sort(sandboxByCreated(sandboxesByPod[uid]))
 	}
 
 	for podUID, sandboxes := range sandboxesByPod {
@@ -346,7 +342,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 			}
 			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
 			if err != nil {
-				klog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
+				klog.ErrorS(err, "Failed to remove pod logs directory", "path", name)
 			}
 		}
 	}
@@ -356,9 +352,35 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 	logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
 	for _, logSymlink := range logSymlinks {
 		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+			if containerID, err := getContainerIDFromLegacyLogSymlink(logSymlink); err == nil {
+				status, err := cgc.manager.runtimeService.ContainerStatus(containerID)
+				if err != nil {
+					// TODO: we should handle container not found (i.e. container was deleted) case differently
+					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
+					klog.InfoS("Error getting ContainerStatus for containerID", "containerID", containerID, "err", err)
+				} else if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
+					// Here is how container log rotation works (see containerLogManager#rotateLatestLog):
+					//
+					// 1. rename current log to rotated log file whose filename contains current timestamp (fmt.Sprintf("%s.%s", log, timestamp))
+					// 2. reopen the container log
+					// 3. if #2 fails, rename rotated log file back to container log
+					//
+					// There is small but indeterministic amount of time during which log file doesn't exist (between steps #1 and #2, between #1 and #3).
+					// Hence the symlink may be deemed unhealthy during that period.
+					// See https://github.com/kubernetes/kubernetes/issues/52172
+					//
+					// We only remove unhealthy symlink for dead containers
+					klog.V(5).InfoS("Container is still running, not removing symlink", "containerID", containerID, "path", logSymlink)
+					continue
+				}
+			} else {
+				klog.V(4).InfoS("Unable to obtain container ID", "err", err)
+			}
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
-				klog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+				klog.ErrorS(err, "Failed to remove container log dead symlink", "path", logSymlink)
+			} else {
+				klog.V(4).InfoS("Removed symlink", "path", logSymlink)
 			}
 		}
 	}
@@ -375,7 +397,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
-func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
 	errors := []error{}
 	// Remove evictable containers
 	if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictTerminatedPods); err != nil {

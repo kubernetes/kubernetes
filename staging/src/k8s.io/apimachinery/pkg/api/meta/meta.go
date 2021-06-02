@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // errNotList is returned when an object implements the Object style interfaces but not the List style
@@ -39,8 +39,6 @@ var errNotCommon = fmt.Errorf("object does not implement the common interface fo
 func CommonAccessor(obj interface{}) (metav1.Common, error) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
-	case metav1.ListInterface:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
@@ -71,8 +69,6 @@ func CommonAccessor(obj interface{}) (metav1.Common, error) {
 func ListAccessor(obj interface{}) (List, error) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
-	case metav1.ListInterface:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
@@ -135,7 +131,6 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
 				ClusterName:                m.GetClusterName(),
-				Initializers:               m.GetInitializers(),
 				ManagedFields:              m.GetManagedFields(),
 			},
 		}

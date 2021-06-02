@@ -21,6 +21,8 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// IsJobFinished checks whether the given Job has finished execution.
+// It does not discriminate between successful and failed terminations.
 func IsJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {

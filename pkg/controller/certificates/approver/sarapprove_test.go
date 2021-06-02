@@ -27,62 +27,14 @@ import (
 	"net"
 	"testing"
 
-	authorization "k8s.io/api/authorization/v1beta1"
-	capi "k8s.io/api/certificates/v1beta1"
+	authorization "k8s.io/api/authorization/v1"
+	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
-	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	k8s_certificates_v1 "k8s.io/kubernetes/pkg/apis/certificates/v1"
 )
-
-func TestHasKubeletUsages(t *testing.T) {
-	cases := []struct {
-		usages   []capi.KeyUsage
-		expected bool
-	}{
-		{
-			usages:   nil,
-			expected: false,
-		},
-		{
-			usages:   []capi.KeyUsage{},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-			},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-				capi.UsageServerAuth,
-			},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-				capi.UsageClientAuth,
-			},
-			expected: true,
-		},
-	}
-	for _, c := range cases {
-		if hasExactUsages(&capi.CertificateSigningRequest{
-			Spec: capi.CertificateSigningRequestSpec{
-				Usages: c.usages,
-			},
-		}, kubeletClientUsages) != c.expected {
-			t.Errorf("unexpected result of hasKubeletUsages(%v), expecting: %v", c.usages, c.expected)
-		}
-	}
-}
 
 func TestHandle(t *testing.T) {
 	cases := []struct {
@@ -134,7 +86,7 @@ func TestHandle(t *testing.T) {
 				if got, expected := a.Verb, "update"; got != expected {
 					t.Errorf("got: %v, expected: %v", got, expected)
 				}
-				if got, expected := a.Resource, (schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}); got != expected {
+				if got, expected := a.Resource, (schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}); got != expected {
 					t.Errorf("got: %v, expected: %v", got, expected)
 				}
 				if got, expected := a.Subresource, "approval"; got != expected {
@@ -208,6 +160,12 @@ func TestRecognizers(t *testing.T) {
 		func(b *csrBuilder) {
 			b.usages = append(b.usages, capi.UsageServerAuth)
 		},
+		func(b *csrBuilder) {
+			b.signerName = "example.com/not-correct"
+		},
+		func(b *csrBuilder) {
+			b.signerName = capi.KubeletServingSignerName
+		},
 	}
 
 	testRecognizer(t, badCases, isNodeClientCert, false)
@@ -230,9 +188,10 @@ func TestRecognizers(t *testing.T) {
 func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc func(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool, shouldRecognize bool) {
 	for _, c := range cases {
 		b := csrBuilder{
-			cn:        "system:node:foo",
-			orgs:      []string{"system:nodes"},
-			requestor: "system:node:foo",
+			signerName: capi.KubeAPIServerClientKubeletSignerName,
+			cn:         "system:node:foo",
+			orgs:       []string{"system:nodes"},
+			requestor:  "system:node:foo",
 			usages: []capi.KeyUsage{
 				capi.UsageKeyEncipherment,
 				capi.UsageDigitalSignature,
@@ -242,7 +201,7 @@ func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc fun
 		c(&b)
 		t.Run(fmt.Sprintf("csr:%#v", b), func(t *testing.T) {
 			csr := makeFancyTestCsr(b)
-			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
+			x509cr, err := k8s_certificates_v1.ParseCSR(csr.Spec.Request)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -262,17 +221,18 @@ func makeTestCsr() *capi.CertificateSigningRequest {
 }
 
 type csrBuilder struct {
-	cn        string
-	orgs      []string
-	requestor string
-	usages    []capi.KeyUsage
-	dns       []string
-	emails    []string
-	ips       []net.IP
+	cn         string
+	orgs       []string
+	requestor  string
+	usages     []capi.KeyUsage
+	dns        []string
+	emails     []string
+	ips        []net.IP
+	signerName string
 }
 
 func makeFancyTestCsr(b csrBuilder) *capi.CertificateSigningRequest {
-	pk, err := ecdsa.GenerateKey(elliptic.P224(), insecureRand)
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
 		panic(err)
 	}
@@ -290,9 +250,10 @@ func makeFancyTestCsr(b csrBuilder) *capi.CertificateSigningRequest {
 	}
 	return &capi.CertificateSigningRequest{
 		Spec: capi.CertificateSigningRequestSpec{
-			Username: b.requestor,
-			Usages:   b.usages,
-			Request:  pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrb}),
+			Username:   b.requestor,
+			Usages:     b.usages,
+			SignerName: b.signerName,
+			Request:    pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrb}),
 		},
 	}
 }

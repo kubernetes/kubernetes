@@ -48,6 +48,7 @@ func (l *lister) Get(name string) (*corev1.Secret, error) {
 }
 
 const (
+	// Fake values for testing.
 	tokenID     = "foobar"           // 6 letters
 	tokenSecret = "circumnavigation" // 16 letters
 )
@@ -286,74 +287,5 @@ func TestTokenAuthenticator(t *testing.T) {
 				t.Errorf("test %q want user=%#v, got=%#v", test.name, test.wantUser, gotUser)
 			}
 		}()
-	}
-}
-
-func TestGetGroups(t *testing.T) {
-	tests := []struct {
-		name         string
-		secret       *corev1.Secret
-		expectResult []string
-		expectError  bool
-	}{
-		{
-			name: "not set",
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-				Data:       map[string][]byte{},
-			},
-			expectResult: []string{"system:bootstrappers"},
-		},
-		{
-			name: "set to empty value",
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-				Data: map[string][]byte{
-					bootstrapapi.BootstrapTokenExtraGroupsKey: []byte(""),
-				},
-			},
-			expectResult: []string{"system:bootstrappers"},
-		},
-		{
-			name: "invalid prefix",
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-				Data: map[string][]byte{
-					bootstrapapi.BootstrapTokenExtraGroupsKey: []byte("foo"),
-				},
-			},
-			expectError: true,
-		},
-		{
-			name: "valid",
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-				Data: map[string][]byte{
-					bootstrapapi.BootstrapTokenExtraGroupsKey: []byte("system:bootstrappers:foo,system:bootstrappers:bar,system:bootstrappers:bar"),
-				},
-			},
-			// expect the results in deduplicated, sorted order
-			expectResult: []string{
-				"system:bootstrappers",
-				"system:bootstrappers:bar",
-				"system:bootstrappers:foo",
-			},
-		},
-	}
-	for _, test := range tests {
-		result, err := getGroups(test.secret)
-		if test.expectError {
-			if err == nil {
-				t.Errorf("test %q expected an error, but didn't get one (result: %#v)", test.name, result)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("test %q return an unexpected error: %v", test.name, err)
-			continue
-		}
-		if !reflect.DeepEqual(result, test.expectResult) {
-			t.Errorf("test %q expected %#v, got %#v", test.name, test.expectResult, result)
-		}
 	}
 }

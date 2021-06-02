@@ -20,18 +20,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
-
-	"k8s.io/klog"
 )
-
-func TestMain(m *testing.M) {
-	klog.InitFlags(nil)
-	os.Exit(m.Run())
-}
 
 func TestHandleCrash(t *testing.T) {
 	defer func() {
@@ -103,7 +97,7 @@ func TestHandleCrashLog(t *testing.T) {
 	// 	.../src/k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/runtime/runtime.go:69 +0x...
 	lines := strings.Split(log, "\n")
 	if len(lines) < 4 {
-		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call: %v", lines)
+		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call")
 	}
 	if match, _ := regexp.MatchString("Observed a panic: test panic", lines[0]); !match {
 		t.Errorf("mismatch panic message: %s", lines[0])
@@ -118,6 +112,24 @@ func TestHandleCrashLog(t *testing.T) {
 	}
 	if match, _ := regexp.MatchString(`runtime\.go:[0-9]+ \+0x`, lines[3]); !match {
 		t.Errorf("mismatch file/line/offset information: %s", lines[3])
+	}
+}
+
+func TestHandleCrashLogSilenceHTTPErrAbortHandler(t *testing.T) {
+	log, err := captureStderr(func() {
+		defer func() {
+			if r := recover(); r != http.ErrAbortHandler {
+				t.Fatalf("expected to recover from http.ErrAbortHandler")
+			}
+		}()
+		defer HandleCrash()
+		panic(http.ErrAbortHandler)
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(log) > 0 {
+		t.Fatalf("expected no stderr log, got: %s", log)
 	}
 }
 

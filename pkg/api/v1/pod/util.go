@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -48,29 +50,92 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }
 
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// AllContainers specifies that all containers be visited
+const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+
+// AllFeatureEnabledContainers returns a ContainerType mask which includes all container
+// types except for the ones guarded by feature gate.
+func AllFeatureEnabledContainers() ContainerType {
+	containerType := AllContainers
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		containerType &= ^EphemeralContainers
+	}
+	return containerType
+}
+
+// ContainerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
+
+func skipEmptyNames(visitor Visitor) Visitor {
+	return func(name string) bool {
+		if len(name) == 0 {
+			// continue visiting
+			return true
+		}
+		// delegate to visitor
+		return visitor(name)
+	}
+}
+
+// VisitContainers invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
+// visiting is short-circuited. VisitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask&InitContainers != 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
+				return false
+			}
+		}
+	}
+	if mask&Containers != 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
+				return false
+			}
+		}
+	}
+	if mask&EphemeralContainers != 0 {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
+	visitor = skipEmptyNames(visitor)
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
 		}
 	}
-	for i := range pod.Spec.InitContainers {
-		if !visitContainerSecretNames(&pod.Spec.InitContainers[i], visitor) {
-			return false
-		}
-	}
-	for i := range pod.Spec.Containers {
-		if !visitContainerSecretNames(&pod.Spec.Containers[i], visitor) {
-			return false
-		}
-	}
+	VisitContainers(&pod.Spec, AllContainers, func(c *v1.Container, containerType ContainerType) bool {
+		return visitContainerSecretNames(c, visitor)
+	})
 	var source *v1.VolumeSource
 
 	for i := range pod.Spec.Volumes {
@@ -152,16 +217,10 @@ func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
-	for i := range pod.Spec.InitContainers {
-		if !visitContainerConfigmapNames(&pod.Spec.InitContainers[i], visitor) {
-			return false
-		}
-	}
-	for i := range pod.Spec.Containers {
-		if !visitContainerConfigmapNames(&pod.Spec.Containers[i], visitor) {
-			return false
-		}
-	}
+	visitor = skipEmptyNames(visitor)
+	VisitContainers(&pod.Spec, AllContainers, func(c *v1.Container, containerType ContainerType) bool {
+		return visitContainerConfigmapNames(c, visitor)
+	})
 	var source *v1.VolumeSource
 	for i := range pod.Spec.Volumes {
 		source = &pod.Spec.Volumes[i].VolumeSource
@@ -231,7 +290,7 @@ func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 
 	c := GetPodReadyCondition(pod.Status)
 	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-	if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time) {
+	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time)) {
 		return true
 	}
 	return false

@@ -37,8 +37,8 @@ func NewUploadCertsPhase() workflow.Phase {
 		Run:   runUploadCerts,
 		InheritFlags: []string{
 			options.CfgPath,
+			options.KubeconfigPath,
 			options.UploadCerts,
-			options.ExperimentalUploadCerts,
 			options.CertificateKey,
 			options.SkipCertificateKeyPrint,
 		},

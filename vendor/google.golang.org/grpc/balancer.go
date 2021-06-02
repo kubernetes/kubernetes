@@ -19,11 +19,10 @@
 package grpc
 
 import (
-	"fmt"
+	"context"
 	"net"
 	"sync"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
@@ -44,7 +43,7 @@ type Address struct {
 
 // BalancerConfig specifies the configurations for Balancer.
 //
-// Deprecated: please use package balancer.
+// Deprecated: please use package balancer.  May be removed in a future 1.x release.
 type BalancerConfig struct {
 	// DialCreds is the transport credential the Balancer implementation can
 	// use to dial to a remote load balancer server. The Balancer implementations
@@ -58,7 +57,7 @@ type BalancerConfig struct {
 
 // BalancerGetOptions configures a Get call.
 //
-// Deprecated: please use package balancer.
+// Deprecated: please use package balancer.  May be removed in a future 1.x release.
 type BalancerGetOptions struct {
 	// BlockingWait specifies whether Get should block when there is no
 	// connected address.
@@ -67,7 +66,7 @@ type BalancerGetOptions struct {
 
 // Balancer chooses network addresses for RPCs.
 //
-// Deprecated: please use package balancer.
+// Deprecated: please use package balancer.  May be removed in a future 1.x release.
 type Balancer interface {
 	// Start does the initialization work to bootstrap a Balancer. For example,
 	// this function may start the name resolution and watch the updates. It will
@@ -118,30 +117,10 @@ type Balancer interface {
 	Close() error
 }
 
-// downErr implements net.Error. It is constructed by gRPC internals and passed to the down
-// call of Balancer.
-type downErr struct {
-	timeout   bool
-	temporary bool
-	desc      string
-}
-
-func (e downErr) Error() string   { return e.desc }
-func (e downErr) Timeout() bool   { return e.timeout }
-func (e downErr) Temporary() bool { return e.temporary }
-
-func downErrorf(timeout, temporary bool, format string, a ...interface{}) downErr {
-	return downErr{
-		timeout:   timeout,
-		temporary: temporary,
-		desc:      fmt.Sprintf(format, a...),
-	}
-}
-
 // RoundRobin returns a Balancer that selects addresses round-robin. It uses r to watch
 // the name resolution updates and updates the addresses available correspondingly.
 //
-// Deprecated: please use package balancer/roundrobin.
+// Deprecated: please use package balancer/roundrobin. May be removed in a future 1.x release.
 func RoundRobin(r naming.Resolver) Balancer {
 	return &roundRobin{r: r}
 }
@@ -409,8 +388,4 @@ func (rr *roundRobin) Close() error {
 // returns the only address Up by resetTransport().
 type pickFirst struct {
 	*roundRobin
-}
-
-func pickFirstBalancerV1(r naming.Resolver) Balancer {
-	return &pickFirst{&roundRobin{r: r}}
 }

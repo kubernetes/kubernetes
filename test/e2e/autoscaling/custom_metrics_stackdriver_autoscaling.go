@@ -22,15 +22,16 @@ import (
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 	appsv1 "k8s.io/api/apps/v1"
 	as "k8s.io/api/autoscaling/v2beta1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	"github.com/onsi/ginkgo"
@@ -46,7 +47,7 @@ const (
 
 var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
@@ -222,7 +223,7 @@ type CustomMetricTestCase struct {
 	hpa             *as.HorizontalPodAutoscaler
 	kubeClient      clientset.Interface
 	deployment      *appsv1.Deployment
-	pod             *corev1.Pod
+	pod             *v1.Pod
 	initialReplicas int
 	scaledReplicas  int
 }
@@ -233,6 +234,9 @@ func (tc *CustomMetricTestCase) Run() {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	if err != nil {
+		framework.Failf("Failed to initialize gcm default client, %v", err)
+	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
 	// If this is your use case, create application default credentials:
@@ -240,14 +244,14 @@ func (tc *CustomMetricTestCase) Run() {
 	// and uncomment following lines:
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		e2elog.Logf("Couldn't get application default credentials, %v", err)
+		framework.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
 			framework.Failf("Error accessing application default credentials, %v", err)
 		}
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
@@ -276,24 +280,24 @@ func (tc *CustomMetricTestCase) Run() {
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.initialReplicas)
 
 	// Autoscale the deployment
-	_, err = tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Create(tc.hpa)
+	_, err = tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Create(context.TODO(), tc.hpa, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create HPA: %v", err)
 	}
-	defer tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(tc.hpa.ObjectMeta.Name, &metav1.DeleteOptions{})
+	defer tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(context.TODO(), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
 
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 }
 
-func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) error {
+func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *v1.Pod) error {
 	if deployment != nil {
-		_, err := cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Create(deployment)
+		_, err := cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 	}
 	if pod != nil {
-		_, err := cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Create(pod)
+		_, err := cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -301,12 +305,12 @@ func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, dep
 	return nil
 }
 
-func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) {
+func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *v1.Pod) {
 	if deployment != nil {
-		_ = cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Delete(deployment.ObjectMeta.Name, &metav1.DeleteOptions{})
+		_ = cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Delete(context.TODO(), deployment.ObjectMeta.Name, metav1.DeleteOptions{})
 	}
 	if pod != nil {
-		_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{})
+		_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(context.TODO(), pod.ObjectMeta.Name, metav1.DeleteOptions{})
 	}
 }
 
@@ -440,12 +444,12 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := cs.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		deployment, err := cs.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
-		e2elog.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	if err != nil {

@@ -27,6 +27,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -226,10 +227,10 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.CoreV1().Secrets("").List(options)
+					return fake.CoreV1().Secrets("").List(context.TODO(), options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.CoreV1().Secrets("").Watch(options)
+					return fake.CoreV1().Secrets("").Watch(context.TODO(), options)
 				},
 			}
 			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
@@ -275,4 +276,89 @@ func TestNewInformerWatcher(t *testing.T) {
 		})
 	}
 
+}
+
+// TestInformerWatcherDeletedFinalStateUnknown tests the code path when `DeleteFunc`
+// in `NewIndexerInformerWatcher` receives a `cache.DeletedFinalStateUnknown`
+// object from the underlying `DeltaFIFO`. The triggering condition is described
+// at https://github.com/kubernetes/kubernetes/blob/dc39ab2417bfddcec37be4011131c59921fdbe98/staging/src/k8s.io/client-go/tools/cache/delta_fifo.go#L736-L739.
+//
+// Code from @liggitt
+func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
+	listCalls := 0
+	watchCalls := 0
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			retval := &corev1.SecretList{}
+			if listCalls == 0 {
+				// Return a list with items in it
+				retval.ResourceVersion = "1"
+				retval.Items = []corev1.Secret{{ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1", ResourceVersion: "123"}}}
+			} else {
+				// Return empty lists after the first call
+				retval.ResourceVersion = "2"
+			}
+			listCalls++
+			return retval, nil
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			w := watch.NewFake()
+			if options.ResourceVersion == "1" {
+				go func() {
+					// Close with a "Gone" error when trying to start a watch from the first list
+					w.Error(&apierrors.NewGone("gone").ErrStatus)
+					w.Stop()
+				}()
+			}
+			watchCalls++
+			return w, nil
+		},
+	}
+	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+
+	// Expect secret add
+	select {
+	case event, ok := <-w.ResultChan():
+		if !ok {
+			t.Fatal("unexpected close")
+		}
+		if event.Type != watch.Added {
+			t.Fatalf("expected Added event, got %#v", event)
+		}
+		if event.Object.(*corev1.Secret).ResourceVersion != "123" {
+			t.Fatalf("expected added Secret with rv=123, got %#v", event.Object)
+		}
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	// Expect secret delete because the relist was missing the secret
+	select {
+	case event, ok := <-w.ResultChan():
+		if !ok {
+			t.Fatal("unexpected close")
+		}
+		if event.Type != watch.Deleted {
+			t.Fatalf("expected Deleted event, got %#v", event)
+		}
+		if event.Object.(*corev1.Secret).ResourceVersion != "123" {
+			t.Fatalf("expected deleted Secret with rv=123, got %#v", event.Object)
+		}
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	w.Stop()
+	select {
+	case <-done:
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	if listCalls < 2 {
+		t.Fatalf("expected at least 2 list calls, got %d", listCalls)
+	}
+	if watchCalls < 1 {
+		t.Fatalf("expected at least 1 watch call, got %d", watchCalls)
+	}
 }

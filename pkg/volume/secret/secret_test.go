@@ -268,7 +268,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -279,7 +279,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != secretPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -310,7 +310,7 @@ func TestPlugin(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -384,7 +384,7 @@ func TestInvalidPathSecret(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -434,7 +434,7 @@ func TestPluginReboot(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -488,7 +488,7 @@ func TestPluginOptional(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -586,7 +586,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}

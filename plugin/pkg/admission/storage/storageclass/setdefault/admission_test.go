@@ -17,9 +17,10 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -213,7 +214,7 @@ func TestAdmission(t *testing.T) {
 			false, // dryRun
 			nil,   // userInfo
 		)
-		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(attrs, nil)
+		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(context.TODO(), attrs, nil)
 		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)

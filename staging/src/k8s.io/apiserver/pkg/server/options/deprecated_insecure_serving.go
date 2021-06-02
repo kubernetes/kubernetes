@@ -43,7 +43,7 @@ type DeprecatedInsecureServingOptions struct {
 
 	// ListenFunc can be overridden to create a custom listener, e.g. for mocking in tests.
 	// It defaults to options.CreateListener.
-	ListenFunc func(network, addr string) (net.Listener, int, error)
+	ListenFunc func(network, addr string, config net.ListenConfig) (net.Listener, int, error)
 }
 
 // Validate ensures that the insecure port values within the range of the port.
@@ -54,8 +54,8 @@ func (s *DeprecatedInsecureServingOptions) Validate() []error {
 
 	errors := []error{}
 
-	if s.BindPort < 0 || s.BindPort > 65335 {
-		errors = append(errors, fmt.Errorf("insecure port %v must be between 0 and 65335, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
+	if s.BindPort < 0 || s.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("insecure port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port", s.BindPort))
 	}
 
 	return errors
@@ -68,7 +68,7 @@ func (s *DeprecatedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 or :: for listening in all interfaces and IP families).")
 	// Though this flag is deprecated, we discovered security concerns over how to do health checks without it e.g. #43784
 	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
 	fs.Lookup("insecure-bind-address").Hidden = false
@@ -87,7 +87,7 @@ func (s *DeprecatedInsecureServingOptions) AddUnqualifiedFlags(fs *pflag.FlagSet
 	}
 
 	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
-		"The IP address on which to serve the insecure --port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+		"The IP address on which to serve the insecure --port (set to '0.0.0.0' or '::' for listening in all interfaces and IP families).")
 	fs.MarkDeprecated("address", "see --bind-address instead.")
 	fs.Lookup("address").Hidden = false
 
@@ -113,7 +113,7 @@ func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecure
 			listen = s.ListenFunc
 		}
 		addr := net.JoinHostPort(s.BindAddress.String(), fmt.Sprintf("%d", s.BindPort))
-		s.Listener, s.BindPort, err = listen(s.BindNetwork, addr)
+		s.Listener, s.BindPort, err = listen(s.BindNetwork, addr, net.ListenConfig{})
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}

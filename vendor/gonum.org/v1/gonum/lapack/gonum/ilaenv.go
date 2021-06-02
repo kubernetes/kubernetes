@@ -165,12 +165,12 @@ func (impl Implementation) Ilaenv(ispec int, name string, opts string, n1, n2, n
 				panic(badName)
 			case "TRF":
 				if sname {
-					if n4 <= 64 {
+					if n2 <= 64 {
 						return 1
 					}
 					return 32
 				}
-				if n4 <= 64 {
+				if n2 <= 64 {
 					return 1
 				}
 				return 32

@@ -25,8 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gofuzz"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // IntOrString is a type that can hold an int32 or a string.  When used in
@@ -45,7 +44,7 @@ type IntOrString struct {
 }
 
 // Type represents the stored type of IntOrString.
-type Type int
+type Type int64
 
 const (
 	Int    Type = iota // The IntOrString holds an int.
@@ -90,6 +89,9 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 
 // String returns the string value, or the Itoa of the int value.
 func (intstr *IntOrString) String() string {
+	if intstr == nil {
+		return "<nil>"
+	}
 	if intstr.Type == String {
 		return intstr.StrVal
 	}
@@ -97,7 +99,8 @@ func (intstr *IntOrString) String() string {
 }
 
 // IntValue returns the IntVal if type Int, or if
-// it is a String, will attempt a conversion to int.
+// it is a String, will attempt a conversion to int,
+// returning 0 if a parsing error occurs.
 func (intstr *IntOrString) IntValue() int {
 	if intstr.Type == String {
 		i, _ := strconv.Atoi(intstr.StrVal)
@@ -122,26 +125,11 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 // the OpenAPI spec of this type.
 //
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
+func (IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
-func (_ IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
-
-func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
-	if intstr == nil {
-		return
-	}
-	if c.RandBool() {
-		intstr.Type = Int
-		c.Fuzz(&intstr.IntVal)
-		intstr.StrVal = ""
-	} else {
-		intstr.Type = String
-		intstr.IntVal = 0
-		c.Fuzz(&intstr.StrVal)
-	}
-}
+func (IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
 
 func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
 	if intOrPercent == nil {
@@ -150,6 +138,33 @@ func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrS
 	return intOrPercent
 }
 
+// GetScaledValueFromIntOrPercent is meant to replace GetValueFromIntOrPercent.
+// This method returns a scaled value from an IntOrString type. If the IntOrString
+// is a percentage string value it's treated as a percentage and scaled appropriately
+// in accordance to the total, if it's an int value it's treated as a a simple value and
+// if it is a string value which is either non-numeric or numeric but lacking a trailing '%' it returns an error.
+func GetScaledValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
+	if intOrPercent == nil {
+		return 0, errors.New("nil value for IntOrString")
+	}
+	value, isPercent, err := getIntOrPercentValueSafely(intOrPercent)
+	if err != nil {
+		return 0, fmt.Errorf("invalid value for IntOrString: %v", err)
+	}
+	if isPercent {
+		if roundUp {
+			value = int(math.Ceil(float64(value) * (float64(total)) / 100))
+		} else {
+			value = int(math.Floor(float64(value) * (float64(total)) / 100))
+		}
+	}
+	return value, nil
+}
+
+// GetValueFromIntOrPercent was deprecated in favor of
+// GetScaledValueFromIntOrPercent. This method was treating all int as a numeric value and all
+// strings with or without a percent symbol as a percentage value.
+// Deprecated
 func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
 	if intOrPercent == nil {
 		return 0, errors.New("nil value for IntOrString")
@@ -168,6 +183,8 @@ func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool
 	return value, nil
 }
 
+// getIntOrPercentValue is a legacy function and only meant to be called by GetValueFromIntOrPercent
+// For a more correct implementation call getIntOrPercentSafely
 func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 	switch intOrStr.Type {
 	case Int:
@@ -179,6 +196,28 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
 		}
 		return int(v), true, nil
+	}
+	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
+}
+
+func getIntOrPercentValueSafely(intOrStr *IntOrString) (int, bool, error) {
+	switch intOrStr.Type {
+	case Int:
+		return intOrStr.IntValue(), false, nil
+	case String:
+		isPercent := false
+		s := intOrStr.StrVal
+		if strings.HasSuffix(s, "%") {
+			isPercent = true
+			s = strings.TrimSuffix(intOrStr.StrVal, "%")
+		} else {
+			return 0, false, fmt.Errorf("invalid type: string is not a percentage")
+		}
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
+		}
+		return int(v), isPercent, nil
 	}
 	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
 }

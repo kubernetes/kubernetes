@@ -6,7 +6,14 @@ package mat
 
 import "gonum.org/v1/gonum/blas/cblas128"
 
-// Dense is a dense matrix representation with complex data.
+var (
+	cDense *CDense
+
+	_ CMatrix   = cDense
+	_ allMatrix = cDense
+)
+
+// CDense is a dense matrix representation with complex data.
 type CDense struct {
 	mat cblas128.General
 
@@ -58,11 +65,32 @@ func NewCDense(r, c int, data []complex128) *CDense {
 	}
 }
 
+// ReuseAs changes the receiver if it IsEmpty() to be of size r×c.
+//
+// ReuseAs re-uses the backing data slice if it has sufficient capacity,
+// otherwise a new slice is allocated. The backing data is zero on return.
+//
+// ReuseAs panics if the receiver is not empty, and panics if
+// the input sizes are less than one. To empty the receiver for re-use,
+// Reset should be used.
+func (m *CDense) ReuseAs(r, c int) {
+	if r <= 0 || c <= 0 {
+		if r == 0 || c == 0 {
+			panic(ErrZeroLength)
+		}
+		panic(ErrNegativeDimension)
+	}
+	if !m.IsEmpty() {
+		panic(ErrReuseNonEmpty)
+	}
+	m.reuseAsZeroed(r, c)
+}
+
 // reuseAs resizes an empty matrix to a r×c matrix,
 // or checks that a non-empty matrix is r×c.
 //
 // reuseAs must be kept in sync with reuseAsZeroed.
-func (m *CDense) reuseAs(r, c int) {
+func (m *CDense) reuseAsNonZeroed(r, c int) {
 	if m.mat.Rows > m.capRows || m.mat.Cols > m.capCols {
 		// Panic as a string, not a mat.Error.
 		panic("mat: caps not correctly set")
@@ -70,7 +98,7 @@ func (m *CDense) reuseAs(r, c int) {
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
 	}
-	if m.IsZero() {
+	if m.IsEmpty() {
 		m.mat = cblas128.General{
 			Rows:   r,
 			Cols:   c,
@@ -95,7 +123,7 @@ func (m *CDense) reuseAsZeroed(r, c int) {
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
 	}
-	if m.IsZero() {
+	if m.IsEmpty() {
 		m.mat = cblas128.General{
 			Rows:   r,
 			Cols:   c,
@@ -115,6 +143,7 @@ func (m *CDense) reuseAsZeroed(r, c int) {
 // Reset zeros the dimensions of the matrix so that it can be reused as the
 // receiver of a dimensionally restricted operation.
 //
+// Reset should not be used when the matrix shares backing data.
 // See the Reseter interface for more information.
 func (m *CDense) Reset() {
 	// Row, Cols and Stride must be zeroed in unison.
@@ -123,9 +152,9 @@ func (m *CDense) Reset() {
 	m.mat.Data = m.mat.Data[:0]
 }
 
-// IsZero returns whether the receiver is zero-sized. Zero-sized matrices can be the
-// receiver for size-restricted operations. CDense matrices can be zeroed using Reset.
-func (m *CDense) IsZero() bool {
+// IsEmpty returns whether the receiver is empty. Empty matrices can be the
+// receiver for size-restricted operations. The receiver can be zeroed using Reset.
+func (m *CDense) IsEmpty() bool {
 	// It must be the case that m.Dims() returns
 	// zeros in this case. See comment in Reset().
 	return m.mat.Stride == 0
@@ -166,3 +195,8 @@ func (m *CDense) Copy(a CMatrix) (r, c int) {
 	}
 	return r, c
 }
+
+// RawCMatrix returns the underlying cblas128.General used by the receiver.
+// Changes to elements in the receiver following the call will be reflected
+// in returned cblas128.General.
+func (m *CDense) RawCMatrix() cblas128.General { return m.mat }

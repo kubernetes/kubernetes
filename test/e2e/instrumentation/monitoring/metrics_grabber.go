@@ -17,87 +17,86 @@ limitations under the License.
 package monitoring
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
-	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
-	gin "github.com/onsi/ginkgo"
-	gom "github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
 	var c, ec clientset.Interface
-	var grabber *metrics.Grabber
-	gin.BeforeEach(func() {
+	var grabber *e2emetrics.Grabber
+	var masterRegistered bool
+	ginkgo.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
-		framework.ExpectNoError(err)
-		grabber, err = metrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
-		framework.ExpectNoError(err)
-	})
-
-	gin.It("should grab all metrics from API server.", func() {
-		gin.By("Connecting to /metrics endpoint")
-		response, err := grabber.GrabFromAPIServer()
-		framework.ExpectNoError(err)
-		gom.Expect(response).NotTo(gom.BeEmpty())
-	})
-
-	gin.It("should grab all metrics from a Kubelet.", func() {
-		gin.By("Proxying to Node through the API server")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gom.Expect(nodes.Items).NotTo(gom.BeEmpty())
-		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
-		framework.ExpectNoError(err)
-		gom.Expect(response).NotTo(gom.BeEmpty())
-	})
-
-	gin.It("should grab all metrics from a Scheduler.", func() {
-		gin.By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-
-		var masterRegistered = false
 		for _, node := range nodes.Items {
 			if strings.HasSuffix(node.Name, "master") {
 				masterRegistered = true
 			}
 		}
+		gomega.Eventually(func() error {
+			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true, true)
+			if err != nil {
+				return fmt.Errorf("failed to create metrics grabber: %v", err)
+			}
+			if masterRegistered && !grabber.HasControlPlanePods() {
+				return fmt.Errorf("unable to get find control plane pods")
+			}
+			return nil
+		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
+	})
+
+	ginkgo.It("should grab all metrics from API server.", func() {
+		ginkgo.By("Connecting to /metrics endpoint")
+		response, err := grabber.GrabFromAPIServer()
+		framework.ExpectNoError(err)
+		gomega.Expect(response).NotTo(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should grab all metrics from a Kubelet.", func() {
+		ginkgo.By("Proxying to Node through the API server")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		response, err := grabber.GrabFromKubelet(node.Name)
+		framework.ExpectNoError(err)
+		gomega.Expect(response).NotTo(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should grab all metrics from a Scheduler.", func() {
+		ginkgo.By("Proxying to Pod through the API server")
 		if !masterRegistered {
-			e2elog.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
+			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 			return
 		}
 		response, err := grabber.GrabFromScheduler()
 		framework.ExpectNoError(err)
-		gom.Expect(response).NotTo(gom.BeEmpty())
+		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
-	gin.It("should grab all metrics from a ControllerManager.", func() {
-		gin.By("Proxying to Pod through the API server")
-		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-
-		var masterRegistered = false
-		for _, node := range nodes.Items {
-			if strings.HasSuffix(node.Name, "master") {
-				masterRegistered = true
-			}
-		}
+	ginkgo.It("should grab all metrics from a ControllerManager.", func() {
+		ginkgo.By("Proxying to Pod through the API server")
 		if !masterRegistered {
-			e2elog.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
+			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 			return
 		}
 		response, err := grabber.GrabFromControllerManager()
 		framework.ExpectNoError(err)
-		gom.Expect(response).NotTo(gom.BeEmpty())
+		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 })

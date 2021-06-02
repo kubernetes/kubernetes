@@ -35,7 +35,7 @@ func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 			return &svcPort, nil
 		}
 	}
-	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %q found for service %q", port, svc.Name))
+	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", port, svc.Name))
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.

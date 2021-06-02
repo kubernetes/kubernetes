@@ -54,6 +54,33 @@ stuff: 1
 	}
 }
 
+func TestBigYAML(t *testing.T) {
+	d := `
+stuff: 1
+`
+	maxLen := 5 * 1024 * 1024
+	bufferLen := 4 * 1024
+	//  maxLen 5 M
+	dd := strings.Repeat(d, 512*1024)
+	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd[:maxLen-1]))))
+	b := make([]byte, bufferLen)
+	n, err := r.Read(b)
+	if err != io.ErrShortBuffer {
+		t.Fatalf("expected ErrShortBuffer: %d / %v", n, err)
+	}
+	b = make([]byte, maxLen)
+	n, err = r.Read(b)
+	if err != nil {
+		t.Fatalf("expected nil: %d / %v", n, err)
+	}
+	r = NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd))))
+	b = make([]byte, maxLen)
+	n, err = r.Read(b)
+	if err != bufio.ErrTooLong {
+		t.Fatalf("bufio.Scanner: token too long: %d / %v", n, err)
+	}
+}
+
 func TestYAMLDecoderCallsAfterErrShortBufferRestOfFrame(t *testing.T) {
 	d := `---
 stuff: 1
@@ -215,8 +242,9 @@ func TestDecodeBrokenJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error with json: prefix, got no error")
 	}
-	if !strings.HasPrefix(err.Error(), "json: line 3:") {
-		t.Fatalf("expected %q to have 'json: line 3:' prefix", err.Error())
+	const msg = `json: offset 28: invalid character '"' after object key:value pair`
+	if msg != err.Error() {
+		t.Fatalf("expected %q, got %q", msg, err.Error())
 	}
 }
 
@@ -401,5 +429,46 @@ stuff: 1
 	}
 	if _, ok := err.(YAMLSyntaxError); !ok {
 		t.Fatalf("expected %q to be of type YAMLSyntaxError", err.Error())
+	}
+}
+
+func TestUnmarshal(t *testing.T) {
+	mapWithIntegerBytes := []byte(`replicas: 1`)
+	mapWithInteger := make(map[string]interface{})
+	if err := Unmarshal(mapWithIntegerBytes, &mapWithInteger); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := mapWithInteger["replicas"].(int64); !ok {
+		t.Fatalf(`Expected number in map to be int64 but got "%T"`, mapWithInteger["replicas"])
+	}
+
+	sliceWithIntegerBytes := []byte(`- 1`)
+	var sliceWithInteger []interface{}
+	if err := Unmarshal(sliceWithIntegerBytes, &sliceWithInteger); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := sliceWithInteger[0].(int64); !ok {
+		t.Fatalf(`Expected number in slice to be int64 but got "%T"`, sliceWithInteger[0])
+	}
+
+	integerBytes := []byte(`1`)
+	var integer interface{}
+	if err := Unmarshal(integerBytes, &integer); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := integer.(int64); !ok {
+		t.Fatalf(`Expected number to be int64 but got "%T"`, integer)
+	}
+
+	otherTypeBytes := []byte(`123: 2`)
+	otherType := make(map[int]interface{})
+	if err := Unmarshal(otherTypeBytes, &otherType); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := otherType[123].(int64); ok {
+		t.Fatalf(`Expected number not to be converted to int64`)
+	}
+	if _, ok := otherType[123].(float64); !ok {
+		t.Fatalf(`Expected number to be float64 but got "%T"`, otherType[123])
 	}
 }

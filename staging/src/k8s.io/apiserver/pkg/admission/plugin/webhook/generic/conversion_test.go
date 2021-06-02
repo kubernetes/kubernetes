@@ -104,7 +104,7 @@ func TestConvertToGVK(t *testing.T) {
 					},
 				},
 				Spec: example2v1.ReplicaSetSpec{
-					Replicas: func() *int32 { var i int32; i = 1; return &i }(),
+					Replicas: func() *int32 { var i int32 = 1; return &i }(),
 				},
 			},
 		},

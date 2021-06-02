@@ -28,7 +28,7 @@ run_kubectl_version_tests() {
   kube::log::status "Testing kubectl version"
   TEMP="${KUBE_TEMP}"
 
-  kubectl get "${kube_flags[@]}" --raw /version
+  kubectl get "${kube_flags[@]:?}" --raw /version
 
   # create version files, one for the client, one for the server.
   # these are the files we will use to ensure that the remainder output is correct

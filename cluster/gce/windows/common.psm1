@@ -19,8 +19,9 @@
 #>
 
 # IMPORTANT PLEASE NOTE:
-# Any time the file structure in the `windows` directory changes, `windows/BUILD`
-# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# Any time the file structure in the `windows` directory changes,
+# `windows/BUILD` and `k8s.io/release/lib/releaselib.sh` must be manually
+# updated with the changes.
 # We HIGHLY recommend not changing the file structure, because consumers of
 # Kubernetes releases depend on the release structure remaining stable.
 
@@ -45,6 +46,25 @@ function Log-Output {
   if (${Fatal}) {
     Exit 1
   }
+}
+
+# Dumps detailed information about the specified service to the console output.
+# $Delay can be set to a positive value to introduce some seconds of delay
+# before querying the service information, which may produce more consistent
+# results if this function is called immediately after changing a service's
+# configuration.
+function Write-VerboseServiceInfoToConsole {
+  param (
+    [parameter(Mandatory=$true)] [string]$Service,
+    [parameter(Mandatory=$false)] [int]$Delay = 0
+  )
+  if ($Delay -gt 0) {
+    Start-Sleep $Delay
+  }
+  Get-Service -ErrorAction Continue $Service | Select-Object * | Out-String
+  & sc.exe queryex $Service
+  & sc.exe qc $Service
+  & sc.exe qfailure $Service
 }
 
 # Checks if a file should be written or overwritten by testing if it already
@@ -106,67 +126,154 @@ function Get-InstanceMetadataAttribute {
   return Get-InstanceMetadata "attributes/$Key" $Default
 }
 
-function Validate-SHA1 {
+function Validate-SHA {
   param(
     [parameter(Mandatory=$true)] [string]$Hash,
-    [parameter(Mandatory=$true)] [string]$Path
+    [parameter(Mandatory=$true)] [string]$Path,
+    [parameter(Mandatory=$true)] [string]$Algorithm
   )
-  $actual = Get-FileHash -Path $Path -Algorithm SHA1
+  $actual = Get-FileHash -Path $Path -Algorithm $Algorithm
   # Note: Powershell string comparisons are case-insensitive by default, and this
   # is important here because Linux shell scripts produce lowercase hashes but
   # Powershell Get-FileHash produces uppercase hashes. This must be case-insensitive
   # to work.
   if ($actual.Hash -ne $Hash) {
-    Log-Output "$Path corrupted, sha1 $actual doesn't match expected $Hash"
-    Throw ("$Path corrupted, sha1 $actual doesn't match expected $Hash")
+    Log-Output "$Path corrupted, $Algorithm $actual doesn't match expected $Hash"
+    Throw ("$Path corrupted, $Algorithm $actual doesn't match expected $Hash")
   }
 }
 
 # Attempts to download the file from URLs, trying each URL until it succeeds.
 # It will loop through the URLs list forever until it has a success. If
 # successful, it will write the file to OutFile. You can optionally provide a
-# SHA1 Hash argument, in which case it will attempt to validate the downloaded
-# file against the hash.
+# Hash argument with an optional Algorithm, in which case it will attempt to
+# validate the downloaded file against the hash. SHA512 will be used if
+# -Algorithm is not provided.
+# This function is idempotent, if OutFile already exists and has the correct Hash
+# then the download will be skipped. If the Hash is incorrect, the file will be
+# overwritten.
 function MustDownload-File {
   param (
-    [parameter(Mandatory=$false)] [string]$Hash,
-    [parameter(Mandatory=$true)] [string]$OutFile,
-    [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs,
-    [parameter(Mandatory=$false)] [System.Collections.IDictionary]$Headers = @{}
+    [parameter(Mandatory = $false)] [string]$Hash,
+    [parameter(Mandatory = $false)] [string]$Algorithm = 'SHA512',
+    [parameter(Mandatory = $true)] [string]$OutFile,
+    [parameter(Mandatory = $true)] [System.Collections.Generic.List[String]]$URLs,
+    [parameter(Mandatory = $false)] [System.Collections.IDictionary]$Headers = @{},
+    [parameter(Mandatory = $false)] [int]$Attempts = 0
   )
 
-  While($true) {
-    ForEach($url in $URLs) {
-      # If the URL is for GCS and the node has dev storage scope, add the
-      # service account token to the request headers.
-      if (($url -match "^https://storage`.googleapis`.com.*") -and $(Check-StorageScope)) {
-        $Headers["Authorization"] = "Bearer $(Get-Credentials)"
-      }
+  # If the file is already downloaded and matches the expected hash, skip the download.
+  if ((Test-Path -Path $OutFile) -And -Not [string]::IsNullOrEmpty($Hash)) {
+    try {
+      Validate-SHA -Hash $Hash -Path $OutFile -Algorithm $Algorithm
+      Log-Output "Skip download of ${OutFile}, it already exists with expected hash."
+      return
+    }
+    catch {
+      # The hash does not match the file on disk.
+      # Proceed with the download and overwrite the file.
+      Log-Output "${OutFile} exists but had wrong hash. Redownloading."
+    }
+  }
 
-      # Attempt to download the file
-      Try {
-        # TODO(mtaufen): When we finally get a Windows version that has Powershell 6
-        # installed we can set `-MaximumRetryCount 6 -RetryIntervalSec 10` to make this even more robust.
-        $result = Invoke-WebRequest $url -Headers $Headers -OutFile $OutFile -TimeoutSec 300
-      } Catch {
+  $currentAttempt = 0
+  while ($true) {
+    foreach ($url in $URLs) {
+      if (($Attempts -ne 0) -And ($currentAttempt -Gt 5)) {
+        throw "Attempted to download ${url} ${currentAttempt} times. Giving up."
+      }
+      $currentAttempt++
+      try {
+        Get-RemoteFile -OutFile $OutFile -Url $url -Headers $Headers
+      }
+      catch {
         $message = $_.Exception.ToString()
-        Log-Output "Failed to download file from $url. Will retry. Error: $message"
+        Log-Output "Failed to download file from ${Url}. Will retry. Error: ${message}"
         continue
       }
       # Attempt to validate the hash
-      if ($Hash) {
-        Try {
-            Validate-SHA1 -Hash $Hash -Path $OutFile
-        } Catch {
-            $message = $_.Exception.ToString()
-            Log-Output "Hash validation of $url failed. Will retry. Error: $message"
-            continue
+      if (-Not [string]::IsNullOrEmpty($Hash)) {
+        try {
+          Validate-SHA -Hash $Hash -Path $OutFile -Algorithm $Algorithm
         }
-        Log-Output "Downloaded $url (SHA1 = $Hash)"
+        catch {
+          $message = $_.Exception.ToString()
+          Log-Output "Hash validation of ${url} failed. Will retry. Error: ${message}"
+          continue
+        }
+        Log-Output "Downloaded ${url} (${Algorithm} = ${Hash})"
         return
       }
-      Log-Output "Downloaded $url"
+      Log-Output "Downloaded ${url}"
       return
+    }
+  }
+}
+
+# Downloads a file via HTTP/HTTPS.
+# If the file is stored in GCS and this is running on a GCE node with a service account
+# with credentials that have the devstore.read_only auth scope the bearer token will be
+# automatically added to download the file.
+function Get-RemoteFile {
+  param (
+    [parameter(Mandatory = $true)] [string]$OutFile,
+    [parameter(Mandatory = $true)] [string]$Url,
+    [parameter(Mandatory = $false)] [System.Collections.IDictionary]$Headers = @{}
+  )
+
+  # Load the System.Net.Http assembly if it's not loaded yet.
+  if ("System.Net.Http.HttpClient" -as [type]) {} else {
+    Add-Type -AssemblyName System.Net.Http
+  }
+
+  $timeout = New-TimeSpan -Minutes 5
+
+  try {
+    # Use HttpClient in favor of WebClient.
+    # https://docs.microsoft.com/en-us/dotnet/api/system.net.webclient?view=net-5.0#remarks
+    $httpClient = New-Object -TypeName System.Net.Http.HttpClient
+    $httpClient.Timeout = $timeout
+    foreach ($key in $Headers.Keys) {
+      $httpClient.DefaultRequestHeaders.Add($key, $Headers[$key])
+    }
+    # If the URL is for GCS and the node has dev storage scope, add the
+    # service account OAuth2 bearer token to the request headers.
+    # https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances#applications
+    if (($Url -match "^https://storage`.googleapis`.com.*") -and $(Check-StorageScope)) {
+      $httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer $(Get-Credentials)")
+    }
+
+    # Attempt to download the file
+    $httpResponseMessage = $httpClient.GetAsync([System.Uri]::new($Url))
+    $httpResponseMessage.Wait()
+    if (-not $httpResponseMessage.IsCanceled) {
+      # Check if the request was successful.
+      #
+      # DO NOT replace with EnsureSuccessStatusCode(), it prints the
+      # OAuth2 bearer token.
+      if (-not $httpResponseMessage.Result.IsSuccessStatusCode) {
+        $statusCode = $httpResponseMessage.Result.StatusCode
+        throw "Downloading ${Url} returned status code ${statusCode}, retrying."
+      }
+      try {
+        $outFileStream = [System.IO.FileStream]::new($OutFile, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
+        $copyResult = $httpResponseMessage.Result.Content.CopyToAsync($outFileStream)
+        $copyResult.Wait()
+        $outFileStream.Close()
+        if ($null -ne $copyResult.Exception) {
+          throw $copyResult.Exception
+        }
+      }
+      finally {
+        if ($null -ne $outFileStream) {
+          $outFileStream.Dispose()
+        }
+      }
+    }
+  }
+  finally {
+    if ($null -ne $httpClient) {
+      $httpClient.Dispose()
     }
   }
 }
@@ -188,7 +295,7 @@ function Check-StorageScope {
   While($true) {
     $data = Get-InstanceMetadata -Key "service-accounts/default/scopes"
     if ($data) {
-      return ($data -match "auth/devstorage")
+      return ($data -match "auth/devstorage") -or ($data -match "auth/cloud-platform")
     }
     Start-Sleep -Seconds 1
   }
@@ -539,6 +646,37 @@ function Test-IsTestCluster {
     return $true
   }
   return $false
+}
+
+# Returns true if this node uses a plugin to support authentication to the
+# master, e.g. for TPM-based authentication. $KubeEnv is a hash table
+# containing the kube-env metadata keys+values.
+function Test-NodeUsesAuthPlugin {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  return $KubeEnv.Contains('EXEC_AUTH_PLUGIN_URL')
+}
+
+# Permanently adds a directory to the $env:PATH environment variable.
+function Add-MachineEnvironmentPath {
+  param (
+    [parameter(Mandatory=$true)] [string]$Path
+  )
+  # Verify that the $Path is not already in the $env:Path variable.
+  $pathForCompare = $Path.TrimEnd('\').ToLower()
+  foreach ($p in $env:Path.Split(";")) {
+    if ($p.TrimEnd('\').ToLower() -eq $pathForCompare) {
+        return
+    }
+  }
+
+  $newMachinePath = $Path + ";" + `
+    [System.Environment]::GetEnvironmentVariable("Path","Machine")
+  [Environment]::SetEnvironmentVariable("Path", $newMachinePath, `
+    [System.EnvironmentVariableTarget]::Machine)
+  $env:Path = $Path + ";" + $env:Path
 }
 
 # Export all public functions:

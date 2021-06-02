@@ -19,22 +19,17 @@ package proxy
 import (
 	"strings"
 	"testing"
-	"time"
 
 	apps "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/utils/pointer"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -50,7 +45,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		},
 		{
 			"duplication errors should be ignored",
-			apierrors.NewAlreadyExists(api.Resource(""), ""),
+			apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
 			false,
 		},
 		{
@@ -126,7 +121,7 @@ func TestCompileManifests(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			_, err := kubeadmutil.ParseTemplate(rt.manifest, rt.data)
 			if err != nil {
-				t.Errorf("unexpected ParseTemplate faiure: %+v", err)
+				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
 		})
 	}
@@ -173,20 +168,21 @@ func TestEnsureProxyAddon(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fake client and set up default test configuration
 			client := clientsetfake.NewSimpleClientset()
+
 			// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-			controlPlaneConfig := &kubeadmapiv1beta2.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
+			initConfiguration, err := configutil.DefaultedStaticInitConfiguration()
+			if err != nil {
+				t.Errorf("test failed to convert external to internal version: %v", err)
+				return
 			}
-			controlPlaneClusterConfig := &kubeadmapiv1beta2.ClusterConfiguration{
-				Networking: kubeadmapiv1beta2.Networking{
-					PodSubnet: "5.6.7.8/24",
-				},
-				ImageRepository:   "someRepo",
-				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+
+			initConfiguration.LocalAPIEndpoint = kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "1.2.3.4",
+				BindPort:         1234,
 			}
+
+			initConfiguration.ClusterConfiguration.Networking.PodSubnet = "5.6.7.8/24"
+			initConfiguration.ClusterConfiguration.ImageRepository = "someRepo"
 
 			// Simulate an error if necessary
 			switch tc.simError {
@@ -195,34 +191,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 					return true, nil, apierrors.NewUnauthorized("")
 				})
 			case InvalidControlPlaneEndpoint:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 			case IPv6SetBindAddress:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/96"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
+				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig, controlPlaneClusterConfig)
-			if err != nil {
-				t.Errorf("test failed to convert external to internal version")
-				return
-			}
-			intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
-				BindAddress:        "",
-				HealthzBindAddress: "0.0.0.0:10256",
-				MetricsBindAddress: "127.0.0.1:10249",
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					MaxPerCore:            pointer.Int32Ptr(1),
-					Min:                   pointer.Int32Ptr(1),
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				},
-			}
-			// Run dynamic defaulting again as we changed the internal cfg
-			if err := configutil.SetInitDynamicDefaults(intControlPlane); err != nil {
-				t.Errorf("test failed to set dynamic defaults: %v", err)
-				return
-			}
-			err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)
+			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client)
 
 			// Compare actual to expected errors
 			actErr := "No error"
@@ -239,18 +214,6 @@ func TestEnsureProxyAddon(t *testing.T) {
 					tc.name,
 					expErr,
 					actErr)
-			}
-			if intControlPlane.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
-				t.Errorf("%s test failed, expected: %s, got: %s",
-					tc.name,
-					tc.expBindAddr,
-					intControlPlane.ComponentConfigs.KubeProxy.BindAddress)
-			}
-			if intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
-				t.Errorf("%s test failed, expected: %s, got: %s",
-					tc.name,
-					tc.expClusterCIDR,
-					intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR)
 			}
 		})
 	}

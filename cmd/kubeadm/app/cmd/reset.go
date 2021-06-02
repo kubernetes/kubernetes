@@ -25,16 +25,15 @@ import (
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
@@ -42,15 +41,17 @@ import (
 var (
 	iptablesCleanupInstructions = dedent.Dedent(`
 		The reset process does not reset or clean up iptables rules or IPVS tables.
-		If you wish to reset iptables, you must do so manually.
-		For example:
-		iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+		If you wish to reset iptables, you must do so manually by using the "iptables" command.
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
 
 		The reset process does not clean your kubeconfig files and you must remove them manually.
 		Please, check the contents of the $HOME/.kube/config file.
+	`)
+
+	cniCleanupInstructions = dedent.Dedent(`
+		The reset process does not clean CNI configuration. To do so, you must remove /etc/cni/net.d
 	`)
 )
 
@@ -80,7 +81,7 @@ type resetData struct {
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
 func newResetOptions() *resetOptions {
 	return &resetOptions{
-		certificatesDir: kubeadmapiv1beta2.DefaultCertificatesDir,
+		certificatesDir: kubeadmapiv1.DefaultCertificatesDir,
 		forceReset:      false,
 		kubeconfigPath:  kubeadmconstants.GetAdminKubeConfigPath(),
 	}
@@ -93,7 +94,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -105,7 +106,6 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	if err != nil {
 		return nil, err
 	}
-	kubeadmutil.CheckErr(err)
 	if cfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
@@ -118,6 +118,9 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 			return nil, err
 		}
 		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+	} else {
+		criSocketPath = options.criSocketPath
+		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
 	}
 
 	return &resetData{
@@ -155,8 +158,8 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	cmdutil.AddCRISocketFlag(flagSet, &resetOptions.criSocketPath)
 }
 
-// NewCmdReset returns the "kubeadm reset" command
-func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
+// newCmdReset returns the "kubeadm reset" command
+func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()
 	}
@@ -164,20 +167,27 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'",
-		Run: func(cmd *cobra.Command, args []string) {
+		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := resetRunner.InitData(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			err = resetRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Then clean contents from the stateful kubelet, etcd and cni directories
 			data := c.(*resetData)
 			cleanDirs(data)
 
+			// output help text instructing user how to remove cni folders
+			fmt.Print(cniCleanupInstructions)
 			// Output help text instructing user how to remove iptables rules
 			fmt.Print(iptablesCleanupInstructions)
+			return nil
 		},
 	}
 
@@ -205,8 +215,10 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 func cleanDirs(data *resetData) {
 	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
 	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting content of %s", dir)
-		phases.CleanDir(dir)
+		klog.V(1).Infof("[reset] Deleting contents of %s", dir)
+		if err := phases.CleanDir(dir); err != nil {
+			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
+		}
 	}
 }
 

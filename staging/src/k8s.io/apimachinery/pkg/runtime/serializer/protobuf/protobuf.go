@@ -61,6 +61,7 @@ func (e errNotMarshalable) Status() metav1.Status {
 	}
 }
 
+// IsNotMarshalable checks the type of error, returns a boolean true if error is not nil and not marshalable false otherwise
 func IsNotMarshalable(err error) bool {
 	_, ok := err.(errNotMarshalable)
 	return err != nil && ok
@@ -77,6 +78,7 @@ func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Se
 	}
 }
 
+// Serializer handles encoding versioned objects into the proper wire form
 type Serializer struct {
 	prefix  []byte
 	creater runtime.ObjectCreater
@@ -86,6 +88,8 @@ type Serializer struct {
 var _ runtime.Serializer = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
+const serializerIdentifier runtime.Identifier = "protobuf"
+
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
 // the raw data will be extracted and no decoding will be performed. If into is not registered with the typer, then the object will
@@ -93,23 +97,6 @@ var _ recognizer.RecognizingDecoder = &Serializer{}
 // not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk. On success or most
 // errors, the method will return the calculated schema kind.
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		// the last item in versioned becomes into, so if versioned was not originally empty we reset the object
-		// array so the first position is the decoded object and the second position is the outermost object.
-		// if there were no objects in the versioned list passed to us, only add ourselves.
-		if into != nil && into != obj {
-			versioned.Objects = []runtime.Object{obj, into}
-		} else {
-			versioned.Objects = []runtime.Object{obj}
-		}
-		return versioned, actual, err
-	}
-
 	prefixLen := len(s.prefix)
 	switch {
 	case len(originalData) == 0:
@@ -133,7 +120,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
 		*intoUnknown = unk
-		if ok, _, _ := s.RecognizesData(bytes.NewBuffer(unk.Raw)); ok {
+		if ok, _, _ := s.RecognizesData(unk.Raw); ok {
 			intoUnknown.ContentType = runtime.ContentTypeProtobuf
 		}
 		return intoUnknown, &actual, nil
@@ -176,6 +163,13 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+	}
+	return s.doEncode(obj, w)
+}
+
+func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	prefixSize := uint64(len(s.prefix))
 
 	var unk runtime.Unknown
@@ -203,7 +197,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement
-		// the more efficient Size and MarshalTo methods
+		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
 		estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
 		data := make([]byte, estimatedSize)
@@ -245,20 +239,14 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	}
 }
 
+// Identifier implements runtime.Encoder interface.
+func (s *Serializer) Identifier() runtime.Identifier {
+	return serializerIdentifier
+}
+
 // RecognizesData implements the RecognizingDecoder interface.
-func (s *Serializer) RecognizesData(peek io.Reader) (bool, bool, error) {
-	prefix := make([]byte, 4)
-	n, err := peek.Read(prefix)
-	if err != nil {
-		if err == io.EOF {
-			return false, false, nil
-		}
-		return false, false, err
-	}
-	if n != 4 {
-		return false, false, nil
-	}
-	return bytes.Equal(s.prefix, prefix), false, nil
+func (s *Serializer) RecognizesData(data []byte) (bool, bool, error) {
+	return bytes.HasPrefix(data, s.prefix), false, nil
 }
 
 // copyKindDefaults defaults dst to the value in src if dst does not have a value set.
@@ -281,6 +269,12 @@ func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 type bufferedMarshaller interface {
 	proto.Sizer
 	runtime.ProtobufMarshaller
+}
+
+// Like bufferedMarshaller, but is able to marshal backwards, which is more efficient since it doesn't call Size() as frequently.
+type bufferedReverseMarshaller interface {
+	proto.Sizer
+	runtime.ProtobufReverseMarshaller
 }
 
 // estimateUnknownSize returns the expected bytes consumed by a given runtime.Unknown
@@ -315,6 +309,8 @@ type RawSerializer struct {
 
 var _ runtime.Serializer = &RawSerializer{}
 
+const rawSerializerIdentifier runtime.Identifier = "raw-protobuf"
+
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
 // the raw data will be extracted and no decoding will be performed. If into is not registered with the typer, then the object will
@@ -324,20 +320,6 @@ var _ runtime.Serializer = &RawSerializer{}
 func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	if into == nil {
 		return nil, nil, fmt.Errorf("this serializer requires an object to decode into: %#v", s)
-	}
-
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		if into != nil && into != obj {
-			versioned.Objects = []runtime.Object{obj, into}
-		} else {
-			versioned.Objects = []runtime.Object{obj}
-		}
-		return versioned, actual, err
 	}
 
 	if len(originalData) == 0 {
@@ -413,7 +395,27 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 
 // Encode serializes the provided object to the given writer. Overrides is ignored.
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+	}
+	return s.doEncode(obj, w)
+}
+
+func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
+	case bufferedReverseMarshaller:
+		// this path performs a single allocation during write but requires the caller to implement
+		// the more efficient Size and MarshalToSizedBuffer methods
+		encodedSize := uint64(t.Size())
+		data := make([]byte, encodedSize)
+
+		n, err := t.MarshalToSizedBuffer(data)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data[:n])
+		return err
+
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalTo methods
@@ -441,8 +443,15 @@ func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	}
 }
 
+// Identifier implements runtime.Encoder interface.
+func (s *RawSerializer) Identifier() runtime.Identifier {
+	return rawSerializerIdentifier
+}
+
+// LengthDelimitedFramer is exported variable of type lengthDelimitedFramer
 var LengthDelimitedFramer = lengthDelimitedFramer{}
 
+// Provides length delimited frame reader and writer methods
 type lengthDelimitedFramer struct{}
 
 // NewFrameWriter implements stream framing for this serializer

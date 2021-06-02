@@ -19,23 +19,27 @@ package lifecycle
 import (
 	"fmt"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/features"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
-type pluginResourceUpdateFuncType func(*schedulernodeinfo.NodeInfo, *PodAdmitAttributes) error
+type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error)
+	HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []PredicateFailureReason) ([]PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -46,7 +50,9 @@ type predicateAdmitHandler struct {
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
+// NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
+// if a pod can be admitted from the perspective of predicates.
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
@@ -57,7 +63,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.Errorf("Cannot get Node info: %v", err)
+		klog.ErrorS(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "InvalidNodeInfo",
@@ -66,12 +72,12 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
+	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
-		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "UnexpectedAdmissionError",
@@ -89,10 +95,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	fit, reasons, err := predicates.GeneralPredicates(podWithoutMissingExtendedResources, nil, nodeInfo)
+	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	fit := len(reasons) == 0 && err == nil
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+		klog.InfoS("Failed to admit pod, GeneralPredicates failed", "pod", klog.KObj(admitPod), "err", err)
 		return PodAdmitResult{
 			Admit:   fit,
 			Reason:  "UnexpectedAdmissionError",
@@ -100,10 +107,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	if !fit {
-		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
+		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
+		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnexpectedAdmissionError",
@@ -116,7 +124,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var message string
 		if len(reasons) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnknownReason",
@@ -126,22 +134,18 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		// If there are failed predicates, we only return the first one as a reason.
 		r := reasons[0]
 		switch re := r.(type) {
-		case *predicates.PredicateFailureError:
+		case *PredicateFailureError:
 			reason = re.PredicateName
 			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
-		case *predicates.InsufficientResourceError:
+			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
+		case *InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
-		case *predicates.FailureReason:
-			reason = re.GetReason()
-			message = fmt.Sprintf("Failure: %s", re.GetReason())
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
+			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
 			Admit:   fit,
@@ -154,7 +158,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 }
 
-func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *v1.Pod {
+func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
 	podCopy := pod.DeepCopy()
 	for i, c := range pod.Spec.Containers {
 		// We only handle requests in Requests but not Limits because the
@@ -163,7 +167,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.Nod
 		podCopy.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
 		for rName, rQuant := range c.Resources.Requests {
 			if v1helper.IsExtendedResourceName(rName) {
-				if _, found := nodeInfo.AllocatableResource().ScalarResources[rName]; !found {
+				if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 					continue
 				}
 			}
@@ -171,4 +175,79 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.Nod
 		}
 	}
 	return podCopy
+}
+
+// InsufficientResourceError is an error type that indicates what kind of resource limit is
+// hit and caused the unfitting failure.
+type InsufficientResourceError struct {
+	ResourceName v1.ResourceName
+	Requested    int64
+	Used         int64
+	Capacity     int64
+}
+
+func (e *InsufficientResourceError) Error() string {
+	return fmt.Sprintf("Node didn't have enough resource: %s, requested: %d, used: %d, capacity: %d",
+		e.ResourceName, e.Requested, e.Used, e.Capacity)
+}
+
+// PredicateFailureReason interface represents the failure reason of a predicate.
+type PredicateFailureReason interface {
+	GetReason() string
+}
+
+// GetReason returns the reason of the InsufficientResourceError.
+func (e *InsufficientResourceError) GetReason() string {
+	return fmt.Sprintf("Insufficient %v", e.ResourceName)
+}
+
+// GetInsufficientAmount returns the amount of the insufficient resource of the error.
+func (e *InsufficientResourceError) GetInsufficientAmount() int64 {
+	return e.Requested - (e.Capacity - e.Used)
+}
+
+// PredicateFailureError describes a failure error of predicate.
+type PredicateFailureError struct {
+	PredicateName string
+	PredicateDesc string
+}
+
+func (e *PredicateFailureError) Error() string {
+	return fmt.Sprintf("Predicate %s failed", e.PredicateName)
+}
+
+// GetReason returns the reason of the PredicateFailureError.
+func (e *PredicateFailureError) GetReason() string {
+	return e.PredicateDesc
+}
+
+// GeneralPredicates checks a group of predicates that the kubelet cares about.
+func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
+	if nodeInfo.Node() == nil {
+		return nil, fmt.Errorf("node not found")
+	}
+
+	var reasons []PredicateFailureReason
+	for _, r := range noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead)) {
+		reasons = append(reasons, &InsufficientResourceError{
+			ResourceName: r.ResourceName,
+			Requested:    r.Requested,
+			Used:         r.Used,
+			Capacity:     r.Capacity,
+		})
+	}
+
+	// Ignore parsing errors for backwards compatibility.
+	match, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
+	if !match {
+		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
+	}
+	if !nodename.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
+	}
+	if !nodeports.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
+	}
+
+	return reasons, nil
 }

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -21,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -41,7 +43,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/vsphere-volume/volumeDevices/
 	tmpVDir, err := utiltesting.MkTmpdir("vsphereBlockVolume")
 	if err != nil {
-		t.Fatalf("cant' make a temp dir: %s", err)
+		t.Fatalf("can't make a temp dir: %s", err)
 	}
 	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
@@ -49,23 +51,26 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	// Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("")
+	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Errorf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath)
+	spec, err := getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %s", err)
+	}
+	if spec.PersistentVolume.Name != "myVolume" {
+		t.Errorf("Invalid PV name from GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 	if spec.PersistentVolume.Spec.VsphereVolume.VolumePath != testVolumePath {
 		t.Fatalf("Invalid volumePath from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.VsphereVolume.VolumePath)
 	}
 	block := v1.PersistentVolumeBlock
 	specMode := spec.PersistentVolume.Spec.VolumeMode
-	if &specMode == nil {
-		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v expected: %v", &specMode, block)
+	if specMode == nil {
+		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v expected: %v", specMode, block)
 	}
 	if *specMode != block {
 		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v expected: %v", *specMode, block)
@@ -75,7 +80,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 func TestGetPodAndPluginMapPaths(t *testing.T) {
 	tmpVDir, err := utiltesting.MkTmpdir("vsphereBlockVolume")
 	if err != nil {
-		t.Fatalf("cant' make a temp dir: %s", err)
+		t.Fatalf("can't make a temp dir: %s", err)
 	}
 	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
@@ -85,7 +90,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 
 	spec := getTestVolume(true) // block volume
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plugin, err := pluginMgr.FindMapperPluginByName(vsphereVolumePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

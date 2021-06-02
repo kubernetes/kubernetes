@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -22,12 +24,19 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"k8s.io/klog/v2"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
 const (
-	metadataCacheTTL = time.Minute
-	metadataCacheKey = "InstanceMetadata"
-	metadataURL      = "http://169.254.169.254/metadata/instance"
+	metadataCacheTTL           = time.Minute
+	metadataCacheKey           = "InstanceMetadata"
+	imdsInstanceAPIVersion     = "2019-03-11"
+	imdsLoadBalancerAPIVersion = "2020-10-01"
+	imdsServer                 = "http://169.254.169.254"
+	imdsInstanceURI            = "/metadata/instance"
+	imdsLoadBalancerURI        = "/metadata/loadbalancer"
 )
 
 // NetworkMetadata contains metadata about an instance's network
@@ -50,8 +59,8 @@ type NetworkData struct {
 
 // IPAddress represents IP address information.
 type IPAddress struct {
-	PrivateIP string `json:"privateIPAddress"`
-	PublicIP  string `json:"publicIPAddress"`
+	PrivateIP string `json:"privateIpAddress"`
+	PublicIP  string `json:"publicIpAddress"`
 }
 
 // Subnet represents subnet information.
@@ -62,6 +71,7 @@ type Subnet struct {
 
 // ComputeMetadata represents compute information
 type ComputeMetadata struct {
+	Environment    string `json:"azEnvironment,omitempty"`
 	SKU            string `json:"sku,omitempty"`
 	Name           string `json:"name,omitempty"`
 	Zone           string `json:"zone,omitempty"`
@@ -72,6 +82,7 @@ type ComputeMetadata struct {
 	UpdateDomain   string `json:"platformUpdateDomain,omitempty"`
 	ResourceGroup  string `json:"resourceGroupName,omitempty"`
 	VMScaleSetName string `json:"vmScaleSetName,omitempty"`
+	SubscriptionID string `json:"subscriptionId,omitempty"`
 }
 
 // InstanceMetadata represents instance information.
@@ -80,19 +91,35 @@ type InstanceMetadata struct {
 	Network *NetworkMetadata `json:"network,omitempty"`
 }
 
+// PublicIPMetadata represents the public IP metadata.
+type PublicIPMetadata struct {
+	FrontendIPAddress string `json:"frontendIpAddress,omitempty"`
+	PrivateIPAddress  string `json:"privateIpAddress,omitempty"`
+}
+
+// LoadbalancerProfile represents load balancer profile in IMDS.
+type LoadbalancerProfile struct {
+	PublicIPAddresses []PublicIPMetadata `json:"publicIpAddresses,omitempty"`
+}
+
+// LoadBalancerMetadata represents load balancer metadata.
+type LoadBalancerMetadata struct {
+	LoadBalancer *LoadbalancerProfile `json:"loadbalancer,omitempty"`
+}
+
 // InstanceMetadataService knows how to query the Azure instance metadata server.
 type InstanceMetadataService struct {
-	metadataURL string
-	imsCache    *timedCache
+	imdsServer string
+	imsCache   *azcache.TimedCache
 }
 
 // NewInstanceMetadataService creates an instance of the InstanceMetadataService accessor object.
-func NewInstanceMetadataService(metadataURL string) (*InstanceMetadataService, error) {
+func NewInstanceMetadataService(imdsServer string) (*InstanceMetadataService, error) {
 	ims := &InstanceMetadataService{
-		metadataURL: metadataURL,
+		imdsServer: imdsServer,
 	}
 
-	imsCache, err := newTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
+	imsCache, err := azcache.NewTimedcache(metadataCacheTTL, ims.getMetadata)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +128,52 @@ func NewInstanceMetadataService(metadataURL string) (*InstanceMetadataService, e
 	return ims, nil
 }
 
-func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}, error) {
-	req, err := http.NewRequest("GET", ims.metadataURL, nil)
+func (ims *InstanceMetadataService) getMetadata(key string) (interface{}, error) {
+	instanceMetadata, err := ims.getInstanceMetadata(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if instanceMetadata.Network != nil && len(instanceMetadata.Network.Interface) > 0 {
+		netInterface := instanceMetadata.Network.Interface[0]
+		if (len(netInterface.IPV4.IPAddress) > 0 && len(netInterface.IPV4.IPAddress[0].PublicIP) > 0) ||
+			(len(netInterface.IPV6.IPAddress) > 0 && len(netInterface.IPV6.IPAddress[0].PublicIP) > 0) {
+			// Return if public IP address has already part of instance metadata.
+			return instanceMetadata, nil
+		}
+
+		loadBalancerMetadata, err := ims.getLoadBalancerMetadata()
+		if err != nil || loadBalancerMetadata == nil || loadBalancerMetadata.LoadBalancer == nil {
+			// Log a warning since loadbalancer metadata may not be available when the VM
+			// is not in standard LoadBalancer backend address pool.
+			klog.V(4).Infof("Warning: failed to get loadbalancer metadata: %v", err)
+			return instanceMetadata, nil
+		}
+
+		publicIPs := loadBalancerMetadata.LoadBalancer.PublicIPAddresses
+		if len(netInterface.IPV4.IPAddress) > 0 && len(netInterface.IPV4.IPAddress[0].PrivateIP) > 0 {
+			for _, pip := range publicIPs {
+				if pip.PrivateIPAddress == netInterface.IPV4.IPAddress[0].PrivateIP {
+					netInterface.IPV4.IPAddress[0].PublicIP = pip.FrontendIPAddress
+					break
+				}
+			}
+		}
+		if len(netInterface.IPV6.IPAddress) > 0 && len(netInterface.IPV6.IPAddress[0].PrivateIP) > 0 {
+			for _, pip := range publicIPs {
+				if pip.PrivateIPAddress == netInterface.IPV6.IPAddress[0].PrivateIP {
+					netInterface.IPV6.IPAddress[0].PublicIP = pip.FrontendIPAddress
+					break
+				}
+			}
+		}
+	}
+
+	return instanceMetadata, nil
+}
+
+func (ims *InstanceMetadataService) getInstanceMetadata(key string) (*InstanceMetadata, error) {
+	req, err := http.NewRequest("GET", ims.imdsServer+imdsInstanceURI, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +182,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 
 	q := req.URL.Query()
 	q.Add("format", "json")
-	q.Add("api-version", "2017-12-01")
+	q.Add("api-version", imdsInstanceAPIVersion)
 	req.URL.RawQuery = q.Encode()
 
 	client := &http.Client{}
@@ -121,7 +192,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
 	}
 
@@ -139,14 +210,53 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 	return &obj, nil
 }
 
-// GetMetadata gets instance metadata from cache.
-func (ims *InstanceMetadataService) GetMetadata() (*InstanceMetadata, error) {
-	cache, err := ims.imsCache.Get(metadataCacheKey)
+func (ims *InstanceMetadataService) getLoadBalancerMetadata() (*LoadBalancerMetadata, error) {
+	req, err := http.NewRequest("GET", ims.imdsServer+imdsLoadBalancerURI, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Metadata", "True")
+	req.Header.Add("User-Agent", "golang/kubernetes-cloud-provider")
+
+	q := req.URL.Query()
+	q.Add("format", "json")
+	q.Add("api-version", imdsLoadBalancerAPIVersion)
+	req.URL.RawQuery = q.Encode()
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failure of getting loadbalancer metadata with response %q", resp.Status)
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	// Cache shouldn't be nil, but added a check incase something wrong.
+	obj := LoadBalancerMetadata{}
+	err = json.Unmarshal(data, &obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &obj, nil
+}
+
+// GetMetadata gets instance metadata from cache.
+// crt determines if we can get data from stalled cache/need fresh if cache expired.
+func (ims *InstanceMetadataService) GetMetadata(crt azcache.AzureCacheReadType) (*InstanceMetadata, error) {
+	cache, err := ims.imsCache.Get(metadataCacheKey, crt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache shouldn't be nil, but added a check in case something is wrong.
 	if cache == nil {
 		return nil, fmt.Errorf("failure of getting instance metadata")
 	}

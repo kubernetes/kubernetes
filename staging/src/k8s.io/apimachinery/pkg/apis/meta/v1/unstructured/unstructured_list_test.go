@@ -71,7 +71,7 @@ func TestEmptyCreationTimestampIsOmitted(t *testing.T) {
 	// set an initial creationTimestamp and ensure the field exists
 	u.SetCreationTimestamp(now)
 	metadata := u.Object["metadata"].(map[string]interface{})
-	creationTimestamp, exists := metadata["creationTimestamp"]
+	_, exists := metadata["creationTimestamp"]
 	if !exists {
 		t.Fatalf("unexpected missing creationTimestamp")
 	}
@@ -79,7 +79,7 @@ func TestEmptyCreationTimestampIsOmitted(t *testing.T) {
 	// set an empty timestamp and ensure the field no longer exists
 	u.SetCreationTimestamp(metav1.Time{})
 	metadata = u.Object["metadata"].(map[string]interface{})
-	creationTimestamp, exists = metadata["creationTimestamp"]
+	creationTimestamp, exists := metadata["creationTimestamp"]
 	if exists {
 		t.Errorf("unexpected creation timestamp field: %q", creationTimestamp)
 	}

@@ -87,7 +87,7 @@ func (md *metricsDu) runFind(metrics *Metrics) error {
 // getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
 // info
 func (md *metricsDu) getFsInfo(metrics *Metrics) error {
-	available, capacity, _, inodes, inodesFree, _, err := fs.FsInfo(md.path)
+	available, capacity, _, inodes, inodesFree, _, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}

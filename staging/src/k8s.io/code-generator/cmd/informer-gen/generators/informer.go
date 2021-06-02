@@ -28,7 +28,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // informerGenerator produces a file of listers for a given GroupVersion and
@@ -151,13 +151,13 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(context.TODO(), options)
 			},
 			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(context.TODO(), options)
 			},
 		},
 		&$.type|raw${},

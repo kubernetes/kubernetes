@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,13 +62,13 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1beta1().Flunders(namespace).List(options)
+				return client.WardleV1beta1().Flunders(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1beta1().Flunders(namespace).Watch(options)
+				return client.WardleV1beta1().Flunders(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&wardlev1beta1.Flunder{},

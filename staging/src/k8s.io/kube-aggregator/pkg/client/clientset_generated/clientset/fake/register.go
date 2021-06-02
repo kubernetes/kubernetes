@@ -30,7 +30,7 @@ import (
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
-var parameterCodec = runtime.NewParameterCodec(scheme)
+
 var localSchemeBuilder = runtime.SchemeBuilder{
 	apiregistrationv1beta1.AddToScheme,
 	apiregistrationv1.AddToScheme,

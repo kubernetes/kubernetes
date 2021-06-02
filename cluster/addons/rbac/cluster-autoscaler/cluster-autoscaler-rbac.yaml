@@ -6,11 +6,11 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
   # leader election
-  - apiGroups: [""]
-    resources: ["endpoints"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
     verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["endpoints"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
     resourceNames: ["cluster-autoscaler"]
     verbs: ["get", "update", "patch", "delete"]
   # accessing & modifying cluster state (nodes & pods)
@@ -27,7 +27,7 @@ rules:
   - apiGroups: [""]
     resources: ["services", "replicationcontrollers", "persistentvolumes", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps", "extensions"]
+  - apiGroups: ["apps"]
     resources: ["daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
@@ -40,7 +40,7 @@ rules:
     resources: ["poddisruptionbudgets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
+    resources: ["storageclasses", "csinodes"]
     verbs: ["get", "list", "watch"]
   # misc access
   - apiGroups: [""]

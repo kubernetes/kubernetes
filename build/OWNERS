@@ -3,15 +3,21 @@
 reviewers:
   - bentheelder
   - cblecker
+  - dims
   - fejta
-  - jbeda
+  - hasheddan # Release Manager / SIG Technical Lead
+  - justaugustus # Release Manager / SIG Chair
   - lavalamp
+  - saschagrunert # Release Manager / SIG Chair
   - spiffxp
-  - zmerlynn
 approvers:
+  - bentheelder
   - cblecker
   - fejta
-  - jbeda
+  - justaugustus
   - lavalamp
   - mikedanese
+  - spiffxp
+emeritus_approvers:
+  - jbeda
   - zmerlynn

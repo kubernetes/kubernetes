@@ -61,6 +61,25 @@ type node struct {
 	owners []metav1.OwnerReference
 }
 
+// clone() must only be called from the single-threaded GraphBuilder.processGraphChanges()
+func (n *node) clone() *node {
+	c := &node{
+		identity:           n.identity,
+		dependents:         make(map[*node]struct{}, len(n.dependents)),
+		deletingDependents: n.deletingDependents,
+		beingDeleted:       n.beingDeleted,
+		virtual:            n.virtual,
+		owners:             make([]metav1.OwnerReference, 0, len(n.owners)),
+	}
+	for dep := range n.dependents {
+		c.dependents[dep] = struct{}{}
+	}
+	for _, owner := range n.owners {
+		c.owners = append(c.owners, owner)
+	}
+	return c
+}
+
 // An object is on a one way trip to its final deletion if it starts being
 // deleted, so we only provide a function to set beingDeleted to true.
 func (n *node) markBeingDeleted() {
@@ -83,7 +102,7 @@ func (n *node) markObserved() {
 func (n *node) isObserved() bool {
 	n.virtualLock.RLock()
 	defer n.virtualLock.RUnlock()
-	return n.virtual == false
+	return !n.virtual
 }
 
 func (n *node) markDeletingDependents() {
@@ -98,32 +117,32 @@ func (n *node) isDeletingDependents() bool {
 	return n.deletingDependents
 }
 
-func (ownerNode *node) addDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	ownerNode.dependents[dependent] = struct{}{}
+func (n *node) addDependent(dependent *node) {
+	n.dependentsLock.Lock()
+	defer n.dependentsLock.Unlock()
+	n.dependents[dependent] = struct{}{}
 }
 
-func (ownerNode *node) deleteDependent(dependent *node) {
-	ownerNode.dependentsLock.Lock()
-	defer ownerNode.dependentsLock.Unlock()
-	delete(ownerNode.dependents, dependent)
+func (n *node) deleteDependent(dependent *node) {
+	n.dependentsLock.Lock()
+	defer n.dependentsLock.Unlock()
+	delete(n.dependents, dependent)
 }
 
-func (ownerNode *node) dependentsLength() int {
-	ownerNode.dependentsLock.RLock()
-	defer ownerNode.dependentsLock.RUnlock()
-	return len(ownerNode.dependents)
+func (n *node) dependentsLength() int {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
+	return len(n.dependents)
 }
 
 // Note that this function does not provide any synchronization guarantees;
 // items could be added to or removed from ownerNode.dependents the moment this
 // function returns.
-func (ownerNode *node) getDependents() []*node {
-	ownerNode.dependentsLock.RLock()
-	defer ownerNode.dependentsLock.RUnlock()
+func (n *node) getDependents() []*node {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
 	var ret []*node
-	for dep := range ownerNode.dependents {
+	for dep := range n.dependents {
 		ret = append(ret, dep)
 	}
 	return ret
@@ -146,6 +165,23 @@ func (n *node) blockingDependents() []*node {
 		}
 	}
 	return ret
+}
+
+// ownerReferenceCoordinates returns an owner reference containing only the coordinate fields
+// from the input reference (uid, name, kind, apiVersion)
+func ownerReferenceCoordinates(ref metav1.OwnerReference) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		UID:        ref.UID,
+		Name:       ref.Name,
+		Kind:       ref.Kind,
+		APIVersion: ref.APIVersion,
+	}
+}
+
+// ownerReferenceMatchesCoordinates returns true if all of the coordinate fields match
+// between the two references (uid, name, kind, apiVersion)
+func ownerReferenceMatchesCoordinates(a, b metav1.OwnerReference) bool {
+	return a.UID == b.UID && a.Name == b.Name && a.Kind == b.Kind && a.APIVersion == b.APIVersion
 }
 
 // String renders node as a string using fmt. Acquires a read lock to ensure the

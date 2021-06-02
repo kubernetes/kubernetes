@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,21 +23,22 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"time"
+
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary endpoint for volume plugins
@@ -52,7 +55,8 @@ var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
 var _ volume.ExpandableVolumePlugin = &azureFilePlugin{}
 
 const (
-	azureFilePluginName = "kubernetes.io/azure-file"
+	azureFilePluginName     = "kubernetes.io/azure-file"
+	minimumPremiumShareSize = 100 // GB
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -83,12 +87,7 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
 
-func (plugin *azureFilePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
-}
-
-func (plugin *azureFilePlugin) RequiresRemount() bool {
+func (plugin *azureFilePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -118,6 +117,11 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		return nil, err
 	}
 	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, pod.Namespace)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.Errorf("get secret name and namespace from pod(%s) return with error: %v", pod.Name, err)
+	}
 	return &azureFileMounter{
 		azureFile: &azureFile{
 			volName:         spec.Name(),
@@ -162,9 +166,12 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, fmt.Errorf("invalid PV spec")
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		return oldSize, err
+	}
+	if spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation] != "" {
+		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
 	}
 
 	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
@@ -172,12 +179,18 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	accountName, accountKey, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
+	accountName, _, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
 	if err != nil {
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volumehelpers.RoundUpToGiB(newSize))); err != nil {
+	requestGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
+
+	if err != nil {
+		return oldSize, err
+	}
+
+	if err := azure.ResizeFileShare(resourceGroup, accountName, shareName, requestGiB); err != nil {
 		return oldSize, err
 	}
 
@@ -261,7 +274,6 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 			klog.Errorf("azureFile - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
-		notMnt = true
 	}
 
 	var accountKey, accountName string
@@ -269,19 +281,22 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		return err
 	}
 
-	mountOptions := []string{}
+	var mountOptions []string
+	var sensitiveMountOptions []string
 	source := ""
 	osSeparator := string(os.PathSeparator)
 	source = fmt.Sprintf("%s%s%s.file.%s%s%s", osSeparator, osSeparator, accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), osSeparator, b.shareName)
 
 	if runtime.GOOS == "windows" {
-		mountOptions = []string{fmt.Sprintf("AZURE\\%s", accountName), accountKey}
+		mountOptions = []string{fmt.Sprintf("AZURE\\%s", accountName)}
+		sensitiveMountOptions = []string{accountKey}
 	} else {
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
 		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-		options := []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
+		options := []string{}
+		sensitiveMountOptions = []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
 		if b.readOnly {
 			options = append(options, "ro")
 		}
@@ -289,7 +304,15 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		mountOptions = appendDefaultMountOptions(mountOptions, mounterArgs.FsGroup)
 	}
 
-	err = b.mounter.Mount(source, dir, "cifs", mountOptions)
+	mountComplete := false
+	err = wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
+		err := b.mounter.MountSensitiveWithoutSystemd(source, dir, "cifs", mountOptions, sensitiveMountOptions)
+		mountComplete = true
+		return true, err
+	})
+	if !mountComplete {
+		return fmt.Errorf("volume(%s) mount on %s timeout(10m)", source, dir)
+	}
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
@@ -374,7 +397,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
 	azure, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azure == nil {
-		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return azure, nil

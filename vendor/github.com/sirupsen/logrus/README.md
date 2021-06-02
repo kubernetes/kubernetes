@@ -1,7 +1,27 @@
-# Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:"/>&nbsp;[![Build Status](https://travis-ci.org/sirupsen/logrus.svg?branch=master)](https://travis-ci.org/sirupsen/logrus)&nbsp;[![GoDoc](https://godoc.org/github.com/sirupsen/logrus?status.svg)](https://godoc.org/github.com/sirupsen/logrus)
+# Logrus <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:"/> [![Build Status](https://travis-ci.org/sirupsen/logrus.svg?branch=master)](https://travis-ci.org/sirupsen/logrus) [![GoDoc](https://godoc.org/github.com/sirupsen/logrus?status.svg)](https://godoc.org/github.com/sirupsen/logrus)
 
 Logrus is a structured logger for Go (golang), completely API compatible with
 the standard library logger.
+
+**Logrus is in maintenance-mode.** We will not be introducing new features. It's
+simply too hard to do in a way that won't break many people's projects, which is
+the last thing you want from your Logging library (again...).
+
+This does not mean Logrus is dead. Logrus will continue to be maintained for
+security, (backwards compatible) bug fixes, and performance (where we are
+limited by the interface). 
+
+I believe Logrus' biggest contribution is to have played a part in today's
+widespread use of structured logging in Golang. There doesn't seem to be a
+reason to do a major, breaking iteration into Logrus V2, since the fantastic Go
+community has built those independently. Many fantastic alternatives have sprung
+up. Logrus would look like those, had it been re-designed with what we know
+about structured logging in Go today. Check out, for example,
+[Zerolog][zerolog], [Zap][zap], and [Apex][apex].
+
+[zerolog]: https://github.com/rs/zerolog
+[zap]: https://github.com/uber-go/zap
+[apex]: https://github.com/apex/log
 
 **Seeing weird case-sensitive problems?** It's in the past been possible to
 import Logrus as both upper- and lower-case. Due to the Go package environment,
@@ -14,11 +34,6 @@ To fix Glide, see [these
 comments](https://github.com/sirupsen/logrus/issues/553#issuecomment-306591437).
 For an in-depth explanation of the casing issue, see [this
 comment](https://github.com/sirupsen/logrus/issues/570#issuecomment-313933276).
-
-**Are you interested in assisting in maintaining Logrus?** Currently I have a
-lot of obligations, and I am unable to provide Logrus with the maintainership it
-needs. If you'd like to help, please reach out to me at `simon at author's
-username dot com`.
 
 Nicely color-coded in development (when a TTY is attached, otherwise just
 plain text):
@@ -187,7 +202,7 @@ func main() {
   log.Out = os.Stdout
 
   // You could set this to any `io.Writer` such as a file
-  // file, err := os.OpenFile("logrus.log", os.O_CREATE|os.O_WRONLY, 0666)
+  // file, err := os.OpenFile("logrus.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
   // if err == nil {
   //  log.Out = file
   // } else {
@@ -272,7 +287,7 @@ func init() {
 ```
 Note: Syslog hook also support connecting to local syslog (Ex. "/dev/log" or "/var/run/syslog" or "/var/run/log"). For the detail, please check the [syslog hook README](hooks/syslog/README.md).
 
-A list of currently known of service hook can be found in this wiki [page](https://github.com/sirupsen/logrus/wiki/Hooks)
+A list of currently known service hooks can be found in this wiki [page](https://github.com/sirupsen/logrus/wiki/Hooks)
 
 
 #### Level logging
@@ -354,6 +369,7 @@ The built-in logging formatters are:
     [github.com/mattn/go-colorable](https://github.com/mattn/go-colorable).
   * When colors are enabled, levels are truncated to 4 characters by default. To disable
     truncation set the `DisableLevelTruncation` field to `true`.
+  * When outputting to a TTY, it's often helpful to visually scan down a column where all the levels are the same width. Setting the `PadLevelText` field to `true` enables this behavior, by adding padding to the level text.
   * All options are listed in the [generated docs](https://godoc.org/github.com/sirupsen/logrus#TextFormatter).
 * `logrus.JSONFormatter`. Logs fields as JSON.
   * All options are listed in the [generated docs](https://godoc.org/github.com/sirupsen/logrus#JSONFormatter).
@@ -361,9 +377,13 @@ The built-in logging formatters are:
 Third party logging formatters:
 
 * [`FluentdFormatter`](https://github.com/joonix/log). Formats entries that can be parsed by Kubernetes and Google Container Engine.
+* [`GELF`](https://github.com/fabienm/go-logrus-formatters). Formats entries so they comply to Graylog's [GELF 1.1 specification](http://docs.graylog.org/en/2.4/pages/gelf.html).
 * [`logstash`](https://github.com/bshuster-repo/logrus-logstash-hook). Logs fields as [Logstash](http://logstash.net) Events.
 * [`prefixed`](https://github.com/x-cray/logrus-prefixed-formatter). Displays log entry source along with alternative layout.
-* [`zalgo`](https://github.com/aybabtme/logzalgo). Invoking the P͉̫o̳̼̊w̖͈̰͎e̬͔̭͂r͚̼̹̲ ̫͓͉̳͈ō̠͕͖̚f̝͍̠ ͕̲̞͖͑Z̖̫̤̫ͪa͉̬͈̗l͖͎g̳̥o̰̥̅!̣͔̲̻͊̄ ̙̘̦̹̦.
+* [`zalgo`](https://github.com/aybabtme/logzalgo). Invoking the Power of Zalgo.
+* [`nested-logrus-formatter`](https://github.com/antonfisher/nested-logrus-formatter). Converts logrus fields to a nested structure.
+* [`powerful-logrus-formatter`](https://github.com/zput/zxcTool). get fileName, log's line number and the latest function's name when print log; Sava log to files.
+* [`caption-json-formatter`](https://github.com/nolleh/caption_json_formatter). logrus's message json formatter with human-readable caption added.
 
 You can define your formatter by implementing the `Formatter` interface,
 requiring a `Format` method. `Format` takes an `*Entry`. `entry.Data` is a
@@ -428,14 +448,14 @@ entries. It should not be a feature of the application-level logger.
 
 | Tool | Description |
 | ---- | ----------- |
-|[Logrus Mate](https://github.com/gogap/logrus_mate)|Logrus mate is a tool for Logrus to manage loggers, you can initial logger's level, hook and formatter by config file, the logger will generated with different config at different environment.|
+|[Logrus Mate](https://github.com/gogap/logrus_mate)|Logrus mate is a tool for Logrus to manage loggers, you can initial logger's level, hook and formatter by config file, the logger will be generated with different configs in different environments.|
 |[Logrus Viper Helper](https://github.com/heirko/go-contrib/tree/master/logrusHelper)|An Helper around Logrus to wrap with spf13/Viper to load configuration with fangs! And to simplify Logrus configuration use some behavior of [Logrus Mate](https://github.com/gogap/logrus_mate). [sample](https://github.com/heirko/iris-contrib/blob/master/middleware/logrus-logger/example) |
 
 #### Testing
 
 Logrus has a built in facility for asserting the presence of log messages. This is implemented through the `test` hook and provides:
 
-* decorators for existing logger (`test.NewLocal` and `test.NewGlobal`) which basically just add the `test` hook
+* decorators for existing logger (`test.NewLocal` and `test.NewGlobal`) which basically just adds the `test` hook
 * a test logger (`test.NewNullLogger`) that just records log messages (and does not output any):
 
 ```go
@@ -463,7 +483,7 @@ func TestSomething(t*testing.T){
 
 Logrus can register one or more functions that will be called when any `fatal`
 level message is logged. The registered handlers will be executed before
-logrus performs a `os.Exit(1)`. This behavior may be helpful if callers need
+logrus performs an `os.Exit(1)`. This behavior may be helpful if callers need
 to gracefully shutdown. Unlike a `panic("Something went wrong...")` call which can be intercepted with a deferred `recover` a call to `os.Exit(1)` can not be intercepted.
 
 ```
@@ -488,6 +508,6 @@ Situation when locking is not needed includes:
 
   1) logger.Out is protected by locks.
 
-  2) logger.Out is a os.File handler opened with `O_APPEND` flag, and every write is smaller than 4k. (This allow multi-thread/multi-process writing)
+  2) logger.Out is an os.File handler opened with `O_APPEND` flag, and every write is smaller than 4k. (This allows multi-thread/multi-process writing)
 
      (Refer to http://www.notthewizard.com/2014/06/17/are-files-appends-really-atomic/)

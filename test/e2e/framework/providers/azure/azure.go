@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
@@ -38,7 +39,7 @@ func newProvider() (framework.ProviderInterface, error) {
 	}
 	config, err := os.Open(framework.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
-		e2elog.Logf("Couldn't open cloud provider configuration %s: %#v",
+		framework.Logf("Couldn't open cloud provider configuration %s: %#v",
 			framework.TestContext.CloudConfig.ConfigFile, err)
 	}
 	defer config.Close()
@@ -63,17 +64,29 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
 	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
-	_, diskURI, _, err := p.azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
-	if err != nil {
-		return "", err
+
+	volumeOptions := &azure.ManagedDiskOptions{
+		DiskName:           pdName,
+		StorageAccountType: compute.StandardLRS,
+		ResourceGroup:      "",
+		PVCName:            pdName,
+		SizeGB:             1,
+		Tags:               nil,
+		DiskIOPSReadWrite:  "",
+		DiskMBpsReadWrite:  "",
 	}
-	return diskURI, nil
+
+	// do not use blank zone definition
+	if len(zone) > 0 {
+		volumeOptions.AvailabilityZone = zone
+	}
+	return p.azureCloud.CreateManagedDisk(volumeOptions)
 }
 
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
-	if err := p.azureCloud.DeleteVolume(pdName); err != nil {
-		e2elog.Logf("failed to delete Azure volume %q: %v", pdName, err)
+	if err := p.azureCloud.DeleteManagedDisk(pdName); err != nil {
+		framework.Logf("failed to delete Azure volume %q: %v", pdName, err)
 		return err
 	}
 	return nil

@@ -32,6 +32,10 @@ func (client *QuobyteClient) GetAPIRetryPolicy() string {
 	return client.apiRetryPolicy
 }
 
+func (client *QuobyteClient) SetTransport(t http.RoundTripper) {
+	client.client.Transport = t
+}
+
 // NewQuobyteClient creates a new Quobyte API client
 func NewQuobyteClient(url string, username string, password string) *QuobyteClient {
 	return &QuobyteClient{

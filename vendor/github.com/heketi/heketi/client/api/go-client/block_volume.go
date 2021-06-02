@@ -16,7 +16,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
@@ -52,7 +51,7 @@ func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
 		return nil, utils.GetErrorFromResponse(r)
 	}
 
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func (c *Client) BlockVolumeDelete(id string) error {
 		return utils.GetErrorFromResponse(r)
 	}
 
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}
@@ -157,4 +156,57 @@ func (c *Client) BlockVolumeDelete(id string) error {
 	}
 
 	return nil
+}
+
+func (c *Client) BlockVolumeExpand(id string, request *api.BlockVolumeExpandRequest) (
+	*api.BlockVolumeInfoResponse, error) {
+
+	// Marshal request to JSON
+	buffer, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a request
+	req, err := http.NewRequest("POST",
+		c.host+"/blockvolumes/"+id+"/expand",
+		bytes.NewBuffer(buffer))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send request
+	r, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusAccepted {
+		return nil, utils.GetErrorFromResponse(r)
+	}
+
+	// Wait for response
+	r, err = c.pollResponse(r)
+	if err != nil {
+		return nil, err
+	}
+	if r.StatusCode != http.StatusOK {
+		return nil, utils.GetErrorFromResponse(r)
+	}
+
+	// Read JSON response
+	var blockvolume api.BlockVolumeInfoResponse
+	err = utils.GetJsonFromResponse(r, &blockvolume)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blockvolume, nil
 }

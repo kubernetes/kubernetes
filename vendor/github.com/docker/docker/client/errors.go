@@ -24,8 +24,7 @@ func (err errConnectionFailed) Error() string {
 
 // IsErrConnectionFailed returns true if the error is caused by connection failed.
 func IsErrConnectionFailed(err error) bool {
-	_, ok := errors.Cause(err).(errConnectionFailed)
-	return ok
+	return errors.As(err, &errConnectionFailed{})
 }
 
 // ErrorConnectionFailed returns an error with host in the error message when connection to docker daemon failed.
@@ -42,8 +41,9 @@ type notFound interface {
 // IsErrNotFound returns true if the error is a NotFound error, which is returned
 // by the API when some object is not found.
 func IsErrNotFound(err error) bool {
-	if _, ok := err.(notFound); ok {
-		return ok
+	var e notFound
+	if errors.As(err, &e) {
+		return true
 	}
 	return errdefs.IsNotFound(err)
 }

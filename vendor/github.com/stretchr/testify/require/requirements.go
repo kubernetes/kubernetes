@@ -22,8 +22,8 @@ type ValueAssertionFunc func(TestingT, interface{}, ...interface{})
 // for table driven tests.
 type BoolAssertionFunc func(TestingT, bool, ...interface{})
 
-// ValuesAssertionFunc is a common function prototype when validating an error value.  Can be useful
+// ErrorAssertionFunc is a common function prototype when validating an error value.  Can be useful
 // for table driven tests.
 type ErrorAssertionFunc func(TestingT, error, ...interface{})
 
-//go:generate go run ../_codegen/main.go -output-package=require -template=require.go.tmpl -include-format-funcs
+//go:generate sh -c "cd ../_codegen && go build && cd - && ../_codegen/_codegen -output-package=require -template=require.go.tmpl -include-format-funcs"

@@ -1,3 +1,61 @@
+# 1.6.0
+Fixes:
+  * end of line cleanup
+  * revert the entry concurrency bug fix whic leads to deadlock under some circumstances
+  * update dependency on go-windows-terminal-sequences to fix a crash with go 1.14
+
+Features:
+  * add an option to the `TextFormatter` to completely disable fields quoting
+
+# 1.5.0
+Code quality:
+  * add golangci linter run on travis
+
+Fixes:
+  * add mutex for hooks concurrent access on `Entry` data
+  * caller function field for go1.14
+  * fix build issue for gopherjs target
+
+Feature:
+  * add an hooks/writer sub-package whose goal is to split output on different stream depending on the trace level
+  * add a `DisableHTMLEscape` option in the `JSONFormatter`
+  * add `ForceQuote` and `PadLevelText` options in the `TextFormatter`
+
+# 1.4.2
+  * Fixes build break for plan9, nacl, solaris
+# 1.4.1
+This new release introduces:
+  * Enhance TextFormatter to not print caller information when they are empty (#944)
+  * Remove dependency on golang.org/x/crypto (#932, #943)
+
+Fixes:
+  * Fix Entry.WithContext method to return a copy of the initial entry (#941)
+
+# 1.4.0
+This new release introduces:
+  * Add `DeferExitHandler`, similar to `RegisterExitHandler` but prepending the handler to the list of handlers (semantically like `defer`) (#848).
+  * Add `CallerPrettyfier` to `JSONFormatter` and `TextFormatter` (#909, #911)
+  * Add `Entry.WithContext()` and `Entry.Context`, to set a context on entries to be used e.g. in hooks (#919).
+
+Fixes:
+  * Fix wrong method calls `Logger.Print` and `Logger.Warningln` (#893).
+  * Update `Entry.Logf` to not do string formatting unless the log level is enabled (#903)
+  * Fix infinite recursion on unknown `Level.String()` (#907)
+  * Fix race condition in `getCaller` (#916).
+
+
+# 1.3.0
+This new release introduces:
+  * Log, Logf, Logln functions for Logger and Entry that take a Level
+
+Fixes:
+  * Building prometheus node_exporter on AIX (#840)
+  * Race condition in TextFormatter (#468)
+  * Travis CI import path (#868)
+  * Remove coloured output on Windows (#862)
+  * Pointer to func as field in JSONFormatter (#870)
+  * Properly marshal Levels (#873)
+
 # 1.2.0
 This new release introduces:
   * A new method `SetReportCaller` in the `Logger` to enable the file, line and calling function from which the trace has been issued

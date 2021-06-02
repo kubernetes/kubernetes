@@ -26,8 +26,10 @@ import (
 )
 
 // EndpointsLister helps list Endpoints.
+// All objects returned here must be treated as read-only.
 type EndpointsLister interface {
 	// List lists all Endpoints in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Endpoints, err error)
 	// Endpoints returns an object that can list and get Endpoints.
 	Endpoints(namespace string) EndpointsNamespaceLister
@@ -58,10 +60,13 @@ func (s *endpointsLister) Endpoints(namespace string) EndpointsNamespaceLister {
 }
 
 // EndpointsNamespaceLister helps list and get Endpoints.
+// All objects returned here must be treated as read-only.
 type EndpointsNamespaceLister interface {
 	// List lists all Endpoints in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Endpoints, err error)
 	// Get retrieves the Endpoints from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Endpoints, error)
 	EndpointsNamespaceListerExpansion
 }

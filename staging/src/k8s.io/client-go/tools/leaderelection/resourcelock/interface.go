@@ -17,7 +17,11 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"fmt"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +34,8 @@ const (
 	EndpointsResourceLock             = "endpoints"
 	ConfigMapsResourceLock            = "configmaps"
 	LeasesResourceLock                = "leases"
+	EndpointsLeasesResourceLock       = "endpointsleases"
+	ConfigMapsLeasesResourceLock      = "configmapsleases"
 )
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -71,13 +77,13 @@ type ResourceLockConfig struct {
 // by the leaderelection code.
 type Interface interface {
 	// Get returns the LeaderElectionRecord
-	Get() (*LeaderElectionRecord, error)
+	Get(ctx context.Context) (*LeaderElectionRecord, []byte, error)
 
 	// Create attempts to create a LeaderElectionRecord
-	Create(ler LeaderElectionRecord) error
+	Create(ctx context.Context, ler LeaderElectionRecord) error
 
 	// Update will update and existing LeaderElectionRecord
-	Update(ler LeaderElectionRecord) error
+	Update(ctx context.Context, ler LeaderElectionRecord) error
 
 	// RecordEvent is used to record events
 	RecordEvent(string)
@@ -92,35 +98,64 @@ type Interface interface {
 
 // Manufacture will create a lock of a given type according to the input parameters
 func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
+	endpointsLock := &EndpointsLock{
+		EndpointsMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coreClient,
+		LockConfig: rlc,
+	}
+	configmapLock := &ConfigMapLock{
+		ConfigMapMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coreClient,
+		LockConfig: rlc,
+	}
+	leaseLock := &LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coordinationClient,
+		LockConfig: rlc,
+	}
 	switch lockType {
 	case EndpointsResourceLock:
-		return &EndpointsLock{
-			EndpointsMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coreClient,
-			LockConfig: rlc,
-		}, nil
+		return endpointsLock, nil
 	case ConfigMapsResourceLock:
-		return &ConfigMapLock{
-			ConfigMapMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coreClient,
-			LockConfig: rlc,
-		}, nil
+		return configmapLock, nil
 	case LeasesResourceLock:
-		return &LeaseLock{
-			LeaseMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coordinationClient,
-			LockConfig: rlc,
+		return leaseLock, nil
+	case EndpointsLeasesResourceLock:
+		return &MultiLock{
+			Primary:   endpointsLock,
+			Secondary: leaseLock,
+		}, nil
+	case ConfigMapsLeasesResourceLock:
+		return &MultiLock{
+			Primary:   configmapLock,
+			Secondary: leaseLock,
 		}, nil
 	default:
 		return nil, fmt.Errorf("Invalid lock-type %s", lockType)
 	}
+}
+
+// NewFromKubeconfig will create a lock of a given type according to the input parameters.
+// Timeout set for a client used to contact to Kubernetes should be lower than
+// RenewDeadline to keep a single hung request from forcing a leader loss.
+// Setting it to max(time.Second, RenewDeadline/2) as a reasonable heuristic.
+func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLockConfig, kubeconfig *restclient.Config, renewDeadline time.Duration) (Interface, error) {
+	// shallow copy, do not modify the kubeconfig
+	config := *kubeconfig
+	timeout := renewDeadline / 2
+	if timeout < time.Second {
+		timeout = time.Second
+	}
+	config.Timeout = timeout
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
+	return New(lockType, ns, name, leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), rlc)
 }

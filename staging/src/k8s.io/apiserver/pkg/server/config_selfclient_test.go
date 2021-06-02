@@ -19,6 +19,8 @@ package server
 import (
 	"net"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 )
 
 func TestLoopbackHostPortIPv4(t *testing.T) {
@@ -58,7 +60,7 @@ func TestLoopbackHostPortIPv6(t *testing.T) {
 		t.Fatalf("fail to enumerate network interface, %s", err)
 	}
 	if !ipv6 {
-		t.Fatalf("no ipv6 loopback interface")
+		t.Skip("no ipv6 loopback interface")
 	}
 
 	host, port, err := LoopbackHostPort("[ff06:0:0:0:0:0:0:c3]:443")
@@ -95,7 +97,7 @@ func isIPv6LoopbackSupported() (ipv6 bool, ipv6only bool, err error) {
 		if !ok || !ipnet.IP.IsLoopback() {
 			continue
 		}
-		if ipnet.IP.To4() == nil {
+		if netutils.IsIPv6(ipnet.IP) {
 			ipv6 = true
 			continue
 		}

@@ -110,7 +110,7 @@ func (c *Client) PoolDelete(opts types.DeleteOptions) error {
 				return ErrPoolInUse
 			}
 		}
-		return nil
+		return err
 	}
 	defer resp.Body.Close()
 	return nil

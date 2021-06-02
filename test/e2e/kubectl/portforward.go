@@ -20,6 +20,7 @@ package kubectl
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
@@ -36,7 +37,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -68,7 +71,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 			Containers: []v1.Container{
 				{
 					Name:  "readiness",
-					Image: imageutils.GetE2EImage(imageutils.Netexec),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"netexec"},
 					ReadinessProbe: &v1.Probe{
 						Handler: v1.Handler{
 							Exec: &v1.ExecAction{
@@ -83,7 +87,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 				},
 				{
 					Name:  "portforwardtester",
-					Image: imageutils.GetE2EImage(imageutils.PortForwardTester),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"port-forward-tester"},
 					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",
@@ -119,7 +124,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 
 // WaitForTerminatedContainer wait till a given container be terminated for a given pod.
 func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string) error {
-	return framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
 			return true, nil
 		}
@@ -137,7 +142,7 @@ type portForwardCommand struct {
 func (c *portForwardCommand) Stop() {
 	// SIGINT signals that kubectl port-forward should gracefully terminate
 	if err := c.cmd.Process.Signal(syscall.SIGINT); err != nil {
-		e2elog.Logf("error sending SIGINT to kubectl port-forward: %v", err)
+		framework.Logf("error sending SIGINT to kubectl port-forward: %v", err)
 	}
 
 	// try to wait for a clean exit
@@ -155,22 +160,23 @@ func (c *portForwardCommand) Stop() {
 			// success
 			return
 		}
-		e2elog.Logf("error waiting for kubectl port-forward to exit: %v", err)
+		framework.Logf("error waiting for kubectl port-forward to exit: %v", err)
 	case <-expired.C:
-		e2elog.Logf("timed out waiting for kubectl port-forward to exit")
+		framework.Logf("timed out waiting for kubectl port-forward to exit")
 	}
 
-	e2elog.Logf("trying to forcibly kill kubectl port-forward")
+	framework.Logf("trying to forcibly kill kubectl port-forward")
 	framework.TryKill(c.cmd)
 }
 
 // runPortForward runs port-forward, warning, this may need root functionality on some systems.
 func runPortForward(ns, podName string, port int) *portForwardCommand {
-	cmd := framework.KubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf(":%d", port))
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+	cmd := tk.KubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf(":%d", port))
 	// This is somewhat ugly but is the only way to retrieve the port that was picked
 	// by the port-forward command. We don't want to hard code the port as we have no
 	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
-	e2elog.Logf("starting port-forward command and streaming output")
+	framework.Logf("starting port-forward command and streaming output")
 	portOutput, _, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		framework.Failf("Failed to start port-forward command: %v", err)
@@ -179,7 +185,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	buf := make([]byte, 128)
 
 	var n int
-	e2elog.Logf("reading from `kubectl port-forward` command's stdout")
+	framework.Logf("reading from `kubectl port-forward` command's stdout")
 	if n, err = portOutput.Read(buf); err != nil {
 		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
@@ -203,10 +209,10 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfPod("", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -241,7 +247,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Done"),
@@ -251,10 +257,10 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -278,7 +284,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Expected to read 3 bytes from client, but got 0 instead"),
@@ -288,10 +294,10 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -316,9 +322,6 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	ginkgo.By("Sending the expected data to the local port")
 	fmt.Fprint(conn, "abc")
 
-	ginkgo.By("Closing the write half of the client's connection")
-	conn.CloseWrite()
-
 	ginkgo.By("Reading data from the local port")
 	fromServer, err := ioutil.ReadAll(conn)
 	if err != nil {
@@ -326,7 +329,18 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	}
 
 	if e, a := strings.Repeat("x", 100), string(fromServer); e != a {
+		podlogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		if err != nil {
+			framework.Logf("Failed to get logs of portforwardtester pod: %v", err)
+		} else {
+			framework.Logf("Logs of portforwardtester pod: %v", podlogs)
+		}
 		framework.Failf("Expected %q from server, got %q", e, a)
+	}
+
+	ginkgo.By("Closing the write half of the client's connection")
+	if err = conn.CloseWrite(); err != nil {
+		framework.Failf("Couldn't close the write half of the client's connection: %v", err)
 	}
 
 	ginkgo.By("Waiting for the target pod to stop running")
@@ -336,7 +350,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Received expected client data"),
@@ -350,10 +364,10 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Creating the pod")
 	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -365,7 +379,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		Param("ports", "80")
 
 	url := req.URL()
-	ws, err := framework.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
+	ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
 	if err != nil {
 		framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 	}
@@ -374,13 +388,13 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 0 {
-			return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
 		}
 		if p := binary.LittleEndian.Uint16(msg); p != 80 {
-			return fmt.Errorf("Received the wrong port: %d", p)
+			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -388,13 +402,13 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 1 {
-			return fmt.Errorf("Got message from server that didn't start with channel 1 (error): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 1 (error): %v", msg)
 		}
 		if p := binary.LittleEndian.Uint16(msg); p != 80 {
-			return fmt.Errorf("Received the wrong port: %d", p)
+			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -411,21 +425,21 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 0 {
-			return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
 		}
 		buf.Write(msg)
 		if bytes.Equal(expectedData, buf.Bytes()) {
-			return fmt.Errorf("Expected %q from server, got %q", expectedData, buf.Bytes())
+			return fmt.Errorf("expected %q from server, got %q", expectedData, buf.Bytes())
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Received expected client data"),
@@ -435,8 +449,8 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
 
-	framework.KubeDescribe("With a server listening on 0.0.0.0", func() {
-		framework.KubeDescribe("that expects a client request", func() {
+	ginkgo.Describe("With a server listening on 0.0.0.0", func() {
+		ginkgo.Describe("that expects a client request", func() {
 			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("0.0.0.0", f)
 			})
@@ -445,7 +459,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			})
 		})
 
-		framework.KubeDescribe("that expects NO client request", func() {
+		ginkgo.Describe("that expects NO client request", func() {
 			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("0.0.0.0", f)
 			})
@@ -457,8 +471,8 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	})
 
 	// kubectl port-forward may need elevated privileges to do its job.
-	framework.KubeDescribe("With a server listening on localhost", func() {
-		framework.KubeDescribe("that expects a client request", func() {
+	ginkgo.Describe("With a server listening on localhost", func() {
+		ginkgo.Describe("that expects a client request", func() {
 			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
 				doTestMustConnectSendNothing("localhost", f)
 			})
@@ -467,7 +481,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			})
 		})
 
-		framework.KubeDescribe("that expects NO client request", func() {
+		ginkgo.Describe("that expects NO client request", func() {
 			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
 				doTestConnectSendDisconnect("localhost", f)
 			})

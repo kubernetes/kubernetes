@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -21,14 +23,15 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
@@ -52,10 +55,10 @@ func (plugin *gcePersistentDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID
 		return nil, fmt.Errorf("failed to get volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 
-	return getVolumeSpecFromGlobalMapPath(globalMapPath)
+	return getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath)
 }
 
-func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
+func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.Spec, error) {
 	// Get volume spec information from globalMapPath
 	// globalMapPath example:
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeID}
@@ -66,6 +69,9 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) 
 	}
 	block := v1.PersistentVolumeBlock
 	gceVolume := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -102,7 +108,7 @@ func (plugin *gcePersistentDiskPlugin) newBlockVolumeMapperInternal(spec *volume
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
-	return &gcePersistentDiskMapper{
+	mapper := &gcePersistentDiskMapper{
 		gcePersistentDisk: &gcePersistentDisk{
 			volName:   spec.Name(),
 			podUID:    podUID,
@@ -112,7 +118,16 @@ func (plugin *gcePersistentDiskPlugin) newBlockVolumeMapperInternal(spec *volume
 			mounter:   mounter,
 			plugin:    plugin,
 		},
-		readOnly: readOnly}, nil
+		readOnly: readOnly,
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
@@ -130,10 +145,6 @@ func (plugin *gcePersistentDiskPlugin) newUnmapperInternal(volName string, podUI
 		}}, nil
 }
 
-func (c *gcePersistentDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type gcePersistentDiskUnmapper struct {
 	*gcePersistentDisk
 }
@@ -146,14 +157,6 @@ type gcePersistentDiskMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &gcePersistentDiskMapper{}
-
-func (b *gcePersistentDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *gcePersistentDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/pdName
@@ -170,4 +173,10 @@ func (pd *gcePersistentDisk) GetGlobalMapPath(spec *volume.Spec) (string, error)
 func (pd *gcePersistentDisk) GetPodDeviceMapPath() (string, string) {
 	name := gcePersistentDiskPluginName
 	return pd.plugin.host.GetPodVolumeDeviceDir(pd.podUID, utilstrings.EscapeQualifiedName(name)), pd.volName
+}
+
+// SupportsMetrics returns true for gcePersistentDisk as it initializes the
+// MetricsProvider.
+func (pd *gcePersistentDisk) SupportsMetrics() bool {
+	return true
 }

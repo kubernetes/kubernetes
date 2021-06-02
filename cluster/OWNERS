@@ -2,18 +2,19 @@
 
 reviewers:
   - bentheelder
-  - eparis
-  - jbeda
-  - Katharine
+  - cheftako
+  - dims
+  - justaugustus
   - mikedanese
-  - roberthbailey
-  - zmerlynn
-approvers:
-  - eparis
-  - jbeda
-  - mikedanese
-  - roberthbailey
   - spiffxp
+approvers:
+  - bentheelder
+  - cheftako
+  - dims
+  - mikedanese
+  - spiffxp
+emeritus_approvers:
+  - eparis
+  - roberthbailey   # 2019-03-08
+  - jbeda
   - zmerlynn
-labels:
-- sig/cluster-lifecycle

@@ -30,6 +30,7 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	runtimeError             error
 	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
@@ -60,6 +61,12 @@ func (s *runtimeState) setNetworkState(err error) {
 	s.Lock()
 	defer s.Unlock()
 	s.networkError = err
+}
+
+func (s *runtimeState) setRuntimeState(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.runtimeError = err
 }
 
 func (s *runtimeState) setStorageState(err error) {
@@ -94,6 +101,9 @@ func (s *runtimeState) runtimeErrors() error {
 			errs = append(errs, fmt.Errorf("%s is not healthy: %v", hc.name, err))
 		}
 	}
+	if s.runtimeError != nil {
+		errs = append(errs, s.runtimeError)
+	}
 
 	return utilerrors.NewAggregate(errs)
 }
@@ -118,9 +128,7 @@ func (s *runtimeState) storageErrors() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func newRuntimeState(
-	runtimeSyncThreshold time.Duration,
-) *runtimeState {
+func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,

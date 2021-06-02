@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -40,6 +41,15 @@ var (
 	}
 	allowSpecific = map[string]string{
 		AllowedProfilesAnnotationKey: "foo",
+	}
+	allowSpecificLocalhost = map[string]string{
+		AllowedProfilesAnnotationKey: v1.SeccompLocalhostProfileNamePrefix + "foo",
+	}
+	allowSpecificDockerDefault = map[string]string{
+		AllowedProfilesAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
+	}
+	allowSpecificRuntimeDefault = map[string]string{
+		AllowedProfilesAnnotationKey: v1.SeccompProfileRuntimeDefault,
 	}
 )
 
@@ -102,9 +112,11 @@ func TestNewStrategy(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
+	bar := "bar"
 	tests := map[string]struct {
 		pspAnnotations  map[string]string
 		podAnnotations  map[string]string
+		seccompProfile  *api.SeccompProfile
 		expectedProfile string
 	}{
 		"no seccomp, no pod annotations": {
@@ -143,10 +155,25 @@ func TestGenerate(t *testing.T) {
 			},
 			expectedProfile: "bar",
 		},
+		"seccomp with default, pod field": {
+			pspAnnotations: allowAnyDefault,
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &bar,
+			},
+			expectedProfile: "localhost/bar",
+		},
 	}
 	for k, v := range tests {
 		s := NewStrategy(v.pspAnnotations)
-		actual, err := s.Generate(v.podAnnotations, nil)
+		actual, err := s.Generate(v.podAnnotations, &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: v.seccompProfile,
+				},
+			},
+		})
+
 		if err != nil {
 			t.Errorf("%s received error during generation %#v", k, err)
 			continue
@@ -158,9 +185,11 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestValidatePod(t *testing.T) {
+	foo := "foo"
 	tests := map[string]struct {
 		pspAnnotations map[string]string
 		podAnnotations map[string]string
+		seccompProfile *api.SeccompProfile
 		expectedError  string
 	}{
 		"no pod annotations, required profiles": {
@@ -206,11 +235,57 @@ func TestValidatePod(t *testing.T) {
 			podAnnotations: nil,
 			expectedError:  "",
 		},
+		"valid pod annotations and field, required profiles": {
+			pspAnnotations: allowSpecific,
+			podAnnotations: map[string]string{
+				api.SeccompPodAnnotationKey: "foo",
+			},
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &foo,
+			},
+			expectedError: "",
+		},
+		"valid pod field and no annotation, required profiles": {
+			pspAnnotations: allowSpecific,
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &foo,
+			},
+			expectedError: "Forbidden: localhost/foo is not an allowed seccomp profile. Valid values are foo",
+		},
+		"valid pod field and no annotation, required profiles (localhost)": {
+			pspAnnotations: allowSpecificLocalhost,
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &foo,
+			},
+			expectedError: "",
+		},
+		"docker/default PSP annotation automatically allows runtime/default pods": {
+			pspAnnotations: allowSpecificDockerDefault,
+			podAnnotations: map[string]string{
+				api.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			expectedError: "",
+		},
+		"runtime/default PSP annotation automatically allows docker/default pods": {
+			pspAnnotations: allowSpecificRuntimeDefault,
+			podAnnotations: map[string]string{
+				api.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
+			},
+			expectedError: "",
+		},
 	}
 	for k, v := range tests {
 		pod := &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: v.podAnnotations,
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: v.seccompProfile,
+				},
 			},
 		}
 		s := NewStrategy(v.pspAnnotations)
@@ -231,9 +306,12 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidateContainer(t *testing.T) {
+	foo := "foo"
+	bar := "bar"
 	tests := map[string]struct {
 		pspAnnotations map[string]string
 		podAnnotations map[string]string
+		seccompProfile *api.SeccompProfile
 		expectedError  string
 	}{
 		"no pod annotations, required profiles": {
@@ -293,6 +371,22 @@ func TestValidateContainer(t *testing.T) {
 			},
 			expectedError: "Forbidden: bar is not an allowed seccomp profile. Valid values are foo",
 		},
+		"valid container field and no annotation, required profiles": {
+			pspAnnotations: allowSpecificLocalhost,
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &foo,
+			},
+			expectedError: "",
+		},
+		"invalid container field and no annotation, required profiles": {
+			pspAnnotations: allowSpecificLocalhost,
+			seccompProfile: &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &bar,
+			},
+			expectedError: "Forbidden: localhost/bar is not an allowed seccomp profile. Valid values are localhost/foo",
+		},
 	}
 	for k, v := range tests {
 		pod := &api.Pod{
@@ -302,6 +396,9 @@ func TestValidateContainer(t *testing.T) {
 		}
 		container := &api.Container{
 			Name: "container",
+			SecurityContext: &api.SecurityContext{
+				SeccompProfile: v.seccompProfile,
+			},
 		}
 
 		s := NewStrategy(v.pspAnnotations)

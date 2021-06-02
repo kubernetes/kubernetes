@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/code-generator/cmd/register-gen/generators"

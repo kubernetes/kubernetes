@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -32,18 +34,7 @@ func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// scheme is the registry for the common types that adhere to the meta v1beta1 API spec.
-var scheme = runtime.NewScheme()
-
-// ParameterCodec knows about query parameters used with the meta v1beta1 API spec.
-var ParameterCodec = runtime.NewParameterCodec(scheme)
-
-func init() {
-	if err := AddMetaToScheme(scheme); err != nil {
-		panic(err)
-	}
-}
-
+// AddMetaToScheme registers base meta types into schemas.
 func AddMetaToScheme(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Table{},
@@ -52,10 +43,20 @@ func AddMetaToScheme(scheme *runtime.Scheme) error {
 		&PartialObjectMetadataList{},
 	)
 
-	return scheme.AddConversionFuncs(
-		Convert_Slice_string_To_v1beta1_IncludeObjectPolicy,
-	)
+	return nil
+}
 
-	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
+// RegisterConversions adds conversion functions to the given scheme.
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*PartialObjectMetadataList)(nil), (*v1.PartialObjectMetadataList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PartialObjectMetadataList_To_v1_PartialObjectMetadataList(a.(*PartialObjectMetadataList), b.(*v1.PartialObjectMetadataList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.PartialObjectMetadataList)(nil), (*PartialObjectMetadataList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PartialObjectMetadataList_To_v1beta1_PartialObjectMetadataList(a.(*v1.PartialObjectMetadataList), b.(*PartialObjectMetadataList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }

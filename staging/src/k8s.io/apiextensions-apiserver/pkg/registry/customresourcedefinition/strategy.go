@@ -22,16 +22,18 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // strategy implements behavior for CustomResources.
@@ -48,13 +50,26 @@ func (strategy) NamespaceScoped() bool {
 	return false
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiextensions.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"apiextensions.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears the status of a CustomResourceDefinition before creation.
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	crd := obj.(*apiextensions.CustomResourceDefinition)
 	crd.Status = apiextensions.CustomResourceDefinitionStatus{}
 	crd.Generation = 1
-
-	dropDisabledFields(&crd.Spec, nil)
 
 	for _, v := range crd.Spec.Versions {
 		if v.Storage {
@@ -84,8 +99,6 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 		newCRD.Generation = oldCRD.Generation + 1
 	}
 
-	dropDisabledFields(&newCRD.Spec, &oldCRD.Spec)
-
 	for _, v := range newCRD.Spec.Versions {
 		if v.Storage {
 			if !apiextensions.IsStoredVersion(newCRD, v.Name) {
@@ -98,8 +111,16 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 // Validate validates a new CustomResourceDefinition.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
+	var groupVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+
+	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition), groupVersion)
 }
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 // AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
 // needed to create one.
@@ -118,7 +139,17 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+	var groupVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+
+	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition), groupVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 type statusStrategy struct {
@@ -134,18 +165,30 @@ func (statusStrategy) NamespaceScoped() bool {
 	return false
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiextensions.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"apiextensions.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
+
 func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newObj := obj.(*apiextensions.CustomResourceDefinition)
 	oldObj := old.(*apiextensions.CustomResourceDefinition)
 	newObj.Spec = oldObj.Spec
 
 	// Status updates are for only for updating status, not objectmeta.
-	// TODO: Update after ResetObjectMetaForStatus is added to meta/v1.
-	newObj.Labels = oldObj.Labels
-	newObj.Annotations = oldObj.Annotations
-	newObj.OwnerReferences = oldObj.OwnerReferences
-	newObj.Generation = oldObj.Generation
-	newObj.SelfLink = oldObj.SelfLink
+	metav1.ResetObjectMetaForStatus(&newObj.ObjectMeta, &newObj.ObjectMeta)
 }
 
 func (statusStrategy) AllowCreateOnUpdate() bool {
@@ -161,6 +204,11 @@ func (statusStrategy) Canonicalize(obj runtime.Object) {
 
 func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (statusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -185,103 +233,4 @@ func MatchCustomResourceDefinition(label labels.Selector, field fields.Selector)
 // CustomResourceDefinitionToSelectableFields returns a field set that represents the object.
 func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourceDefinition) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
-}
-
-func dropDisabledFields(crdSpec, oldCrdSpec *apiextensions.CustomResourceDefinitionSpec) {
-	// if the feature gate is disabled, drop the feature.
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) &&
-		!validationInUse(oldCrdSpec) {
-		crdSpec.Validation = nil
-		for i := range crdSpec.Versions {
-			crdSpec.Versions[i].Schema = nil
-		}
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) &&
-		!subresourceInUse(oldCrdSpec) {
-		crdSpec.Subresources = nil
-		for i := range crdSpec.Versions {
-			crdSpec.Versions[i].Subresources = nil
-		}
-	}
-
-	// 1. On CREATE (in which case the old CRD spec is nil), if the CustomResourceWebhookConversion feature gate is off, we auto-clear
-	// the per-version fields. This is to be consistent with the other built-in types, as the
-	// apiserver drops unknown fields.
-	// 2. On UPDATE, if the CustomResourceWebhookConversion feature gate is off, we auto-clear
-	// the per-version fields if the old CRD doesn't use per-version fields already.
-	// This is to be consistent with the other built-in types, as the apiserver drops unknown
-	// fields. If the old CRD already uses per-version fields, the CRD is allowed to continue
-	// use per-version fields.
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) &&
-		!hasPerVersionField(oldCrdSpec) {
-		for i := range crdSpec.Versions {
-			crdSpec.Versions[i].Schema = nil
-			crdSpec.Versions[i].Subresources = nil
-			crdSpec.Versions[i].AdditionalPrinterColumns = nil
-		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) &&
-		!conversionWebhookInUse(oldCrdSpec) {
-		if crdSpec.Conversion != nil {
-			crdSpec.Conversion.WebhookClientConfig = nil
-		}
-	}
-
-}
-
-func validationInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if crdSpec == nil {
-		return false
-	}
-	if crdSpec.Validation != nil {
-		return true
-	}
-
-	for i := range crdSpec.Versions {
-		if crdSpec.Versions[i].Schema != nil {
-			return true
-		}
-	}
-	return false
-}
-
-func subresourceInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if crdSpec == nil {
-		return false
-	}
-	if crdSpec.Subresources != nil {
-		return true
-	}
-
-	for i := range crdSpec.Versions {
-		if crdSpec.Versions[i].Subresources != nil {
-			return true
-		}
-	}
-	return false
-}
-
-// hasPerVersionField returns true if a CRD uses per-version schema/subresources/columns fields.
-//func hasPerVersionField(versions []apiextensions.CustomResourceDefinitionVersion) bool {
-func hasPerVersionField(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if crdSpec == nil {
-		return false
-	}
-	for _, v := range crdSpec.Versions {
-		if v.Schema != nil || v.Subresources != nil || len(v.AdditionalPrinterColumns) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func conversionWebhookInUse(crdSpec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if crdSpec == nil {
-		return false
-	}
-	if crdSpec.Conversion == nil {
-		return false
-	}
-	return crdSpec.Conversion.WebhookClientConfig != nil
 }

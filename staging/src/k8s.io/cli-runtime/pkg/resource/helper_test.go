@@ -19,6 +19,7 @@ package resource
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -120,7 +122,7 @@ func TestHelperDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -227,7 +229,7 @@ func TestHelperCreate(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			_, err := modifier.Create("bar", tt.Modify, tt.Object, nil)
+			_, err := modifier.Create("bar", tt.Modify, tt.Object)
 			if (err != nil) != tt.Err {
 				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}
@@ -312,7 +314,7 @@ func TestHelperGet(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			obj, err := modifier.Get("bar", "foo", false)
+			obj, err := modifier.Get("bar", "foo")
 
 			if (err != nil) != tt.Err {
 				t.Errorf("unexpected error: %d %t %v", i, tt.Err, err)
@@ -393,7 +395,7 @@ func TestHelperList(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			obj, err := modifier.List("bar", corev1GV.String(), false, &metav1.ListOptions{LabelSelector: "foo=baz"})
+			obj, err := modifier.List("bar", corev1GV.String(), &metav1.ListOptions{LabelSelector: "foo=baz"})
 			if (err != nil) != tt.Err {
 				t.Errorf("unexpected error: %t %v", tt.Err, err)
 			}
@@ -464,7 +466,6 @@ func TestHelperListSelectorCombination(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			_, err := modifier.List("bar",
 				corev1GV.String(),
-				false,
 				&metav1.ListOptions{LabelSelector: tt.LabelSelector, FieldSelector: tt.FieldSelector})
 			if tt.Err {
 				if err == nil {
@@ -592,7 +593,7 @@ func TestHelperReplace(t *testing.T) {
 			Req:             expectPut,
 		},
 	}
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
@@ -607,24 +608,195 @@ func TestHelperReplace(t *testing.T) {
 			}
 			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object)
 			if (err != nil) != tt.Err {
-				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
+				t.Fatalf("unexpected error: %t %v", tt.Err, err)
 			}
 			if err != nil {
 				return
 			}
-			if tt.Req != nil && !tt.Req(tt.ExpectPath, client.Req) {
-				t.Errorf("%d: unexpected request: %#v", i, client.Req)
+			if tt.Req != nil && (client.Req == nil || !tt.Req(tt.ExpectPath, client.Req)) {
+				t.Fatalf("unexpected request: %#v", client.Req)
 			}
 			body, err := ioutil.ReadAll(client.Req.Body)
 			if err != nil {
-				t.Fatalf("%d: unexpected error: %#v", i, err)
+				t.Fatalf("unexpected error: %#v", err)
 			}
 			expect := []byte{}
 			if tt.ExpectObject != nil {
 				expect = []byte(runtime.EncodeOrDie(corev1Codec, tt.ExpectObject))
 			}
 			if !reflect.DeepEqual(expect, body) {
-				t.Errorf("%d: unexpected body: %s", i, string(body))
+				t.Fatalf("unexpected body: %s", string(body))
+			}
+		})
+	}
+}
+
+func TestEnhanceListError(t *testing.T) {
+	podGVR := corev1.SchemeGroupVersion.WithResource(corev1.ResourcePods.String())
+	podSubject := podGVR.String()
+	tests := []struct {
+		name string
+		err  error
+		opts metav1.ListOptions
+		subj string
+
+		expectedErr     string
+		expectStatusErr bool
+	}{
+		{
+			name:            "leaves resource expired error as is",
+			err:             apierrors.NewResourceExpired("resourceversion too old"),
+			opts:            metav1.ListOptions{},
+			subj:            podSubject,
+			expectedErr:     "resourceversion too old",
+			expectStatusErr: true,
+		}, {
+			name:            "leaves unrecognized error as is",
+			err:             errors.New("something went wrong"),
+			opts:            metav1.ListOptions{},
+			subj:            podSubject,
+			expectedErr:     "something went wrong",
+			expectStatusErr: false,
+		}, {
+			name:            "bad request StatusError without selectors",
+			err:             apierrors.NewBadRequest("request is invalid"),
+			opts:            metav1.ListOptions{},
+			subj:            podSubject,
+			expectedErr:     "Unable to list \"/v1, Resource=pods\": request is invalid",
+			expectStatusErr: true,
+		}, {
+			name: "bad request StatusError with selectors",
+			err:  apierrors.NewBadRequest("request is invalid"),
+			opts: metav1.ListOptions{
+				LabelSelector: "a=b",
+				FieldSelector: ".spec.nodeName=foo",
+			},
+			subj:            podSubject,
+			expectedErr:     "Unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": request is invalid",
+			expectStatusErr: true,
+		}, {
+			name:            "not found without selectors",
+			err:             apierrors.NewNotFound(podGVR.GroupResource(), "foo"),
+			opts:            metav1.ListOptions{},
+			subj:            podSubject,
+			expectedErr:     "Unable to list \"/v1, Resource=pods\": pods \"foo\" not found",
+			expectStatusErr: true,
+		}, {
+			name: "not found StatusError with selectors",
+			err:  apierrors.NewNotFound(podGVR.GroupResource(), "foo"),
+			opts: metav1.ListOptions{
+				LabelSelector: "a=b",
+				FieldSelector: ".spec.nodeName=foo",
+			},
+			subj:            podSubject,
+			expectedErr:     "Unable to find \"/v1, Resource=pods\" that match label selector \"a=b\", field selector \".spec.nodeName=foo\": pods \"foo\" not found",
+			expectStatusErr: true,
+		}, {
+			name: "non StatusError without selectors",
+			err: fmt.Errorf("extra info: %w", apierrors.NewNotFound(podGVR.GroupResource(),
+				"foo")),
+			opts:            metav1.ListOptions{},
+			subj:            podSubject,
+			expectedErr:     "Unable to list \"/v1, Resource=pods\": extra info: pods \"foo\" not found",
+			expectStatusErr: false,
+		}, {
+			name: "non StatusError with selectors",
+			err:  fmt.Errorf("extra info: %w", apierrors.NewNotFound(podGVR.GroupResource(), "foo")),
+			opts: metav1.ListOptions{
+				LabelSelector: "a=b",
+				FieldSelector: ".spec.nodeName=foo",
+			},
+			subj: podSubject,
+			expectedErr: "Unable to find \"/v1, " +
+				"Resource=pods\" that match label selector \"a=b\", " +
+				"field selector \".spec.nodeName=foo\": extra info: pods \"foo\" not found",
+			expectStatusErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := EnhanceListError(tt.err, tt.opts, tt.subj)
+			if err == nil {
+				t.Errorf("EnhanceListError did not return an error")
+			}
+			if err.Error() != tt.expectedErr {
+				t.Errorf("EnhanceListError() error = %q, expectedErr %q", err, tt.expectedErr)
+			}
+			if tt.expectStatusErr {
+				if _, ok := err.(*apierrors.StatusError); !ok {
+					t.Errorf("EnhanceListError incorrectly returned a non-StatusError: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestFollowContinue(t *testing.T) {
+	var continueTokens []string
+	tests := []struct {
+		name        string
+		initialOpts *metav1.ListOptions
+		tokensSeen  []string
+		listFunc    func(metav1.ListOptions) (runtime.Object, error)
+
+		expectedTokens []string
+		wantErr        string
+	}{
+		{
+			name:        "updates list options with continue token until list finished",
+			initialOpts: &metav1.ListOptions{},
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				continueTokens = append(continueTokens, options.Continue)
+				obj := corev1.PodList{}
+				switch options.Continue {
+				case "":
+					metadataAccessor.SetContinue(&obj, "abc")
+				case "abc":
+					metadataAccessor.SetContinue(&obj, "def")
+				case "def":
+					metadataAccessor.SetKind(&obj, "ListComplete")
+				}
+				return &obj, nil
+			},
+			expectedTokens: []string{"", "abc", "def"},
+		},
+		{
+			name:        "stops looping if listFunc returns an error",
+			initialOpts: &metav1.ListOptions{},
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				continueTokens = append(continueTokens, options.Continue)
+				obj := corev1.PodList{}
+				switch options.Continue {
+				case "":
+					metadataAccessor.SetContinue(&obj, "abc")
+				case "abc":
+					return nil, fmt.Errorf("err from list func")
+				case "def":
+					metadataAccessor.SetKind(&obj, "ListComplete")
+				}
+				return &obj, nil
+			},
+			expectedTokens: []string{"", "abc"},
+			wantErr:        "err from list func",
+		},
+	}
+	for _, tt := range tests {
+		continueTokens = []string{}
+		t.Run(tt.name, func(t *testing.T) {
+			err := FollowContinue(tt.initialOpts, tt.listFunc)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("FollowContinue was expected to return an error and did not")
+				} else if err.Error() != tt.wantErr {
+					t.Fatalf("wanted error %q, got %q", tt.wantErr, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("FollowContinue failed: %v", tt.wantErr)
+				}
+				if !reflect.DeepEqual(continueTokens, tt.expectedTokens) {
+					t.Errorf("got token list %q, wanted %q", continueTokens, tt.expectedTokens)
+				}
 			}
 		})
 	}

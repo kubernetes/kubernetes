@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -33,7 +34,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the control-plane node as expected
-var _ = KubeadmDescribe("control-plane node", func() {
+var _ = Describe("control-plane node", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("control-plane node")
@@ -44,12 +45,12 @@ var _ = KubeadmDescribe("control-plane node", func() {
 
 	// Important! please note that this test can't be run on single-node clusters
 	// in case you can skip this test with SKIP=multi-node
-	It("should be labelled and tainted [multi-node]", func() {
+	ginkgo.It("should be labelled and tainted [multi-node]", func() {
 		// get all control-plane nodes (and this implicitly checks that node are properly labeled)
 		controlPlanes := getControlPlaneNodes(f.ClientSet)
 
 		// checks if there is at least one control-plane node
-		Expect(controlPlanes.Items).NotTo(BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneTaint)
+		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneTaint)
 
 		// checks that the control-plane nodes have the expected taint
 		for _, cp := range controlPlanes.Items {
@@ -61,7 +62,7 @@ var _ = KubeadmDescribe("control-plane node", func() {
 func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
 	selector := labels.Set{controlPlaneTaint: ""}.AsSelector()
 	masters, err := c.CoreV1().Nodes().
-		List(metav1.ListOptions{LabelSelector: selector.String()})
+		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "error reading control-plane nodes")
 
 	return masters

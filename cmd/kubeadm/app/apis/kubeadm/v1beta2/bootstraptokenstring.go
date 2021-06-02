@@ -31,8 +31,8 @@ import (
 // of view and as an authentication method for the node in the bootstrap phase of
 // "kubeadm join". This token is and should be short-lived
 type BootstrapTokenString struct {
-	ID     string
-	Secret string
+	ID     string `json:"-"`
+	Secret string `json:"-"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -40,7 +40,7 @@ func (bts BootstrapTokenString) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, bts.String())), nil
 }
 
-// UnmarshalJSON implements the json.Unmarshaller interface.
+// UnmarshalJSON implements the json.Unmarshaler interface.
 func (bts *BootstrapTokenString) UnmarshalJSON(b []byte) error {
 	// If the token is represented as "", just return quickly without an error
 	if len(b) == 0 {

@@ -30,26 +30,26 @@ const secondsToNanoSeconds = secondsToMilliSeconds * milliSecondsToNanoSeconds
 
 type Uint64Slice []uint64
 
-func (a Uint64Slice) Len() int           { return len(a) }
-func (a Uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a Uint64Slice) Less(i, j int) bool { return a[i] < a[j] }
+func (s Uint64Slice) Len() int           { return len(s) }
+func (s Uint64Slice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s Uint64Slice) Less(i, j int) bool { return s[i] < s[j] }
 
 // Get percentile of the provided samples. Round to integer.
-func (self Uint64Slice) GetPercentile(d float64) uint64 {
+func (s Uint64Slice) GetPercentile(d float64) uint64 {
 	if d < 0.0 || d > 1.0 {
 		return 0
 	}
-	count := self.Len()
+	count := s.Len()
 	if count == 0 {
 		return 0
 	}
-	sort.Sort(self)
+	sort.Sort(s)
 	n := float64(d * (float64(count) + 1))
 	idx, frac := math.Modf(n)
 	index := int(idx)
-	percentile := float64(self[index-1])
+	percentile := float64(s[index-1])
 	if index > 1 && index < count {
-		percentile += frac * float64(self[index]-self[index-1])
+		percentile += frac * float64(s[index]-s[index-1])
 	}
 	return uint64(percentile)
 }
@@ -61,15 +61,21 @@ type mean struct {
 	Mean float64
 }
 
-func (self *mean) Add(value uint64) {
-	self.count++
-	if self.count == 1 {
-		self.Mean = float64(value)
+func (m *mean) Add(value uint64) {
+	m.count++
+	if m.count == 1 {
+		m.Mean = float64(value)
 		return
 	}
-	c := float64(self.count)
+	c := float64(m.count)
 	v := float64(value)
-	self.Mean = (self.Mean*(c-1) + v) / c
+	m.Mean = (m.Mean*(c-1) + v) / c
+}
+
+type Percentile interface {
+	Add(info.Percentiles)
+	AddSample(uint64)
+	GetAllPercentiles() info.Percentiles
 }
 
 type resource struct {
@@ -82,20 +88,20 @@ type resource struct {
 }
 
 // Adds a new percentile sample.
-func (self *resource) Add(p info.Percentiles) {
+func (r *resource) Add(p info.Percentiles) {
 	if !p.Present {
 		return
 	}
-	if p.Max > self.max {
-		self.max = p.Max
+	if p.Max > r.max {
+		r.max = p.Max
 	}
-	self.mean.Add(p.Mean)
+	r.mean.Add(p.Mean)
 	// Selecting 90p of 90p :(
-	self.samples = append(self.samples, p.Ninety)
+	r.samples = append(r.samples, p.Ninety)
 }
 
 // Add a single sample. Internally, we convert it to a fake percentile sample.
-func (self *resource) AddSample(val uint64) {
+func (r *resource) AddSample(val uint64) {
 	sample := info.Percentiles{
 		Present:    true,
 		Mean:       val,
@@ -104,22 +110,22 @@ func (self *resource) AddSample(val uint64) {
 		Ninety:     val,
 		NinetyFive: val,
 	}
-	self.Add(sample)
+	r.Add(sample)
 }
 
 // Get max, average, and 90p from existing samples.
-func (self *resource) GetAllPercentiles() info.Percentiles {
+func (r *resource) GetAllPercentiles() info.Percentiles {
 	p := info.Percentiles{}
-	p.Mean = uint64(self.mean.Mean)
-	p.Max = self.max
-	p.Fifty = self.samples.GetPercentile(0.5)
-	p.Ninety = self.samples.GetPercentile(0.9)
-	p.NinetyFive = self.samples.GetPercentile(0.95)
+	p.Mean = uint64(r.mean.Mean)
+	p.Max = r.max
+	p.Fifty = r.samples.GetPercentile(0.5)
+	p.Ninety = r.samples.GetPercentile(0.9)
+	p.NinetyFive = r.samples.GetPercentile(0.95)
 	p.Present = true
 	return p
 }
 
-func NewResource(size int) *resource {
+func NewResource(size int) Percentile {
 	return &resource{
 		samples: make(Uint64Slice, 0, size),
 		mean:    mean{count: 0, Mean: 0},
@@ -155,9 +161,8 @@ func getPercentComplete(stats []*secondSample) (percent int32) {
 }
 
 // Calculate cpurate from two consecutive total cpu usage samples.
-func getCpuRate(latest, previous secondSample) (uint64, error) {
-	var elapsed int64
-	elapsed = latest.Timestamp.Sub(previous.Timestamp).Nanoseconds()
+func getCPURate(latest, previous secondSample) (uint64, error) {
+	elapsed := latest.Timestamp.Sub(previous.Timestamp).Nanoseconds()
 	if elapsed < 10*milliSecondsToNanoSeconds {
 		return 0, fmt.Errorf("elapsed time too small: %d ns: time now %s last %s", elapsed, latest.Timestamp.String(), previous.Timestamp.String())
 	}
@@ -176,7 +181,7 @@ func GetMinutePercentiles(stats []*secondSample) info.Usage {
 	memory := NewResource(len(stats))
 	for _, stat := range stats {
 		if !lastSample.Timestamp.IsZero() {
-			cpuRate, err := getCpuRate(*stat, lastSample)
+			cpuRate, err := getCPURate(*stat, lastSample)
 			if err != nil {
 				continue
 			}

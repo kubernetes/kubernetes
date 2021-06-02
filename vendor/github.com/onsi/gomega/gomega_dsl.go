@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.4.3"
+const GOMEGA_VERSION = "1.10.1"
 
 const nilFailHandlerPanic = `You are trying to make an assertion, but Gomega's fail handler is nil.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -155,7 +155,7 @@ func Expect(actual interface{}, extra ...interface{}) Assertion {
 //    ExpectWithOffset(1, "foo").To(Equal("foo"))
 //
 // Unlike `Expect` and `Ω`, `ExpectWithOffset` takes an additional integer argument
-// this is used to modify the call-stack offset when computing line numbers.
+// that is used to modify the call-stack offset when computing line numbers.
 //
 // This is most useful in helper functions that make assertions.  If you want Gomega's
 // error message to refer to the calling line in the test (as opposed to the line in the helper function)
@@ -242,7 +242,7 @@ func EventuallyWithOffset(offset int, actual interface{}, intervals ...interface
 // assert that all other values are nil/zero.
 // This allows you to pass Consistently a function that returns a value and an error - a common pattern in Go.
 //
-// Consistently is useful in cases where you want to assert that something *does not happen* over a period of tiem.
+// Consistently is useful in cases where you want to assert that something *does not happen* over a period of time.
 // For example, you want to assert that a goroutine does *not* send data down a channel.  In this case, you could:
 //
 //   Consistently(channel).ShouldNot(Receive())
@@ -252,7 +252,7 @@ func Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion {
 	return ConsistentlyWithOffset(0, actual, intervals...)
 }
 
-// ConsistentlyWithOffset operates like Consistnetly but takes an additional
+// ConsistentlyWithOffset operates like Consistently but takes an additional
 // initial argument to indicate an offset in the call stack. This is useful when building helper
 // functions that contain matchers. To learn more, read about `ExpectWithOffset`.
 func ConsistentlyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion {
@@ -280,7 +280,7 @@ func SetDefaultEventuallyPollingInterval(t time.Duration) {
 	defaultEventuallyPollingInterval = t
 }
 
-// SetDefaultConsistentlyDuration sets  the default duration for Consistently. Consistently will verify that your condition is satsified for this long.
+// SetDefaultConsistentlyDuration sets  the default duration for Consistently. Consistently will verify that your condition is satisfied for this long.
 func SetDefaultConsistentlyDuration(t time.Duration) {
 	defaultConsistentlyDuration = t
 }
@@ -293,16 +293,18 @@ func SetDefaultConsistentlyPollingInterval(t time.Duration) {
 // AsyncAssertion is returned by Eventually and Consistently and polls the actual value passed into Eventually against
 // the matcher passed to the Should and ShouldNot methods.
 //
-// Both Should and ShouldNot take a variadic optionalDescription argument.  This is passed on to
-// fmt.Sprintf() and is used to annotate failure messages.  This allows you to make your failure messages more
-// descriptive.
+// Both Should and ShouldNot take a variadic optionalDescription argument.
+// This argument allows you to make your failure messages more descriptive.
+// If a single argument of type `func() string` is passed, this function will be lazily evaluated if a failure occurs
+// and the returned string is used to annotate the failure message.
+// Otherwise, this argument is passed on to fmt.Sprintf() and then used to annotate the failure message.
 //
 // Both Should and ShouldNot return a boolean that is true if the assertion passed and false if it failed.
 //
 // Example:
 //
 //   Eventually(myChannel).Should(Receive(), "Something should have come down the pipe.")
-//   Consistently(myChannel).ShouldNot(Receive(), "Nothing should have come down the pipe.")
+//   Consistently(myChannel).ShouldNot(Receive(), func() string { return "Nothing should have come down the pipe." })
 type AsyncAssertion interface {
 	Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
 	ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
@@ -317,10 +319,13 @@ type GomegaAsyncAssertion = AsyncAssertion
 // Typically Should/ShouldNot are used with Ω and To/ToNot/NotTo are used with Expect
 // though this is not enforced.
 //
-// All methods take a variadic optionalDescription argument.  This is passed on to fmt.Sprintf()
-// and is used to annotate failure messages.
+// All methods take a variadic optionalDescription argument.
+// This argument allows you to make your failure messages more descriptive.
+// If a single argument of type `func() string` is passed, this function will be lazily evaluated if a failure occurs
+// and the returned string is used to annotate the failure message.
+// Otherwise, this argument is passed on to fmt.Sprintf() and then used to annotate the failure message.
 //
-// All methods return a bool that is true if hte assertion passed and false if it failed.
+// All methods return a bool that is true if the assertion passed and false if it failed.
 //
 // Example:
 //
@@ -426,4 +431,33 @@ func toDuration(input interface{}) time.Duration {
 	}
 
 	panic(fmt.Sprintf("%v is not a valid interval.  Must be time.Duration, parsable duration string or a number.", input))
+}
+
+// Gomega describes the essential Gomega DSL. This interface allows libraries
+// to abstract between the standard package-level function implementations
+// and alternatives like *WithT.
+type Gomega interface {
+	Expect(actual interface{}, extra ...interface{}) Assertion
+	Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion
+	Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion
+}
+
+type globalFailHandlerGomega struct{}
+
+// DefaultGomega supplies the standard package-level implementation
+var Default Gomega = globalFailHandlerGomega{}
+
+// Expect is used to make assertions. See documentation for Expect.
+func (globalFailHandlerGomega) Expect(actual interface{}, extra ...interface{}) Assertion {
+	return Expect(actual, extra...)
+}
+
+// Eventually is used to make asynchronous assertions. See documentation for Eventually.
+func (globalFailHandlerGomega) Eventually(actual interface{}, extra ...interface{}) AsyncAssertion {
+	return Eventually(actual, extra...)
+}
+
+// Consistently is used to make asynchronous assertions. See documentation for Consistently.
+func (globalFailHandlerGomega) Consistently(actual interface{}, extra ...interface{}) AsyncAssertion {
+	return Consistently(actual, extra...)
 }

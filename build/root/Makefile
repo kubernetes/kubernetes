@@ -30,7 +30,10 @@ endif
 #   clean: Clean up.
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
+
+# Define variables so `make --warn-undefined-variables` works.
+PRINT_HELP ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
@@ -56,10 +59,6 @@ $(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
 endif
 endif
 
-# Extra options for the release or quick-release options:
-KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS)
-KUBE_FASTBUILD := $(KUBE_FASTBUILD)
-
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 
@@ -68,7 +67,7 @@ define ALL_HELP_INFO
 #
 # Args:
 #   WHAT: Directory names to build.  If any of these directories has a 'main'
-#     package, the build will produce executable files under $(OUT_DIR)/go/bin.
+#     package, the build will produce executable files under $(OUT_DIR)/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
@@ -118,7 +117,7 @@ define VERIFY_HELP_INFO
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
-#   make verify WHAT="bazel typecheck"
+#   make verify WHAT="gofmt typecheck"
 endef
 .PHONY: verify
 ifeq ($(PRINT_HELP),y)
@@ -204,66 +203,57 @@ test-integration: generated_files
 	hack/make-rules/test-integration.sh $(WHAT)
 endif
 
-define TEST_E2E_HELP_INFO
-# Build and run end-to-end tests.
-#
-# Example:
-#   make test-e2e
-endef
-.PHONY: test-e2e
-ifeq ($(PRINT_HELP),y)
-test-e2e:
-	@echo "$$TEST_E2E_HELP_INFO"
-else
-test-e2e: ginkgo generated_files
-	go run hack/e2e.go -- --build --up --test --down
-endif
-
 define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #
 # Args:
 #  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
-#  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
-#    to "".
+#  SKIP: Regexp that matches the tests that needs to be skipped.
+#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
+#  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
+#    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults
 #    to false.
-#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
-#    remote hosts to run tests against.  Defaults to a recent image.
-#  LIST_IMAGES: If true, don't run tests.  Just output the list of available
-#    images for testing.  Defaults to false.
-#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
-#    run tests against.  Defaults to "".
-#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
-#    part of this test run.  Defaults to false.
-#  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
-#    from the remote hosts.  Defaults to "/tmp/_artifacts".
-#  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
-#    to.  Defaults to "/tmp/".
-#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
-#    test files on remote hosts.  Defaults to true.
-#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
-#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
-#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
-#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
-#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
-#	 Defaults to false.
-#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
+#  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
+#    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
+#    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
+#  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
+#    list of available images for testing.  Defaults to false.
+#  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
+#    for ginkgo tests to complete. Defaults to 45m.
+#  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, remote).
 #    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
-#   Used when RUNTIME is set to "remote".
+#    Used when RUNTIME is set to "remote".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
-#   Used when RUNTIME is set to "remote".
+#    Used when RUNTIME is set to "remote".
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
 #    image in the node conformance test. The specs are located at
 #    test/e2e_node/system/specs/. For example, "SYSTEM_SPEC_NAME=gke" will use
 #    the spec at test/e2e_node/system/specs/gke.yaml. If unspecified, the
 #    default built-in spec (system.DefaultSpec) will be used.
+#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
+#    remote hosts to run tests against.  Defaults to a recent image.
+#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
+#    run tests against.  Defaults to "".
+#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
+#    part of this test run.  Defaults to false.
+#  PREEMPTIBLE_INSTANCES: For REMOTE=true only.  Mark created gce instances
+#    as preemptible.  Defaults to false.
+#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
+#    test files on remote hosts.  Defaults to true.
+#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
+#    $$IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
+#    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
+#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
+#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
+#    Defaults to false.
+#  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -290,7 +280,7 @@ define TEST_E2E_KUBEADM_HELP_INFO
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
 #    repeatedly until they fail. Defaults to false.
 #  ARTIFACTS: Local directory to save test artifacts into. Defaults to "/tmp/_artifacts".
-#  PARALLELISM: The number of gingko nodes to run.  If empty ginkgo default 
+#  PARALLELISM: The number of ginkgo nodes to run.  If empty ginkgo default
 #    parallelism (cores - 1) is used
 #  BUILD: Build kubeadm end-to-end tests. Defaults to true.
 #
@@ -375,7 +365,7 @@ clean_generated:
 	@echo "$$CLEAN_GENERATED_HELP_INFO"
 else
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
+	find . -type f -name '$(GENERATED_FILE_PREFIX)*'  | xargs rm -f
 endif
 
 define VET_HELP_INFO
@@ -414,6 +404,7 @@ ifeq ($(PRINT_HELP),y)
 release release-in-a-container:
 	@echo "$$RELEASE_HELP_INFO"
 else
+release release-in-a-container: KUBE_BUILD_CONFORMANCE = y
 release:
 	build/release.sh
 release-in-a-container:
@@ -424,7 +415,6 @@ define RELEASE_IMAGES_HELP_INFO
 # Build release images
 #
 # Args:
-#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
 #
 # Example:
@@ -432,6 +422,7 @@ define RELEASE_IMAGES_HELP_INFO
 endef
 .PHONY: release-images
 ifeq ($(PRINT_HELP),y)
+release-images: KUBE_BUILD_CONFORMANCE = y
 release-images:
 	@echo "$$RELEASE_IMAGES_HELP_INFO"
 else
@@ -445,6 +436,8 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
+#   KUBE_DOCKER_REGISTRY: Registry of released images, default to k8s.gcr.io
+#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to k8s.gcr.io/build-image
 #
 # Example:
 #   make release-skip-tests
@@ -466,8 +459,7 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 #
 # Args:
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
-#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
-#   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
+#   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'y' to do so.
 #
 # Example:
 #   make quick-release-images
@@ -495,6 +487,7 @@ ifeq ($(PRINT_HELP),y)
 package package-tarballs:
 	@echo "$$PACKAGE_HELP_INFO"
 else
+package-tarballs: KUBE_BUILD_CONFORMANCE = y
 package package-tarballs:
 	build/package-tarballs.sh
 endif
@@ -514,6 +507,7 @@ ifeq ($(PRINT_HELP),y)
 cross cross-in-a-container:
 	@echo "$$CROSS_HELP_INFO"
 else
+cross cross-in-a-container: KUBE_BUILD_CONFORMANCE = y
 cross:
 	hack/make-rules/cross.sh
 cross-in-a-container: KUBE_OUTPUT_SUBPATH = $(OUT_DIR)/dockerized
@@ -533,12 +527,13 @@ define CMD_HELP_INFO
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
 EXCLUDE_TARGET=BUILD OWNERS
-.PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+CMD_TARGET = $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+.PHONY: $(CMD_TARGET)
 ifeq ($(PRINT_HELP),y)
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
+$(CMD_TARGET):
 	@echo "$$CMD_HELP_INFO"
 else
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
+$(CMD_TARGET): generated_files
 	hack/make-rules/build.sh cmd/$@
 endif
 
@@ -553,7 +548,7 @@ ifeq ($(PRINT_HELP),y)
 generated_files:
 	@echo "$$GENERATED_FILES_HELP_INFO"
 else
-generated_files:
+generated_files gen_openapi:
 	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
 endif
 
@@ -570,70 +565,4 @@ help:
 else
 help:
 	hack/make-rules/make-help.sh
-endif
-
-# Non-dockerized bazel rules.
-.PHONY: bazel-build bazel-test bazel-release
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_BUILD_HELP_INFO
-# Build with bazel
-#
-# Example:
-# make bazel-build
-endef
-bazel-build:
-	@echo "$$BAZEL_BUILD_HELP_INFO"
-else
-# Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-build:
-	bazel build -- //... -//vendor/...
-endif
-
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_TEST_HELP_INFO
-# Test with bazel
-#
-# Example:
-# make bazel-test
-endef
-bazel-test:
-	@echo "$$BAZEL_TEST_HELP_INFO"
-else
-# //hack:verify-all is a manual target.
-# Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-test:
-	bazel test --config=unit -- \
-	  //... \
-	  //hack:verify-all \
-	  -//vendor/...
-endif
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_TEST_INTEGRATION_HELP_INFO
-# Integration test with bazel
-#
-# Example:
-# make bazel-test-integration
-endef
-bazel-test-integration:
-	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
-else
-bazel-test-integration:
-	bazel test --config integration //test/integration/...
-endif
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_RELEASE_HELP_INFO
-# Build release tars with bazel
-#
-# Example:
-# make bazel-release
-endef
-bazel-release:
-	@echo "$$BAZEL_RELEASE_HELP_INFO"
-else
-bazel-release:
-	bazel build //build/release-tars
 endif

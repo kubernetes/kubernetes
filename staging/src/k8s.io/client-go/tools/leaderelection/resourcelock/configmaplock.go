@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,31 +42,33 @@ type ConfigMapLock struct {
 }
 
 // Get returns the election record from a ConfigMap Annotation
-func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
+func (cml *ConfigMapLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(cml.ConfigMapMeta.Name, metav1.GetOptions{})
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(ctx, cml.ConfigMapMeta.Name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if cml.cm.Annotations == nil {
 		cml.cm.Annotations = make(map[string]string)
 	}
-	if recordBytes, found := cml.cm.Annotations[LeaderElectionRecordAnnotationKey]; found {
-		if err := json.Unmarshal([]byte(recordBytes), &record); err != nil {
-			return nil, err
+	recordStr, found := cml.cm.Annotations[LeaderElectionRecordAnnotationKey]
+	recordBytes := []byte(recordStr)
+	if found {
+		if err := json.Unmarshal(recordBytes, &record); err != nil {
+			return nil, nil, err
 		}
 	}
-	return &record, nil
+	return &record, recordBytes, nil
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
-func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
+func (cml *ConfigMapLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
 		return err
 	}
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Create(&v1.ConfigMap{
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cml.ConfigMapMeta.Name,
 			Namespace: cml.ConfigMapMeta.Namespace,
@@ -73,12 +76,12 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }
 
 // Update will update an existing annotation on a given resource.
-func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
+func (cml *ConfigMapLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
 	if cml.cm == nil {
 		return errors.New("configmap not initialized, call get or create first")
 	}
@@ -86,9 +89,16 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
+	if cml.cm.Annotations == nil {
+		cml.cm.Annotations = make(map[string]string)
+	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
-	return err
+	cm, err := cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(ctx, cml.cm, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	cml.cm = cm
+	return nil
 }
 
 // RecordEvent in leader election while adding meta-data
@@ -106,7 +116,7 @@ func (cml *ConfigMapLock) Describe() string {
 	return fmt.Sprintf("%v/%v", cml.ConfigMapMeta.Namespace, cml.ConfigMapMeta.Name)
 }
 
-// returns the Identity of the lock
+// Identity returns the Identity of the lock
 func (cml *ConfigMapLock) Identity() string {
 	return cml.LockConfig.Identity
 }

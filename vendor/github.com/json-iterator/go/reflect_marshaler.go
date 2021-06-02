@@ -3,8 +3,9 @@ package jsoniter
 import (
 	"encoding"
 	"encoding/json"
-	"github.com/modern-go/reflect2"
 	"unsafe"
+
+	"github.com/modern-go/reflect2"
 )
 
 var marshalerType = reflect2.TypeOfPtr((*json.Marshaler)(nil)).Elem()
@@ -98,6 +99,12 @@ func (encoder *marshalerEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	if err != nil {
 		stream.Error = err
 	} else {
+		// html escape was already done by jsoniter
+		// but the extra '\n' should be trimed
+		l := len(bytes)
+		if l > 0 && bytes[l-1] == '\n' {
+			bytes = bytes[:l-1]
+		}
 		stream.Write(bytes)
 	}
 }

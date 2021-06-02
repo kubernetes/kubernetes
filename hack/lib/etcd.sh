@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.3.10}
+ETCD_VERSION=${ETCD_VERSION:-3.4.13}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
@@ -45,13 +45,20 @@ kube::etcd::validate() {
     exit 1
   fi
 
+  # need set the env of "ETCD_UNSUPPORTED_ARCH" on unstable arch.
+  arch=$(uname -m)
+  if [[ $arch =~ aarch* ]]; then
+	  export ETCD_UNSUPPORTED_ARCH=arm64
+  elif [[ $arch =~ arm* ]]; then
+	  export ETCD_UNSUPPORTED_ARCH=arm
+  fi
   # validate installed version is at least equal to minimum
-  version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
+  version=$(etcd --version | grep Version | head -n 1 | cut -d " " -f 3)
   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
    echo "${PATH}"
-   version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+   version=$(etcd --version | grep Version | head -n 1 | cut -d " " -f 3)
    if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
@@ -75,13 +82,13 @@ kube::etcd::start() {
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
-  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --log-level=debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --log-level=debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
-  kube::util::wait_for_url "${KUBE_INTEGRATION_ETCD_URL}/v2/machines" "etcd: " 0.25 80
-  curl -fs -X PUT "${KUBE_INTEGRATION_ETCD_URL}/v2/keys/_test"
+  kube::util::wait_for_url "${KUBE_INTEGRATION_ETCD_URL}/health" "etcd: " 0.25 80
+  curl -fs -X POST "${KUBE_INTEGRATION_ETCD_URL}/v3/kv/put" -d '{"key": "X3Rlc3Q=", "value": ""}'
 }
 
 kube::etcd::stop() {

@@ -54,11 +54,11 @@ func NewAggregator(nodeCount int, result chan bool, config config.DefaultReporte
 		config:       config,
 		stenographer: stenographer,
 
-		suiteBeginnings: make(chan configAndSuite, 0),
-		beforeSuites:    make(chan *types.SetupSummary, 0),
-		afterSuites:     make(chan *types.SetupSummary, 0),
-		specCompletions: make(chan *types.SpecSummary, 0),
-		suiteEndings:    make(chan *types.SuiteSummary, 0),
+		suiteBeginnings: make(chan configAndSuite),
+		beforeSuites:    make(chan *types.SetupSummary),
+		afterSuites:     make(chan *types.SetupSummary),
+		specCompletions: make(chan *types.SpecSummary),
+		suiteEndings:    make(chan *types.SuiteSummary),
 	}
 
 	go aggregator.mux()
@@ -197,11 +197,11 @@ func (aggregator *Aggregator) announceSpec(specSummary *types.SpecSummary) {
 	switch specSummary.State {
 	case types.SpecStatePassed:
 		if specSummary.IsMeasurement {
-			aggregator.stenographer.AnnounceSuccesfulMeasurement(specSummary, aggregator.config.Succinct)
+			aggregator.stenographer.AnnounceSuccessfulMeasurement(specSummary, aggregator.config.Succinct)
 		} else if specSummary.RunTime.Seconds() >= aggregator.config.SlowSpecThreshold {
-			aggregator.stenographer.AnnounceSuccesfulSlowSpec(specSummary, aggregator.config.Succinct)
+			aggregator.stenographer.AnnounceSuccessfulSlowSpec(specSummary, aggregator.config.Succinct)
 		} else {
-			aggregator.stenographer.AnnounceSuccesfulSpec(specSummary)
+			aggregator.stenographer.AnnounceSuccessfulSpec(specSummary)
 		}
 
 	case types.SpecStatePending:
@@ -227,7 +227,7 @@ func (aggregator *Aggregator) registerSuiteEnding(suite *types.SuiteSummary) (fi
 	aggregatedSuiteSummary.SuiteSucceeded = true
 
 	for _, suiteSummary := range aggregator.aggregatedSuiteEndings {
-		if suiteSummary.SuiteSucceeded == false {
+		if !suiteSummary.SuiteSucceeded {
 			aggregatedSuiteSummary.SuiteSucceeded = false
 		}
 

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -237,6 +238,7 @@ func TestRunInitNodeChecks(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "Test APIEndpoint exists if exists",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
@@ -248,7 +250,8 @@ func TestRunInitNodeChecks(t *testing.T) {
 		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString(), rt.isSecondaryControlPlane, rt.downloadCerts)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				"failed RunInitNodeChecks:%v\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				rt.name,
 				rt.expected,
 				(actual == nil),
 				actual,
@@ -259,14 +262,17 @@ func TestRunInitNodeChecks(t *testing.T) {
 
 func TestRunJoinNodeChecks(t *testing.T) {
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
 		{
+			name:     "Check empty JoinConfiguration",
 			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
 		{
+			name: "Check TLS Bootstrap APIServerEndpoint IPv4 addr",
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
@@ -277,6 +283,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "Check TLS Bootstrap APIServerEndpoint IPv6 addr",
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
@@ -292,7 +299,8 @@ func TestRunJoinNodeChecks(t *testing.T) {
 		actual := RunJoinNodeChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed RunJoinNodeChecks:%v\n\texpected: %t\n\t  actual: %t",
+				rt.name,
 				rt.expected,
 				(actual != nil),
 			)
@@ -590,6 +598,22 @@ func TestHTTPProxyCheck(t *testing.T) {
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			name: "IPv6 direct access, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8::1:15",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			name: "IPv6 via proxy, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8:1::1:15",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
 	}
 
 	// Save current content of *_proxy and *_PROXY variables.
@@ -673,8 +697,8 @@ func TestKubeletVersionCheck(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.kubeletVersion, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil },
+				OutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil, nil },
 				},
 			}
 			fexec := &fakeexec.FakeExec{
@@ -731,7 +755,7 @@ func TestSetHasItemOrAll(t *testing.T) {
 
 func TestImagePullCheck(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
+		RunScript: []fakeexec.FakeAction{
 			// Test case 1: img1 and img2 exist, img3 doesn't exist
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
@@ -742,18 +766,35 @@ func TestImagePullCheck(t *testing.T) {
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Test case1: pull only img3
-			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// Test case 2: fail to pull image2 and image3
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -812,6 +853,32 @@ func TestNumCPUCheck(t *testing.T) {
 			}
 			if len(errors) != rt.numErrors {
 				t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestMemCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS for memory check test ")
+	}
+
+	var tests = []struct {
+		minimum        uint64
+		expectedErrors int
+	}{
+		{0, 0},
+		{9999999999999999, 1},
+	}
+
+	for _, rt := range tests {
+		t.Run(fmt.Sprintf("MemoryCheck{%d}", rt.minimum), func(t *testing.T) {
+			warnings, errors := MemCheck{Mem: rt.minimum}.Check()
+			if len(warnings) > 0 {
+				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
+			} else if len(errors) != rt.expectedErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", rt.expectedErrors, len(errors), errors)
 			}
 		})
 	}

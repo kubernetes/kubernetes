@@ -57,10 +57,16 @@ type fakeIOHandler struct{}
 func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	switch dirname {
 	case "/dev/disk/by-path/":
-		f := &fakeFileInfo{
+		f1 := &fakeFileInfo{
 			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-0",
 		}
-		return []os.FileInfo{f}, nil
+		f2 := &fakeFileInfo{
+			name: "fc-0x5005076810213b32-lun-2",
+		}
+		f3 := &fakeFileInfo{
+			name: "abc-0000:41:00.0-fc-0x5005076810213404-lun-0",
+		}
+		return []os.FileInfo{f1, f2, f3}, nil
 	case "/sys/block/":
 		f := &fakeFileInfo{
 			name: "dm-1",
@@ -88,18 +94,58 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 }
 
 func TestSearchDisk(t *testing.T) {
-	fakeMounter := fcDiskMounter{
-		fcDisk: &fcDisk{
+	tests := []struct {
+		name        string
+		wwns        []string
+		lun         string
+		expectError bool
+	}{
+		{
+			name: "PCI disk",
 			wwns: []string{"500a0981891b8dc5"},
 			lun:  "0",
-			io:   &fakeIOHandler{},
 		},
-		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+		{
+			name: "Non PCI disk",
+			wwns: []string{"5005076810213b32"},
+			lun:  "2",
+		},
+		{
+			name:        "Invalid Storage Controller",
+			wwns:        []string{"5005076810213404"},
+			lun:         "0",
+			expectError: true,
+		},
+		{
+			name:        "Non existing disk",
+			wwns:        []string{"500507681fffffff"},
+			lun:         "0",
+			expectError: true,
+		},
 	}
-	devicePath, error := searchDisk(fakeMounter)
-	// if no disk matches input wwn and lun, exit
-	if devicePath == "" || error != nil {
-		t.Errorf("no fc disk found")
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeMounter := fcDiskMounter{
+				fcDisk: &fcDisk{
+					wwns: test.wwns,
+					lun:  test.lun,
+					io:   &fakeIOHandler{},
+				},
+				deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+			}
+			devicePath, err := searchDisk(fakeMounter)
+			if test.expectError && err == nil {
+				t.Errorf("expected error but got none")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("got unexpected error: %s", err)
+			}
+			// if no disk matches input wwn and lun, exit
+			if devicePath == "" && !test.expectError {
+				t.Errorf("no fc disk found")
+			}
+		})
 	}
 }
 

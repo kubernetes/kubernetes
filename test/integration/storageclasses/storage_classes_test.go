@@ -19,6 +19,7 @@ package storageclasses
 // This file contains tests for the storage classes API resource.
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -59,7 +60,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 		Provisioner: provisionerPluginName,
 	}
 
-	if _, err := client.StorageV1().StorageClasses().Create(&s); err != nil {
+	if _, err := client.StorageV1().StorageClasses().Create(context.TODO(), &s, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unable to create test storage class: %v", err)
 	}
 	defer deleteStorageClassOrErrorf(t, client, s.Namespace, s.Name)
@@ -79,20 +80,20 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 	}
 
 	pvc.ObjectMeta.Name = "uses-storageclass"
-	if _, err := client.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc); err != nil {
+	if _, err := client.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pvc: %v", err)
 	}
 	defer deletePersistentVolumeClaimOrErrorf(t, client, ns.Name, pvc.Name)
 }
 
 func deleteStorageClassOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.StorageV1().StorageClasses().Delete(name, nil); err != nil {
+	if err := c.StorageV1().StorageClasses().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete storage class %v: %v", name, err)
 	}
 }
 
 func deletePersistentVolumeClaimOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete persistent volume claim %v: %v", name, err)
 	}
 }

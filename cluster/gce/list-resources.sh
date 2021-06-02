@@ -75,6 +75,9 @@ echo "Provider: ${KUBERNETES_PROVIDER:-}"
 
 # List resources related to instances, filtering by the instance prefix if
 # provided.
+
+set +e # do not stop on error
+
 gcloud-list compute instance-templates "name ~ '${INSTANCE_PREFIX}.*'"
 gcloud-list compute instance-groups "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
 gcloud-list compute instances "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
@@ -95,3 +98,5 @@ gcloud-list compute forwarding-rules ${REGION:+"region=(${REGION})"}
 gcloud-list compute target-pools ${REGION:+"region=(${REGION})"}
 
 gcloud-list logging sinks
+
+set -e

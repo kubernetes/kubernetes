@@ -20,26 +20,37 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
-
-	"k8s.io/klog"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/x509metrics"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/klog/v2"
+	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
 
-const aggregatorComponent string = "aggregator"
+const (
+	aggregatorComponent string = "aggregator"
+
+	aggregatedDiscoveryTimeout = 5 * time.Second
+)
+
+type certKeyFunc func() ([]byte, []byte)
 
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
@@ -47,16 +58,18 @@ type proxyHandler struct {
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	// proxyCurrentCertKeyContent holds the client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
+	proxyCurrentCertKeyContent certKeyFunc
+	proxyTransport             *http.Transport
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
 
 	handlingInfo atomic.Value
+
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 type proxyHandlingInfo struct {
@@ -92,7 +105,7 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 		return
 	}
 	// TODO: record long-running request differently? The long-running check func does not necessarily match the one of the aggregated apiserver
-	endpointmetrics.Record(req, info, aggregatorComponent, "", code, 0, 0)
+	endpointmetrics.RecordRequestTermination(req, info, aggregatorComponent, code)
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -140,11 +153,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
-	// WithContext creates a shallow clone of the request with the new context.
-	newReq := req.WithContext(context.Background())
-	newReq.Header = utilnet.CloneHeader(req.Header)
-	newReq.URL = location
-	newReq.Host = location.Host
+	newReq, cancelFn := newRequestForProxy(location, req)
+	defer cancelFn()
 
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
@@ -169,6 +179,37 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
 	handler.ServeHTTP(w, newReq)
+}
+
+// newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
+func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
+	newCtx := req.Context()
+	cancelFn := func() {}
+
+	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
+		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
+		// segments that we are going to proxy, we have a discovery request.
+		if !requestInfo.IsResourceRequest && len(strings.Split(strings.Trim(requestInfo.Path, "/"), "/")) == 3 {
+			// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
+			// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
+			// so forcing a short timeout here helps responsiveness of all clients.
+			newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
+		}
+	}
+
+	// WithContext creates a shallow clone of the request with the same context.
+	newReq := req.WithContext(newCtx)
+	newReq.Header = utilnet.CloneHeader(req.Header)
+	newReq.URL = location
+	newReq.Host = location.Host
+
+	// If the original request has an audit ID, let's make sure we propagate this
+	// to the aggregated server.
+	if auditID, found := genericapirequest.AuditIDFrom(req.Context()); found {
+		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
+	}
+
+	return newReq, cancelFn
 }
 
 // maybeWrapForConnectionUpgrades wraps the roundtripper for upgrades.  The bool indicates if it was wrapped
@@ -204,34 +245,48 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 }
 
 func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
-	http.Error(r.w, err.Error(), http.StatusInternalServerError)
+	http.Error(r.w, err.Error(), http.StatusServiceUnavailable)
 }
 
 // these methods provide locked access to fields
 
-func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIService) {
+func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
 		return
 	}
 
-	newInfo := proxyHandlingInfo{
-		name: apiService.Name,
-		restConfig: &restclient.Config{
-			TLSClientConfig: restclient.TLSClientConfig{
-				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
-				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-				CertData:   r.proxyClientCert,
-				KeyData:    r.proxyClientKey,
-				CAData:     apiService.Spec.CABundle,
-			},
+	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
+
+	clientConfig := &restclient.Config{
+		TLSClientConfig: restclient.TLSClientConfig{
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+			CertData:   proxyClientCert,
+			KeyData:    proxyClientKey,
+			CAData:     apiService.Spec.CABundle,
 		},
+	}
+	clientConfig.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+
+	newInfo := proxyHandlingInfo{
+		name:             apiService.Name,
+		restConfig:       clientConfig,
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
-		servicePort:      apiService.Spec.Service.Port,
-		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
+		servicePort:      *apiService.Spec.Service.Port,
+		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
-	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
+	if r.egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := r.egressSelector.Lookup(networkContext)
+		if err != nil {
+			klog.Warning(err.Error())
+		} else {
+			newInfo.restConfig.Dial = egressDialer
+		}
+	} else if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)

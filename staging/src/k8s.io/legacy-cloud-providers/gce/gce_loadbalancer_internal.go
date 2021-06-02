@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,40 +20,80 @@ package gce
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
+	// Used to list instances in all states(RUNNING and other) - https://cloud.google.com/compute/docs/reference/rest/v1/instanceGroups/listInstances
 	allInstances = "ALL"
+	// ILBFinalizerV1 key is used to identify ILB services whose resources are managed by service controller.
+	ILBFinalizerV1 = "gke.networking.io/l4-ilb-v1"
+	// ILBFinalizerV2 is the finalizer used by newer controllers that implement Internal LoadBalancer services.
+	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
+	// maxInstancesPerInstanceGroup defines maximum number of VMs per InstanceGroup.
+	maxInstancesPerInstanceGroup = 1000
+	// maxL4ILBPorts is the maximum number of ports that can be specified in an L4 ILB Forwarding Rule. Beyond this, "AllPorts" field should be used.
+	maxL4ILBPorts = 5
 )
 
-func usesNEG(service *v1.Service) bool {
-	_, ok := service.GetAnnotations()[NEGAnnotation]
-	return ok
-}
-
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if usesNEG(svc) {
-		// Do not manage loadBalancer for services using NEGs
-		return &svc.Status.LoadBalancer, nil
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
+		// When ILBSubsets is enabled, new ILB services will not be processed here.
+		// Services that have existing GCE resources created by this controller will continue to update.
+		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
+			"Skipped ensureInternalLoadBalancer since %s feature is enabled.", AlphaFeatureILBSubsets)
+		return nil, cloudprovider.ImplementedElsewhere
 	}
+	if hasFinalizer(svc, ILBFinalizerV2) {
+		// Another controller is handling the resources for this service.
+		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
+			"Skipped ensureInternalLoadBalancer as service contains '%s' finalizer.", ILBFinalizerV2)
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
-	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
+
+	var serviceState L4ILBServiceState
+	// Mark the service InSuccess state as false to begin with.
+	// This will be updated to true if the VIP is configured successfully.
+	serviceState.InSuccess = false
+	defer func() {
+		g.metricsCollector.SetL4ILBService(nm.String(), serviceState)
+	}()
+
+	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Attaching %q finalizer", loadBalancerName, ILBFinalizerV1)
+	if err := addFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
+		klog.Errorf("Failed to attach finalizer '%s' on service %s/%s - %v", ILBFinalizerV1, svc.Namespace, svc.Name, err)
+		return nil, err
+	}
+
+	ports, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
 	scheme := cloud.SchemeInternal
-	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
+	options := getILBOptions(svc)
+	if g.IsLegacyNetwork() {
+		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
+		options = ILBOptions{}
+	}
+
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
 	backendServiceLink := g.getBackendServiceLink(backendServiceName)
@@ -90,28 +132,35 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
+	subnetworkURL := g.SubnetworkURL()
+	// Any subnet specified using the subnet annotation will be picked up and reflected in the forwarding rule.
+	// Removing the annotation will set the forwarding rule to use the default subnet and result in a VIP change.
+	// In order to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861,
+	// users will need to specify that subnet with the annotation.
+	if options.SubnetName != "" {
+		subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
+	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
-	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	ipToUse := requestedIP
+	ipToUse := ilbIPToUse(svc, existingFwdRule, subnetworkURL)
 
-	// If the ILB already exists, continue using the subnet that it's already using.
-	// This is to support existing ILBs that were setup using the wrong subnet.
-	subnetworkURL := g.SubnetworkURL()
-	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-		// external LBs have an empty Subnetwork field.
-		subnetworkURL = existingFwdRule.Subnetwork
-	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Using subnet %s for LoadBalancer IP %s", loadBalancerName, options.SubnetName, ipToUse)
 
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
-		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
+		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, ipToUse, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
 		}
 		klog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
+		defer func() {
+			// Release the address if all resources were created successfully, or if we error out.
+			if err := addrMgr.ReleaseAddress(); err != nil {
+				klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
+			}
+		}()
 	}
 
 	// Ensure firewall rules if necessary
@@ -119,27 +168,39 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	expectedFwdRule := &compute.ForwardingRule{
+	fwdRuleDescription := &forwardingRuleDescription{ServiceName: nm.String()}
+	fwdRuleDescriptionString, err := fwdRuleDescription.marshal()
+	if err != nil {
+		return nil, err
+	}
+	newFwdRule := &compute.ForwardingRule{
 		Name:                loadBalancerName,
-		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String()),
+		Description:         fwdRuleDescriptionString,
 		IPAddress:           ipToUse,
 		BackendService:      backendServiceLink,
 		Ports:               ports,
 		IPProtocol:          string(protocol),
 		LoadBalancingScheme: string(scheme),
+		// Given that CreateGCECloud will attempt to determine the subnet based off the network,
+		// the subnetwork should rarely be unknown.
+		Subnetwork: subnetworkURL,
+		Network:    g.networkURL,
 	}
-
-	// Given that CreateGCECloud will attempt to determine the subnet based off the network,
-	// the subnetwork should rarely be unknown.
-	if subnetworkURL != "" {
-		expectedFwdRule.Subnetwork = subnetworkURL
-	} else {
-		expectedFwdRule.Network = g.networkURL
+	if options.AllowGlobalAccess {
+		newFwdRule.AllowGlobalAccess = options.AllowGlobalAccess
+	}
+	if len(ports) > maxL4ILBPorts {
+		newFwdRule.Ports = nil
+		newFwdRule.AllPorts = true
 	}
 
 	fwdRuleDeleted := false
-	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
+	if existingFwdRule != nil && !forwardingRulesEqual(existingFwdRule, newFwdRule) {
+		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
+		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
+		// rule would show the old protocol.
+		frDiff := cmp.Diff(existingFwdRule, newFwdRule)
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
@@ -152,13 +213,11 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	// If we previously deleted the forwarding rule or it never existed, finally create it.
 	if fwdRuleDeleted || existingFwdRule == nil {
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", loadBalancerName)
-		if err = g.CreateRegionForwardingRule(expectedFwdRule, g.region); err != nil {
+		// existing rule has been deleted, pass in nil
+		if err := g.ensureInternalForwardingRule(nil, newFwdRule); err != nil {
 			return nil, err
 		}
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", loadBalancerName)
 	}
 
 	// Delete the previous internal load balancer resources if necessary
@@ -166,18 +225,23 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
 	}
 
-	if addrMgr != nil {
-		// Now that the controller knows the forwarding rule exists, we can release the address.
-		if err := addrMgr.ReleaseAddress(); err != nil {
-			klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
-		}
-	}
-
 	// Get the most recent forwarding rule for the address.
 	updatedFwdRule, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err != nil {
 		return nil, err
 	}
+
+	serviceState.InSuccess = true
+	if options.AllowGlobalAccess {
+		serviceState.EnabledGlobalAccess = true
+	}
+	// SubnetName is overridden to nil value if Alpha feature gate for custom subnet
+	// is not enabled. So, a non empty subnet name at this point implies that the
+	// feature is in use.
+	if options.SubnetName != "" {
+		serviceState.EnabledCustomSubnet = true
+	}
+	klog.V(6).Infof("Internal Loadbalancer for Service %s ensured, updating its state %v in metrics cache", nm, serviceState)
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: updatedFwdRule.IPAddress}}
@@ -210,9 +274,8 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	if usesNEG(svc) {
-		// Do not manage loadBalancer for services using NEGs
-		return nil
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
 	defer g.sharedResourceLock.Unlock()
@@ -224,7 +287,7 @@ func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	// Generate the backend service name
-	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	_, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, shareBackendService(svc), scheme, protocol, svc.Spec.SessionAffinity)
@@ -234,7 +297,8 @@ func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v
 
 func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
-	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	svcNamespacedName := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
+	_, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
 	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(svc)
@@ -256,14 +320,26 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := ignoreNotFound(g.DeleteFirewall(loadBalancerName)); err != nil {
-		if isForbidden(err) && g.OnXPN() {
-			klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
-			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, g.NetworkProjectID()))
-		} else {
+	deleteFunc := func(fwName string) error {
+		if err := ignoreNotFound(g.DeleteFirewall(fwName)); err != nil {
+			if isForbidden(err) && g.OnXPN() {
+				klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
+				g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(fwName, g.NetworkProjectID()))
+				return nil
+			}
 			return err
 		}
+		return nil
+	}
+	fwName := MakeFirewallName(loadBalancerName)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall %s for traffic",
+		loadBalancerName, fwName)
+	if err := deleteFunc(fwName); err != nil {
+		return err
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting legacy name firewall for traffic", loadBalancerName)
+	if err := deleteFunc(loadBalancerName); err != nil {
+		return err
 	}
 
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
@@ -274,10 +350,19 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 
 	// Try deleting instance groups - expect ResourceInuse error if needed by other LBs
 	igName := makeInstanceGroupName(clusterID)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): Attempting delete of instanceGroup %v", loadBalancerName, igName)
 	if err := g.ensureInternalInstanceGroupsDeleted(igName); err != nil && !isInUsedByError(err) {
 		return err
 	}
 
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): Removing %q finalizer", loadBalancerName, ILBFinalizerV1)
+	if err := removeFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
+		klog.Errorf("Failed to remove finalizer '%s' on service %s - %v", ILBFinalizerV1, svcNamespacedName, err)
+		return err
+	}
+
+	klog.V(6).Infof("Internal Loadbalancer for Service %s deleted, removing its state from metrics cache", svcNamespacedName)
+	g.metricsCollector.DeleteL4ILBService(svcNamespacedName.String())
 	return nil
 }
 
@@ -325,7 +410,7 @@ func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName s
 	return nil
 }
 
-func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, portRanges []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
 	klog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
 	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
@@ -335,6 +420,29 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	existingFirewall, err := g.GetFirewall(fwName)
 	if err != nil && !isNotFound(err) {
 		return err
+	}
+	// TODO(84821) Remove legacyFwName logic after 3 releases, so there would have been atleast 2 master upgrades that would
+	// have triggered service sync and deletion of the legacy rules.
+	if legacyFwName != "" {
+		// Check for firewall named with the legacy naming scheme and delete if found.
+		legacyFirewall, err := g.GetFirewall(legacyFwName)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if legacyFirewall != nil && existingFirewall != nil {
+			// Delete the legacyFirewall rule if the new one was already created. If not, it will be deleted in the
+			// next sync or when the service is deleted.
+			defer func() {
+				err = g.DeleteFirewall(legacyFwName)
+				if err != nil {
+					klog.Errorf("Failed to delete legacy firewall %s for service %s/%s, err %v",
+						legacyFwName, svc.Namespace, svc.Name, err)
+				} else {
+					klog.V(2).Infof("Successfully deleted legacy firewall %s for service %s/%s",
+						legacyFwName, svc.Namespace, svc.Name)
+				}
+			}()
+		}
 	}
 
 	expectedFirewall := &compute.Firewall{
@@ -346,7 +454,7 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: strings.ToLower(string(protocol)),
-				Ports:      ports,
+				Ports:      portRanges,
 			},
 		},
 	}
@@ -379,20 +487,20 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
-	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	_, portRanges, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(svc)
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
+	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
 
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
-	hcSrcRanges := LoadBalancerSrcRanges()
-	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
+	hcSrcRanges := L4LoadBalancerSrcRanges()
+	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
 
 func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
@@ -420,7 +528,7 @@ func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedN
 
 	if needToUpdateHealthChecks(hc, expectedHC) {
 		klog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
-		expectedHC = mergeHealthChecks(hc, expectedHC)
+		mergeHealthChecks(hc, expectedHC)
 		if err := g.UpdateHealthCheck(expectedHC); err != nil {
 			klog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err
@@ -444,6 +552,17 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node)
 	kubeNodes := sets.NewString()
 	for _, n := range nodes {
 		kubeNodes.Insert(n.Name)
+	}
+
+	// Individual InstanceGroup has a limit for 1000 instances in it.
+	// As a result, it's not possible to add more to it.
+	// Given that the long-term fix (AlphaFeatureILBSubsets) is already in-progress,
+	// to stop the bleeding we now simply cut down the contents to first 1000
+	// instances in the alphabetical order. Since there is a limitation for
+	// 250 backend VMs for ILB, this isn't making things worse.
+	if len(kubeNodes) > maxInstancesPerInstanceGroup {
+		klog.Warningf("Limiting number of VMs for InstanceGroup %s to %d", name, maxInstancesPerInstanceGroup)
+		kubeNodes = sets.NewString(kubeNodes.List()[:maxInstancesPerInstanceGroup]...)
 	}
 
 	gceNodes := sets.NewString()
@@ -642,7 +761,7 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 // The HC interval will be reconciled to 8 seconds.
 // If the existing health check is larger than the default interval,
 // the configuration will be kept.
-func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
+func mergeHealthChecks(hc, newHC *compute.HealthCheck) {
 	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
 		newHC.CheckIntervalSec = hc.CheckIntervalSec
 	}
@@ -655,18 +774,24 @@ func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
 	if hc.HealthyThreshold > newHC.HealthyThreshold {
 		newHC.HealthyThreshold = hc.HealthyThreshold
 	}
-	return newHC
 }
 
 // needToUpdateHealthChecks checks whether the healthcheck needs to be updated.
 func needToUpdateHealthChecks(hc, newHC *compute.HealthCheck) bool {
-	if hc.HttpHealthCheck == nil || newHC.HttpHealthCheck == nil {
+	switch {
+	case
+		hc.HttpHealthCheck == nil,
+		newHC.HttpHealthCheck == nil,
+		hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port,
+		hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath,
+		hc.Description != newHC.Description,
+		hc.CheckIntervalSec < newHC.CheckIntervalSec,
+		hc.TimeoutSec < newHC.TimeoutSec,
+		hc.UnhealthyThreshold < newHC.UnhealthyThreshold,
+		hc.HealthyThreshold < newHC.HealthyThreshold:
 		return true
 	}
-	changed := hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port || hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath || hc.Description != newHC.Description
-	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
-	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
-	return changed
+	return false
 }
 
 // backendsListEqual asserts that backend lists are equal by instance group link only
@@ -699,25 +824,62 @@ func backendSvcEqual(a, b *compute.BackendService) bool {
 		backendsListEqual(a.Backends, b.Backends)
 }
 
-func fwdRuleEqual(a, b *compute.ForwardingRule) bool {
-	return (a.IPAddress == "" || b.IPAddress == "" || a.IPAddress == b.IPAddress) &&
-		a.IPProtocol == b.IPProtocol &&
-		a.LoadBalancingScheme == b.LoadBalancingScheme &&
-		equalStringSets(a.Ports, b.Ports) &&
-		a.BackendService == b.BackendService
-}
-
-func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1.Protocol) {
+func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, portRanges []string, protocol v1.Protocol) {
 	if len(svcPorts) == 0 {
-		return []string{}, v1.ProtocolUDP
+		return []string{}, []string{}, v1.ProtocolUDP
 	}
 
 	// GCP doesn't support multiple protocols for a single load balancer
 	protocol = svcPorts[0].Protocol
+	portInts := []int{}
 	for _, p := range svcPorts {
 		ports = append(ports, strconv.Itoa(int(p.Port)))
+		portInts = append(portInts, int(p.Port))
 	}
-	return ports, protocol
+
+	return ports, getPortRanges(portInts), protocol
+}
+
+func getPortRanges(ports []int) (ranges []string) {
+	if len(ports) < 1 {
+		return ranges
+	}
+	sort.Ints(ports)
+
+	start := ports[0]
+	prev := ports[0]
+	for ix, current := range ports {
+		switch {
+		case current == prev:
+			// Loop over duplicates, except if the end of list is reached.
+			if ix == len(ports)-1 {
+				if start == current {
+					ranges = append(ranges, fmt.Sprintf("%d", current))
+				} else {
+					ranges = append(ranges, fmt.Sprintf("%d-%d", start, current))
+				}
+			}
+		case current == prev+1:
+			// continue the streak, create the range if this is the last element in the list.
+			if ix == len(ports)-1 {
+				ranges = append(ranges, fmt.Sprintf("%d-%d", start, current))
+			}
+		default:
+			// current is not prev + 1, streak is broken. Construct the range and handle last element case.
+			if start == prev {
+				ranges = append(ranges, fmt.Sprintf("%d", prev))
+			} else {
+				ranges = append(ranges, fmt.Sprintf("%d-%d", start, prev))
+			}
+			if ix == len(ports)-1 {
+				ranges = append(ranges, fmt.Sprintf("%d", current))
+			}
+			// reset start element
+			start = current
+		}
+		prev = current
+	}
+	return ranges
 }
 
 func (g *Cloud) getBackendServiceLink(name string) string {
@@ -733,14 +895,99 @@ func getNameFromLink(link string) string {
 	return fields[len(fields)-1]
 }
 
-func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) string {
+// ilbIPToUse determines which IP address needs to be used in the ForwardingRule. If an IP has been
+// specified by the user, that is used. If there is an existing ForwardingRule, the ip address from
+// that is reused. In case a subnetwork change is requested, the existing ForwardingRule IP is ignored.
+func ilbIPToUse(svc *v1.Service, fwdRule *compute.ForwardingRule, requestedSubnet string) string {
 	if svc.Spec.LoadBalancerIP != "" {
 		return svc.Spec.LoadBalancerIP
 	}
-
-	if fwdRule != nil {
-		return fwdRule.IPAddress
+	if fwdRule == nil {
+		return ""
 	}
+	if requestedSubnet != fwdRule.Subnetwork {
+		// reset ip address since subnet is being changed.
+		return ""
+	}
+	return fwdRule.IPAddress
+}
 
-	return ""
+func getILBOptions(svc *v1.Service) ILBOptions {
+	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
+		SubnetName: GetLoadBalancerAnnotationSubnet(svc),
+	}
+}
+
+type forwardingRuleDescription struct {
+	ServiceName string       `json:"kubernetes.io/service-name"`
+	APIVersion  meta.Version `json:"kubernetes.io/api-version,omitempty"`
+}
+
+// marshal the description as a JSON-encoded string.
+func (d *forwardingRuleDescription) marshal() (string, error) {
+	out, err := json.Marshal(d)
+	if err != nil {
+		return "", err
+	}
+	return string(out), err
+}
+
+// unmarshal desc JSON-encoded string into this structure.
+func (d *forwardingRuleDescription) unmarshal(desc string) error {
+	return json.Unmarshal([]byte(desc), d)
+}
+
+func getFwdRuleAPIVersion(rule *compute.ForwardingRule) (meta.Version, error) {
+	d := &forwardingRuleDescription{}
+	if rule.Description == "" {
+		return meta.VersionGA, nil
+	}
+	if err := d.unmarshal(rule.Description); err != nil {
+		return meta.VersionGA, fmt.Errorf("Failed to get APIVersion from Forwarding rule %s - %v", rule.Name, err)
+	}
+	if d.APIVersion == "" {
+		d.APIVersion = meta.VersionGA
+	}
+	return d.APIVersion, nil
+}
+
+func (g *Cloud) ensureInternalForwardingRule(existingFwdRule, newFwdRule *compute.ForwardingRule) (err error) {
+	if existingFwdRule != nil {
+		if forwardingRulesEqual(existingFwdRule, newFwdRule) {
+			klog.V(4).Infof("existingFwdRule == newFwdRule, no updates needed (existingFwdRule == %+v)", existingFwdRule)
+			return nil
+		}
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", existingFwdRule.Name, existingFwdRule.IPAddress)
+		if err = ignoreNotFound(g.DeleteRegionForwardingRule(existingFwdRule.Name, g.region)); err != nil {
+			return err
+		}
+	}
+	// At this point, the existing rule has been deleted if required.
+	// Create the rule based on the api version determined
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", newFwdRule.Name)
+	if err = g.CreateRegionForwardingRule(newFwdRule, g.region); err != nil {
+		return err
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", newFwdRule.Name)
+	return nil
+}
+
+func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
+	// basepath could have differences like compute.googleapis.com vs www.googleapis.com, compare resourceIDs
+	oldResourceID, err := cloud.ParseResourceURL(old.BackendService)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	}
+	newResourceID, err := cloud.ParseResourceURL(new.BackendService)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
+	}
+	return (old.IPAddress == "" || new.IPAddress == "" || old.IPAddress == new.IPAddress) &&
+		old.IPProtocol == new.IPProtocol &&
+		old.LoadBalancingScheme == new.LoadBalancingScheme &&
+		equalStringSets(old.Ports, new.Ports) &&
+		old.AllPorts == new.AllPorts &&
+		oldResourceID.Equal(newResourceID) &&
+		old.AllowGlobalAccess == new.AllowGlobalAccess &&
+		old.Subnetwork == new.Subnetwork
 }

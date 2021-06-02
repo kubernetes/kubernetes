@@ -2,6 +2,7 @@ package libcontainer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -18,11 +19,6 @@ type syncType string
 //
 // procHooks   --> [run hooks]
 //             <-- procResume
-//
-// procConsole -->
-//             <-- procConsoleReq
-//  [send(fd)] --> [recv(fd)]
-//             <-- procConsoleAck
 //
 // procReady   --> [final setup]
 //             <-- procRun
@@ -50,22 +46,23 @@ func readSync(pipe io.Reader, expected syncType) error {
 	var procSync syncT
 	if err := json.NewDecoder(pipe).Decode(&procSync); err != nil {
 		if err == io.EOF {
-			return fmt.Errorf("parent closed synchronisation channel")
+			return errors.New("parent closed synchronisation channel")
+		}
+		return fmt.Errorf("failed reading error from parent: %v", err)
+	}
+
+	if procSync.Type == procError {
+		var ierr genericError
+
+		if err := json.NewDecoder(pipe).Decode(&ierr); err != nil {
+			return fmt.Errorf("failed reading error from parent: %v", err)
 		}
 
-		if procSync.Type == procError {
-			var ierr genericError
+		return &ierr
+	}
 
-			if err := json.NewDecoder(pipe).Decode(&ierr); err != nil {
-				return fmt.Errorf("failed reading error from parent: %v", err)
-			}
-
-			return &ierr
-		}
-
-		if procSync.Type != expected {
-			return fmt.Errorf("invalid synchronisation flag from parent")
-		}
+	if procSync.Type != expected {
+		return errors.New("invalid synchronisation flag from parent")
 	}
 	return nil
 }

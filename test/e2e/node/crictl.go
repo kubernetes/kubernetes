@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -32,9 +32,9 @@ var _ = SIGDescribe("crictl", func() {
 
 	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		// The test requires $HOME/.ssh/id_rsa key to be present.
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 
 	ginkgo.It("should be able to run crictl on the node", func() {
@@ -65,10 +65,10 @@ var _ = SIGDescribe("crictl", func() {
 			// Log the stdout/stderr output.
 			// TODO: Verify the output.
 			if len(stdout) > 0 {
-				e2elog.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
+				framework.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
 			}
 			if len(stderr) > 0 {
-				e2elog.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
+				framework.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
 			}
 		}
 	})

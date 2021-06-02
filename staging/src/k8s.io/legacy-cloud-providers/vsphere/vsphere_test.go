@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,9 +19,11 @@ limitations under the License.
 package vsphere
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"flag"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -28,6 +32,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vmware/govmomi/find"
@@ -42,37 +47,65 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	vmwaretypes "github.com/vmware/govmomi/vim25/types"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
-	"k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures"
 )
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//     go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = `-----BEGIN CERTIFICATE-----
-MIIBjzCCATmgAwIBAgIRAKpi2WmTcFrVjxrl5n5YDUEwDQYJKoZIhvcNAQELBQAw
-EjEQMA4GA1UEChMHQWNtZSBDbzAgFw03MDAxMDEwMDAwMDBaGA8yMDg0MDEyOTE2
-MDAwMFowEjEQMA4GA1UEChMHQWNtZSBDbzBcMA0GCSqGSIb3DQEBAQUAA0sAMEgC
-QQC9fEbRszP3t14Gr4oahV7zFObBI4TfA5i7YnlMXeLinb7MnvT4bkfOJzE6zktn
-59zP7UiHs3l4YOuqrjiwM413AgMBAAGjaDBmMA4GA1UdDwEB/wQEAwICpDATBgNV
-HSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MC4GA1UdEQQnMCWCC2V4
-YW1wbGUuY29thwR/AAABhxAAAAAAAAAAAAAAAAAAAAABMA0GCSqGSIb3DQEBCwUA
-A0EAUsVE6KMnza/ZbodLlyeMzdo7EM/5nb5ywyOxgIOCf0OOLHsPS9ueGLQX9HEG
-//yjTXuhNcUugExIjM/AIwAZPQ==
+MIIDGDCCAgCgAwIBAgIQTKCKn99d5HhQVCLln2Q+eTANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
+MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEA1Z5/aTwqY706M34tn60l8ZHkanWDl8mM1pYf4Q7qg3zA9XqWLX6S
+4rTYDYCb4stEasC72lQnbEWHbthiQE76zubP8WOFHdvGR3mjAvHWz4FxvLOTheZ+
+3iDUrl6Aj9UIsYqzmpBJAoY4+vGGf+xHvuukHrVcFqR9ZuBdZuJ/HbbjUyuNr3X9
+erNIr5Ha17gVzf17SNbYgNrX9gbCeEB8Z9Ox7dVuJhLDkpF0T/B5Zld3BjyUVY/T
+cukU4dTVp6isbWPvCMRCZCCOpb+qIhxEjJ0n6tnPt8nf9lvDl4SWMl6X1bH+2EFa
+a8R06G0QI+XhwPyjXUyCR8QEOZPCR5wyqQIDAQABo2gwZjAOBgNVHQ8BAf8EBAMC
+AqQwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zAuBgNVHREE
+JzAlggtleGFtcGxlLmNvbYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG
+9w0BAQsFAAOCAQEAThqgJ/AFqaANsOp48lojDZfZBFxJQ3A4zfR/MgggUoQ9cP3V
+rxuKAFWQjze1EZc7J9iO1WvH98lOGVNRY/t2VIrVoSsBiALP86Eew9WucP60tbv2
+8/zsBDSfEo9Wl+Q/gwdEh8dgciUKROvCm76EgAwPGicMAgRsxXgwXHhS5e8nnbIE
+Ewaqvb5dY++6kh0Oz+adtNT5OqOwXTIRI67WuEe6/B3Z4LNVPQDIj7ZUJGNw8e6L
+F4nkUthwlKx4yEJHZBRuFPnO7Z81jNKuwL276+mczRH7piI6z9uyMV/JbEsOIxyL
+W6CzB7pZ9Nj1YLpgzc1r6oONHLokMJJIz/IvkQ==
 -----END CERTIFICATE-----`
 
 // localhostKey is the private key for localhostCert.
+// Fake value for testing.
 var localhostKey = `-----BEGIN RSA PRIVATE KEY-----
-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
+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
 -----END RSA PRIVATE KEY-----`
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {
@@ -172,12 +205,102 @@ func configFromEnvOrSim() (VSphereConfig, func()) {
 	return configFromSim()
 }
 
+func TestSecretUpdated(t *testing.T) {
+	datacenter := "0.0.0.0"
+	secretName := "vccreds"
+	secretNamespace := "kube-system"
+	username := "test-username"
+	password := "test-password"
+	basicSecret := fakeSecret(secretName, secretNamespace, datacenter, username, password)
+
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
+	cfg.Global.User = username
+	cfg.Global.Password = password
+	cfg.Global.Datacenter = datacenter
+	cfg.Global.SecretName = secretName
+	cfg.Global.SecretNamespace = secretNamespace
+
+	vsphere, err := buildVSphereFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	klog.Flush()
+
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "false")
+	flag.Set("alsologtostderr", "false")
+	flag.Set("v", "9")
+	flag.Parse()
+
+	testcases := []struct {
+		name            string
+		oldSecret       *v1.Secret
+		secret          *v1.Secret
+		expectOutput    bool
+		expectErrOutput bool
+	}{
+		{
+			name:         "Secrets are equal",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       basicSecret.DeepCopy(),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different name",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret("different", secretNamespace, datacenter, username, password),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different data",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret(secretName, secretNamespace, datacenter, "...", "..."),
+			expectOutput: true,
+		},
+		{
+			name:            "Secret being nil",
+			oldSecret:       basicSecret.DeepCopy(),
+			secret:          nil,
+			expectOutput:    true,
+			expectErrOutput: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			buf := new(buffer)
+			errBuf := new(buffer)
+
+			klog.SetOutputBySeverity("INFO", buf)
+			klog.SetOutputBySeverity("WARNING", errBuf)
+
+			vsphere.SecretUpdated(testcase.oldSecret, testcase.secret)
+
+			klog.Flush()
+			if testcase.expectOutput && len(buf.String()) == 0 {
+				t.Fatalf("Expected log secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectOutput && len(buf.String()) > 0 {
+				t.Fatalf("Unexpected log messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, buf.String())
+			}
+
+			if testcase.expectErrOutput && len(errBuf.String()) == 0 {
+				t.Fatalf("Expected log error output on secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectErrOutput && len(errBuf.String()) > 0 {
+				t.Fatalf("Unexpected log error messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, errBuf.String())
+			}
+		})
+	}
+}
+
 func TestReadConfig(t *testing.T) {
 	_, err := readConfig(nil)
 	if err == nil {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
 
+	// Fake values for testing.
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
 server = 0.0.0.0
@@ -284,12 +407,12 @@ func TestVSphereLoginByToken(t *testing.T) {
 }
 
 func TestVSphereLoginWithCaCert(t *testing.T) {
-	caCertPEM, err := ioutil.ReadFile(fixtures.CaCertPath)
+	caCertPEM, err := ioutil.ReadFile("./vclib/testdata/ca.pem")
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}
 
-	serverCert, err := tls.LoadX509KeyPair(fixtures.ServerCertPath, fixtures.ServerKeyPath)
+	serverCert, err := tls.LoadX509KeyPair("./vclib/testdata/server.pem", "./vclib/testdata/server.key")
 	if err != nil {
 		t.Fatalf("Could not load server cert and server key from files: %#v", err)
 	}
@@ -307,7 +430,7 @@ func TestVSphereLoginWithCaCert(t *testing.T) {
 	cfg, cleanup := configFromSimWithTLS(&tlsConfig, false)
 	defer cleanup()
 
-	cfg.Global.CAFile = fixtures.CaCertPath
+	cfg.Global.CAFile = "./vclib/testdata/ca.pem"
 
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
@@ -795,12 +918,13 @@ func TestSecretVSphereConfig(t *testing.T) {
 	var vs *VSphere
 	var (
 		username = "user"
-		password = "password"
+		password = "password" // Fake value for testing.
 	)
 	var testcases = []struct {
 		testName                 string
 		conf                     string
 		expectedIsSecretProvided bool
+		expectedSecretNotManaged bool
 		expectedUsername         string
 		expectedPassword         string
 		expectedError            error
@@ -956,6 +1080,24 @@ func TestSecretVSphereConfig(t *testing.T) {
 			expectedError:            nil,
 		},
 		{
+			testName: "SecretName and SecretNamespace with new configuration, but non-managed",
+			conf: `[Global]
+			server = 0.0.0.0
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			secret-not-managed = true
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedSecretNotManaged: true,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
 			testName: "SecretName and SecretNamespace with Username missing in new configuration",
 			conf: `[Global]
 			server = 0.0.0.0
@@ -1068,6 +1210,11 @@ func TestSecretVSphereConfig(t *testing.T) {
 				}
 			}
 		}
+		if testcase.expectedSecretNotManaged && vs.isSecretManaged {
+			t.Fatalf("Expected secret being non-managed but vs.isSecretManaged: %v", vs.isSecretManaged)
+		} else if !testcase.expectedSecretNotManaged && !vs.isSecretManaged {
+			t.Fatalf("Expected secret being managed but vs.isSecretManaged: %v", vs.isSecretManaged)
+		}
 		// Check, if all the expected thumbprints are configured
 		for instanceName, expectedThumbprint := range testcase.expectedThumbprints {
 			instanceConfig, ok := vs.vsphereInstanceMap[instanceName]
@@ -1081,7 +1228,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 				)
 			}
 		}
-		// Check, if all all connections are configured with the global CA certificate
+		// Check, if all connections are configured with the global CA certificate
 		if expectedCaPath := cfg.Global.CAFile; expectedCaPath != "" {
 			for name, instance := range vs.vsphereInstanceMap {
 				if actualCaPath := instance.conn.CACert; actualCaPath != expectedCaPath {
@@ -1093,4 +1240,34 @@ func TestSecretVSphereConfig(t *testing.T) {
 			}
 		}
 	}
+}
+
+func fakeSecret(name, namespace, datacenter, user, password string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"vcenter." + datacenter + ".password": []byte(user),
+			"vcenter." + datacenter + ".username": []byte(password),
+		},
+	}
+}
+
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
 }

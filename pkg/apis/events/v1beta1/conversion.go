@@ -17,8 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	v1beta1 "k8s.io/api/events/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8s_api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -55,4 +58,30 @@ func Convert_core_Event_To_v1beta1_Event(in *k8s_api.Event, out *v1beta1.Event, 
 	out.DeprecatedLastTimestamp = in.LastTimestamp
 	out.DeprecatedCount = in.Count
 	return nil
+}
+
+func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
+	mapping := map[string]string{
+		"reason":                    "reason",
+		"regarding.kind":            "involvedObject.kind",            // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.namespace":       "involvedObject.namespace",       // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.name":            "involvedObject.name",            // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.uid":             "involvedObject.uid",             // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.apiVersion":      "involvedObject.apiVersion",      // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.resourceVersion": "involvedObject.resourceVersion", // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"regarding.fieldPath":       "involvedObject.fieldPath",       // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"reportingController":       "reportingComponent",             // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"type":                      "type",
+		"metadata.namespace":        "metadata.namespace",
+		"metadata.name":             "metadata.name",
+	}
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Event"),
+		func(label, value string) (string, string, error) {
+			mappedLabel, ok := mapping[label]
+			if !ok {
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+			return mappedLabel, value, nil
+		},
+	)
 }

@@ -1,6 +1,6 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/google/go-cmp/cmp/internal/value"
 )
 
 // Path is a list of PathSteps describing the sequence of operations to get
@@ -41,7 +43,7 @@ type PathStep interface {
 	// In some cases, one or both may be invalid or have restrictions:
 	//	• For StructField, both are not interface-able if the current field
 	//	is unexported and the struct type is not explicitly permitted by
-	//	AllowUnexported to traverse unexported fields.
+	//	an Exporter to traverse unexported fields.
 	//	• For SliceIndex, one may be invalid if an element is missing from
 	//	either the x or y slice.
 	//	• For MapIndex, one may be invalid if an entry is missing from
@@ -175,7 +177,8 @@ type structField struct {
 	// pvx, pvy, and field are only valid if unexported is true.
 	unexported bool
 	mayForce   bool                // Forcibly allow visibility
-	pvx, pvy   reflect.Value       // Parent values
+	paddr      bool                // Was parent addressable?
+	pvx, pvy   reflect.Value       // Parent values (always addressible)
 	field      reflect.StructField // Field information
 }
 
@@ -187,8 +190,8 @@ func (sf StructField) Values() (vx, vy reflect.Value) {
 
 	// Forcibly obtain read-write access to an unexported struct field.
 	if sf.mayForce {
-		vx = retrieveUnexportedField(sf.pvx, sf.field)
-		vy = retrieveUnexportedField(sf.pvy, sf.field)
+		vx = retrieveUnexportedField(sf.pvx, sf.field, sf.paddr)
+		vy = retrieveUnexportedField(sf.pvy, sf.field, sf.paddr)
 		return vx, vy // CanInterface reports true
 	}
 	return sf.vx, sf.vy // CanInterface reports false
@@ -207,6 +210,7 @@ type SliceIndex struct{ *sliceIndex }
 type sliceIndex struct {
 	pathStep
 	xkey, ykey int
+	isSlice    bool // False for reflect.Array
 }
 
 func (si SliceIndex) Type() reflect.Type             { return si.typ }
@@ -300,6 +304,72 @@ func (tf Transform) Func() reflect.Value { return tf.trans.fnc }
 // Option returns the originally constructed Transformer option.
 // The == operator can be used to detect the exact option used.
 func (tf Transform) Option() Option { return tf.trans }
+
+// pointerPath represents a dual-stack of pointers encountered when
+// recursively traversing the x and y values. This data structure supports
+// detection of cycles and determining whether the cycles are equal.
+// In Go, cycles can occur via pointers, slices, and maps.
+//
+// The pointerPath uses a map to represent a stack; where descension into a
+// pointer pushes the address onto the stack, and ascension from a pointer
+// pops the address from the stack. Thus, when traversing into a pointer from
+// reflect.Ptr, reflect.Slice element, or reflect.Map, we can detect cycles
+// by checking whether the pointer has already been visited. The cycle detection
+// uses a seperate stack for the x and y values.
+//
+// If a cycle is detected we need to determine whether the two pointers
+// should be considered equal. The definition of equality chosen by Equal
+// requires two graphs to have the same structure. To determine this, both the
+// x and y values must have a cycle where the previous pointers were also
+// encountered together as a pair.
+//
+// Semantically, this is equivalent to augmenting Indirect, SliceIndex, and
+// MapIndex with pointer information for the x and y values.
+// Suppose px and py are two pointers to compare, we then search the
+// Path for whether px was ever encountered in the Path history of x, and
+// similarly so with py. If either side has a cycle, the comparison is only
+// equal if both px and py have a cycle resulting from the same PathStep.
+//
+// Using a map as a stack is more performant as we can perform cycle detection
+// in O(1) instead of O(N) where N is len(Path).
+type pointerPath struct {
+	// mx is keyed by x pointers, where the value is the associated y pointer.
+	mx map[value.Pointer]value.Pointer
+	// my is keyed by y pointers, where the value is the associated x pointer.
+	my map[value.Pointer]value.Pointer
+}
+
+func (p *pointerPath) Init() {
+	p.mx = make(map[value.Pointer]value.Pointer)
+	p.my = make(map[value.Pointer]value.Pointer)
+}
+
+// Push indicates intent to descend into pointers vx and vy where
+// visited reports whether either has been seen before. If visited before,
+// equal reports whether both pointers were encountered together.
+// Pop must be called if and only if the pointers were never visited.
+//
+// The pointers vx and vy must be a reflect.Ptr, reflect.Slice, or reflect.Map
+// and be non-nil.
+func (p pointerPath) Push(vx, vy reflect.Value) (equal, visited bool) {
+	px := value.PointerOf(vx)
+	py := value.PointerOf(vy)
+	_, ok1 := p.mx[px]
+	_, ok2 := p.my[py]
+	if ok1 || ok2 {
+		equal = p.mx[px] == py && p.my[py] == px // Pointers paired together
+		return equal, true
+	}
+	p.mx[px] = py
+	p.my[py] = px
+	return false, false
+}
+
+// Pop ascends from pointers vx and vy.
+func (p pointerPath) Pop(vx, vy reflect.Value) {
+	delete(p.mx, value.PointerOf(vx))
+	delete(p.my, value.PointerOf(vy))
+}
 
 // isExported reports whether the identifier is exported.
 func isExported(id string) bool {
