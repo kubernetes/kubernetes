@@ -81,7 +81,12 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 		return nil, err
 	}
 	klog.V(4).Infof("ensureExternalLoadBalancer(%s): Desired network tier %q.", lbRefStr, netTier)
-	g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
+	// TODO: distinguish between unspecified and specified network tiers annotation properly in forwardingrule creation
+	// Only delete ForwardingRule when network tier annotation is specified, otherwise leave it only to avoid wrongful
+	// deletion against user intention when network tier annotation is not specified.
+	if _, ok := apiService.Annotations[NetworkTierAnnotationKey]; ok {
+		g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
+	}
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := g.forwardingRuleNeedsUpdate(loadBalancerName, g.region, requestedIP, ports)
