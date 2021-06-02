@@ -193,5 +193,4 @@ func TestReadPublicKeys(t *testing.T) {
 	} else if len(keys) != 1 {
 		t.Fatalf("expected 1 keys, got %d", len(keys))
 	}
-
 }

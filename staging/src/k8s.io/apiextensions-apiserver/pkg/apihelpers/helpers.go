@@ -37,7 +37,6 @@ func IsProtectedCommunityGroup(group string) bool {
 	default:
 		return false
 	}
-
 }
 
 // APIApprovalState covers the various options for API approval annotation states

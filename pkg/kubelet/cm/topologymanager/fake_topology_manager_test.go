@@ -29,7 +29,6 @@ func TestNewFakeManager(t *testing.T) {
 
 	if _, ok := fm.(Manager); !ok {
 		t.Errorf("Result is not Manager type")
-
 	}
 }
 
@@ -81,7 +80,6 @@ func TestFakeRemoveContainer(t *testing.T) {
 		}
 
 	}
-
 }
 
 func TestFakeAdmit(t *testing.T) {

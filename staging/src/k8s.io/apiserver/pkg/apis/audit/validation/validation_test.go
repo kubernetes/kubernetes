@@ -56,7 +56,8 @@ func TestValidatePolicy(t *testing.T) {
 	}
 	successCases = append(successCases, audit.Policy{})                         // Empty policy is valid.
 	successCases = append(successCases, audit.Policy{OmitStages: []audit.Stage{ // Policy with omitStages
-		audit.Stage("RequestReceived")}})
+		audit.Stage("RequestReceived"),
+	}})
 	successCases = append(successCases, audit.Policy{Rules: validRules}) // Multiple rules.
 
 	for i, policy := range successCases {
@@ -71,38 +72,46 @@ func TestValidatePolicy(t *testing.T) {
 			Verbs:      []string{"get"},
 			Resources:  []audit.GroupResources{{Resources: []string{"secrets"}}},
 			Namespaces: []string{"kube-system"},
-		}, { // Invalid Level
+		},
+		{ // Invalid Level
 			Level: "FooBar",
-		}, { // NonResourceURLs + Namespaces
+		},
+		{ // NonResourceURLs + Namespaces
 			Level:           audit.LevelMetadata,
 			Namespaces:      []string{"default"},
 			NonResourceURLs: []string{"/logs*"},
-		}, { // NonResourceURLs + ResourceKinds
+		},
+		{ // NonResourceURLs + ResourceKinds
 			Level:           audit.LevelMetadata,
 			Resources:       []audit.GroupResources{{Resources: []string{"secrets"}}},
 			NonResourceURLs: []string{"/logs*"},
-		}, { // invalid group name
+		},
+		{ // invalid group name
 			Level:     audit.LevelMetadata,
 			Resources: []audit.GroupResources{{Group: "rbac.authorization.k8s.io/v1beta1", Resources: []string{"roles"}}},
-		}, { // invalid non-resource URLs
+		},
+		{ // invalid non-resource URLs
 			Level: audit.LevelMetadata,
 			NonResourceURLs: []string{
 				"logs",
 				"/healthz*",
 			},
-		}, { // empty non-resource URLs
+		},
+		{ // empty non-resource URLs
 			Level: audit.LevelMetadata,
 			NonResourceURLs: []string{
 				"",
 				"/healthz*",
 			},
-		}, { // invalid non-resource URLs with multi "*"
+		},
+		{ // invalid non-resource URLs with multi "*"
 			Level: audit.LevelMetadata,
 			NonResourceURLs: []string{
 				"/logs/*/*",
 				"/metrics",
 			},
-		}, { // invalid non-resrouce URLs with "*" not in the end
+		},
+		{ // invalid non-resrouce URLs with "*" not in the end
 			Level: audit.LevelMetadata,
 			NonResourceURLs: []string{
 				"/logs/*.log",
@@ -131,9 +140,10 @@ func TestValidatePolicy(t *testing.T) {
 	errorCases = append(errorCases, audit.Policy{Rules: append(validRules, audit.PolicyRule{})})
 
 	// invalid omitStages in policy
-	policy := audit.Policy{OmitStages: []audit.Stage{
-		audit.Stage("foo"),
-	},
+	policy := audit.Policy{
+		OmitStages: []audit.Stage{
+			audit.Stage("foo"),
+		},
 		Rules: []audit.PolicyRule{
 			{
 				Level: audit.LevelMetadata,

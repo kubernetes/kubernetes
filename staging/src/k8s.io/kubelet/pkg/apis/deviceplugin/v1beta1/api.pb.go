@@ -22,23 +22,26 @@ package v1beta1
 import (
 	context "context"
 	fmt "fmt"
+	io "io"
+	math "math"
+	math_bits "math/bits"
+	reflect "reflect"
+	strings "strings"
+
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	io "io"
-	math "math"
-	math_bits "math/bits"
-	reflect "reflect"
-	strings "strings"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -60,9 +63,11 @@ func (*DevicePluginOptions) ProtoMessage() {}
 func (*DevicePluginOptions) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *DevicePluginOptions) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DevicePluginOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_DevicePluginOptions.Marshal(b, m, deterministic)
@@ -75,12 +80,15 @@ func (m *DevicePluginOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 		return b[:n], nil
 	}
 }
+
 func (m *DevicePluginOptions) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DevicePluginOptions.Merge(m, src)
 }
+
 func (m *DevicePluginOptions) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DevicePluginOptions) XXX_DiscardUnknown() {
 	xxx_messageInfo_DevicePluginOptions.DiscardUnknown(m)
 }
@@ -120,9 +128,11 @@ func (*RegisterRequest) ProtoMessage() {}
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *RegisterRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RegisterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_RegisterRequest.Marshal(b, m, deterministic)
@@ -135,12 +145,15 @@ func (m *RegisterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
+
 func (m *RegisterRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RegisterRequest.Merge(m, src)
 }
+
 func (m *RegisterRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RegisterRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_RegisterRequest.DiscardUnknown(m)
 }
@@ -185,9 +198,11 @@ func (*Empty) ProtoMessage() {}
 func (*Empty) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
+
 func (m *Empty) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Empty) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Empty.Marshal(b, m, deterministic)
@@ -200,12 +215,15 @@ func (m *Empty) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Empty) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Empty.Merge(m, src)
 }
+
 func (m *Empty) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Empty) XXX_DiscardUnknown() {
 	xxx_messageInfo_Empty.DiscardUnknown(m)
 }
@@ -226,9 +244,11 @@ func (*ListAndWatchResponse) ProtoMessage() {}
 func (*ListAndWatchResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
+
 func (m *ListAndWatchResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ListAndWatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ListAndWatchResponse.Marshal(b, m, deterministic)
@@ -241,12 +261,15 @@ func (m *ListAndWatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return b[:n], nil
 	}
 }
+
 func (m *ListAndWatchResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ListAndWatchResponse.Merge(m, src)
 }
+
 func (m *ListAndWatchResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ListAndWatchResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ListAndWatchResponse.DiscardUnknown(m)
 }
@@ -271,9 +294,11 @@ func (*TopologyInfo) ProtoMessage() {}
 func (*TopologyInfo) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
+
 func (m *TopologyInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *TopologyInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_TopologyInfo.Marshal(b, m, deterministic)
@@ -286,12 +311,15 @@ func (m *TopologyInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 		return b[:n], nil
 	}
 }
+
 func (m *TopologyInfo) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_TopologyInfo.Merge(m, src)
 }
+
 func (m *TopologyInfo) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *TopologyInfo) XXX_DiscardUnknown() {
 	xxx_messageInfo_TopologyInfo.DiscardUnknown(m)
 }
@@ -316,9 +344,11 @@ func (*NUMANode) ProtoMessage() {}
 func (*NUMANode) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
 }
+
 func (m *NUMANode) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *NUMANode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_NUMANode.Marshal(b, m, deterministic)
@@ -331,12 +361,15 @@ func (m *NUMANode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *NUMANode) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NUMANode.Merge(m, src)
 }
+
 func (m *NUMANode) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *NUMANode) XXX_DiscardUnknown() {
 	xxx_messageInfo_NUMANode.DiscardUnknown(m)
 }
@@ -376,9 +409,11 @@ func (*Device) ProtoMessage() {}
 func (*Device) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
 }
+
 func (m *Device) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Device) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Device.Marshal(b, m, deterministic)
@@ -391,12 +426,15 @@ func (m *Device) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Device) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Device.Merge(m, src)
 }
+
 func (m *Device) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Device) XXX_DiscardUnknown() {
 	xxx_messageInfo_Device.DiscardUnknown(m)
 }
@@ -439,9 +477,11 @@ func (*PreStartContainerRequest) ProtoMessage() {}
 func (*PreStartContainerRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
 }
+
 func (m *PreStartContainerRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PreStartContainerRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PreStartContainerRequest.Marshal(b, m, deterministic)
@@ -454,12 +494,15 @@ func (m *PreStartContainerRequest) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
+
 func (m *PreStartContainerRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PreStartContainerRequest.Merge(m, src)
 }
+
 func (m *PreStartContainerRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PreStartContainerRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_PreStartContainerRequest.DiscardUnknown(m)
 }
@@ -484,9 +527,11 @@ func (*PreStartContainerResponse) ProtoMessage() {}
 func (*PreStartContainerResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{8}
 }
+
 func (m *PreStartContainerResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PreStartContainerResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PreStartContainerResponse.Marshal(b, m, deterministic)
@@ -499,12 +544,15 @@ func (m *PreStartContainerResponse) XXX_Marshal(b []byte, deterministic bool) ([
 		return b[:n], nil
 	}
 }
+
 func (m *PreStartContainerResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PreStartContainerResponse.Merge(m, src)
 }
+
 func (m *PreStartContainerResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PreStartContainerResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_PreStartContainerResponse.DiscardUnknown(m)
 }
@@ -527,9 +575,11 @@ func (*PreferredAllocationRequest) ProtoMessage() {}
 func (*PreferredAllocationRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
 }
+
 func (m *PreferredAllocationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PreferredAllocationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PreferredAllocationRequest.Marshal(b, m, deterministic)
@@ -542,12 +592,15 @@ func (m *PreferredAllocationRequest) XXX_Marshal(b []byte, deterministic bool) (
 		return b[:n], nil
 	}
 }
+
 func (m *PreferredAllocationRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PreferredAllocationRequest.Merge(m, src)
 }
+
 func (m *PreferredAllocationRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PreferredAllocationRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_PreferredAllocationRequest.DiscardUnknown(m)
 }
@@ -577,9 +630,11 @@ func (*ContainerPreferredAllocationRequest) ProtoMessage() {}
 func (*ContainerPreferredAllocationRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{10}
 }
+
 func (m *ContainerPreferredAllocationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerPreferredAllocationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerPreferredAllocationRequest.Marshal(b, m, deterministic)
@@ -592,12 +647,15 @@ func (m *ContainerPreferredAllocationRequest) XXX_Marshal(b []byte, deterministi
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerPreferredAllocationRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerPreferredAllocationRequest.Merge(m, src)
 }
+
 func (m *ContainerPreferredAllocationRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerPreferredAllocationRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerPreferredAllocationRequest.DiscardUnknown(m)
 }
@@ -638,9 +696,11 @@ func (*PreferredAllocationResponse) ProtoMessage() {}
 func (*PreferredAllocationResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{11}
 }
+
 func (m *PreferredAllocationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PreferredAllocationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PreferredAllocationResponse.Marshal(b, m, deterministic)
@@ -653,12 +713,15 @@ func (m *PreferredAllocationResponse) XXX_Marshal(b []byte, deterministic bool) 
 		return b[:n], nil
 	}
 }
+
 func (m *PreferredAllocationResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PreferredAllocationResponse.Merge(m, src)
 }
+
 func (m *PreferredAllocationResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PreferredAllocationResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_PreferredAllocationResponse.DiscardUnknown(m)
 }
@@ -683,9 +746,11 @@ func (*ContainerPreferredAllocationResponse) ProtoMessage() {}
 func (*ContainerPreferredAllocationResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{12}
 }
+
 func (m *ContainerPreferredAllocationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerPreferredAllocationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerPreferredAllocationResponse.Marshal(b, m, deterministic)
@@ -698,12 +763,15 @@ func (m *ContainerPreferredAllocationResponse) XXX_Marshal(b []byte, determinist
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerPreferredAllocationResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerPreferredAllocationResponse.Merge(m, src)
 }
+
 func (m *ContainerPreferredAllocationResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerPreferredAllocationResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerPreferredAllocationResponse.DiscardUnknown(m)
 }
@@ -734,9 +802,11 @@ func (*AllocateRequest) ProtoMessage() {}
 func (*AllocateRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{13}
 }
+
 func (m *AllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_AllocateRequest.Marshal(b, m, deterministic)
@@ -749,12 +819,15 @@ func (m *AllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
+
 func (m *AllocateRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AllocateRequest.Merge(m, src)
 }
+
 func (m *AllocateRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AllocateRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_AllocateRequest.DiscardUnknown(m)
 }
@@ -779,9 +852,11 @@ func (*ContainerAllocateRequest) ProtoMessage() {}
 func (*ContainerAllocateRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{14}
 }
+
 func (m *ContainerAllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerAllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerAllocateRequest.Marshal(b, m, deterministic)
@@ -794,12 +869,15 @@ func (m *ContainerAllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerAllocateRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerAllocateRequest.Merge(m, src)
 }
+
 func (m *ContainerAllocateRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerAllocateRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerAllocateRequest.DiscardUnknown(m)
 }
@@ -832,9 +910,11 @@ func (*AllocateResponse) ProtoMessage() {}
 func (*AllocateResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{15}
 }
+
 func (m *AllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_AllocateResponse.Marshal(b, m, deterministic)
@@ -847,12 +927,15 @@ func (m *AllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 		return b[:n], nil
 	}
 }
+
 func (m *AllocateResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AllocateResponse.Merge(m, src)
 }
+
 func (m *AllocateResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AllocateResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_AllocateResponse.DiscardUnknown(m)
 }
@@ -884,9 +967,11 @@ func (*ContainerAllocateResponse) ProtoMessage() {}
 func (*ContainerAllocateResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{16}
 }
+
 func (m *ContainerAllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerAllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerAllocateResponse.Marshal(b, m, deterministic)
@@ -899,12 +984,15 @@ func (m *ContainerAllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerAllocateResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerAllocateResponse.Merge(m, src)
 }
+
 func (m *ContainerAllocateResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerAllocateResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerAllocateResponse.DiscardUnknown(m)
 }
@@ -957,9 +1045,11 @@ func (*Mount) ProtoMessage() {}
 func (*Mount) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{17}
 }
+
 func (m *Mount) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Mount) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Mount.Marshal(b, m, deterministic)
@@ -972,12 +1062,15 @@ func (m *Mount) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Mount) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Mount.Merge(m, src)
 }
+
 func (m *Mount) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Mount) XXX_DiscardUnknown() {
 	xxx_messageInfo_Mount.DiscardUnknown(m)
 }
@@ -1025,9 +1118,11 @@ func (*DeviceSpec) ProtoMessage() {}
 func (*DeviceSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{18}
 }
+
 func (m *DeviceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeviceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_DeviceSpec.Marshal(b, m, deterministic)
@@ -1040,12 +1135,15 @@ func (m *DeviceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *DeviceSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeviceSpec.Merge(m, src)
 }
+
 func (m *DeviceSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeviceSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeviceSpec.DiscardUnknown(m)
 }
@@ -1168,8 +1266,10 @@ var fileDescriptor_00212fb1f9d3bf1c = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -1205,8 +1305,7 @@ type RegistrationServer interface {
 }
 
 // UnimplementedRegistrationServer can be embedded to have forward compatible implementations.
-type UnimplementedRegistrationServer struct {
-}
+type UnimplementedRegistrationServer struct{}
 
 func (*UnimplementedRegistrationServer) Register(ctx context.Context, req *RegisterRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
@@ -1376,21 +1475,24 @@ type DevicePluginServer interface {
 }
 
 // UnimplementedDevicePluginServer can be embedded to have forward compatible implementations.
-type UnimplementedDevicePluginServer struct {
-}
+type UnimplementedDevicePluginServer struct{}
 
 func (*UnimplementedDevicePluginServer) GetDevicePluginOptions(ctx context.Context, req *Empty) (*DevicePluginOptions, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDevicePluginOptions not implemented")
 }
+
 func (*UnimplementedDevicePluginServer) ListAndWatch(req *Empty, srv DevicePlugin_ListAndWatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method ListAndWatch not implemented")
 }
+
 func (*UnimplementedDevicePluginServer) GetPreferredAllocation(ctx context.Context, req *PreferredAllocationRequest) (*PreferredAllocationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPreferredAllocation not implemented")
 }
+
 func (*UnimplementedDevicePluginServer) Allocate(ctx context.Context, req *AllocateRequest) (*AllocateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Allocate not implemented")
 }
+
 func (*UnimplementedDevicePluginServer) PreStartContainer(ctx context.Context, req *PreStartContainerRequest) (*PreStartContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PreStartContainer not implemented")
 }
@@ -2300,6 +2402,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *DevicePluginOptions) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2631,25 +2734,30 @@ func (m *DeviceSpec) Size() (n int) {
 func sovApi(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *DevicePluginOptions) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DevicePluginOptions{`,
+	s := strings.Join([]string{
+		`&DevicePluginOptions{`,
 		`PreStartRequired:` + fmt.Sprintf("%v", this.PreStartRequired) + `,`,
 		`GetPreferredAllocationAvailable:` + fmt.Sprintf("%v", this.GetPreferredAllocationAvailable) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RegisterRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegisterRequest{`,
+	s := strings.Join([]string{
+		`&RegisterRequest{`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Endpoint:` + fmt.Sprintf("%v", this.Endpoint) + `,`,
 		`ResourceName:` + fmt.Sprintf("%v", this.ResourceName) + `,`,
@@ -2658,15 +2766,18 @@ func (this *RegisterRequest) String() string {
 	}, "")
 	return s
 }
+
 func (this *Empty) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Empty{`,
+	s := strings.Join([]string{
+		`&Empty{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ListAndWatchResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -2676,12 +2787,14 @@ func (this *ListAndWatchResponse) String() string {
 		repeatedStringForDevices += strings.Replace(f.String(), "Device", "Device", 1) + ","
 	}
 	repeatedStringForDevices += "}"
-	s := strings.Join([]string{`&ListAndWatchResponse{`,
+	s := strings.Join([]string{
+		`&ListAndWatchResponse{`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *TopologyInfo) String() string {
 	if this == nil {
 		return "nil"
@@ -2691,27 +2804,32 @@ func (this *TopologyInfo) String() string {
 		repeatedStringForNodes += strings.Replace(f.String(), "NUMANode", "NUMANode", 1) + ","
 	}
 	repeatedStringForNodes += "}"
-	s := strings.Join([]string{`&TopologyInfo{`,
+	s := strings.Join([]string{
+		`&TopologyInfo{`,
 		`Nodes:` + repeatedStringForNodes + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *NUMANode) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&NUMANode{`,
+	s := strings.Join([]string{
+		`&NUMANode{`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Device) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Device{`,
+	s := strings.Join([]string{
+		`&Device{`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`Health:` + fmt.Sprintf("%v", this.Health) + `,`,
 		`Topology:` + strings.Replace(this.Topology.String(), "TopologyInfo", "TopologyInfo", 1) + `,`,
@@ -2719,25 +2837,30 @@ func (this *Device) String() string {
 	}, "")
 	return s
 }
+
 func (this *PreStartContainerRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PreStartContainerRequest{`,
+	s := strings.Join([]string{
+		`&PreStartContainerRequest{`,
 		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PreStartContainerResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PreStartContainerResponse{`,
+	s := strings.Join([]string{
+		`&PreStartContainerResponse{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PreferredAllocationRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -2747,17 +2870,20 @@ func (this *PreferredAllocationRequest) String() string {
 		repeatedStringForContainerRequests += strings.Replace(f.String(), "ContainerPreferredAllocationRequest", "ContainerPreferredAllocationRequest", 1) + ","
 	}
 	repeatedStringForContainerRequests += "}"
-	s := strings.Join([]string{`&PreferredAllocationRequest{`,
+	s := strings.Join([]string{
+		`&PreferredAllocationRequest{`,
 		`ContainerRequests:` + repeatedStringForContainerRequests + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ContainerPreferredAllocationRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerPreferredAllocationRequest{`,
+	s := strings.Join([]string{
+		`&ContainerPreferredAllocationRequest{`,
 		`AvailableDeviceIDs:` + fmt.Sprintf("%v", this.AvailableDeviceIDs) + `,`,
 		`MustIncludeDeviceIDs:` + fmt.Sprintf("%v", this.MustIncludeDeviceIDs) + `,`,
 		`AllocationSize:` + fmt.Sprintf("%v", this.AllocationSize) + `,`,
@@ -2765,6 +2891,7 @@ func (this *ContainerPreferredAllocationRequest) String() string {
 	}, "")
 	return s
 }
+
 func (this *PreferredAllocationResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -2774,22 +2901,26 @@ func (this *PreferredAllocationResponse) String() string {
 		repeatedStringForContainerResponses += strings.Replace(f.String(), "ContainerPreferredAllocationResponse", "ContainerPreferredAllocationResponse", 1) + ","
 	}
 	repeatedStringForContainerResponses += "}"
-	s := strings.Join([]string{`&PreferredAllocationResponse{`,
+	s := strings.Join([]string{
+		`&PreferredAllocationResponse{`,
 		`ContainerResponses:` + repeatedStringForContainerResponses + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ContainerPreferredAllocationResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerPreferredAllocationResponse{`,
+	s := strings.Join([]string{
+		`&ContainerPreferredAllocationResponse{`,
 		`DeviceIDs:` + fmt.Sprintf("%v", this.DeviceIDs) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *AllocateRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -2799,22 +2930,26 @@ func (this *AllocateRequest) String() string {
 		repeatedStringForContainerRequests += strings.Replace(f.String(), "ContainerAllocateRequest", "ContainerAllocateRequest", 1) + ","
 	}
 	repeatedStringForContainerRequests += "}"
-	s := strings.Join([]string{`&AllocateRequest{`,
+	s := strings.Join([]string{
+		`&AllocateRequest{`,
 		`ContainerRequests:` + repeatedStringForContainerRequests + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ContainerAllocateRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerAllocateRequest{`,
+	s := strings.Join([]string{
+		`&ContainerAllocateRequest{`,
 		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *AllocateResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -2824,12 +2959,14 @@ func (this *AllocateResponse) String() string {
 		repeatedStringForContainerResponses += strings.Replace(f.String(), "ContainerAllocateResponse", "ContainerAllocateResponse", 1) + ","
 	}
 	repeatedStringForContainerResponses += "}"
-	s := strings.Join([]string{`&AllocateResponse{`,
+	s := strings.Join([]string{
+		`&AllocateResponse{`,
 		`ContainerResponses:` + repeatedStringForContainerResponses + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ContainerAllocateResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -2864,7 +3001,8 @@ func (this *ContainerAllocateResponse) String() string {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
 	}
 	mapStringForAnnotations += "}"
-	s := strings.Join([]string{`&ContainerAllocateResponse{`,
+	s := strings.Join([]string{
+		`&ContainerAllocateResponse{`,
 		`Envs:` + mapStringForEnvs + `,`,
 		`Mounts:` + repeatedStringForMounts + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
@@ -2873,11 +3011,13 @@ func (this *ContainerAllocateResponse) String() string {
 	}, "")
 	return s
 }
+
 func (this *Mount) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Mount{`,
+	s := strings.Join([]string{
+		`&Mount{`,
 		`ContainerPath:` + fmt.Sprintf("%v", this.ContainerPath) + `,`,
 		`HostPath:` + fmt.Sprintf("%v", this.HostPath) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
@@ -2885,11 +3025,13 @@ func (this *Mount) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeviceSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeviceSpec{`,
+	s := strings.Join([]string{
+		`&DeviceSpec{`,
 		`ContainerPath:` + fmt.Sprintf("%v", this.ContainerPath) + `,`,
 		`HostPath:` + fmt.Sprintf("%v", this.HostPath) + `,`,
 		`Permissions:` + fmt.Sprintf("%v", this.Permissions) + `,`,
@@ -2897,6 +3039,7 @@ func (this *DeviceSpec) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -2905,6 +3048,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *DevicePluginOptions) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2995,6 +3139,7 @@ func (m *DevicePluginOptions) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3177,6 +3322,7 @@ func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Empty) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3227,6 +3373,7 @@ func (m *Empty) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ListAndWatchResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3311,6 +3458,7 @@ func (m *ListAndWatchResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *TopologyInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3395,6 +3543,7 @@ func (m *TopologyInfo) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *NUMANode) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3464,6 +3613,7 @@ func (m *NUMANode) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Device) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3614,6 +3764,7 @@ func (m *Device) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PreStartContainerRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3696,6 +3847,7 @@ func (m *PreStartContainerRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PreStartContainerResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3746,6 +3898,7 @@ func (m *PreStartContainerResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PreferredAllocationRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3830,6 +3983,7 @@ func (m *PreferredAllocationRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerPreferredAllocationRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3963,6 +4117,7 @@ func (m *ContainerPreferredAllocationRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PreferredAllocationResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4047,6 +4202,7 @@ func (m *PreferredAllocationResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerPreferredAllocationResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4129,6 +4285,7 @@ func (m *ContainerPreferredAllocationResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4213,6 +4370,7 @@ func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerAllocateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4295,6 +4453,7 @@ func (m *ContainerAllocateRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AllocateResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4379,6 +4538,7 @@ func (m *AllocateResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerAllocateResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4751,6 +4911,7 @@ func (m *ContainerAllocateResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Mount) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4885,6 +5046,7 @@ func (m *Mount) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeviceSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5031,6 +5193,7 @@ func (m *DeviceSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

@@ -29,14 +29,16 @@ import (
 	thirdexamplev1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-var ParameterCodec = runtime.NewParameterCodec(Scheme)
-var localSchemeBuilder = runtime.SchemeBuilder{
-	examplev1.AddToScheme,
-	secondexamplev1.AddToScheme,
-	thirdexamplev1.AddToScheme,
-}
+var (
+	Scheme             = runtime.NewScheme()
+	Codecs             = serializer.NewCodecFactory(Scheme)
+	ParameterCodec     = runtime.NewParameterCodec(Scheme)
+	localSchemeBuilder = runtime.SchemeBuilder{
+		examplev1.AddToScheme,
+		secondexamplev1.AddToScheme,
+		thirdexamplev1.AddToScheme,
+	}
+)
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
 // of clientsets, like in:

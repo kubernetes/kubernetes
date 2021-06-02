@@ -80,7 +80,6 @@ func (c *FakeEndpointSlices) List(ctx context.Context, opts v1.ListOptions) (res
 func (c *FakeEndpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(endpointslicesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.

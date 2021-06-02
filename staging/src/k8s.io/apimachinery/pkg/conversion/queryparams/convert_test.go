@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type namedString string
-type namedBool bool
+type (
+	namedString string
+	namedBool   bool
+)
 
 type bar struct {
 	Float1   float32 `json:"float1"`

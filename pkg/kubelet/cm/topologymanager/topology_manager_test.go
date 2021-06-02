@@ -124,9 +124,9 @@ func TestManagerScope(t *testing.T) {
 
 type mockHintProvider struct {
 	th map[string][]TopologyHint
-	//TODO: Add this field and add some tests to make sure things error out
-	//appropriately on allocation errors.
-	//allocateError error
+	// TODO: Add this field and add some tests to make sure things error out
+	// appropriately on allocation errors.
+	// allocateError error
 }
 
 func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
@@ -138,7 +138,7 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 }
 
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
-	//return allocateError
+	// return allocateError
 	return nil
 }
 

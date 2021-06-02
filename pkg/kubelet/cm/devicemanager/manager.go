@@ -393,7 +393,6 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	}
 	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 	return nil
-
 }
 
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
@@ -521,8 +520,8 @@ func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
 func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	needsUpdateCheckpoint := false
-	var capacity = v1.ResourceList{}
-	var allocatable = v1.ResourceList{}
+	capacity := v1.ResourceList{}
+	allocatable := v1.ResourceList{}
 	deletedResources := sets.NewString()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {

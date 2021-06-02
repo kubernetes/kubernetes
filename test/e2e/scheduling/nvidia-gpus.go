@@ -50,9 +50,7 @@ const (
 	driverInstallTimeout = 10 * time.Minute
 )
 
-var (
-	gpuResourceName v1.ResourceName
-)
+var gpuResourceName v1.ResourceName
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 	podName := testPodNamePrefix + string(uuid.NewUUID())

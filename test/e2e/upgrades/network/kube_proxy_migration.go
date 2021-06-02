@@ -42,8 +42,7 @@ const (
 )
 
 // KubeProxyUpgradeTest tests kube-proxy static pods -> DaemonSet upgrade path.
-type KubeProxyUpgradeTest struct {
-}
+type KubeProxyUpgradeTest struct{}
 
 // Name returns the tracking name of the test.
 func (KubeProxyUpgradeTest) Name() string { return "[sig-network] kube-proxy-upgrade" }
@@ -77,8 +76,7 @@ func (t *KubeProxyUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 // KubeProxyDowngradeTest tests kube-proxy DaemonSet -> static pods downgrade path.
-type KubeProxyDowngradeTest struct {
-}
+type KubeProxyDowngradeTest struct{}
 
 // Name returns the tracking name of the test.
 func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-downgrade" }

@@ -54,9 +54,11 @@ type localVolumePlugin struct {
 	recorder    record.EventRecorder
 }
 
-var _ volume.VolumePlugin = &localVolumePlugin{}
-var _ volume.PersistentVolumePlugin = &localVolumePlugin{}
-var _ volume.BlockVolumePlugin = &localVolumePlugin{}
+var (
+	_ volume.VolumePlugin           = &localVolumePlugin{}
+	_ volume.PersistentVolumePlugin = &localVolumePlugin{}
+	_ volume.BlockVolumePlugin      = &localVolumePlugin{}
+)
 
 const (
 	localVolumePluginName = "kubernetes.io/local-volume"
@@ -140,7 +142,6 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 		mountOptions: util.MountOptionFromSpec(spec),
 		readOnly:     readOnly,
 	}, nil
-
 }
 
 func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -613,8 +614,10 @@ type localVolumeMapper struct {
 	readOnly bool
 }
 
-var _ volume.BlockVolumeMapper = &localVolumeMapper{}
-var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
+var (
+	_ volume.BlockVolumeMapper       = &localVolumeMapper{}
+	_ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
+)
 
 // SetUpDevice prepares the volume to the node by the plugin specific way.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {

@@ -110,7 +110,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	}
 
 	for i, cfg := range cfgs {
-		var assertions = []struct {
+		assertions := []struct {
 			kubeConfigFile string
 			clientName     string
 			organizations  []string
@@ -222,7 +222,6 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 }
 
 func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
-
 	// Creates a CAs
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
@@ -234,7 +233,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	invalidConfig := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	invalidConfig.CurrentContext = "invalid context"
 
-	var tests = []struct {
+	tests := []struct {
 		name               string
 		existingKubeConfig *clientcmdapi.Config
 		kubeConfig         *clientcmdapi.Config
@@ -297,7 +296,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 }
 
 func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name                     string
 		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles            []string
@@ -367,7 +366,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 		},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name                    string
 		writeKubeConfigFunction func(out io.Writer) error
 	}{
@@ -419,7 +418,7 @@ func TestWriteKubeConfig(t *testing.T) {
 		},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name                    string
 		writeKubeConfigFunction func(out io.Writer) error
 		withClientCert          bool

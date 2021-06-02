@@ -39,6 +39,7 @@ func TestEmbeddedRawExtensionMarshal(t *testing.T) {
 		t.Errorf("unexpected data: %s", string(data))
 	}
 }
+
 func TestEmbeddedRawExtensionUnmarshal(t *testing.T) {
 	type test struct {
 		Ext runtime.RawExtension

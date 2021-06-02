@@ -48,7 +48,7 @@ func isAdmin() (bool, error) {
 }
 
 func checkPermissions() error {
-	//https://github.com/golang/go/issues/28804#issuecomment-505326268
+	// https://github.com/golang/go/issues/28804#issuecomment-505326268
 	var sid *windows.SID
 	var userIsAdmin bool
 
@@ -64,7 +64,7 @@ func checkPermissions() error {
 		return fmt.Errorf("error while checking for elevated permissions: %s", err)
 	}
 
-	//We must free the sid to prevent security token leaks
+	// We must free the sid to prevent security token leaks
 	defer windows.FreeSid(sid)
 	token := windows.Token(0)
 

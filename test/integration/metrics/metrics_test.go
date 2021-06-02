@@ -326,7 +326,6 @@ func TestApiserverMetricsPods(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-
 			baseSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)
@@ -432,7 +431,6 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-
 			baseSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)

@@ -69,7 +69,7 @@ func TestShouldHide(t *testing.T) {
 		GitVersion: "v1.17.1-alpha-1.12345",
 	})
 
-	var tests = []struct {
+	tests := []struct {
 		desc              string
 		deprecatedVersion string
 		shouldHide        bool
@@ -96,7 +96,7 @@ func TestShouldHide(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc                    string
 		metrics                 []*Counter
 		expectedErrors          []error
@@ -165,7 +165,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMustRegister(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc            string
 		metrics         []*Counter
 		registryVersion *semver.Version
@@ -221,8 +221,8 @@ func TestMustRegister(t *testing.T) {
 			}
 		})
 	}
-
 }
+
 func TestShowHiddenMetric(t *testing.T) {
 	registry := newKubeRegistry(apimachineryversion.Info{
 		Major:      "1",
@@ -263,7 +263,7 @@ func TestValidateShowHiddenMetricsVersion(t *testing.T) {
 		GitVersion: "v1.17.1-alpha-1.12345",
 	})
 
-	var tests = []struct {
+	tests := []struct {
 		desc          string
 		targetVersion string
 		expectedError bool
@@ -316,7 +316,7 @@ func TestEnableHiddenMetrics(t *testing.T) {
 		GitVersion: "v1.17.1-alpha-1.12345",
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		fqName         string
 		counter        *Counter
@@ -387,16 +387,16 @@ func TestEnableHiddenMetrics(t *testing.T) {
 }
 
 func TestEnableHiddenStableCollector(t *testing.T) {
-	var currentVersion = apimachineryversion.Info{
+	currentVersion := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
-	var normal = NewDesc("test_enable_hidden_custom_metric_normal", "this is a normal metric", []string{"name"}, nil, STABLE, "")
-	var hiddenA = NewDesc("test_enable_hidden_custom_metric_hidden_a", "this is the hidden metric A", []string{"name"}, nil, STABLE, "1.16.0")
-	var hiddenB = NewDesc("test_enable_hidden_custom_metric_hidden_b", "this is the hidden metric B", []string{"name"}, nil, STABLE, "1.16.0")
+	normal := NewDesc("test_enable_hidden_custom_metric_normal", "this is a normal metric", []string{"name"}, nil, STABLE, "")
+	hiddenA := NewDesc("test_enable_hidden_custom_metric_hidden_a", "this is the hidden metric A", []string{"name"}, nil, STABLE, "1.16.0")
+	hiddenB := NewDesc("test_enable_hidden_custom_metric_hidden_b", "this is the hidden metric B", []string{"name"}, nil, STABLE, "1.16.0")
 
-	var tests = []struct {
+	tests := []struct {
 		name                      string
 		descriptors               []*Desc
 		metricNames               []string
@@ -406,8 +406,10 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 		{
 			name:        "all hidden",
 			descriptors: []*Desc{hiddenA, hiddenB},
-			metricNames: []string{"test_enable_hidden_custom_metric_hidden_a",
-				"test_enable_hidden_custom_metric_hidden_b"},
+			metricNames: []string{
+				"test_enable_hidden_custom_metric_hidden_a",
+				"test_enable_hidden_custom_metric_hidden_b",
+			},
 			expectMetricsBeforeEnable: "",
 			expectMetricsAfterEnable: `
         		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.16.0) this is the hidden metric A
@@ -421,9 +423,11 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 		{
 			name:        "partial hidden",
 			descriptors: []*Desc{normal, hiddenA, hiddenB},
-			metricNames: []string{"test_enable_hidden_custom_metric_normal",
+			metricNames: []string{
+				"test_enable_hidden_custom_metric_normal",
 				"test_enable_hidden_custom_metric_hidden_a",
-				"test_enable_hidden_custom_metric_hidden_b"},
+				"test_enable_hidden_custom_metric_hidden_b",
+			},
 			expectMetricsBeforeEnable: `
         		# HELP test_enable_hidden_custom_metric_normal [STABLE] this is a normal metric
         		# TYPE test_enable_hidden_custom_metric_normal gauge

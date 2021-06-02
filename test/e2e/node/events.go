@@ -42,7 +42,6 @@ var _ = SIGDescribe("Events", func() {
 		Description: Create a Pod, make sure that the Pod can be queried. Create a event selector for the kind=Pod and the source is the Scheduler. List of the events MUST be at least one. Create a event selector for kind=Pod and the source is the Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST send events when scheduling and running a Pod.
 	*/
 	framework.ConformanceIt("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
-
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
 		ginkgo.By("creating the pod")

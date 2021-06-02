@@ -119,9 +119,11 @@ func (c *namespacedClientConfig) Namespace() (string, bool, error) {
 func (c *namespacedClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return c.delegate.RawConfig()
 }
+
 func (c *namespacedClientConfig) ClientConfig() (*rest.Config, error) {
 	return c.delegate.ClientConfig()
 }
+
 func (c *namespacedClientConfig) ConfigAccess() clientcmd.ConfigAccess {
 	return c.delegate.ConfigAccess()
 }

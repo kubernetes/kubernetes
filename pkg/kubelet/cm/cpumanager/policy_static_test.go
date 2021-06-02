@@ -146,7 +146,6 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
 			}
-
 		})
 	}
 }
@@ -727,13 +726,11 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
 			}
-
 		})
 	}
 }
 
 func TestStaticPolicyAddWithResvList(t *testing.T) {
-
 	testCases := []staticPolicyTestWithResvList{
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",

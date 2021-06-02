@@ -54,7 +54,7 @@ func (tc *testCustomCollector) CollectWithStability(ch chan<- Metric) {
 }
 
 func TestBaseCustomCollector(t *testing.T) {
-	var currentVersion = apimachineryversion.Info{
+	currentVersion := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
@@ -98,16 +98,16 @@ func TestBaseCustomCollector(t *testing.T) {
 }
 
 func TestInvalidCustomCollector(t *testing.T) {
-	var currentVersion = apimachineryversion.Info{
+	currentVersion := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
-	var namelessDesc = NewDesc("", "this is a nameless metric", nil, nil, ALPHA, "")
-	var duplicatedDescA = NewDesc("test_duplicated_metric", "this is a duplicated metric A", nil, nil, ALPHA, "")
-	var duplicatedDescB = NewDesc("test_duplicated_metric", "this is a duplicated metric B", nil, nil, ALPHA, "")
+	namelessDesc := NewDesc("", "this is a nameless metric", nil, nil, ALPHA, "")
+	duplicatedDescA := NewDesc("test_duplicated_metric", "this is a duplicated metric A", nil, nil, ALPHA, "")
+	duplicatedDescB := NewDesc("test_duplicated_metric", "this is a duplicated metric B", nil, nil, ALPHA, "")
 
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		descriptors []*Desc
 		panicStr    string
@@ -139,7 +139,7 @@ func TestInvalidCustomCollector(t *testing.T) {
 // TestCustomCollectorClearState guarantees `ClearState()` will fully clear a collector.
 // It is necessary because we may forget to clear some new-added fields in the future.
 func TestCustomCollectorClearState(t *testing.T) {
-	var currentVersion = parseVersion(apimachineryversion.Info{
+	currentVersion := parseVersion(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",

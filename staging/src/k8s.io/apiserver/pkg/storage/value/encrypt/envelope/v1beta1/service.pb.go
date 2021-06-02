@@ -22,17 +22,20 @@ package v1beta1
 import (
 	context "context"
 	fmt "fmt"
+	math "math"
+
 	proto "github.com/gogo/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -54,18 +57,23 @@ func (*VersionRequest) ProtoMessage()    {}
 func (*VersionRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{0}
 }
+
 func (m *VersionRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VersionRequest.Unmarshal(m, b)
 }
+
 func (m *VersionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_VersionRequest.Marshal(b, m, deterministic)
 }
+
 func (m *VersionRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_VersionRequest.Merge(m, src)
 }
+
 func (m *VersionRequest) XXX_Size() int {
 	return xxx_messageInfo_VersionRequest.Size(m)
 }
+
 func (m *VersionRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_VersionRequest.DiscardUnknown(m)
 }
@@ -97,18 +105,23 @@ func (*VersionResponse) ProtoMessage()    {}
 func (*VersionResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{1}
 }
+
 func (m *VersionResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VersionResponse.Unmarshal(m, b)
 }
+
 func (m *VersionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_VersionResponse.Marshal(b, m, deterministic)
 }
+
 func (m *VersionResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_VersionResponse.Merge(m, src)
 }
+
 func (m *VersionResponse) XXX_Size() int {
 	return xxx_messageInfo_VersionResponse.Size(m)
 }
+
 func (m *VersionResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_VersionResponse.DiscardUnknown(m)
 }
@@ -152,18 +165,23 @@ func (*DecryptRequest) ProtoMessage()    {}
 func (*DecryptRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{2}
 }
+
 func (m *DecryptRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DecryptRequest.Unmarshal(m, b)
 }
+
 func (m *DecryptRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DecryptRequest.Marshal(b, m, deterministic)
 }
+
 func (m *DecryptRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DecryptRequest.Merge(m, src)
 }
+
 func (m *DecryptRequest) XXX_Size() int {
 	return xxx_messageInfo_DecryptRequest.Size(m)
 }
+
 func (m *DecryptRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_DecryptRequest.DiscardUnknown(m)
 }
@@ -198,18 +216,23 @@ func (*DecryptResponse) ProtoMessage()    {}
 func (*DecryptResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{3}
 }
+
 func (m *DecryptResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DecryptResponse.Unmarshal(m, b)
 }
+
 func (m *DecryptResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DecryptResponse.Marshal(b, m, deterministic)
 }
+
 func (m *DecryptResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DecryptResponse.Merge(m, src)
 }
+
 func (m *DecryptResponse) XXX_Size() int {
 	return xxx_messageInfo_DecryptResponse.Size(m)
 }
+
 func (m *DecryptResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_DecryptResponse.DiscardUnknown(m)
 }
@@ -239,18 +262,23 @@ func (*EncryptRequest) ProtoMessage()    {}
 func (*EncryptRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{4}
 }
+
 func (m *EncryptRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_EncryptRequest.Unmarshal(m, b)
 }
+
 func (m *EncryptRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_EncryptRequest.Marshal(b, m, deterministic)
 }
+
 func (m *EncryptRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EncryptRequest.Merge(m, src)
 }
+
 func (m *EncryptRequest) XXX_Size() int {
 	return xxx_messageInfo_EncryptRequest.Size(m)
 }
+
 func (m *EncryptRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_EncryptRequest.DiscardUnknown(m)
 }
@@ -285,18 +313,23 @@ func (*EncryptResponse) ProtoMessage()    {}
 func (*EncryptResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a0b84a42fa06f626, []int{5}
 }
+
 func (m *EncryptResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_EncryptResponse.Unmarshal(m, b)
 }
+
 func (m *EncryptResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_EncryptResponse.Marshal(b, m, deterministic)
 }
+
 func (m *EncryptResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EncryptResponse.Merge(m, src)
 }
+
 func (m *EncryptResponse) XXX_Size() int {
 	return xxx_messageInfo_EncryptResponse.Size(m)
 }
+
 func (m *EncryptResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_EncryptResponse.DiscardUnknown(m)
 }
@@ -344,8 +377,10 @@ var fileDescriptor_a0b84a42fa06f626 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -409,15 +444,16 @@ type KeyManagementServiceServer interface {
 }
 
 // UnimplementedKeyManagementServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedKeyManagementServiceServer struct {
-}
+type UnimplementedKeyManagementServiceServer struct{}
 
 func (*UnimplementedKeyManagementServiceServer) Version(ctx context.Context, req *VersionRequest) (*VersionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Version not implemented")
 }
+
 func (*UnimplementedKeyManagementServiceServer) Decrypt(ctx context.Context, req *DecryptRequest) (*DecryptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Decrypt not implemented")
 }
+
 func (*UnimplementedKeyManagementServiceServer) Encrypt(ctx context.Context, req *EncryptRequest) (*EncryptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Encrypt not implemented")
 }

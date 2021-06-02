@@ -244,15 +244,19 @@ func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
 	// when we delegate, we need the server we're delegating to choose whether or not to use gorestful
 	return s.Handler.Director
 }
+
 func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 	return s.postStartHooks
 }
+
 func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return s.preShutdownHooks
 }
+
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzChecks
 }
+
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
 }
@@ -261,8 +265,7 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
-type emptyDelegate struct {
-}
+type emptyDelegate struct{}
 
 func NewEmptyDelegate() DelegationTarget {
 	return emptyDelegate{}
@@ -271,21 +274,27 @@ func NewEmptyDelegate() DelegationTarget {
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
 	return nil
 }
+
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
 }
+
 func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return map[string]preShutdownHookEntry{}
 }
+
 func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
 	return []healthz.HealthChecker{}
 }
+
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
 }
+
 func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
 }
+
 func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{nil}
 }

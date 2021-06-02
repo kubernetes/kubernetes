@@ -299,7 +299,6 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 		Name(fmt.Sprintf("%v:%v", nodeName, KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
-
 	if err != nil {
 		return nil, err
 	}

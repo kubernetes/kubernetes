@@ -32,10 +32,8 @@ const (
 	formatSHA256 = "sha256"
 )
 
-var (
-	// supportedFormats enumerates the supported formats
-	supportedFormats = strings.Join([]string{formatSHA256}, ", ")
-)
+// supportedFormats enumerates the supported formats
+var supportedFormats = strings.Join([]string{formatSHA256}, ", ")
 
 // Set is a set of pinned x509 public keys.
 type Set struct {

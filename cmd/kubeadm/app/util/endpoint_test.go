@@ -23,7 +23,7 @@ import (
 )
 
 func TestGetControlPlaneEndpoint(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		cfg              *kubeadmapi.InitConfiguration
 		expectedEndpoint string
@@ -216,8 +216,7 @@ func TestGetControlPlaneEndpoint(t *testing.T) {
 }
 
 func TestParseHostPort(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		hostport      string
 		expectedHost  string
@@ -342,8 +341,7 @@ func TestParseHostPort(t *testing.T) {
 }
 
 func TestParsePort(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		port          string
 		expectedPort  int

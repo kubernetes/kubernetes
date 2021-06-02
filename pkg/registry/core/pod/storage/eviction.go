@@ -69,9 +69,11 @@ type EvictionREST struct {
 	podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter
 }
 
-var _ = rest.NamedCreater(&EvictionREST{})
-var _ = rest.GroupVersionKindProvider(&EvictionREST{})
-var _ = rest.GroupVersionAcceptor(&EvictionREST{})
+var (
+	_ = rest.NamedCreater(&EvictionREST{})
+	_ = rest.GroupVersionKindProvider(&EvictionREST{})
+	_ = rest.GroupVersionAcceptor(&EvictionREST{})
+)
 
 var v1Eviction = schema.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"}
 
@@ -330,7 +332,6 @@ func createTooManyRequestsError(name string) error {
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1.PodDisruptionBudget, dryRun bool) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
-
 		return createTooManyRequestsError(pdb.Name)
 	}
 	if pdb.Status.DisruptionsAllowed < 0 {

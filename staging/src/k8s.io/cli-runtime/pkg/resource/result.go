@@ -172,8 +172,10 @@ func (r *Result) Object() (runtime.Object, error) {
 }
 
 // Compile time check to enforce that list implements the necessary interface
-var _ metav1.ListInterface = &v1.List{}
-var _ metav1.ListMetaAccessor = &v1.List{}
+var (
+	_ metav1.ListInterface    = &v1.List{}
+	_ metav1.ListMetaAccessor = &v1.List{}
+)
 
 // toV1List takes a slice of Objects + their version, and returns
 // a v1.List Object containing the objects in the Items field

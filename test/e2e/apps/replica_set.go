@@ -155,7 +155,6 @@ var _ = SIGDescribe("ReplicaSet", func() {
 
 	ginkgo.It("should list and delete a collection of ReplicaSets", func() {
 		listRSDeleteCollection(f)
-
 	})
 
 	ginkgo.It("should validate Replicaset Status endpoints", func() {
@@ -268,7 +267,6 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond != nil, nil
-
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
@@ -449,7 +447,6 @@ func testRSScaleSubresources(f *framework.Framework) {
 	rs, err = c.AppsV1().ReplicaSets(ns).Get(context.TODO(), rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
 	framework.ExpectEqual(*(rs.Spec.Replicas), int32(4), "replicaset should have 4 replicas")
-
 }
 
 // ReplicaSet Replace and Patch tests
@@ -544,7 +541,6 @@ func testRSLifeCycle(f *framework.Framework) {
 
 // List and DeleteCollection operations
 func listRSDeleteCollection(f *framework.Framework) {
-
 	ns := f.Namespace.Name
 	c := f.ClientSet
 	rsClient := f.ClientSet.AppsV1().ReplicaSets(ns)

@@ -412,7 +412,6 @@ func TestNodeAddress(t *testing.T) {
 					Addresses: testCase.nodeAddresses,
 					Err:       nil,
 				}
-
 			}
 
 			// construct setter
@@ -926,7 +925,6 @@ func TestMachineInfo(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestVersionInfo(t *testing.T) {
@@ -1089,7 +1087,6 @@ func TestImages(t *testing.T) {
 				"Diff: %s", diff.ObjectDiff(expectNode, node))
 		})
 	}
-
 }
 
 func TestReadyCondition(t *testing.T) {
@@ -1689,7 +1686,7 @@ func TestVolumeLimits(t *testing.T) {
 		volumeLimitVal = 16
 	)
 
-	var cases = []struct {
+	cases := []struct {
 		desc             string
 		volumePluginList []volume.VolumePluginWithAttachLimits
 		expectNode       *v1.Node

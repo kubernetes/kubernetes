@@ -509,7 +509,6 @@ func (f *Framework) DeleteNamespace(name string) {
 	if !f.SkipNamespaceCreation && ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.ClientSet, name)
 	}
-
 }
 
 // CreateNamespace creates a namespace for e2e testing.

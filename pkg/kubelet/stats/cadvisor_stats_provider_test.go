@@ -212,10 +212,14 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockRuntime.
 		On("ImageStats").Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil)
 
-	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
-		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
-	persistentVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
-		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2")}
+	ephemeralVolumes := []statsapi.VolumeStats{
+		getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
+		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2"),
+	}
+	persistentVolumes := []statsapi.VolumeStats{
+		getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
+		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2"),
+	}
 	volumeStats := serverstats.PodVolumeStats{
 		EphemeralVolumes:  ephemeralVolumes,
 		PersistentVolumes: persistentVolumes,
@@ -389,10 +393,14 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	mockCadvisor.
 		On("ContainerInfoV2", "/", options).Return(infos, nil)
 
-	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
-		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
-	persistentVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
-		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2")}
+	ephemeralVolumes := []statsapi.VolumeStats{
+		getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
+		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2"),
+	}
+	persistentVolumes := []statsapi.VolumeStats{
+		getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
+		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2"),
+	}
 	volumeStats := serverstats.PodVolumeStats{
 		EphemeralVolumes:  ephemeralVolumes,
 		PersistentVolumes: persistentVolumes,

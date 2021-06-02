@@ -77,7 +77,6 @@ func (c *FakeTestTypes) List(ctx context.Context, opts v1.ListOptions) (result *
 func (c *FakeTestTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(testtypesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.

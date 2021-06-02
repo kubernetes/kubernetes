@@ -54,7 +54,6 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir string) 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
 // Used at "kubeadm init" and "kubeadm upgrade" time
 func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
-
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return err

@@ -77,7 +77,6 @@ func (c *FakeFoos) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 func (c *FakeFoos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(foosResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a foo and creates it.  Returns the server's representation of the foo, and an error, if there is any.

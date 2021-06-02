@@ -486,7 +486,6 @@ var _ = SIGDescribe("ConfigMap", func() {
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"content of file \"/etc/configmap-volume/data-1\": value-1",
 		})
-
 	})
 
 	/*

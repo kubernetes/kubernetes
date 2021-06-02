@@ -104,9 +104,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		runningPod       *v1.Pod
 		unschedulablePod *v1.Pod
 	}
-	var (
-		l local
-	)
+	var l local
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.

@@ -94,7 +94,8 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 									Key: "data-2",
 								},
 							},
-						}, {
+						},
+						{
 							Name: "CONFIG_DATA_3",
 							ValueFrom: &v1.EnvVarSource{
 								ConfigMapKeyRef: &v1.ConfigMapKeySelector{

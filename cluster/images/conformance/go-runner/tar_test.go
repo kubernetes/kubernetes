@@ -136,7 +136,6 @@ func readAllTar(tarPath string) (map[string]string, error) {
 			break // End of archive
 		}
 		if err != nil {
-
 			return nil, err
 		}
 

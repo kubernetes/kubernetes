@@ -125,9 +125,11 @@ func (obj *ExternalType2) GroupVersionKind() schema.GroupVersionKind {
 
 // NewInternalType returns an initialized InternalType instance
 func NewInternalType(kind, apiversion, name string) *InternalType {
-	item := InternalType{Kind: kind,
+	item := InternalType{
+		Kind:       kind,
 		APIVersion: apiversion,
-		Name:       name}
+		Name:       name,
+	}
 	return &item
 }
 
@@ -233,10 +235,12 @@ func (obj *ExternalNamespacedType2) GroupVersionKind() schema.GroupVersionKind {
 
 // NewInternalNamespacedType returns an initialized instance of InternalNamespacedType
 func NewInternalNamespacedType(kind, apiversion, name, namespace string) *InternalNamespacedType {
-	item := InternalNamespacedType{Kind: kind,
+	item := InternalNamespacedType{
+		Kind:       kind,
 		APIVersion: apiversion,
 		Name:       name,
-		Namespace:  namespace}
+		Namespace:  namespace,
+	}
 	return &item
 }
 
@@ -785,7 +789,8 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				},
 				PreferredVersion: metav1.GroupVersionForDiscovery{
 					GroupVersion: "unit-test.test.com/v1",
-					Version:      "v1"},
+					Version:      "v1",
+				},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
@@ -801,7 +806,8 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				},
 				PreferredVersion: metav1.GroupVersionForDiscovery{
 					GroupVersion: "apitest/unlikelyversion",
-					Version:      "unlikelyversion"},
+					Version:      "unlikelyversion",
+				},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"unlikelyversion": {

@@ -80,7 +80,6 @@ func (c *FakeCronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v
 func (c *FakeCronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.

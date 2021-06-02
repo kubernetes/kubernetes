@@ -142,7 +142,6 @@ func (f *fakeManager) setCurrent(cert *tls.Certificate) {
 }
 
 func TestRotateShutsDownConnections(t *testing.T) {
-
 	// This test fails if you comment out the t.closeAllConns() call in
 	// transport.go and don't close connections on a rotate.
 

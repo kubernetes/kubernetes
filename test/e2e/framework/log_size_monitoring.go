@@ -46,8 +46,10 @@ const (
 
 var (
 	nodeLogsToCheck   = []string{kubeletLogsPath, kubeProxyLogsPath}
-	masterLogsToCheck = []string{kubeletLogsPath, kubeAddonsLogsPath, kubeMasterAddonsLogsPath,
-		apiServerLogsPath, controllersLogsPath, schedulerLogsPath}
+	masterLogsToCheck = []string{
+		kubeletLogsPath, kubeAddonsLogsPath, kubeMasterAddonsLogsPath,
+		apiServerLogsPath, controllersLogsPath, schedulerLogsPath,
+	}
 )
 
 // TimestampedSize contains a size together with a time of measurement.

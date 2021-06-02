@@ -36,119 +36,189 @@ func TestPVSecrets(t *testing.T) {
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				AzureFile: &corev1.AzureFilePersistentVolumeSource{
-					SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
+					SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName",
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				AzureFile: &corev1.AzureFilePersistentVolumeSource{
 					SecretName:      "Spec.PersistentVolumeSource.AzureFile.SecretName",
-					SecretNamespace: &secretNamespace}}}},
+					SecretNamespace: &secretNamespace,
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CephFS: &corev1.CephFSPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CephFS.SecretRef",
-						Namespace: "cephfs"}}}}},
+						Namespace: "cephfs",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CephFS: &corev1.CephFSPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
-						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
+						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				Cinder: &corev1.CinderPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.Cinder.SecretRef",
-						Namespace: "cinder"}}}}},
+						Namespace: "cinder",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				FlexVolume: &corev1.FlexPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.FlexVolume.SecretRef",
-						Namespace: "flexns"}}}}},
+						Namespace: "flexns",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				FlexVolume: &corev1.FlexPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
-						Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef"}}}}},
+						Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				RBD: &corev1.RBDPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
-						Name: "Spec.PersistentVolumeSource.RBD.SecretRef"}}}}},
+						Name: "Spec.PersistentVolumeSource.RBD.SecretRef",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				RBD: &corev1.RBDPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.RBD.SecretRef",
-						Namespace: "rbdns"}}}}},
+						Namespace: "rbdns",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				ScaleIO: &corev1.ScaleIOPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
-						Name: "Spec.PersistentVolumeSource.ScaleIO.SecretRef"}}}}},
+						Name: "Spec.PersistentVolumeSource.ScaleIO.SecretRef",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				ScaleIO: &corev1.ScaleIOPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.ScaleIO.SecretRef",
-						Namespace: "scaleions"}}}}},
+						Namespace: "scaleions",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				ISCSI: &corev1.ISCSIPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.ISCSI.SecretRef",
-						Namespace: "iscsi"}}}}},
+						Namespace: "iscsi",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				ISCSI: &corev1.ISCSIPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
-						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
+						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				StorageOS: &corev1.StorageOSPersistentVolumeSource{
 					SecretRef: &corev1.ObjectReference{
 						Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
-						Namespace: "storageosns"}}}}},
+						Namespace: "storageosns",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
 					ControllerPublishSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
-						Namespace: "csi"}}}}},
+						Namespace: "csi",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
 					NodePublishSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
-						Namespace: "csi"}}}}},
+						Namespace: "csi",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
 					NodeStageSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
-						Namespace: "csi"}}}}},
+						Namespace: "csi",
+					},
+				},
+			},
+		}},
 		{Spec: corev1.PersistentVolumeSpec{
 			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
 					ControllerExpandSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
-						Namespace: "csi"}}}}},
+						Namespace: "csi",
+					},
+				},
+			},
+		}},
 	}
 	extractedNames := sets.NewString()
 	extractedNamesWithNamespace := sets.NewString()
@@ -246,7 +316,12 @@ func TestPVSecrets(t *testing.T) {
 				CephFS: &corev1.CephFSPersistentVolumeSource{
 					SecretRef: &corev1.SecretReference{
 						Name:      "",
-						Namespace: "cephfs"}}}}}
+						Namespace: "cephfs",
+					},
+				},
+			},
+		},
+	}
 	VisitPVSecretNames(emptyPV, func(namespace, name string, kubeletVisible bool) bool {
 		t.Fatalf("expected no empty names collected, got %q", name)
 		return false

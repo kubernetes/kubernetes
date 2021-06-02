@@ -1956,7 +1956,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 			klog.ErrorS(err, "Failed to ensure chain jumps", "table", jc.table, "srcChain", jc.from, "dstChain", jc.to)
 		}
 	}
-
 }
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.

@@ -80,7 +80,6 @@ func (c *FakePodTemplates) List(ctx context.Context, opts v1.ListOptions) (resul
 func (c *FakePodTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podtemplatesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.

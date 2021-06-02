@@ -55,7 +55,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=cr.example.apiextensions.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("examples"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Cr().V1().Examples().Informer()}, nil
-
 	}
 
 	return nil, fmt.Errorf("no informer found for %v", resource)

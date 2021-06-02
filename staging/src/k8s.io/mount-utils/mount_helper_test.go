@@ -27,7 +27,6 @@ import (
 )
 
 func TestDoCleanupMountPoint(t *testing.T) {
-
 	if runtime.GOOS == "darwin" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
@@ -83,7 +82,6 @@ func TestDoCleanupMountPoint(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			tmpDir, err := ioutil.TempDir("", "unmount-mount-point-test")
 			if err != nil {
 				t.Fatalf("failed to create tmpdir: %v", err)

@@ -204,7 +204,6 @@ func (grm *nestedPendingOperations) IsOperationPending(
 
 // This is an internal function and caller should acquire and release the lock
 func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, int) {
-
 	// If volumeName is empty, operation can be executed concurrently
 	if key.volumeName == EmptyUniqueVolumeName {
 		return false, -1

@@ -79,8 +79,10 @@ type evictUnit struct {
 	name string
 }
 
-type containersByEvictUnit map[evictUnit][]containerGCInfo
-type sandboxesByPodUID map[types.UID][]sandboxGCInfo
+type (
+	containersByEvictUnit map[evictUnit][]containerGCInfo
+	sandboxesByPodUID     map[types.UID][]sandboxGCInfo
+)
 
 // NumContainers returns the number of containers in this map.
 func (cu containersByEvictUnit) NumContainers() int {

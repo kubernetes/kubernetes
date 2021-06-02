@@ -74,12 +74,14 @@ var (
 		"discovery.sendtargets.auth.username",
 		"discovery.sendtargets.auth.password",
 		"discovery.sendtargets.auth.username_in",
-		"discovery.sendtargets.auth.password_in"}
+		"discovery.sendtargets.auth.password_in",
+	}
 	chapSess = []string{
 		"node.session.auth.username",
 		"node.session.auth.password",
 		"node.session.auth.username_in",
-		"node.session.auth.password_in"}
+		"node.session.auth.password_in",
+	}
 	ifaceTransportNameRe = regexp.MustCompile(`iface.transport_name = (.*)\n`)
 	ifaceRe              = regexp.MustCompile(`.+/iface-([^/]+)/.+`)
 )
@@ -138,8 +140,10 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 
 // stat a path, if not exists, retry maxRetries times
 // when iscsi transports other than default are used,  use glob instead as pci id of device is unknown
-type StatFunc func(string) (os.FileInfo, error)
-type GlobFunc func(string) ([]string, error)
+type (
+	StatFunc func(string) (os.FileInfo, error)
+	GlobFunc func(string) ([]string, error)
+)
 
 func waitForPathToExist(devicePath *string, maxRetries int, deviceTransport string) bool {
 	// This makes unit testing a lot easier

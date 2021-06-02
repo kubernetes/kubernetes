@@ -207,7 +207,6 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 			authenticationv1beta1.SchemeGroupVersion.Version,
 		)
 	}
-
 }
 
 type tokenReviewV1Client struct {

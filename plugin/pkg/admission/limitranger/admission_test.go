@@ -724,7 +724,6 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
-
 }
 
 func TestLimitRangerAdmitPod(t *testing.T) {

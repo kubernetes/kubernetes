@@ -537,7 +537,6 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		tc.Unlock()
 	}
 	tc.verifyResults(t)
-
 }
 
 func TestLegacyScaleUp(t *testing.T) {

@@ -86,7 +86,8 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			saConfig := SetServiceAccountOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
-					Filenames: []string{input.yaml}},
+					Filenames: []string{input.yaml},
+				},
 				local:     true,
 				IOStreams: streams,
 			}
@@ -122,7 +123,8 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	opts := SetServiceAccountOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
+			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"},
+		},
 		local:     true,
 		IOStreams: streams,
 	}

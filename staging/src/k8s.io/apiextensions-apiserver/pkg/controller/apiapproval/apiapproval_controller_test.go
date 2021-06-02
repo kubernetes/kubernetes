@@ -96,8 +96,6 @@ func TestCalculateCondition(t *testing.T) {
 
 			actual := calculateCondition(crd)
 			test.validateCondition(t, actual)
-
 		})
 	}
-
 }

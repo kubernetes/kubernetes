@@ -64,7 +64,8 @@ uint64: 9123456789012345678
 
 	require.NoError(t, viperizeFlags(tmpfile.Name(), "", flags), "read config file")
 	require.Equal(t,
-		Context{false, time.Second, -1.23456789, "pong",
+		Context{
+			false, time.Second, -1.23456789, "pong",
 			-2, -9123456789012345678, 2, 9123456789012345678,
 		},
 		context,

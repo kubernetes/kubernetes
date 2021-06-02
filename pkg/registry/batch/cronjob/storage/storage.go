@@ -63,8 +63,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
-var _ rest.CategoriesProvider = &REST{}
-var _ rest.ShortNamesProvider = &REST{}
+var (
+	_ rest.CategoriesProvider = &REST{}
+	_ rest.ShortNamesProvider = &REST{}
+)
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {

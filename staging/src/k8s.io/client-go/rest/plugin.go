@@ -55,8 +55,10 @@ func (n *noopPersister) Persist(_ map[string]string) error {
 }
 
 // All registered auth provider plugins.
-var pluginsLock sync.Mutex
-var plugins = make(map[string]Factory)
+var (
+	pluginsLock sync.Mutex
+	plugins     = make(map[string]Factory)
+)
 
 func RegisterAuthProviderPlugin(name string, plugin Factory) error {
 	pluginsLock.Lock()

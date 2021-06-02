@@ -32,11 +32,15 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
-var projectsFile = "/etc/projects"
-var projidFile = "/etc/projid"
+var (
+	projectsFile = "/etc/projects"
+	projidFile   = "/etc/projid"
+)
 
-var projectsParseRegexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
-var projidParseRegexp = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
+var (
+	projectsParseRegexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
+	projidParseRegexp   = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
+)
 
 var quotaIDLock sync.RWMutex
 
@@ -196,7 +200,7 @@ func addDirToProject(path string, id common.QuotaID, list *projectsList) (common
 		}
 		idMap[project.id] = true
 	}
-	var needToAddProjid = true
+	needToAddProjid := true
 	for _, projid := range list.projid {
 		idMap[projid.id] = true
 		if projid.id == id && id != common.BadQuotaID {

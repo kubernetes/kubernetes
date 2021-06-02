@@ -57,9 +57,7 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var (
-	errPrioritize = fmt.Errorf("priority map encounters an error")
-)
+var errPrioritize = fmt.Errorf("priority map encounters an error")
 
 type noPodsFilterPlugin struct{}
 
@@ -1067,7 +1065,6 @@ func TestFindFitAllError(t *testing.T) {
 	}
 
 	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1101,7 +1098,6 @@ func TestFindFitSomeError(t *testing.T) {
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
 	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1275,8 +1271,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of zero-request pod with machine with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 250,
 		},
@@ -1285,8 +1283,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of nonzero-request pod with machine with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 250,
 		},
@@ -1296,8 +1296,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of larger pod with machine with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 230,
 		},

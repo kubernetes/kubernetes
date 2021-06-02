@@ -35,24 +35,22 @@ const (
 	retryDelay       = 10 * time.Second
 )
 
-var (
-	baseNodeTemplate = &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "sample-node-",
+var baseNodeTemplate = &v1.Node{
+	ObjectMeta: metav1.ObjectMeta{
+		GenerateName: "sample-node-",
+	},
+	Status: v1.NodeStatus{
+		Capacity: v1.ResourceList{
+			v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+			v1.ResourceCPU:    resource.MustParse("4"),
+			v1.ResourceMemory: resource.MustParse("32Gi"),
 		},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("32Gi"),
-			},
-			Phase: v1.NodeRunning,
-			Conditions: []v1.NodeCondition{
-				{Type: v1.NodeReady, Status: v1.ConditionTrue},
-			},
+		Phase: v1.NodeRunning,
+		Conditions: []v1.NodeCondition{
+			{Type: v1.NodeReady, Status: v1.ConditionTrue},
 		},
-	}
-)
+	},
+}
 
 func deleteNodes(apiURL string, config *Config) {
 	klog.Info("Deleting nodes")

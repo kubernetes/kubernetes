@@ -416,7 +416,6 @@ func (manager *gceServiceManager) ResizeDiskOnCloudProvider(disk *Disk, sizeGb i
 }
 
 func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *Disk, sizeGb int64) error {
-
 	resizeServiceRequest := &compute.RegionDisksResizeRequest{
 		SizeGb: sizeGb,
 	}
@@ -830,7 +829,6 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	case singleZone:
 		mc = newDiskMetricContextZonal("resize", disk.Region, zoneInfo.zone)
 		err := g.manager.ResizeDiskOnCloudProvider(disk, requestGIB, zoneInfo.zone)
-
 		if err != nil {
 			return oldSize, mc.Observe(err)
 		}
@@ -838,7 +836,6 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	case multiZone:
 		mc = newDiskMetricContextRegional("resize", disk.Region)
 		err := g.manager.RegionalResizeDiskOnCloudProvider(disk, requestGIB)
-
 		if err != nil {
 			return oldSize, mc.Observe(err)
 		}

@@ -63,5 +63,4 @@ func TestGetMetricsStatFS(t *testing.T) {
 	if a := actual.Available.Value(); a <= 0 {
 		t.Errorf("Expected Available %d to be greater than 0.", a)
 	}
-
 }

@@ -63,7 +63,6 @@ func isSubpath(subpath, path string) bool {
 //    /metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
 //    /logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
 func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
-
 	apiVerb := ""
 	switch r.Method {
 	case "POST":

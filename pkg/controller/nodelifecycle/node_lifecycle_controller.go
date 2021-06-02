@@ -697,7 +697,7 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 
 			result := nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
 			if result {
-				//count the evictionsNumber
+				// count the evictionsNumber
 				zone := utilnode.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
@@ -1531,7 +1531,6 @@ func (nc *Controller) reconcileNodeLabels(nodeName string) error {
 			// Secondary label exists, but not consistent with the primary
 			// label. Need to reconcile.
 			labelsToUpdate[r.secondaryKey] = primaryValue
-
 		} else if !secondaryExists && r.ensureSecondaryExists {
 			// Apply secondary label based on primary label.
 			labelsToUpdate[r.secondaryKey] = primaryValue

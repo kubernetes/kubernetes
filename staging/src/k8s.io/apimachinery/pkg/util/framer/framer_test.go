@@ -98,6 +98,7 @@ func TestReadLarge(t *testing.T) {
 		t.Fatalf("unexpected: %v %d", err, n)
 	}
 }
+
 func TestReadInvalidFrame(t *testing.T) {
 	data := []byte{
 		0x00, 0x00, 0x00, 0x04,

@@ -80,7 +80,6 @@ func (c *FakeServices) List(ctx context.Context, opts v1.ListOptions) (result *c
 func (c *FakeServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(servicesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.

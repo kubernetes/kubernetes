@@ -141,5 +141,4 @@ func TestDiscoveryCategoryExpander(t *testing.T) {
 			t.Errorf("expected %v, got %v", test.expected, expanded)
 		}
 	}
-
 }

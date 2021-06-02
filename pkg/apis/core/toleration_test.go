@@ -19,7 +19,6 @@ package core
 import "testing"
 
 func TestMatchToleration(t *testing.T) {
-
 	tolerationSeconds := int64(5)
 	tolerationToMatchSeconds := int64(3)
 	testCases := []struct {

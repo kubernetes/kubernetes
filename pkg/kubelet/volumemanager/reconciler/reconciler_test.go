@@ -158,7 +158,6 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -315,7 +314,6 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -405,7 +403,6 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -513,7 +510,6 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -711,7 +707,6 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -822,7 +817,6 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -894,7 +888,8 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
 			volumeToMount := operationexecutor.VolumeToMount{
 				Pod:        pod,
-				VolumeSpec: tmpSpec}
+				VolumeSpec: tmpSpec,
+			}
 			err := oex.MountVolume(waitForAttachTimeout, volumeToMount, asw, false)
 			// Assert
 			if assert.Error(t, err) {
@@ -937,7 +932,8 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
 			volumeToUnmount := operationexecutor.MountedVolume{
 				PluginName: "fake-file-plugin",
-				VolumeSpec: tmpSpec}
+				VolumeSpec: tmpSpec,
+			}
 			err := oex.UnmountVolume(volumeToUnmount, asw, "" /* podsDir */)
 			// Assert
 			if assert.Error(t, err) {
@@ -1000,7 +996,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 	blockMode := v1.PersistentVolumeBlock
 	fsMode := v1.PersistentVolumeFilesystem
 
-	var tests = []struct {
+	tests := []struct {
 		name            string
 		volumeMode      *v1.PersistentVolumeMode
 		expansionFailed bool
@@ -1177,13 +1173,12 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 					t.Fatal("Volume resize should succeeded")
 				}
 			}
-
 		})
 	}
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
 		unmountDeviceCallCount int
@@ -1364,7 +1359,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
 		unmountDeviceCallCount int
@@ -1581,7 +1576,6 @@ func waitForUncertainGlobalMount(t *testing.T, volumeName v1.UniqueVolumeName, a
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("expected volumes %s to be mounted in uncertain state globally", volumeName)
 	}
@@ -1601,7 +1595,6 @@ func waitForGlobalMount(t *testing.T, volumeName v1.UniqueVolumeName, asw cache.
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("expected volume devices %s to be mounted globally", volumeName)
 	}
@@ -1621,7 +1614,6 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, asw 
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("expected volumes %s to be mounted in uncertain state for pod", volumeName)
 	}
@@ -1645,7 +1637,6 @@ func waitForMount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Timed out waiting for volume %q to be attached.", volumeName)
 	}
@@ -1680,7 +1671,6 @@ func waitForDetach(
 			return true, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Timed out waiting for volume %q to be detached.", volumeName)
 	}
@@ -1708,7 +1698,8 @@ func createTestClient() *fake.Clientset {
 							Name:       "fake-plugin/fake-device1",
 							DevicePath: "/fake/path",
 						},
-					}},
+					},
+				},
 			}, nil
 		})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {

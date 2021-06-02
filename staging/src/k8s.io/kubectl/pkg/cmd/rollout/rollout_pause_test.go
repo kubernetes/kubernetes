@@ -33,8 +33,10 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
-var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
-var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "apps", Version: "v1"}
+var (
+	rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
+	rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "apps", Version: "v1"}
+)
 
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"

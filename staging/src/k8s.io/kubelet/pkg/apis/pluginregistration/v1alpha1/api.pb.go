@@ -22,22 +22,25 @@ package pluginregistration
 import (
 	context "context"
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -76,9 +79,11 @@ func (*PluginInfo) ProtoMessage() {}
 func (*PluginInfo) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *PluginInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PluginInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PluginInfo.Marshal(b, m, deterministic)
@@ -91,12 +96,15 @@ func (m *PluginInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *PluginInfo) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PluginInfo.Merge(m, src)
 }
+
 func (m *PluginInfo) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PluginInfo) XXX_DiscardUnknown() {
 	xxx_messageInfo_PluginInfo.DiscardUnknown(m)
 }
@@ -146,9 +154,11 @@ func (*RegistrationStatus) ProtoMessage() {}
 func (*RegistrationStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *RegistrationStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RegistrationStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_RegistrationStatus.Marshal(b, m, deterministic)
@@ -161,12 +171,15 @@ func (m *RegistrationStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 		return b[:n], nil
 	}
 }
+
 func (m *RegistrationStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RegistrationStatus.Merge(m, src)
 }
+
 func (m *RegistrationStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RegistrationStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_RegistrationStatus.DiscardUnknown(m)
 }
@@ -198,9 +211,11 @@ func (*RegistrationStatusResponse) ProtoMessage() {}
 func (*RegistrationStatusResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
+
 func (m *RegistrationStatusResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RegistrationStatusResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_RegistrationStatusResponse.Marshal(b, m, deterministic)
@@ -213,12 +228,15 @@ func (m *RegistrationStatusResponse) XXX_Marshal(b []byte, deterministic bool) (
 		return b[:n], nil
 	}
 }
+
 func (m *RegistrationStatusResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RegistrationStatusResponse.Merge(m, src)
 }
+
 func (m *RegistrationStatusResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RegistrationStatusResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_RegistrationStatusResponse.DiscardUnknown(m)
 }
@@ -236,9 +254,11 @@ func (*InfoRequest) ProtoMessage() {}
 func (*InfoRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
+
 func (m *InfoRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *InfoRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_InfoRequest.Marshal(b, m, deterministic)
@@ -251,12 +271,15 @@ func (m *InfoRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 		return b[:n], nil
 	}
 }
+
 func (m *InfoRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_InfoRequest.Merge(m, src)
 }
+
 func (m *InfoRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *InfoRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_InfoRequest.DiscardUnknown(m)
 }
@@ -299,8 +322,10 @@ var fileDescriptor_00212fb1f9d3bf1c = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -347,12 +372,12 @@ type RegistrationServer interface {
 }
 
 // UnimplementedRegistrationServer can be embedded to have forward compatible implementations.
-type UnimplementedRegistrationServer struct {
-}
+type UnimplementedRegistrationServer struct{}
 
 func (*UnimplementedRegistrationServer) GetInfo(ctx context.Context, req *InfoRequest) (*PluginInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetInfo not implemented")
 }
+
 func (*UnimplementedRegistrationServer) NotifyRegistrationStatus(ctx context.Context, req *RegistrationStatus) (*RegistrationStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyRegistrationStatus not implemented")
 }
@@ -564,6 +589,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *PluginInfo) Size() (n int) {
 	if m == nil {
 		return 0
@@ -628,14 +654,17 @@ func (m *InfoRequest) Size() (n int) {
 func sovApi(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *PluginInfo) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PluginInfo{`,
+	s := strings.Join([]string{
+		`&PluginInfo{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Endpoint:` + fmt.Sprintf("%v", this.Endpoint) + `,`,
@@ -644,35 +673,42 @@ func (this *PluginInfo) String() string {
 	}, "")
 	return s
 }
+
 func (this *RegistrationStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegistrationStatus{`,
+	s := strings.Join([]string{
+		`&RegistrationStatus{`,
 		`PluginRegistered:` + fmt.Sprintf("%v", this.PluginRegistered) + `,`,
 		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RegistrationStatusResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegistrationStatusResponse{`,
+	s := strings.Join([]string{
+		`&RegistrationStatusResponse{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *InfoRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&InfoRequest{`,
+	s := strings.Join([]string{
+		`&InfoRequest{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -681,6 +717,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *PluginInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -859,6 +896,7 @@ func (m *PluginInfo) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RegistrationStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -961,6 +999,7 @@ func (m *RegistrationStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RegistrationStatusResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1011,6 +1050,7 @@ func (m *RegistrationStatusResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1061,6 +1101,7 @@ func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

@@ -890,7 +890,8 @@ func TestVolumes(t *testing.T) {
 		CapacityKB: 1 * 1024 * 1024,
 		Tags:       nil,
 		Name:       "kubernetes-test-volume-" + rand.String(10),
-		DiskFormat: "thin"}
+		DiskFormat: "thin",
+	}
 
 	volPath, err := vs.CreateVolume(volumeOptions)
 	if err != nil {
@@ -920,7 +921,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 		username = "user"
 		password = "password" // Fake value for testing.
 	)
-	var testcases = []struct {
+	testcases := []struct {
 		testName                 string
 		conf                     string
 		expectedIsSecretProvided bool

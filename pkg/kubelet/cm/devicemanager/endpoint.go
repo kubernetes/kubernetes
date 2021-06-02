@@ -198,7 +198,6 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
 	}

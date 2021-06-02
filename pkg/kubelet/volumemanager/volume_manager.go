@@ -382,7 +382,6 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
-
 	if err != nil {
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)

@@ -33,7 +33,6 @@ import (
 )
 
 func makeNetworkPolicy(isIngress, isEgress, hasEndPort bool) *networking.NetworkPolicy {
-
 	protocolTCP := api.ProtocolTCP
 	endPort := int32(32000)
 	netPol := &networking.NetworkPolicy{
@@ -278,7 +277,6 @@ func TestNetworkPolicyEndPortEnablement(t *testing.T) {
 	if err != nil {
 		t.Errorf("Update with enabled FG failed. %v", err)
 	}
-
 }
 
 func testUpdateEndPort(oldNetPol *networking.NetworkPolicy) (*networking.NetworkPolicy, error) {
@@ -315,5 +313,4 @@ func testUpdateEndPort(oldNetPol *networking.NetworkPolicy) (*networking.Network
 		return nil, fmt.Errorf("Unexpected error from validation for created Network Policy: %v", errs)
 	}
 	return updatedNetPol, nil
-
 }

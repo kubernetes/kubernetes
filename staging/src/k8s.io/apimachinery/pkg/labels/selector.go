@@ -707,7 +707,6 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 		return nil, err
 	}
 	return NewRequirement(key, operator, values.List(), field.WithPath(p.path))
-
 }
 
 // parseKeyAndInferOperator parses literals.

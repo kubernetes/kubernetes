@@ -41,7 +41,6 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNode(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := asw.AddVolumeNode(volumeName, volumeSpec, nodeName, devicePath, true)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
@@ -76,7 +75,6 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 
 	// Act
 	generatedVolumeName, err := asw.AddVolumeNode(volumeName, volumeSpec, nodeName, devicePath, false)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
@@ -156,7 +154,6 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 	if !exists {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q does not exist> Expect: <node does exist in the reportedAsAttached map", nodeName)
 	}
-
 }
 
 // Calls AddVolumeNode() once with attached set to false.
@@ -176,7 +173,6 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 
 	// Act
 	generatedVolumeName, err := asw.AddVolumeNode(volumeName, volumeSpec, node1Name, devicePath, false)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
@@ -1017,7 +1013,6 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	if len(volumes) > 0 {
 		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
 	}
-
 }
 
 // Populates data struct with one volume/node entry.
@@ -1342,7 +1337,6 @@ func Test_updateNodeStatusUpdateNeeded(t *testing.T) {
 
 	// Act
 	err := asw.updateNodeStatusUpdateNeeded(nodeName, false)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should not return error, but got: %v", err)

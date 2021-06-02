@@ -101,7 +101,8 @@ func NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorld:       desiredStateOfWorld,
 		actualStateOfWorld:        actualStateOfWorld,
 		pods: processedPods{
-			processedPods: make(map[volumetypes.UniquePodName]bool)},
+			processedPods: make(map[volumetypes.UniquePodName]bool),
+		},
 		kubeContainerRuntime:     kubeContainerRuntime,
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
@@ -370,7 +371,6 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		// ReprocessPod() which is triggered by SyncPod.
 		dswp.markPodProcessed(uniquePodName)
 	}
-
 }
 
 // checkVolumeFSResize checks whether a PVC mounted by the pod requires file

@@ -165,7 +165,6 @@ func TestOtherResources(t *testing.T) {
 			t.Errorf("%s: image pull policy was changed to %s", tc.name, a)
 		}
 	}
-
 }
 
 // TestUpdatePod ensures that this admission controller is a no-op for update pod if no
@@ -264,5 +263,4 @@ func TestUpdatePod(t *testing.T) {
 		}
 
 	}
-
 }

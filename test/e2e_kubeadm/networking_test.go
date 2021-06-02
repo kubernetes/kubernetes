@@ -38,7 +38,6 @@ var (
 // that kubeadm configures the networking as expected.
 // in case you want to skip this test use SKIP=setup-networking
 var _ = Describe("networking [setup-networking]", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("networking")
 

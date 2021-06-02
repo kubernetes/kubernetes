@@ -50,8 +50,10 @@ type AllocationBitmap struct {
 }
 
 // AllocationBitmap implements Interface and Snapshottable
-var _ Interface = &AllocationBitmap{}
-var _ Snapshottable = &AllocationBitmap{}
+var (
+	_ Interface     = &AllocationBitmap{}
+	_ Snapshottable = &AllocationBitmap{}
+)
 
 // bitAllocator represents a search strategy in the allocation map for a valid item.
 type bitAllocator interface {

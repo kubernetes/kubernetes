@@ -846,7 +846,7 @@ func TestIsValidSysctlPattern(t *testing.T) {
 }
 
 func TestValidatePSPRunAsUser(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name              string
 		runAsUserStrategy policy.RunAsUserStrategyOptions
 		fail              bool
@@ -874,7 +874,7 @@ func TestValidatePSPRunAsUser(t *testing.T) {
 }
 
 func TestValidatePSPFSGroup(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name            string
 		fsGroupStrategy policy.FSGroupStrategyOptions
 		fail            bool
@@ -900,7 +900,7 @@ func TestValidatePSPFSGroup(t *testing.T) {
 }
 
 func TestValidatePSPSupplementalGroup(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name                      string
 		supplementalGroupStrategy policy.SupplementalGroupsStrategyOptions
 		fail                      bool
@@ -926,7 +926,7 @@ func TestValidatePSPSupplementalGroup(t *testing.T) {
 }
 
 func TestValidatePSPRunAsGroup(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name       string
 		runAsGroup policy.RunAsGroupStrategyOptions
 		fail       bool
@@ -951,19 +951,27 @@ func TestValidatePSPRunAsGroup(t *testing.T) {
 }
 
 func TestValidatePSPSELinux(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name    string
 		selinux policy.SELinuxStrategyOptions
 		fail    bool
 	}{
-		{"SELinuxStrategyMustRunAs",
+		{
+			"SELinuxStrategyMustRunAs",
 			policy.SELinuxStrategyOptions{
 				Rule:           policy.SELinuxStrategyMustRunAs,
-				SELinuxOptions: &api.SELinuxOptions{Level: "s9:z0,z1"}}, false},
-		{"SELinuxStrategyMustRunAs",
+				SELinuxOptions: &api.SELinuxOptions{Level: "s9:z0,z1"},
+			},
+			false,
+		},
+		{
+			"SELinuxStrategyMustRunAs",
 			policy.SELinuxStrategyOptions{
 				Rule:           policy.SELinuxStrategyMustRunAs,
-				SELinuxOptions: &api.SELinuxOptions{Level: "s0"}}, false},
+				SELinuxOptions: &api.SELinuxOptions{Level: "s0"},
+			},
+			false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -981,7 +989,7 @@ func TestValidatePSPSELinux(t *testing.T) {
 }
 
 func TestValidateRuntimeClassStrategy(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name         string
 		strategy     *policy.RuntimeClassStrategyOptions
 		expectErrors bool

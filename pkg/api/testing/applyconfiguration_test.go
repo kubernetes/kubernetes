@@ -121,7 +121,6 @@ func unstructuredRoundTripApplyConfiguration(t *testing.T, item runtime.Object, 
 }
 
 func jsonRoundTripApplyConfiguration(t *testing.T, item runtime.Object, applyConfig interface{}) {
-
 	objData, err := json.Marshal(item)
 	if err != nil {
 		t.Errorf("json.Marshal failed: %v", err)

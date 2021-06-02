@@ -44,9 +44,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
-var (
-	fakeCreatedAt int64 = 1
-)
+var fakeCreatedAt int64 = 1
 
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	return customTestRuntimeManager(&credentialprovider.BasicDockerKeyring{})
@@ -139,7 +137,6 @@ func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template san
 	}
 	podSandBoxStatus.Network.AdditionalIps = additionalPodIPs
 	return podSandBoxStatus
-
 }
 
 // makeFakePodSandboxes creates a group of fake pod sandboxes based on the sandbox templates.

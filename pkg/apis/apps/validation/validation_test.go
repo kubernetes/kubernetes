@@ -124,7 +124,8 @@ func TestValidateStatefulSet(t *testing.T) {
 					Type: apps.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 						return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
-					}()},
+					}(),
+				},
 			},
 		},
 	}
@@ -303,10 +304,12 @@ func TestValidateStatefulSet(t *testing.T) {
 				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:            validPodTemplate.Template,
 				Replicas:            3,
-				UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.OnDeleteStatefulSetStrategyType,
 					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 						return &apps.RollingUpdateStatefulSetStrategy{Partition: 1}
-					}()},
+					}(),
+				},
 			},
 		},
 		"negative parition": {
@@ -316,10 +319,12 @@ func TestValidateStatefulSet(t *testing.T) {
 				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:            validPodTemplate.Template,
 				Replicas:            3,
-				UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 						return &apps.RollingUpdateStatefulSetStrategy{Partition: -1}
-					}()},
+					}(),
+				},
 			},
 		},
 		"empty pod management policy": {
@@ -2270,7 +2275,8 @@ func TestValidateDeployment(t *testing.T) {
 			Name:                     "ec",
 			Image:                    "image",
 			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File"},
+			TerminationMessagePolicy: "File",
+		},
 	}}
 	errorCases["ephemeral containers not allowed"] = invalidEphemeralContainersDeployment
 
@@ -2719,7 +2725,6 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
-
 }
 
 func TestValidateReplicaSetUpdate(t *testing.T) {

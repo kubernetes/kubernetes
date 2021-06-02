@@ -29,8 +29,10 @@ import (
 // In general these should be errors that indicate a server is overloaded.
 // These shouldn't be configured by any user, we set them based on conventions
 // described in
-var serverIsOverloadedSet = sets.NewInt(429)
-var maxResponseCode = 499
+var (
+	serverIsOverloadedSet = sets.NewInt(429)
+	maxResponseCode       = 499
+)
 
 type BackoffManager interface {
 	UpdateBackoff(actualUrl *url.URL, err error, responseCode int)
@@ -46,8 +48,7 @@ type URLBackoff struct {
 }
 
 // NoBackoff is a stub implementation, can be used for mocking or else as a default.
-type NoBackoff struct {
-}
+type NoBackoff struct{}
 
 func (n *NoBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
 	// do nothing.
@@ -92,7 +93,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 
-	//If we got this far, there is no backoff required for this URL anymore.
+	// If we got this far, there is no backoff required for this URL anymore.
 	b.Backoff.Reset(b.baseUrlKey(actualUrl))
 }
 

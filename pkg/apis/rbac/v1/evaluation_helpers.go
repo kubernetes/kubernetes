@@ -75,7 +75,6 @@ func ResourceMatches(rule *rbacv1.PolicyRule, combinedRequestedResource, request
 			strings.HasPrefix(ruleResource, "*/") &&
 			strings.HasSuffix(ruleResource, requestedSubresource) {
 			return true
-
 		}
 	}
 

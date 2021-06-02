@@ -33,14 +33,16 @@ import (
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
-	before := metav1.LabelSelector{MatchLabels: map[string]string{"fee": "true"},
+	before := metav1.LabelSelector{
+		MatchLabels: map[string]string{"fee": "true"},
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
 				Key:      "foo",
 				Operator: metav1.LabelSelectorOpIn,
 				Values:   []string{"on", "yes"},
 			},
-		}}
+		},
+	}
 
 	rc := v1.ReplicationController{}
 	ser := v1.Service{}
@@ -59,56 +61,64 @@ func TestUpdateSelectorForObjectTypes(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "rc",
+		{
+			name: "rc",
 			args: args{
 				obj:      &rc,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "ser",
+		{
+			name: "ser",
 			args: args{
 				obj:      &ser,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: false,
 		},
-		{name: "dep",
+		{
+			name: "dep",
 			args: args{
 				obj:      &dep,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "ds",
+		{
+			name: "ds",
 			args: args{
 				obj:      &ds,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "rs",
+		{
+			name: "rs",
 			args: args{
 				obj:      &rs,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "job",
+		{
+			name: "job",
 			args: args{
 				obj:      &job,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "pvc - no updates",
+		{
+			name: "pvc - no updates",
 			args: args{
 				obj:      &pvc,
 				selector: metav1.LabelSelector{},
 			},
 			wantErr: true,
 		},
-		{name: "sa - no selector",
+		{
+			name: "sa - no selector",
 			args: args{
 				obj:      &sa,
 				selector: metav1.LabelSelector{},
@@ -134,7 +144,8 @@ func TestUpdateNewSelectorValuesForObject(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "empty",
+		{
+			name: "empty",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{
@@ -144,7 +155,8 @@ func TestUpdateNewSelectorValuesForObject(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "label-only",
+		{
+			name: "label-only",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{
@@ -176,7 +188,8 @@ func TestUpdateOldSelectorValuesForObject(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "empty",
+		{
+			name: "empty",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{
@@ -186,7 +199,8 @@ func TestUpdateOldSelectorValuesForObject(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "label-only",
+		{
+			name: "label-only",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{
@@ -196,7 +210,8 @@ func TestUpdateOldSelectorValuesForObject(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "expr-only - err",
+		{
+			name: "expr-only - err",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{
@@ -212,7 +227,8 @@ func TestUpdateOldSelectorValuesForObject(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{name: "both - err",
+		{
+			name: "both - err",
 			args: args{
 				obj: &ser,
 				selector: metav1.LabelSelector{

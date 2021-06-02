@@ -987,7 +987,8 @@ func TestDryRunPreemption(t *testing.T) {
 					func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 						return &fakePlugin, nil
 					},
-				)},
+				),
+			},
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
@@ -1550,7 +1551,7 @@ func TestPreempt(t *testing.T) {
 				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			//sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
+			// sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
 			expectedNode: "node2",
 			expectedPods: []string{"p2.1"},
 		},

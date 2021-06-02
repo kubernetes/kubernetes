@@ -149,7 +149,6 @@ func TestCreateIngressValidation(t *testing.T) {
 			if tc.expected != "" && err == nil {
 				t.Errorf("expected error, got no error")
 			}
-
 		})
 	}
 }

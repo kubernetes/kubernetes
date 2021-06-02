@@ -171,8 +171,10 @@ func checkReceiver(name string, t *testing.T, receiver *receiver, expected bool)
 }
 
 // Durations embedded in test cases depend on these.
-var minInterval = 1 * time.Second
-var maxInterval = 10 * time.Second
+var (
+	minInterval = 1 * time.Second
+	maxInterval = 10 * time.Second
+)
 
 func waitForReset(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectCall bool, expectNext time.Duration) {
 	upd := <-timer.updated // wait for stop

@@ -412,7 +412,7 @@ func TestDeleteWithGCFinalizers(t *testing.T) {
 	propagationOrphan := metav1.DeletePropagationOrphan
 	trueVar := true
 
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		deleteOptions *metav1.DeleteOptions
 

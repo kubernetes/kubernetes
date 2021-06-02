@@ -81,7 +81,6 @@ func (c *FakeReplicationControllers) List(ctx context.Context, opts v1.ListOptio
 func (c *FakeReplicationControllers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(replicationcontrollersResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.

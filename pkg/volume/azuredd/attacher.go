@@ -50,11 +50,15 @@ type azureDiskAttacher struct {
 	cloud  *azure.Cloud
 }
 
-var _ volume.Attacher = &azureDiskAttacher{}
-var _ volume.Detacher = &azureDiskDetacher{}
+var (
+	_ volume.Attacher = &azureDiskAttacher{}
+	_ volume.Detacher = &azureDiskDetacher{}
+)
 
-var _ volume.DeviceMounter = &azureDiskAttacher{}
-var _ volume.DeviceUnmounter = &azureDiskDetacher{}
+var (
+	_ volume.DeviceMounter   = &azureDiskAttacher{}
+	_ volume.DeviceUnmounter = &azureDiskDetacher{}
+)
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
 func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
@@ -205,7 +209,6 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 func (a *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := a.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
-
 	if err != nil {
 		if os.IsNotExist(err) {
 			dir := deviceMountPath

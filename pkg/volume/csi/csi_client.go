@@ -217,7 +217,6 @@ func (c *csiDriverClient) NodePublishVolume(
 
 	if c.nodeV1ClientCreator == nil {
 		return errors.New("failed to call NodePublishVolume. nodeV1ClientCreator is nil")
-
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)

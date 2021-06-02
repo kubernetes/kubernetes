@@ -20,10 +20,11 @@ package mockstorageaccountclient
 
 import (
 	context "context"
+	reflect "reflect"
+
 	storage "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	gomock "github.com/golang/mock/gomock"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
-	reflect "reflect"
 )
 
 // MockInterface is a mock of Interface interface

@@ -30,14 +30,12 @@ import (
 )
 
 var _ = SIGDescribe("[Feature:Windows] DNS", func() {
-
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("dns")
 	ginkgo.It("should support configurable pod DNS servers", func() {
-
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
 
 		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(context.TODO(), "kube-dns", metav1.GetOptions{})

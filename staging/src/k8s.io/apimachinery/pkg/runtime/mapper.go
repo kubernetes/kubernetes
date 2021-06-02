@@ -37,8 +37,10 @@ type equivalentResourceRegistry struct {
 	mutex sync.RWMutex
 }
 
-var _ EquivalentResourceMapper = (*equivalentResourceRegistry)(nil)
-var _ EquivalentResourceRegistry = (*equivalentResourceRegistry)(nil)
+var (
+	_ EquivalentResourceMapper   = (*equivalentResourceRegistry)(nil)
+	_ EquivalentResourceRegistry = (*equivalentResourceRegistry)(nil)
+)
 
 // NewEquivalentResourceRegistry creates a resource registry that considers all versions of a GroupResource to be equivalent.
 func NewEquivalentResourceRegistry() EquivalentResourceRegistry {
@@ -57,11 +59,13 @@ func (r *equivalentResourceRegistry) EquivalentResourcesFor(resource schema.Grou
 	defer r.mutex.RUnlock()
 	return r.resources[r.keys[resource.GroupResource()]][subresource]
 }
+
 func (r *equivalentResourceRegistry) KindFor(resource schema.GroupVersionResource, subresource string) schema.GroupVersionKind {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.kinds[resource][subresource]
 }
+
 func (r *equivalentResourceRegistry) RegisterKindFor(resource schema.GroupVersionResource, subresource string, kind schema.GroupVersionKind) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

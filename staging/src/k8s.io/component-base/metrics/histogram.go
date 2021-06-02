@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 )

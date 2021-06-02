@@ -22,7 +22,7 @@ import (
 )
 
 func TestLinter(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name   string
 		metric string
 		expect string
@@ -70,7 +70,7 @@ func TestMergeProblems(t *testing.T) {
 		Text:   "problem two",
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		problems []Problem
 		expected string

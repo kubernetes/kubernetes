@@ -277,7 +277,6 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", scenario.name, allErrs)
 		}
 	}
-
 }
 
 func doTestPlugin(scenario struct {
@@ -301,7 +300,6 @@ func doTestPlugin(scenario struct {
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(scenario.vol), pod, volume.VolumeOptions{})
-
 	if err != nil {
 		allErrs = append(allErrs,
 			fmt.Errorf("failed to make a new Mounter: %w", err))
@@ -413,7 +411,6 @@ func doTestSetUp(scenario struct {
 		fakeAction = append(fakeAction, func(cmd string, args ...string) exec.Cmd {
 			return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 		})
-
 	}
 	fake := fakeexec.FakeExec{
 		CommandScript: fakeAction,

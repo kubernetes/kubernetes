@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -26,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-
-	"regexp"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

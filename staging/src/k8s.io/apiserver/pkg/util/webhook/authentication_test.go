@@ -210,5 +210,4 @@ func TestAuthenticationDetection(t *testing.T) {
 			}
 		})
 	}
-
 }

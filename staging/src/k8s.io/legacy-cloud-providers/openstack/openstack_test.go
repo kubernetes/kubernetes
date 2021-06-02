@@ -629,7 +629,6 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Cannot delete Cinder volume %s: %v", vol, err)
 	}
 	t.Logf("Volume (%s) deleted\n", vol)
-
 }
 
 func TestInstanceIDFromProviderID(t *testing.T) {
@@ -720,6 +719,7 @@ func clearEnviron(t *testing.T) []string {
 	}
 	return env
 }
+
 func resetEnviron(t *testing.T, items []string) {
 	for _, pair := range items {
 		if strings.HasPrefix(pair, "OS_") {

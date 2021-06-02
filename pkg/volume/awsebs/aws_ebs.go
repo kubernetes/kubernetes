@@ -50,10 +50,12 @@ type awsElasticBlockStorePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
+var (
+	_ volume.VolumePlugin              = &awsElasticBlockStorePlugin{}
+	_ volume.PersistentVolumePlugin    = &awsElasticBlockStorePlugin{}
+	_ volume.DeletableVolumePlugin     = &awsElasticBlockStorePlugin{}
+	_ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
+)
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
@@ -215,7 +217,8 @@ func (plugin *awsElasticBlockStorePlugin) newDeleterInternal(spec *volume.Spec, 
 			volumeID: aws.KubernetesVolumeID(spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID),
 			manager:  manager,
 			plugin:   plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -276,7 +279,6 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 	var awsVolume aws.Volumes
 
 	awsVolume, err := getCloudProvider(plugin.host.GetCloudProvider())
-
 	if err != nil {
 		return oldSize, err
 	}
@@ -306,9 +308,11 @@ func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeRe
 	return true, nil
 }
 
-var _ volume.NodeExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
+var (
+	_ volume.NodeExpandableVolumePlugin   = &awsElasticBlockStorePlugin{}
+	_ volume.ExpandableVolumePlugin       = &awsElasticBlockStorePlugin{}
+	_ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
+)
 
 // Abstract interface to PD operations.
 type ebsManager interface {

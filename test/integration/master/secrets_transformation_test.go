@@ -74,7 +74,7 @@ resources:
 // 2. Secrets are decrypted on read
 // when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		transformerConfigContent string
 		transformerPrefix        string
 		unSealFunc               unSealSecret

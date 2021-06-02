@@ -1061,7 +1061,6 @@ func TestSortByEvictionPriority(t *testing.T) {
 					t.Errorf("At index %d, expected threshold with signal %s, but got %s", i, tc.expected[i].Signal, tc.thresholds[i].Signal)
 				}
 			}
-
 		})
 	}
 }

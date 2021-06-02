@@ -54,6 +54,7 @@ var _ rest.ResourceStreamer = &LocationStreamer{}
 func (obj *LocationStreamer) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+
 func (obj *LocationStreamer) DeepCopyObject() runtime.Object {
 	panic("rest.LocationStreamer does not implement DeepCopyObject")
 }

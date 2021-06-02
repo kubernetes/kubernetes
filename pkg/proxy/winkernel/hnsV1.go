@@ -21,10 +21,11 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Microsoft/hcsshim"
-	"k8s.io/klog/v2"
 	"net"
 	"strings"
+
+	"github.com/Microsoft/hcsshim"
+	"k8s.io/klog/v2"
 )
 
 type HostNetworkService interface {
@@ -53,6 +54,7 @@ func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 		networkType: hnsnetwork.Type,
 	}, nil
 }
+
 func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcsshim.GetHNSEndpointByID(id)
 	if err != nil {
@@ -61,7 +63,7 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 	}
 	return &endpointsInfo{
 		ip:         hnsendpoint.IPAddress.String(),
-		isLocal:    !hnsendpoint.IsRemoteEndpoint, //TODO: Change isLocal to isRemote
+		isLocal:    !hnsendpoint.IsRemoteEndpoint, // TODO: Change isLocal to isRemote
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
@@ -72,6 +74,7 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 		terminating: false,
 	}, nil
 }
+
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
@@ -106,6 +109,7 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
+
 func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
@@ -145,7 +149,7 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		isLocal:         createdEndpoint.IsRemoteEndpoint,
 		macAddress:      createdEndpoint.MacAddress,
 		hnsID:           createdEndpoint.Id,
-		providerAddress: ep.providerAddress, //TODO get from createdEndpoint
+		providerAddress: ep.providerAddress, // TODO get from createdEndpoint
 		hns:             hns,
 
 		ready:       ep.ready,
@@ -153,6 +157,7 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		terminating: ep.terminating,
 	}, nil
 }
+
 func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	hnsendpoint, err := hcsshim.GetHNSEndpointByID(hnsID)
 	if err != nil {
@@ -226,6 +231,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		hnsID: lb.ID,
 	}, err
 }
+
 func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 	if len(hnsID) == 0 {
 		// Return silently

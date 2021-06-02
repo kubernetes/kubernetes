@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	//e.g. framework.ConformanceIt("should provide secure master service ", func() {
+	// e.g. framework.ConformanceIt("should provide secure master service ", func() {
 	patternStartConformance = `framework.ConformanceIt\(.*, func\(\) {$`
 	patternEndConformance   = `}\)$`
 	patternSkip             = `e2eskipper.Skip.*\(`

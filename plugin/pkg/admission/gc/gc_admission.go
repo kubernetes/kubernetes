@@ -152,7 +152,6 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 	}
 
 	return nil
-
 }
 
 func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {

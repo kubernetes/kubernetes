@@ -452,7 +452,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	// We use a fake filter that only allows one particular node. We create two
 	// profiles, each with a different node in the filter configuration.
 	objs := append([]runtime.Object{
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}},
+	}, nodes...)
 	client := clientsetfake.NewSimpleClientset(objs...)
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -465,14 +466,17 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
 		WithProfiles(
-			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
+			schedulerapi.KubeSchedulerProfile{
+				SchedulerName: "match-machine2",
 				Plugins: &schedulerapi.Plugins{
 					Filter: schedulerapi.PluginSet{
 						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
 						Disabled: []schedulerapi.Plugin{{Name: "*"}},
-					}},
+					},
+				},
 				PluginConfig: []schedulerapi.PluginConfig{
-					{Name: "FakeNodeSelector",
+					{
+						Name: "FakeNodeSelector",
 						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine2"}`)},
 					},
 				},
@@ -483,9 +487,11 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 					Filter: schedulerapi.PluginSet{
 						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
 						Disabled: []schedulerapi.Plugin{{Name: "*"}},
-					}},
+					},
+				},
 				PluginConfig: []schedulerapi.PluginConfig{
-					{Name: "FakeNodeSelector",
+					{
+						Name: "FakeNodeSelector",
 						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine3"}`)},
 					},
 				},
@@ -724,8 +730,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scache := internalcache.New(10*time.Minute, stop)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
-	var cpu = int64(4)
-	var mem = int64(500)
+	cpu := int64(4)
+	mem := int64(500)
 	podWithTooBigResourceRequests := podWithResources("bar", "", v1.ResourceList{
 		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
 		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
@@ -751,7 +757,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 					v1.ResourceCPU:    *(resource.NewQuantity(cpu/2, resource.DecimalSI)),
 					v1.ResourceMemory: *(resource.NewQuantity(mem/5, resource.DecimalSI)),
 					v1.ResourcePods:   *(resource.NewQuantity(10, resource.DecimalSI)),
-				}},
+				},
+			},
 		}
 		scache.AddNode(&node)
 		nodes = append(nodes, &node)
@@ -865,8 +872,10 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
 	pod.Namespace = "foo-ns"
-	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
-		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name:         "testVol",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}},
+	})
 	queuedPodStore.Add(pod)
 	scache := internalcache.New(10*time.Minute, stop)
 	scache.AddNode(&testNode)
@@ -1208,7 +1217,6 @@ func TestSchedulerBinding(t *testing.T) {
 					t.Errorf("got bound with extender #%d: %v, want %v", i, gotBound, wantBound)
 				}
 			}
-
 		})
 	}
 }

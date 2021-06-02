@@ -55,11 +55,9 @@ const (
 	ingressesCleanupTimeout  = 80 * time.Minute
 )
 
-var (
-	scaleTestLabels = map[string]string{
-		"app": scaleTestBackendName,
-	}
-)
+var scaleTestLabels = map[string]string{
+	"app": scaleTestBackendName,
+}
 
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {

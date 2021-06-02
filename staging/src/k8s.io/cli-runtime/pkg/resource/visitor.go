@@ -435,7 +435,6 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			}
 		}
 		return utilerrors.NewAggregate(errs)
-
 	})
 }
 
@@ -489,7 +488,6 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ext
 		visitors = append(visitors, visitor)
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

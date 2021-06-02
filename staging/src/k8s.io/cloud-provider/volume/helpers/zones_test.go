@@ -415,7 +415,6 @@ func TestChooseZonesForVolume(t *testing.T) {
 }
 
 func TestSelectZoneForVolume(t *testing.T) {
-
 	nodeWithGATopologyLabels := &v1.Node{}
 	nodeWithGATopologyLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
 
@@ -805,7 +804,6 @@ func TestSelectZoneForVolume(t *testing.T) {
 }
 
 func TestSelectZonesForVolume(t *testing.T) {
-
 	nodeWithZoneLabels := &v1.Node{}
 	nodeWithZoneLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
 

@@ -18,9 +18,10 @@ package netpol
 
 import (
 	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"strings"
 )
 
 // TestCase describes the data for a netpol test

@@ -103,8 +103,7 @@ type puller interface {
 	Name() string
 }
 
-type dockerPuller struct {
-}
+type dockerPuller struct{}
 
 func (dp *dockerPuller) Name() string {
 	return "docker"

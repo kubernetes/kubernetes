@@ -80,7 +80,6 @@ func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOpt
 func (c *FakeHorizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.

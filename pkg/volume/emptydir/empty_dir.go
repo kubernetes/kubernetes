@@ -427,7 +427,6 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
-
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.

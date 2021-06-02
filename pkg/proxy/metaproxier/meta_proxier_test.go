@@ -24,7 +24,6 @@ import (
 )
 
 func Test_endpointsIPFamily(t *testing.T) {
-
 	ipv4 := v1.IPv4Protocol
 	ipv6 := v1.IPv6Protocol
 

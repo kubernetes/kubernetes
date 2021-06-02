@@ -39,9 +39,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -54,9 +56,11 @@ func (*ControllerRevision) ProtoMessage() {}
 func (*ControllerRevision) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{0}
 }
+
 func (m *ControllerRevision) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ControllerRevision) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -65,12 +69,15 @@ func (m *ControllerRevision) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *ControllerRevision) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ControllerRevision.Merge(m, src)
 }
+
 func (m *ControllerRevision) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ControllerRevision) XXX_DiscardUnknown() {
 	xxx_messageInfo_ControllerRevision.DiscardUnknown(m)
 }
@@ -82,9 +89,11 @@ func (*ControllerRevisionList) ProtoMessage() {}
 func (*ControllerRevisionList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{1}
 }
+
 func (m *ControllerRevisionList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ControllerRevisionList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -93,12 +102,15 @@ func (m *ControllerRevisionList) XXX_Marshal(b []byte, deterministic bool) ([]by
 	}
 	return b[:n], nil
 }
+
 func (m *ControllerRevisionList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ControllerRevisionList.Merge(m, src)
 }
+
 func (m *ControllerRevisionList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ControllerRevisionList) XXX_DiscardUnknown() {
 	xxx_messageInfo_ControllerRevisionList.DiscardUnknown(m)
 }
@@ -110,9 +122,11 @@ func (*Deployment) ProtoMessage() {}
 func (*Deployment) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{2}
 }
+
 func (m *Deployment) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Deployment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -121,12 +135,15 @@ func (m *Deployment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Deployment) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Deployment.Merge(m, src)
 }
+
 func (m *Deployment) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Deployment) XXX_DiscardUnknown() {
 	xxx_messageInfo_Deployment.DiscardUnknown(m)
 }
@@ -138,9 +155,11 @@ func (*DeploymentCondition) ProtoMessage() {}
 func (*DeploymentCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{3}
 }
+
 func (m *DeploymentCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -149,12 +168,15 @@ func (m *DeploymentCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentCondition.Merge(m, src)
 }
+
 func (m *DeploymentCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentCondition.DiscardUnknown(m)
 }
@@ -166,9 +188,11 @@ func (*DeploymentList) ProtoMessage() {}
 func (*DeploymentList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{4}
 }
+
 func (m *DeploymentList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -177,12 +201,15 @@ func (m *DeploymentList) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentList.Merge(m, src)
 }
+
 func (m *DeploymentList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentList) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentList.DiscardUnknown(m)
 }
@@ -194,9 +221,11 @@ func (*DeploymentRollback) ProtoMessage() {}
 func (*DeploymentRollback) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{5}
 }
+
 func (m *DeploymentRollback) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentRollback) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -205,12 +234,15 @@ func (m *DeploymentRollback) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentRollback) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentRollback.Merge(m, src)
 }
+
 func (m *DeploymentRollback) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentRollback) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentRollback.DiscardUnknown(m)
 }
@@ -222,9 +254,11 @@ func (*DeploymentSpec) ProtoMessage() {}
 func (*DeploymentSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{6}
 }
+
 func (m *DeploymentSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -233,12 +267,15 @@ func (m *DeploymentSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentSpec.Merge(m, src)
 }
+
 func (m *DeploymentSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentSpec.DiscardUnknown(m)
 }
@@ -250,9 +287,11 @@ func (*DeploymentStatus) ProtoMessage() {}
 func (*DeploymentStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{7}
 }
+
 func (m *DeploymentStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -261,12 +300,15 @@ func (m *DeploymentStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentStatus.Merge(m, src)
 }
+
 func (m *DeploymentStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentStatus.DiscardUnknown(m)
 }
@@ -278,9 +320,11 @@ func (*DeploymentStrategy) ProtoMessage() {}
 func (*DeploymentStrategy) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{8}
 }
+
 func (m *DeploymentStrategy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeploymentStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -289,12 +333,15 @@ func (m *DeploymentStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *DeploymentStrategy) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeploymentStrategy.Merge(m, src)
 }
+
 func (m *DeploymentStrategy) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeploymentStrategy) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeploymentStrategy.DiscardUnknown(m)
 }
@@ -306,9 +353,11 @@ func (*RollbackConfig) ProtoMessage() {}
 func (*RollbackConfig) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{9}
 }
+
 func (m *RollbackConfig) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RollbackConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -317,12 +366,15 @@ func (m *RollbackConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *RollbackConfig) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RollbackConfig.Merge(m, src)
 }
+
 func (m *RollbackConfig) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RollbackConfig) XXX_DiscardUnknown() {
 	xxx_messageInfo_RollbackConfig.DiscardUnknown(m)
 }
@@ -334,9 +386,11 @@ func (*RollingUpdateDeployment) ProtoMessage() {}
 func (*RollingUpdateDeployment) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{10}
 }
+
 func (m *RollingUpdateDeployment) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RollingUpdateDeployment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -345,12 +399,15 @@ func (m *RollingUpdateDeployment) XXX_Marshal(b []byte, deterministic bool) ([]b
 	}
 	return b[:n], nil
 }
+
 func (m *RollingUpdateDeployment) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RollingUpdateDeployment.Merge(m, src)
 }
+
 func (m *RollingUpdateDeployment) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RollingUpdateDeployment) XXX_DiscardUnknown() {
 	xxx_messageInfo_RollingUpdateDeployment.DiscardUnknown(m)
 }
@@ -362,9 +419,11 @@ func (*RollingUpdateStatefulSetStrategy) ProtoMessage() {}
 func (*RollingUpdateStatefulSetStrategy) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{11}
 }
+
 func (m *RollingUpdateStatefulSetStrategy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RollingUpdateStatefulSetStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -373,12 +432,15 @@ func (m *RollingUpdateStatefulSetStrategy) XXX_Marshal(b []byte, deterministic b
 	}
 	return b[:n], nil
 }
+
 func (m *RollingUpdateStatefulSetStrategy) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RollingUpdateStatefulSetStrategy.Merge(m, src)
 }
+
 func (m *RollingUpdateStatefulSetStrategy) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RollingUpdateStatefulSetStrategy) XXX_DiscardUnknown() {
 	xxx_messageInfo_RollingUpdateStatefulSetStrategy.DiscardUnknown(m)
 }
@@ -390,9 +452,11 @@ func (*Scale) ProtoMessage() {}
 func (*Scale) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{12}
 }
+
 func (m *Scale) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Scale) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -401,12 +465,15 @@ func (m *Scale) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Scale) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Scale.Merge(m, src)
 }
+
 func (m *Scale) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Scale) XXX_DiscardUnknown() {
 	xxx_messageInfo_Scale.DiscardUnknown(m)
 }
@@ -418,9 +485,11 @@ func (*ScaleSpec) ProtoMessage() {}
 func (*ScaleSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{13}
 }
+
 func (m *ScaleSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ScaleSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -429,12 +498,15 @@ func (m *ScaleSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *ScaleSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ScaleSpec.Merge(m, src)
 }
+
 func (m *ScaleSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ScaleSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_ScaleSpec.DiscardUnknown(m)
 }
@@ -446,9 +518,11 @@ func (*ScaleStatus) ProtoMessage() {}
 func (*ScaleStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{14}
 }
+
 func (m *ScaleStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ScaleStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -457,12 +531,15 @@ func (m *ScaleStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *ScaleStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ScaleStatus.Merge(m, src)
 }
+
 func (m *ScaleStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ScaleStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ScaleStatus.DiscardUnknown(m)
 }
@@ -474,9 +551,11 @@ func (*StatefulSet) ProtoMessage() {}
 func (*StatefulSet) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{15}
 }
+
 func (m *StatefulSet) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -485,12 +564,15 @@ func (m *StatefulSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSet) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSet.Merge(m, src)
 }
+
 func (m *StatefulSet) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSet) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSet.DiscardUnknown(m)
 }
@@ -502,9 +584,11 @@ func (*StatefulSetCondition) ProtoMessage() {}
 func (*StatefulSetCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{16}
 }
+
 func (m *StatefulSetCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSetCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -513,12 +597,15 @@ func (m *StatefulSetCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSetCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSetCondition.Merge(m, src)
 }
+
 func (m *StatefulSetCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSetCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSetCondition.DiscardUnknown(m)
 }
@@ -530,9 +617,11 @@ func (*StatefulSetList) ProtoMessage() {}
 func (*StatefulSetList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{17}
 }
+
 func (m *StatefulSetList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSetList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -541,12 +630,15 @@ func (m *StatefulSetList) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSetList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSetList.Merge(m, src)
 }
+
 func (m *StatefulSetList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSetList) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSetList.DiscardUnknown(m)
 }
@@ -558,9 +650,11 @@ func (*StatefulSetSpec) ProtoMessage() {}
 func (*StatefulSetSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{18}
 }
+
 func (m *StatefulSetSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSetSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -569,12 +663,15 @@ func (m *StatefulSetSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSetSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSetSpec.Merge(m, src)
 }
+
 func (m *StatefulSetSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSetSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSetSpec.DiscardUnknown(m)
 }
@@ -586,9 +683,11 @@ func (*StatefulSetStatus) ProtoMessage() {}
 func (*StatefulSetStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{19}
 }
+
 func (m *StatefulSetStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSetStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -597,12 +696,15 @@ func (m *StatefulSetStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSetStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSetStatus.Merge(m, src)
 }
+
 func (m *StatefulSetStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSetStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSetStatus.DiscardUnknown(m)
 }
@@ -614,9 +716,11 @@ func (*StatefulSetUpdateStrategy) ProtoMessage() {}
 func (*StatefulSetUpdateStrategy) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2a07313e8f66e805, []int{20}
 }
+
 func (m *StatefulSetUpdateStrategy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *StatefulSetUpdateStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -625,12 +729,15 @@ func (m *StatefulSetUpdateStrategy) XXX_Marshal(b []byte, deterministic bool) ([
 	}
 	return b[:n], nil
 }
+
 func (m *StatefulSetUpdateStrategy) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatefulSetUpdateStrategy.Merge(m, src)
 }
+
 func (m *StatefulSetUpdateStrategy) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *StatefulSetUpdateStrategy) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatefulSetUpdateStrategy.DiscardUnknown(m)
 }
@@ -1902,6 +2009,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ControllerRevision) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2295,14 +2403,17 @@ func (m *StatefulSetUpdateStrategy) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ControllerRevision) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ControllerRevision{`,
+	s := strings.Join([]string{
+		`&ControllerRevision{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Data:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Data), "RawExtension", "runtime.RawExtension", 1), `&`, ``, 1) + `,`,
 		`Revision:` + fmt.Sprintf("%v", this.Revision) + `,`,
@@ -2310,6 +2421,7 @@ func (this *ControllerRevision) String() string {
 	}, "")
 	return s
 }
+
 func (this *ControllerRevisionList) String() string {
 	if this == nil {
 		return "nil"
@@ -2319,18 +2431,21 @@ func (this *ControllerRevisionList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "ControllerRevision", "ControllerRevision", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&ControllerRevisionList{`,
+	s := strings.Join([]string{
+		`&ControllerRevisionList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Deployment) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Deployment{`,
+	s := strings.Join([]string{
+		`&Deployment{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "DeploymentSpec", "DeploymentSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "DeploymentStatus", "DeploymentStatus", 1), `&`, ``, 1) + `,`,
@@ -2338,11 +2453,13 @@ func (this *Deployment) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeploymentCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeploymentCondition{`,
+	s := strings.Join([]string{
+		`&DeploymentCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
@@ -2353,6 +2470,7 @@ func (this *DeploymentCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeploymentList) String() string {
 	if this == nil {
 		return "nil"
@@ -2362,13 +2480,15 @@ func (this *DeploymentList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Deployment", "Deployment", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&DeploymentList{`,
+	s := strings.Join([]string{
+		`&DeploymentList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *DeploymentRollback) String() string {
 	if this == nil {
 		return "nil"
@@ -2383,7 +2503,8 @@ func (this *DeploymentRollback) String() string {
 		mapStringForUpdatedAnnotations += fmt.Sprintf("%v: %v,", k, this.UpdatedAnnotations[k])
 	}
 	mapStringForUpdatedAnnotations += "}"
-	s := strings.Join([]string{`&DeploymentRollback{`,
+	s := strings.Join([]string{
+		`&DeploymentRollback{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`UpdatedAnnotations:` + mapStringForUpdatedAnnotations + `,`,
 		`RollbackTo:` + strings.Replace(strings.Replace(this.RollbackTo.String(), "RollbackConfig", "RollbackConfig", 1), `&`, ``, 1) + `,`,
@@ -2391,11 +2512,13 @@ func (this *DeploymentRollback) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeploymentSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeploymentSpec{`,
+	s := strings.Join([]string{
+		`&DeploymentSpec{`,
 		`Replicas:` + valueToStringGenerated(this.Replicas) + `,`,
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`Template:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Template), "PodTemplateSpec", "v11.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
@@ -2409,6 +2532,7 @@ func (this *DeploymentSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeploymentStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -2418,7 +2542,8 @@ func (this *DeploymentStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "DeploymentCondition", "DeploymentCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&DeploymentStatus{`,
+	s := strings.Join([]string{
+		`&DeploymentStatus{`,
 		`ObservedGeneration:` + fmt.Sprintf("%v", this.ObservedGeneration) + `,`,
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`UpdatedReplicas:` + fmt.Sprintf("%v", this.UpdatedReplicas) + `,`,
@@ -2431,53 +2556,63 @@ func (this *DeploymentStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeploymentStrategy) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeploymentStrategy{`,
+	s := strings.Join([]string{
+		`&DeploymentStrategy{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`RollingUpdate:` + strings.Replace(this.RollingUpdate.String(), "RollingUpdateDeployment", "RollingUpdateDeployment", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RollbackConfig) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RollbackConfig{`,
+	s := strings.Join([]string{
+		`&RollbackConfig{`,
 		`Revision:` + fmt.Sprintf("%v", this.Revision) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RollingUpdateDeployment) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RollingUpdateDeployment{`,
+	s := strings.Join([]string{
+		`&RollingUpdateDeployment{`,
 		`MaxUnavailable:` + strings.Replace(fmt.Sprintf("%v", this.MaxUnavailable), "IntOrString", "intstr.IntOrString", 1) + `,`,
 		`MaxSurge:` + strings.Replace(fmt.Sprintf("%v", this.MaxSurge), "IntOrString", "intstr.IntOrString", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RollingUpdateStatefulSetStrategy) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RollingUpdateStatefulSetStrategy{`,
+	s := strings.Join([]string{
+		`&RollingUpdateStatefulSetStrategy{`,
 		`Partition:` + valueToStringGenerated(this.Partition) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Scale) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Scale{`,
+	s := strings.Join([]string{
+		`&Scale{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ScaleSpec", "ScaleSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ScaleStatus", "ScaleStatus", 1), `&`, ``, 1) + `,`,
@@ -2485,16 +2620,19 @@ func (this *Scale) String() string {
 	}, "")
 	return s
 }
+
 func (this *ScaleSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ScaleSpec{`,
+	s := strings.Join([]string{
+		`&ScaleSpec{`,
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ScaleStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -2509,7 +2647,8 @@ func (this *ScaleStatus) String() string {
 		mapStringForSelector += fmt.Sprintf("%v: %v,", k, this.Selector[k])
 	}
 	mapStringForSelector += "}"
-	s := strings.Join([]string{`&ScaleStatus{`,
+	s := strings.Join([]string{
+		`&ScaleStatus{`,
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`Selector:` + mapStringForSelector + `,`,
 		`TargetSelector:` + fmt.Sprintf("%v", this.TargetSelector) + `,`,
@@ -2517,11 +2656,13 @@ func (this *ScaleStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *StatefulSet) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatefulSet{`,
+	s := strings.Join([]string{
+		`&StatefulSet{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "StatefulSetSpec", "StatefulSetSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "StatefulSetStatus", "StatefulSetStatus", 1), `&`, ``, 1) + `,`,
@@ -2529,11 +2670,13 @@ func (this *StatefulSet) String() string {
 	}, "")
 	return s
 }
+
 func (this *StatefulSetCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatefulSetCondition{`,
+	s := strings.Join([]string{
+		`&StatefulSetCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -2543,6 +2686,7 @@ func (this *StatefulSetCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *StatefulSetList) String() string {
 	if this == nil {
 		return "nil"
@@ -2552,13 +2696,15 @@ func (this *StatefulSetList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "StatefulSet", "StatefulSet", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&StatefulSetList{`,
+	s := strings.Join([]string{
+		`&StatefulSetList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *StatefulSetSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -2568,7 +2714,8 @@ func (this *StatefulSetSpec) String() string {
 		repeatedStringForVolumeClaimTemplates += fmt.Sprintf("%v", f) + ","
 	}
 	repeatedStringForVolumeClaimTemplates += "}"
-	s := strings.Join([]string{`&StatefulSetSpec{`,
+	s := strings.Join([]string{
+		`&StatefulSetSpec{`,
 		`Replicas:` + valueToStringGenerated(this.Replicas) + `,`,
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`Template:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Template), "PodTemplateSpec", "v11.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
@@ -2582,6 +2729,7 @@ func (this *StatefulSetSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *StatefulSetStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -2591,7 +2739,8 @@ func (this *StatefulSetStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "StatefulSetCondition", "StatefulSetCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&StatefulSetStatus{`,
+	s := strings.Join([]string{
+		`&StatefulSetStatus{`,
 		`ObservedGeneration:` + valueToStringGenerated(this.ObservedGeneration) + `,`,
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`ReadyReplicas:` + fmt.Sprintf("%v", this.ReadyReplicas) + `,`,
@@ -2606,17 +2755,20 @@ func (this *StatefulSetStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *StatefulSetUpdateStrategy) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&StatefulSetUpdateStrategy{`,
+	s := strings.Join([]string{
+		`&StatefulSetUpdateStrategy{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`RollingUpdate:` + strings.Replace(this.RollingUpdate.String(), "RollingUpdateStatefulSetStrategy", "RollingUpdateStatefulSetStrategy", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -2625,6 +2777,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ControllerRevision) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2760,6 +2913,7 @@ func (m *ControllerRevision) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ControllerRevisionList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2877,6 +3031,7 @@ func (m *ControllerRevisionList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Deployment) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3026,6 +3181,7 @@ func (m *Deployment) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3270,6 +3426,7 @@ func (m *DeploymentCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3387,6 +3544,7 @@ func (m *DeploymentList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentRollback) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3629,6 +3787,7 @@ func (m *DeploymentRollback) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3916,6 +4075,7 @@ func (m *DeploymentSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4134,6 +4294,7 @@ func (m *DeploymentStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeploymentStrategy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4252,6 +4413,7 @@ func (m *DeploymentStrategy) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RollbackConfig) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4321,6 +4483,7 @@ func (m *RollbackConfig) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RollingUpdateDeployment) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4443,6 +4606,7 @@ func (m *RollingUpdateDeployment) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RollingUpdateStatefulSetStrategy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4513,6 +4677,7 @@ func (m *RollingUpdateStatefulSetStrategy) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Scale) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4662,6 +4827,7 @@ func (m *Scale) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ScaleSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4731,6 +4897,7 @@ func (m *ScaleSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ScaleStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4959,6 +5126,7 @@ func (m *ScaleStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSet) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5108,6 +5276,7 @@ func (m *StatefulSet) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSetCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5319,6 +5488,7 @@ func (m *StatefulSetCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSetList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5436,6 +5606,7 @@ func (m *StatefulSetList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSetSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5745,6 +5916,7 @@ func (m *StatefulSetSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSetStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6028,6 +6200,7 @@ func (m *StatefulSetStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *StatefulSetUpdateStrategy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6146,6 +6319,7 @@ func (m *StatefulSetUpdateStrategy) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

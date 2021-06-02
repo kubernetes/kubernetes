@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*ImageReview) ProtoMessage() {}
 func (*ImageReview) Descriptor() ([]byte, []int) {
 	return fileDescriptor_834793af728657a5, []int{0}
 }
+
 func (m *ImageReview) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ImageReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *ImageReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *ImageReview) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ImageReview.Merge(m, src)
 }
+
 func (m *ImageReview) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ImageReview) XXX_DiscardUnknown() {
 	xxx_messageInfo_ImageReview.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*ImageReviewContainerSpec) ProtoMessage() {}
 func (*ImageReviewContainerSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_834793af728657a5, []int{1}
 }
+
 func (m *ImageReviewContainerSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ImageReviewContainerSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *ImageReviewContainerSpec) XXX_Marshal(b []byte, deterministic bool) ([]
 	}
 	return b[:n], nil
 }
+
 func (m *ImageReviewContainerSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ImageReviewContainerSpec.Merge(m, src)
 }
+
 func (m *ImageReviewContainerSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ImageReviewContainerSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_ImageReviewContainerSpec.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*ImageReviewSpec) ProtoMessage() {}
 func (*ImageReviewSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_834793af728657a5, []int{2}
 }
+
 func (m *ImageReviewSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ImageReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *ImageReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *ImageReviewSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ImageReviewSpec.Merge(m, src)
 }
+
 func (m *ImageReviewSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ImageReviewSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_ImageReviewSpec.DiscardUnknown(m)
 }
@@ -133,9 +150,11 @@ func (*ImageReviewStatus) ProtoMessage() {}
 func (*ImageReviewStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_834793af728657a5, []int{3}
 }
+
 func (m *ImageReviewStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ImageReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -144,12 +163,15 @@ func (m *ImageReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *ImageReviewStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ImageReviewStatus.Merge(m, src)
 }
+
 func (m *ImageReviewStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ImageReviewStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ImageReviewStatus.DiscardUnknown(m)
 }
@@ -429,6 +451,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ImageReview) Size() (n int) {
 	if m == nil {
 		return 0
@@ -503,14 +526,17 @@ func (m *ImageReviewStatus) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ImageReview) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ImageReview{`,
+	s := strings.Join([]string{
+		`&ImageReview{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ImageReviewSpec", "ImageReviewSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ImageReviewStatus", "ImageReviewStatus", 1), `&`, ``, 1) + `,`,
@@ -518,16 +544,19 @@ func (this *ImageReview) String() string {
 	}, "")
 	return s
 }
+
 func (this *ImageReviewContainerSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ImageReviewContainerSpec{`,
+	s := strings.Join([]string{
+		`&ImageReviewContainerSpec{`,
 		`Image:` + fmt.Sprintf("%v", this.Image) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ImageReviewSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -547,7 +576,8 @@ func (this *ImageReviewSpec) String() string {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
 	}
 	mapStringForAnnotations += "}"
-	s := strings.Join([]string{`&ImageReviewSpec{`,
+	s := strings.Join([]string{
+		`&ImageReviewSpec{`,
 		`Containers:` + repeatedStringForContainers + `,`,
 		`Annotations:` + mapStringForAnnotations + `,`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
@@ -555,6 +585,7 @@ func (this *ImageReviewSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *ImageReviewStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -569,7 +600,8 @@ func (this *ImageReviewStatus) String() string {
 		mapStringForAuditAnnotations += fmt.Sprintf("%v: %v,", k, this.AuditAnnotations[k])
 	}
 	mapStringForAuditAnnotations += "}"
-	s := strings.Join([]string{`&ImageReviewStatus{`,
+	s := strings.Join([]string{
+		`&ImageReviewStatus{`,
 		`Allowed:` + fmt.Sprintf("%v", this.Allowed) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`AuditAnnotations:` + mapStringForAuditAnnotations + `,`,
@@ -577,6 +609,7 @@ func (this *ImageReviewStatus) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -585,6 +618,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ImageReview) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -734,6 +768,7 @@ func (m *ImageReview) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ImageReviewContainerSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -816,6 +851,7 @@ func (m *ImageReviewContainerSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ImageReviewSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1059,6 +1095,7 @@ func (m *ImageReviewSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ImageReviewStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1288,6 +1325,7 @@ func (m *ImageReviewStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

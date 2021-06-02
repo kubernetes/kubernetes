@@ -30,9 +30,7 @@ import (
 	"k8s.io/apiserver/plugin/pkg/audit/fake"
 )
 
-var (
-	infiniteTimeCh <-chan time.Time
-)
+var infiniteTimeCh <-chan time.Time
 
 func newEvents(number int) []*auditinternal.Event {
 	events := make([]*auditinternal.Event, number)

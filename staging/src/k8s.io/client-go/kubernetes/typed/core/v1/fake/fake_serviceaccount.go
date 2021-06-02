@@ -81,7 +81,6 @@ func (c *FakeServiceAccounts) List(ctx context.Context, opts v1.ListOptions) (re
 func (c *FakeServiceAccounts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(serviceaccountsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.

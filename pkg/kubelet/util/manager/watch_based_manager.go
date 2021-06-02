@@ -37,10 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
-type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
-type newObjectFunc func() runtime.Object
-type isImmutableFunc func(runtime.Object) bool
+type (
+	listObjectFunc  func(string, metav1.ListOptions) (runtime.Object, error)
+	watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
+	newObjectFunc   func() runtime.Object
+	isImmutableFunc func(runtime.Object) bool
+)
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {

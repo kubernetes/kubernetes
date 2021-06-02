@@ -27,12 +27,14 @@ import (
 	examplev1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-var ParameterCodec = runtime.NewParameterCodec(Scheme)
-var localSchemeBuilder = runtime.SchemeBuilder{
-	examplev1.AddToScheme,
-}
+var (
+	Scheme             = runtime.NewScheme()
+	Codecs             = serializer.NewCodecFactory(Scheme)
+	ParameterCodec     = runtime.NewParameterCodec(Scheme)
+	localSchemeBuilder = runtime.SchemeBuilder{
+		examplev1.AddToScheme,
+	}
+)
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
 // of clientsets, like in:

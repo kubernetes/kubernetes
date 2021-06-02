@@ -84,7 +84,8 @@ func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *figh
 		clk:            clock.NewFakeClock(now),
 		ctlrs: map[bool][]utilfc.Interface{
 			false: make([]utilfc.Interface, teamSize),
-			true:  make([]utilfc.Interface, teamSize)},
+			true:  make([]utilfc.Interface, teamSize),
+		},
 		writeCounts: map[string]int{},
 	}
 	return ft
@@ -166,6 +167,7 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 		}
 	}
 }
+
 func TestConfigConsumerFight(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	_, loopbackConfig, closeFn := setup(t, 100, 100)

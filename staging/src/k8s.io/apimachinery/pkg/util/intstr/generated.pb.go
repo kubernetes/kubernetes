@@ -30,9 +30,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -45,9 +47,11 @@ func (*IntOrString) ProtoMessage() {}
 func (*IntOrString) Descriptor() ([]byte, []int) {
 	return fileDescriptor_94e046ae3ce6121c, []int{0}
 }
+
 func (m *IntOrString) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IntOrString) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -56,12 +60,15 @@ func (m *IntOrString) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *IntOrString) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IntOrString.Merge(m, src)
 }
+
 func (m *IntOrString) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IntOrString) XXX_DiscardUnknown() {
 	xxx_messageInfo_IntOrString.DiscardUnknown(m)
 }
@@ -144,6 +151,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *IntOrString) Size() (n int) {
 	if m == nil {
 		return 0
@@ -160,9 +168,11 @@ func (m *IntOrString) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (m *IntOrString) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -283,6 +293,7 @@ func (m *IntOrString) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

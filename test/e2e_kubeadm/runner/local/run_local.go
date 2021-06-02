@@ -40,9 +40,11 @@ func bazelBuild() error {
 	return execCommand("bazel", args...)
 }
 
-var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to kubeadm e2e test.")
-var build = flag.Bool("build", false, "use Bazel to build binaries before testing")
+var (
+	ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
+	testFlags   = flag.String("test-flags", "", "Space-separated list of arguments to pass to kubeadm e2e test.")
+	build       = flag.Bool("build", false, "use Bazel to build binaries before testing")
+)
 
 func main() {
 	flag.Parse()
@@ -69,7 +71,6 @@ func main() {
 	if execCommand(ginkgo, args...); err != nil {
 		klog.Exitf("Test failed: %v", err)
 	}
-
 }
 
 func getBazelTestBin() (string, error) {
@@ -82,7 +83,6 @@ func getBazelTestBin() (string, error) {
 		return "", err
 	}
 	return buildFile, nil
-
 }
 
 func getBazelGinkgo() (string, error) {

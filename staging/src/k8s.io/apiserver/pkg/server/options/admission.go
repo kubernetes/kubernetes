@@ -221,7 +221,7 @@ func (a *AdmissionOptions) enabledPluginNames() []string {
 	return orderedPlugins
 }
 
-//Return names of plugins which are enabled by default
+// Return names of plugins which are enabled by default
 func (a *AdmissionOptions) defaultEnabledPluginNames() []string {
 	defaultOnPluginNames := []string{}
 	for _, pluginName := range a.RecommendedPluginOrder {

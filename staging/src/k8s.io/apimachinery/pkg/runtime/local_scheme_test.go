@@ -17,9 +17,8 @@ limitations under the License.
 package runtime
 
 import (
-	"testing"
-
 	"reflect"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"

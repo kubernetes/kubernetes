@@ -55,7 +55,6 @@ func pv() *v1.PersistentVolume {
 }
 
 func TestIsDeletionCandidateLackDeleteTimeAndFinalizer(t *testing.T) {
-
 	tests := []TestCase{
 		{
 			name:      "pv lacks delete time and finalizer",
@@ -106,7 +105,6 @@ func TestIsDeletionCandidateLackDeleteTime(t *testing.T) {
 }
 
 func TestIsDeletionCandidateLackFinalizer(t *testing.T) {
-
 	pv := pv()
 	pv.SetDeletionTimestamp(&metav1.Time{})
 	pvc := pvc()
@@ -133,7 +131,6 @@ func TestIsDeletionCandidateLackFinalizer(t *testing.T) {
 }
 
 func TestIsDeletionCandidateSuccess(t *testing.T) {
-
 	pv := pv()
 	pv.SetDeletionTimestamp(&metav1.Time{})
 	pv.SetFinalizers([]string{util.PVProtectionFinalizer})

@@ -935,7 +935,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	if !apiequality.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !apiequality.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
 	}
-
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {

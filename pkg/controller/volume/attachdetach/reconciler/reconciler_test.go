@@ -596,7 +596,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
-
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -662,7 +661,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
-
 }
 
 func Test_ReportMultiAttachError(t *testing.T) {
@@ -814,7 +812,6 @@ func waitForNewAttacherCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Timed out waiting for NewAttacherCallCount. Expected: <%v> Actual: <%v>",
@@ -841,7 +838,6 @@ func waitForNewDetacherCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Timed out waiting for NewDetacherCallCount. Expected: <%v> Actual: <%v>",
@@ -879,7 +875,6 @@ func waitForAttachCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"No attachers have expected AttachCallCount. Expected: <%v>",
@@ -913,7 +908,6 @@ func waitForTotalAttachCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Total AttachCallCount does not match expected value. Expected: <%v>",
@@ -950,7 +944,6 @@ func waitForDetachCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"No detachers have expected DetachCallCount. Expected: <%v>",
@@ -984,7 +977,6 @@ func waitForTotalDetachCallCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Total DetachCallCount does not match expected value. Expected: <%v>",
@@ -1014,7 +1006,6 @@ func waitForAttachedToNodesCount(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		count := len(asw.GetNodesForAttachedVolume(volumeName))
 		t.Fatalf(
@@ -1092,7 +1083,6 @@ func waitForVolumeAddedToNode(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Volume <%v> is not added to node  <%v>. %v",
@@ -1126,10 +1116,8 @@ func waitForVolumeRemovedFromNode(
 				return false, nil
 			}
 			return true, nil
-
 		},
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"Volume <%v> is not removed from node  <%v>. %v",
@@ -1178,7 +1166,6 @@ func verifyVolumeReportedAsAttachedToNode(
 		nodeName,
 		result,
 		isAttached)
-
 }
 
 func verifyNewDetacherCallCount(

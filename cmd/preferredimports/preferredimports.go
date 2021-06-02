@@ -76,7 +76,6 @@ func (a *analyzer) collect(dir string) {
 
 	// Create the AST by parsing src.
 	fs, err := parser.ParseDir(a.fset, dir, nil, parser.AllErrors|parser.ParseComments)
-
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR(syntax)", logPrefix, err)
 		a.failed = true

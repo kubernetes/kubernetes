@@ -56,8 +56,10 @@ import (
 //      default). This is useful to test how long does it take for periodic sync
 //      to process bound PVs/PVCs.
 //
-const defaultObjectCount = 100
-const defaultSyncPeriod = 1 * time.Second
+const (
+	defaultObjectCount = 100
+	defaultSyncPeriod  = 1 * time.Second
+)
 
 const provisionerPluginName = "kubernetes.io/mock-provisioner"
 

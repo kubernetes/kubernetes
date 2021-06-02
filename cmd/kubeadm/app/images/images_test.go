@@ -46,7 +46,7 @@ func TestGetGenericImage(t *testing.T) {
 }
 
 func TestGetKubernetesImage(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		image    string
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
@@ -89,7 +89,7 @@ func TestGetKubernetesImage(t *testing.T) {
 }
 
 func TestGetEtcdImage(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
@@ -228,7 +228,7 @@ func TestGetAllImages(t *testing.T) {
 }
 
 func TestGetDNSImage(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{

@@ -58,6 +58,7 @@ type dummyMutationDetector struct{}
 
 func (dummyMutationDetector) Run(stopCh <-chan struct{}) {
 }
+
 func (dummyMutationDetector) AddObject(obj interface{}) {
 }
 

@@ -97,7 +97,6 @@ func TestEnsurePortProxyRule(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestDeletePortProxyRule(t *testing.T) {

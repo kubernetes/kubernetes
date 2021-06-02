@@ -595,7 +595,6 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 				break
 			}
 		}
-
 	}
 	return podsToMove
 }
@@ -870,7 +869,6 @@ func podInfoKeyFunc(obj interface{}) (string, error) {
 // Checks if the Pod may become schedulable upon the event.
 // This is achieved by looking up the global clusterEventMap registry.
 func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, clusterEvent framework.ClusterEvent) bool {
-
 	if clusterEvent.IsWildCard() {
 		return true
 	}

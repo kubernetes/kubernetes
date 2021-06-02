@@ -234,7 +234,6 @@ func getPbmCompatibleDatastore(ctx context.Context, vcClient *vim25.Client, stor
 }
 
 func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selectedZones []string) ([]*vclib.DatastoreInfo, error) {
-
 	var sharedDatastores []*vclib.DatastoreInfo
 
 	for _, zone := range selectedZones {
@@ -299,9 +298,12 @@ func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selecte
 				}
 				dsObjList = append(dsObjList,
 					&vclib.DatastoreInfo{
-						Datastore: &vclib.Datastore{Datastore: dsObj,
-							Datacenter: &vclib.Datacenter{Datacenter: dc}},
-						Info: dsMo.Info.GetDatastoreInfo()})
+						Datastore: &vclib.Datastore{
+							Datastore:  dsObj,
+							Datacenter: &vclib.Datacenter{Datacenter: dc},
+						},
+						Info: dsMo.Info.GetDatastoreInfo(),
+					})
 			}
 
 			klog.V(9).Infof("DatastoreInfo details : %s", dsObjList)
@@ -801,7 +803,7 @@ func GetVMUUID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
 	}
-	//strip leading and trailing white space and new line char
+	// strip leading and trailing white space and new line char
 	uuid := strings.TrimSpace(uuidFromFile)
 	// check the uuid starts with "VMware-"
 	if !strings.HasPrefix(uuid, UUIDPrefix) {

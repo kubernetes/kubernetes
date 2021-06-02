@@ -107,8 +107,10 @@ type Serializer struct {
 }
 
 // Serializer implements Serializer
-var _ runtime.Serializer = &Serializer{}
-var _ recognizer.RecognizingDecoder = &Serializer{}
+var (
+	_ runtime.Serializer            = &Serializer{}
+	_ recognizer.RecognizingDecoder = &Serializer{}
+)
 
 type customNumberExtension struct {
 	jsoniter.DummyExtension
@@ -121,8 +123,7 @@ func (cne *customNumberExtension) CreateDecoder(typ reflect2.Type) jsoniter.ValD
 	return nil
 }
 
-type customNumberDecoder struct {
-}
+type customNumberDecoder struct{}
 
 func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 	switch iter.WhatIsNext() {
@@ -180,8 +181,10 @@ func StrictCaseSensitiveJSONIterator() jsoniter.API {
 // from outside. Still does not protect from package level jsoniter.Register*() functions - someone calling them
 // in some other library will mess with every usage of the jsoniter library in the whole program.
 // See https://github.com/json-iterator/go/issues/265
-var caseSensitiveJSONIterator = CaseSensitiveJSONIterator()
-var strictCaseSensitiveJSONIterator = StrictCaseSensitiveJSONIterator()
+var (
+	caseSensitiveJSONIterator       = CaseSensitiveJSONIterator()
+	strictCaseSensitiveJSONIterator = StrictCaseSensitiveJSONIterator()
+)
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
 func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVersionKind {

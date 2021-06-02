@@ -36,9 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
-var (
-	errorUnableToAllocate = errors.New("unable to allocate")
-)
+var errorUnableToAllocate = errors.New("unable to allocate")
 
 // Etcd exposes a service.Allocator
 // TODO: allow multiple allocations to be tried at once
@@ -56,8 +54,10 @@ type Etcd struct {
 }
 
 // Etcd implements allocator.Interface and rangeallocation.RangeRegistry
-var _ allocator.Interface = &Etcd{}
-var _ rangeallocation.RangeRegistry = &Etcd{}
+var (
+	_ allocator.Interface           = &Etcd{}
+	_ rangeallocation.RangeRegistry = &Etcd{}
+)
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
@@ -141,7 +141,6 @@ func (e *Etcd) Release(item int) error {
 	return e.tryUpdate(func() error {
 		return e.alloc.Release(item)
 	})
-
 }
 
 func (e *Etcd) ForEach(fn func(int)) {

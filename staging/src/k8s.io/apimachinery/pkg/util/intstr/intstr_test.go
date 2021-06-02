@@ -179,7 +179,6 @@ func TestGetIntFromIntOrString(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestGetIntFromIntOrPercent(t *testing.T) {

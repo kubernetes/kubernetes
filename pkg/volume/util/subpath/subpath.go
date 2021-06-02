@@ -69,8 +69,10 @@ type Subpath struct {
 }
 
 // Compile time-check for all implementers of subpath interface
-var _ Interface = &subpath{}
-var _ Interface = &FakeSubpath{}
+var (
+	_ Interface = &subpath{}
+	_ Interface = &FakeSubpath{}
+)
 
 // FakeSubpath is a subpather implementation for testing
 type FakeSubpath struct{}

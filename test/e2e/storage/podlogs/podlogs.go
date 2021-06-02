@@ -94,7 +94,6 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 		}
 	}
 	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
-
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}

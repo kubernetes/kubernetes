@@ -25,7 +25,7 @@ import (
 )
 
 func TestKnownFeatures(t *testing.T) {
-	var someFeatures = FeatureList{
+	someFeatures := FeatureList{
 		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
 		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
 		"feature3": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.GA}},
@@ -56,51 +56,51 @@ func TestKnownFeatures(t *testing.T) {
 }
 
 func TestNewFeatureGate(t *testing.T) {
-	var someFeatures = FeatureList{
+	someFeatures := FeatureList{
 		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
 		"feature2":   {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
 		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		value                string
 		expectedError        bool
 		expectedFeaturesGate map[string]bool
 	}{
-		{ //invalid value (missing =)
+		{ // invalid value (missing =)
 			value:         "invalidValue",
 			expectedError: true,
 		},
-		{ //invalid value (missing =)
+		{ // invalid value (missing =)
 			value:         "feature1=true,invalidValue",
 			expectedError: true,
 		},
-		{ //invalid value (not a boolean)
+		{ // invalid value (not a boolean)
 			value:         "feature1=notABoolean",
 			expectedError: true,
 		},
-		{ //invalid value (not a boolean)
+		{ // invalid value (not a boolean)
 			value:         "feature1=true,feature2=notABoolean",
 			expectedError: true,
 		},
-		{ //unrecognized feature-gate key
+		{ // unrecognized feature-gate key
 			value:         "unknownFeature=false",
 			expectedError: true,
 		},
-		{ //unrecognized feature-gate key
+		{ // unrecognized feature-gate key
 			value:         "feature1=true,unknownFeature=false",
 			expectedError: true,
 		},
-		{ //deprecated feature-gate key
+		{ // deprecated feature-gate key
 			value:         "deprecated=true",
 			expectedError: true,
 		},
-		{ //one feature
+		{ // one feature
 			value:                "feature1=true",
 			expectedError:        false,
 			expectedFeaturesGate: map[string]bool{"feature1": true},
 		},
-		{ //two features
+		{ // two features
 			value:                "feature1=true,feature2=false",
 			expectedError:        false,
 			expectedFeaturesGate: map[string]bool{"feature1": true, "feature2": false},
@@ -127,12 +127,12 @@ func TestNewFeatureGate(t *testing.T) {
 }
 
 func TestValidateVersion(t *testing.T) {
-	var someFeatures = FeatureList{
+	someFeatures := FeatureList{
 		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
 		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}, MinimumVersion: version.MustParseSemantic("v1.17.0").WithPreRelease("alpha.1")},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		requestedVersion  string
 		requestedFeatures map[string]bool
@@ -186,12 +186,12 @@ func TestEnabledDefaults(t *testing.T) {
 
 func TestCheckDeprecatedFlags(t *testing.T) {
 	dummyMessage := "dummy message"
-	var someFeatures = FeatureList{
+	someFeatures := FeatureList{
 		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
 		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}, DeprecationMessage: dummyMessage},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		features    map[string]bool
 		expectedMsg map[string]string

@@ -34,9 +34,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const tcpPrefix = "SERVE_PORT_"
-const sctpPrefix = "SERVE_SCTP_PORT_"
-const tlsPrefix = "SERVE_TLS_PORT_"
+const (
+	tcpPrefix  = "SERVE_PORT_"
+	sctpPrefix = "SERVE_SCTP_PORT_"
+	tlsPrefix  = "SERVE_TLS_PORT_"
+)
 
 // CmdPorter is used by agnhost Cobra.
 var CmdPorter = &cobra.Command{
@@ -94,7 +96,6 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func servePort(port, value string) {
-
 	s := &http.Server{
 		Addr: "0.0.0.0:" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +103,8 @@ func servePort(port, value string) {
 			if JSONResponse {
 				j, err := json.Marshal(&jsonResponse{
 					Method: r.Method,
-					Body:   value})
+					Body:   value,
+				})
 				if err != nil {
 					http.Error(w, fmt.Sprintf("Internal Server Error: %v", err), 500)
 					return
@@ -124,7 +126,8 @@ func serveTLSPort(port, value string) {
 			if JSONResponse {
 				j, err := json.Marshal(&jsonResponse{
 					Method: r.Method,
-					Body:   value})
+					Body:   value,
+				})
 				if err != nil {
 					http.Error(w, fmt.Sprintf("Internal Server Error: %v", err), 500)
 					return

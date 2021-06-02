@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-var (
-	errPortRangeNoPortsRemaining = errors.New("port allocation failed; there are no remaining ports left to allocate in the accepted range")
-)
+var errPortRangeNoPortsRemaining = errors.New("port allocation failed; there are no remaining ports left to allocate in the accepted range")
 
 type PortAllocator interface {
 	AllocateNext() (int, error)

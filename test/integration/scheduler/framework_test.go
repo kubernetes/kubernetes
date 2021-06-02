@@ -130,18 +130,20 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
-var _ framework.PreFilterPlugin = &PreFilterPlugin{}
-var _ framework.PostFilterPlugin = &PostFilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.FilterPlugin = &FilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
-var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.PreScorePlugin = &PreScorePlugin{}
-var _ framework.PreBindPlugin = &PreBindPlugin{}
-var _ framework.BindPlugin = &BindPlugin{}
-var _ framework.PostBindPlugin = &PostBindPlugin{}
-var _ framework.PermitPlugin = &PermitPlugin{}
+var (
+	_ framework.PreFilterPlugin  = &PreFilterPlugin{}
+	_ framework.PostFilterPlugin = &PostFilterPlugin{}
+	_ framework.ScorePlugin      = &ScorePlugin{}
+	_ framework.FilterPlugin     = &FilterPlugin{}
+	_ framework.ScorePlugin      = &ScorePlugin{}
+	_ framework.ScorePlugin      = &ScoreWithNormalizePlugin{}
+	_ framework.ReservePlugin    = &ReservePlugin{}
+	_ framework.PreScorePlugin   = &PreScorePlugin{}
+	_ framework.PreBindPlugin    = &PreBindPlugin{}
+	_ framework.BindPlugin       = &BindPlugin{}
+	_ framework.PostBindPlugin   = &PostBindPlugin{}
+	_ framework.PermitPlugin     = &PermitPlugin{}
+)
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
@@ -1853,13 +1855,17 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	permitPlugin.waitingPod = "waiting-pod"
 
 	lowPriority, highPriority := int32(100), int32(300)
-	resourceRequest := v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+	resourceRequest := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+		},
 	}
-	preemptorResourceRequest := v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+	preemptorResourceRequest := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+		},
 	}
 
 	// First pod will go running.

@@ -550,7 +550,7 @@ func TestServiceDefaulting(t *testing.T) {
 				defaultedServiceList.Items[1].Spec.IPFamilyPolicy = &preferDualStack
 				defaultedServiceList.Items[1].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
 
-				//assume single stack for w/selector
+				// assume single stack for w/selector
 				defaultedServiceList.Items[0].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
 				// make dualstacked. if needed
 				if testCase.isDualStack {

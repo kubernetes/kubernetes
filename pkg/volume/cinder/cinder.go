@@ -74,10 +74,12 @@ type cinderPlugin struct {
 	volumeLocks keymutex.KeyMutex
 }
 
-var _ volume.VolumePlugin = &cinderPlugin{}
-var _ volume.PersistentVolumePlugin = &cinderPlugin{}
-var _ volume.DeletableVolumePlugin = &cinderPlugin{}
-var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
+var (
+	_ volume.VolumePlugin              = &cinderPlugin{}
+	_ volume.PersistentVolumePlugin    = &cinderPlugin{}
+	_ volume.DeletableVolumePlugin     = &cinderPlugin{}
+	_ volume.ProvisionableVolumePlugin = &cinderPlugin{}
+)
 
 const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
@@ -116,8 +118,8 @@ func (plugin *cinderPlugin) RequiresRemount(spec *volume.Spec) bool {
 
 func (plugin *cinderPlugin) SupportsMountOption() bool {
 	return true
-
 }
+
 func (plugin *cinderPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
@@ -200,7 +202,8 @@ func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UI
 			mounter:         mounter,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -217,7 +220,8 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 			pdName:  spec.PersistentVolume.Spec.Cinder.VolumeID,
 			manager: manager,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {

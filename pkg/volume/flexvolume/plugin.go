@@ -53,10 +53,12 @@ type flexVolumeAttachablePlugin struct {
 	*flexVolumePlugin
 }
 
-var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
-var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
-var _ volume.NodeExpandableVolumePlugin = &flexVolumePlugin{}
-var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
+var (
+	_ volume.AttachableVolumePlugin     = &flexVolumeAttachablePlugin{}
+	_ volume.PersistentVolumePlugin     = &flexVolumePlugin{}
+	_ volume.NodeExpandableVolumePlugin = &flexVolumePlugin{}
+	_ volume.ExpandableVolumePlugin     = &flexVolumePlugin{}
+)
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
 

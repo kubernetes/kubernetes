@@ -28,13 +28,15 @@ import (
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
-var parameterCodec = runtime.NewParameterCodec(scheme)
-var localSchemeBuilder = runtime.SchemeBuilder{
-	metricsv1alpha1.AddToScheme,
-	metricsv1beta1.AddToScheme,
-}
+var (
+	scheme             = runtime.NewScheme()
+	codecs             = serializer.NewCodecFactory(scheme)
+	parameterCodec     = runtime.NewParameterCodec(scheme)
+	localSchemeBuilder = runtime.SchemeBuilder{
+		metricsv1alpha1.AddToScheme,
+		metricsv1beta1.AddToScheme,
+	}
+)
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
 // of clientsets, like in:

@@ -39,7 +39,6 @@ const (
 )
 
 var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
-
 	f := framework.NewDefaultFramework("node-authz")
 	// client that will impersonate a node
 	var c clientset.Interface
@@ -69,7 +68,6 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 		c, err = clientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to create Clientset for the given config: %+v", *config)
-
 	})
 	ginkgo.It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get(context.TODO(), "foo", metav1.GetOptions{})

@@ -32,8 +32,10 @@ import (
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 )
 
-var zero time.Time
-var sandboxImage = "k8s.gcr.io/pause-amd64:latest"
+var (
+	zero         time.Time
+	sandboxImage = "k8s.gcr.io/pause-amd64:latest"
+)
 
 func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containertest.FakeRuntime, *statstest.StatsProvider) {
 	fakeRuntime := &containertest.FakeRuntime{}
@@ -54,6 +56,7 @@ func (im *realImageGCManager) imageRecordsLen() int {
 	defer im.imageRecordsLock.Unlock()
 	return len(im.imageRecords)
 }
+
 func (im *realImageGCManager) getImageRecord(name string) (*imageRecord, bool) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()

@@ -39,7 +39,8 @@ func TestInt(t *testing.T) {
 			name:     "number",
 			usage:    "some number",
 			defValue: "5",
-		}},
+		},
+	},
 		allFlags(flags))
 	assert.Equal(t, 5, context.Number)
 }
@@ -77,7 +78,8 @@ func TestPrefix(t *testing.T) {
 			name:     "some.prefix.number",
 			usage:    "some number",
 			defValue: "0",
-		}},
+		},
+	},
 		allFlags(flags))
 }
 
@@ -242,7 +244,8 @@ func testTypes(t *testing.T, testcase TypesTestCase) {
 	},
 		allFlags(flags), testcase.name)
 	assert.Equal(t,
-		Context{true, time.Millisecond, 1.23456789, "hello world",
+		Context{
+			true, time.Millisecond, 1.23456789, "hello world",
 			-1, -1234567890123456789, 1, 1234567890123456789,
 		},
 		context,
@@ -258,7 +261,8 @@ func testTypes(t *testing.T, testcase TypesTestCase) {
 		"-duration=1s",
 	}), testcase.name)
 	assert.Equal(t,
-		Context{false, time.Second, -1.23456789, "pong",
+		Context{
+			false, time.Second, -1.23456789, "pong",
 			-2, -9123456789012345678, 2, 9123456789012345678,
 		},
 		context,

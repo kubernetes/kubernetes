@@ -57,21 +57,27 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
-const isInvalidQuotaResource string = `must be a standard resource for quota`
-const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
-const isNotIntegerErrorMsg string = `must be an integer`
-const isNotPositiveErrorMsg string = `must be greater than zero`
+const (
+	isNegativeErrorMsg     string = apimachineryvalidation.IsNegativeErrorMsg
+	isInvalidQuotaResource string = `must be a standard resource for quota`
+	fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
+	isNotIntegerErrorMsg   string = `must be an integer`
+	isNotPositiveErrorMsg  string = `must be greater than zero`
+)
 
-var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
-var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
+var (
+	pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
+	fileModeErrorMsg           = "must be a number between 0 and 0777 (octal), both inclusive"
+)
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
 
-var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
-var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
-var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
+var (
+	iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
+	iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
+	iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
+)
 
 var allowedEphemeralContainerFields = map[string]bool{
 	"Name":                     true,
@@ -977,6 +983,7 @@ func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPat
 	}
 	return allErrs
 }
+
 func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(glusterfs.EndpointsName) == 0 {
@@ -1001,7 +1008,7 @@ func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistent
 func validateFlockerVolumeSource(flocker *core.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(flocker.DatasetName) == 0 && len(flocker.DatasetUUID) == 0 {
-		//TODO: consider adding a RequiredOneOf() error for this and similar cases
+		// TODO: consider adding a RequiredOneOf() error for this and similar cases
 		allErrs = append(allErrs, field.Required(fldPath, "one of datasetName and datasetUUID is required"))
 	}
 	if len(flocker.DatasetName) != 0 && len(flocker.DatasetUUID) != 0 {
@@ -1380,8 +1387,8 @@ func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, fldPath *f
 }
 
 func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) field.ErrorList {
-	var supportedCachingModes = sets.NewString(string(core.AzureDataDiskCachingNone), string(core.AzureDataDiskCachingReadOnly), string(core.AzureDataDiskCachingReadWrite))
-	var supportedDiskKinds = sets.NewString(string(core.AzureSharedBlobDisk), string(core.AzureDedicatedBlobDisk), string(core.AzureManagedDisk))
+	supportedCachingModes := sets.NewString(string(core.AzureDataDiskCachingNone), string(core.AzureDataDiskCachingReadOnly), string(core.AzureDataDiskCachingReadWrite))
+	supportedDiskKinds := sets.NewString(string(core.AzureSharedBlobDisk), string(core.AzureDedicatedBlobDisk), string(core.AzureManagedDisk))
 
 	diskURISupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
 	diskURISupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
@@ -1813,7 +1820,6 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	if pvSpec.AzureFile != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("azureFile"), "may not specify more than 1 volume type"))
-
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateAzureFilePV(pvSpec.AzureFile, fldPath.Child("azureFile"))...)
@@ -2183,11 +2189,15 @@ var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
 // NOTE: this is only valid with DownwardAPIHugePages enabled
-var validContainerResourceFieldPathPrefixes = sets.NewString()
-var validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages = sets.NewString(hugepagesRequestsPrefixDownwardAPI, hugepagesLimitsPrefixDownwardAPI)
+var (
+	validContainerResourceFieldPathPrefixes                         = sets.NewString()
+	validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages = sets.NewString(hugepagesRequestsPrefixDownwardAPI, hugepagesLimitsPrefixDownwardAPI)
+)
 
-const hugepagesRequestsPrefixDownwardAPI string = `requests.hugepages-`
-const hugepagesLimitsPrefixDownwardAPI string = `limits.hugepages-`
+const (
+	hugepagesRequestsPrefixDownwardAPI string = `requests.hugepages-`
+	hugepagesLimitsPrefixDownwardAPI   string = `limits.hugepages-`
+)
 
 func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2349,10 +2359,12 @@ func validateSecretEnvSource(secretSource *core.SecretEnvSource, fldPath *field.
 	return allErrs
 }
 
-var validContainerResourceDivisorForCPU = sets.NewString("1m", "1")
-var validContainerResourceDivisorForMemory = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
-var validContainerResourceDivisorForHugePages = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
-var validContainerResourceDivisorForEphemeralStorage = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+var (
+	validContainerResourceDivisorForCPU              = sets.NewString("1m", "1")
+	validContainerResourceDivisorForMemory           = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+	validContainerResourceDivisorForHugePages        = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+	validContainerResourceDivisorForEphemeralStorage = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+)
 
 func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -3858,7 +3870,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
 	allErrs = field.ErrorList{}
 	if len(newContainers) != len(oldContainers) {
-		//TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
+		// TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(fldPath, "pod updates may not add or remove containers"))
 		return allErrs, true
 	}
@@ -4041,7 +4053,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
-		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
+		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		specDiff := diff.ObjectDiff(mungedPodSpec, oldPod.Spec)
 		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)\n%v", specDiff)))
 	}
@@ -4179,14 +4191,18 @@ func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate, opts PodValidat
 	return allErrs
 }
 
-var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
-var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
-	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
+var (
+	supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
+	supportedServiceType         = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
+		string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
+)
 
 var supportedServiceInternalTrafficPolicy = sets.NewString(string(core.ServiceInternalTrafficPolicyCluster), string(core.ServiceExternalTrafficPolicyTypeLocal))
 
-var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
-var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
+var (
+	supportedServiceIPFamily       = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
+	supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
+)
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service) field.ErrorList {
@@ -5732,7 +5748,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 
 		// EndpointSubsets must include endpoint address. For headless service, we allow its endpoints not to have ports.
 		if len(ss.Addresses) == 0 && len(ss.NotReadyAddresses) == 0 {
-			//TODO: consider adding a RequiredOneOf() error for this and similar cases
+			// TODO: consider adding a RequiredOneOf() error for this and similar cases
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		for addr := range ss.Addresses {
@@ -5823,7 +5839,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 // ValidateSecurityContext ensures the security context contains valid settings
 func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	//this should only be true for testing since SecurityContext is defaulted by the core
+	// this should only be true for testing since SecurityContext is defaulted by the core
 	if sc == nil {
 		return allErrs
 	}
@@ -5850,7 +5866,6 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		if err := ValidateProcMountType(fldPath.Child("procMount"), *sc.ProcMount); err != nil {
 			allErrs = append(allErrs, err)
 		}
-
 	}
 	allErrs = append(allErrs, validateSeccompProfileField(sc.SeccompProfile, fldPath.Child("seccompProfile"))...)
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
@@ -6162,9 +6177,7 @@ func ValidateProcMountType(fldPath *field.Path, procMountType core.ProcMountType
 	}
 }
 
-var (
-	supportedScheduleActions = sets.NewString(string(core.DoNotSchedule), string(core.ScheduleAnyway))
-)
+var supportedScheduleActions = sets.NewString(string(core.DoNotSchedule), string(core.ScheduleAnyway))
 
 // validateTopologySpreadConstraints validates given TopologySpreadConstraints.
 func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstraint, fldPath *field.Path) field.ErrorList {
@@ -6273,7 +6286,7 @@ func validateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 	}
 
 	// IPFamilyPolicy stand alone validation
-	//note: nil is ok, defaulted in alloc check registry/core/service/*
+	// note: nil is ok, defaulted in alloc check registry/core/service/*
 	if service.Spec.IPFamilyPolicy != nil {
 		// must have a supported value
 		if !supportedServiceIPFamilyPolicy.Has(string(*(service.Spec.IPFamilyPolicy))) {

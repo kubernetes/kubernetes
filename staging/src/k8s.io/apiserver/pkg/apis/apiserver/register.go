@@ -21,8 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const LegacyGroupName = "apiserver.k8s.io"
-const GroupName = "apiserver.config.k8s.io"
+const (
+	LegacyGroupName = "apiserver.k8s.io"
+	GroupName       = "apiserver.config.k8s.io"
+)
 
 // LegacySchemeGroupVersion is group version used to register these objects
 var LegacySchemeGroupVersion = schema.GroupVersion{Group: LegacyGroupName, Version: runtime.APIVersionInternal}

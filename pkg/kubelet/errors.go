@@ -23,7 +23,5 @@ const (
 	NetworkNotReadyErrorMsg = "network is not ready"
 )
 
-var (
-	// ErrNetworkUnknown indicates the network state is unknown
-	ErrNetworkUnknown = errors.New("network state unknown")
-)
+// ErrNetworkUnknown indicates the network state is unknown
+var ErrNetworkUnknown = errors.New("network state unknown")

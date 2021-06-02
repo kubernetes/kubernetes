@@ -25,7 +25,6 @@ import (
 
 func TestGetBootTime(t *testing.T) {
 	boottime, err := GetBootTime()
-
 	if err != nil {
 		t.Errorf("Unable to get system uptime")
 	}

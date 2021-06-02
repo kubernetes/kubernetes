@@ -25,9 +25,7 @@ import (
 	"github.com/blang/semver"
 )
 
-var (
-	latestVersion = semver.MustParse("3.1.12")
-)
+var latestVersion = semver.MustParse("3.1.12")
 
 func TestExistingDataDirWithVersionFile(t *testing.T) {
 	d, err := OpenOrCreateDataDirectory("testdata/datadir_with_version")

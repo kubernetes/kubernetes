@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"github.com/pkg/errors"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 type pferror struct{}
@@ -31,7 +32,7 @@ func TestCheckErr(t *testing.T) {
 		codeReturned = code
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		e        error
 		expected int

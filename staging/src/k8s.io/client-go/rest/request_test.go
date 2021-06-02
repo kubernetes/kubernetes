@@ -1439,12 +1439,15 @@ type fakeUpgradeConnection struct{}
 func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
 	return nil, nil
 }
+
 func (c *fakeUpgradeConnection) Close() error {
 	return nil
 }
+
 func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
 	return make(chan bool)
 }
+
 func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
 }
 
@@ -1570,7 +1573,8 @@ func TestBackoffLifecycle(t *testing.T) {
 			time.Duration(1)*time.Second,
 			time.Duration(200)*time.Second,
 			&clock,
-		)}
+		),
+	}
 
 	for _, sec := range seconds {
 		thisBackoff := request.backoff.CalculateBackoff(request.URL())
@@ -2074,7 +2078,7 @@ func TestWatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var table = []struct {
+			table := []struct {
 				t   watch.EventType
 				obj runtime.Object
 			}{
@@ -2143,7 +2147,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchNonDefaultContentType(t *testing.T) {
-	var table = []struct {
+	table := []struct {
 		t   watch.EventType
 		obj runtime.Object
 	}{
@@ -2203,7 +2207,7 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 }
 
 func TestWatchUnknownContentType(t *testing.T) {
-	var table = []struct {
+	table := []struct {
 		t   watch.EventType
 		obj runtime.Object
 	}{
@@ -2286,7 +2290,6 @@ func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig 
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
-
 }
 
 func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
@@ -2592,6 +2595,7 @@ func (c *count) close() {
 	defer c.lock.Unlock()
 	c.closes++
 }
+
 func (c *count) getCloseCount() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()

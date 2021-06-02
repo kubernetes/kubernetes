@@ -28,8 +28,10 @@ import (
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct{}
 
-var _ framework.FilterPlugin = &VolumeRestrictions{}
-var _ framework.EnqueueExtensions = &VolumeRestrictions{}
+var (
+	_ framework.FilterPlugin      = &VolumeRestrictions{}
+	_ framework.EnqueueExtensions = &VolumeRestrictions{}
+)
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "VolumeRestrictions"

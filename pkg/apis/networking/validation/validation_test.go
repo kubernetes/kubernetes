@@ -928,7 +928,8 @@ func TestValidateIngressCreate(t *testing.T) {
 		"Spec.Backend.Resource field allowed on create": {
 			tweakIngress: func(ingress *networking.Ingress) {
 				ingress.Spec.DefaultBackend = &networking.IngressBackend{
-					Resource: resourceBackend}
+					Resource: resourceBackend,
+				}
 			},
 			expectedErrs: field.ErrorList{},
 		},
@@ -942,7 +943,8 @@ func TestValidateIngressCreate(t *testing.T) {
 								Path:     "/([a-z0-9]*)",
 								PathType: &implementationPathType,
 								Backend: networking.IngressBackend{
-									Resource: resourceBackend},
+									Resource: resourceBackend,
+								},
 							}},
 						},
 					},
@@ -1244,23 +1246,27 @@ func TestValidateIngressUpdate(t *testing.T) {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.DefaultBackend = &defaultBackend
 				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
-					Resource: resourceBackend}
+					Resource: resourceBackend,
+				}
 			},
 			expectedErrs: field.ErrorList{},
 		},
 		"old DefaultBackend.Resource allowed on update": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
-					Resource: resourceBackend}
+					Resource: resourceBackend,
+				}
 				newIngress.Spec.DefaultBackend = &networking.IngressBackend{
-					Resource: resourceBackend}
+					Resource: resourceBackend,
+				}
 			},
 			expectedErrs: field.ErrorList{},
 		},
 		"changing spec.backend from resource -> no resource": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.DefaultBackend = &networking.IngressBackend{
-					Resource: resourceBackend}
+					Resource: resourceBackend,
+				}
 				newIngress.Spec.DefaultBackend = &defaultBackend
 			},
 			expectedErrs: field.ErrorList{},
@@ -1275,7 +1281,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 								Path:     "/foo[",
 								PathType: &implementationPathType,
 								Backend: networking.IngressBackend{
-									Resource: resourceBackend},
+									Resource: resourceBackend,
+								},
 							}},
 						},
 					},
@@ -1305,7 +1312,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 								Path:     "/foo[",
 								PathType: &implementationPathType,
 								Backend: networking.IngressBackend{
-									Resource: resourceBackend},
+									Resource: resourceBackend,
+								},
 							}},
 						},
 					},
@@ -1318,7 +1326,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 								Path:     "/bar[",
 								PathType: &implementationPathType,
 								Backend: networking.IngressBackend{
-									Resource: resourceBackend},
+									Resource: resourceBackend,
+								},
 							}},
 						},
 					},
@@ -1377,7 +1386,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 								Path:     "/bar[",
 								PathType: &implementationPathType,
 								Backend: networking.IngressBackend{
-									Resource: resourceBackend},
+									Resource: resourceBackend,
+								},
 							}},
 						},
 					},

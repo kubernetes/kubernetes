@@ -168,11 +168,9 @@ func TestAuthPluginPersist(t *testing.T) {
 				i, tc.plugin, persister.savedConfig, tc.expectedConfigAfterLogin)
 		}
 	}
-
 }
 
 func Test_WhenNilPersister_NoOpPersisterIsAssigned(t *testing.T) {
-
 	if err := RegisterAuthProviderPlugin("anyPlugin", pluginPersistProvider); err != nil {
 		t.Errorf("unexpected error: failed to register 'anyPlugin': %v", err)
 	}
@@ -190,7 +188,6 @@ func Test_WhenNilPersister_NoOpPersisterIsAssigned(t *testing.T) {
 	if _, ok := anyPlugin.persister.(*noopPersister); !ok {
 		t.Errorf("expected to be No Operation persister")
 	}
-
 }
 
 // emptyTransport provides an empty http.Response with an initialized header

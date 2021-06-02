@@ -482,9 +482,11 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 func BenchmarkSerializeObject1000PodsPB(b *testing.B) {
 	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 1000)))
 }
+
 func BenchmarkSerializeObject10000PodsPB(b *testing.B) {
 	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 10000)))
 }
+
 func BenchmarkSerializeObject100000PodsPB(b *testing.B) {
 	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 100000)))
 }
@@ -492,9 +494,11 @@ func BenchmarkSerializeObject100000PodsPB(b *testing.B) {
 func BenchmarkSerializeObject1000PodsJSON(b *testing.B) {
 	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 1000)))
 }
+
 func BenchmarkSerializeObject10000PodsJSON(b *testing.B) {
 	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 10000)))
 }
+
 func BenchmarkSerializeObject100000PodsJSON(b *testing.B) {
 	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 100000)))
 }

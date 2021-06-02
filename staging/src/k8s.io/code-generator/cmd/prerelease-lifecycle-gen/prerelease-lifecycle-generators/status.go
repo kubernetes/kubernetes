@@ -33,8 +33,7 @@ import (
 )
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this generator.
-type CustomArgs struct {
-}
+type CustomArgs struct{}
 
 // This is the comment tag that carries parameters for API status generation.  Because the cadence is fixed, we can predict
 // with near certainty when this lifecycle happens as the API is introduced.
@@ -164,7 +163,7 @@ func extractTag(tagName string, comments []string) *tagValue {
 		//	v = kv[1]
 		//}
 		switch k {
-		//case "register":
+		// case "register":
 		//	if v != "false" {
 		//		tag.register = true
 		//	}

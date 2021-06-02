@@ -140,7 +140,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
-		//modify labels
+		// modify labels
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
@@ -171,7 +171,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
-		//modify annotations
+		// modify annotations
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})

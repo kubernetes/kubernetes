@@ -213,7 +213,6 @@ func (tc *patchTestCase) runner(t *testing.T) {
 	if err := tc.verifyResult(got); err != nil {
 		t.Error(err)
 	}
-
 }
 
 // verifyErr verifies that the given error returned from Patch is the error

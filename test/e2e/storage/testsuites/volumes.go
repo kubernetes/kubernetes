@@ -123,7 +123,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		migrationCheck *migrationOpCheck
 	}
-	var dInfo = driver.GetDriverInfo()
+	dInfo := driver.GetDriverInfo()
 	var l local
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using

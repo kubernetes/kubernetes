@@ -51,25 +51,35 @@ var dirPodMap = make(map[string]types.UID)
 var devApplierMap = make(map[string]common.LinuxVolumeQuotaApplier)
 
 // Directory -> applier
-var dirApplierMap = make(map[string]common.LinuxVolumeQuotaApplier)
-var dirApplierLock sync.RWMutex
+var (
+	dirApplierMap  = make(map[string]common.LinuxVolumeQuotaApplier)
+	dirApplierLock sync.RWMutex
+)
 
 // Pod -> refcount
 var podDirCountMap = make(map[types.UID]int)
 
 // ID -> size
-var quotaSizeMap = make(map[common.QuotaID]int64)
-var quotaLock sync.RWMutex
+var (
+	quotaSizeMap = make(map[common.QuotaID]int64)
+	quotaLock    sync.RWMutex
+)
 
-var supportsQuotasMap = make(map[string]bool)
-var supportsQuotasLock sync.RWMutex
+var (
+	supportsQuotasMap  = make(map[string]bool)
+	supportsQuotasLock sync.RWMutex
+)
 
 // Directory -> backingDev
-var backingDevMap = make(map[string]string)
-var backingDevLock sync.RWMutex
+var (
+	backingDevMap  = make(map[string]string)
+	backingDevLock sync.RWMutex
+)
 
-var mountpointMap = make(map[string]string)
-var mountpointLock sync.RWMutex
+var (
+	mountpointMap  = make(map[string]string)
+	mountpointLock sync.RWMutex
+)
 
 var providers = []common.LinuxVolumeQuotaProvider{
 	&common.VolumeProvider{},

@@ -29,9 +29,9 @@ import (
 
 type viewClusterTest struct {
 	description string
-	config      clientcmdapi.Config //initiate kubectl config
-	flags       []string            //kubectl config viw flags
-	expected    string              //expect out
+	config      clientcmdapi.Config // initiate kubectl config
+	flags       []string            // kubectl config viw flags
+	expected    string              // expect out
 }
 
 func TestViewCluster(t *testing.T) {
@@ -86,7 +86,6 @@ users:
 	}
 
 	test.run(t)
-
 }
 
 func TestViewClusterMinify(t *testing.T) {

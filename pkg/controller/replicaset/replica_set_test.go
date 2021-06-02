@@ -54,9 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-var (
-	informerSyncTimeout = 30 * time.Second
-)
+var informerSyncTimeout = 30 * time.Second
 
 func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*ReplicaSetController, informers.SharedInformerFactory) {
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -142,7 +140,7 @@ func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransition
 	}
 	var controllerReference metav1.OwnerReference
 	if properlyOwned {
-		var trueVar = true
+		trueVar := true
 		controllerReference = metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
 	}
 	return &v1.Pod{
@@ -160,7 +158,7 @@ func newPod(name string, rs *apps.ReplicaSet, status v1.PodPhase, lastTransition
 // create count pods with the given phase for the given ReplicaSet (same selectors and namespace), and add them to the store.
 func newPodList(store cache.Store, count int, status v1.PodPhase, labelMap map[string]string, rs *apps.ReplicaSet, name string) *v1.PodList {
 	pods := []v1.Pod{}
-	var trueVar = true
+	trueVar := true
 	controllerReference := metav1.OwnerReference{UID: rs.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rs.Name, Controller: &trueVar}
 	for i := 0; i < count; i++ {
 		pod := newPod(fmt.Sprintf("%s%d", name, i), rs, status, nil, false)
@@ -450,7 +448,8 @@ func TestPodControllerLookup(t *testing.T) {
 		// pods without labels don't match any ReplicaSets
 		{
 			inRSs: []*apps.ReplicaSet{
-				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}},
+			},
 			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll}},
 			outRSName: "",
 		},
@@ -466,7 +465,9 @@ func TestPodControllerLookup(t *testing.T) {
 			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo2", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
+					Name: "foo2", Namespace: "ns", Labels: map[string]string{"foo": "bar"},
+				},
+			},
 			outRSName: "",
 		},
 		// Matching ns and labels returns the key to the ReplicaSet, not the ReplicaSet name
@@ -481,7 +482,9 @@ func TestPodControllerLookup(t *testing.T) {
 			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo3", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
+					Name: "foo3", Namespace: "ns", Labels: map[string]string{"foo": "bar"},
+				},
+			},
 			outRSName: "bar",
 		},
 	}
@@ -1451,7 +1454,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	defer close(stopCh)
 	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
-	var trueVar = true
+	trueVar := true
 	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
 	// add to podLister a matching Pod controlled by another controller. Expect no patch.
 	pod := newPod("pod", rs, v1.PodRunning, nil, true)

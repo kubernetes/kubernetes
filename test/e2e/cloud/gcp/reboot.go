@@ -322,7 +322,6 @@ func catLogHook(logPath string) terminationHook {
 				framework.Logf("Error while issuing ssh command: %v", err)
 			}
 		}
-
 	}
 }
 

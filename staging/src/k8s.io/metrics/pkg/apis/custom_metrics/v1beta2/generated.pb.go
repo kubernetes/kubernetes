@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*MetricIdentifier) ProtoMessage() {}
 func (*MetricIdentifier) Descriptor() ([]byte, []int) {
 	return fileDescriptor_478ffa937eb23bb9, []int{0}
 }
+
 func (m *MetricIdentifier) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricIdentifier) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *MetricIdentifier) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *MetricIdentifier) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricIdentifier.Merge(m, src)
 }
+
 func (m *MetricIdentifier) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricIdentifier) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricIdentifier.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*MetricListOptions) ProtoMessage() {}
 func (*MetricListOptions) Descriptor() ([]byte, []int) {
 	return fileDescriptor_478ffa937eb23bb9, []int{1}
 }
+
 func (m *MetricListOptions) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricListOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *MetricListOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *MetricListOptions) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricListOptions.Merge(m, src)
 }
+
 func (m *MetricListOptions) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricListOptions) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricListOptions.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*MetricValue) ProtoMessage() {}
 func (*MetricValue) Descriptor() ([]byte, []int) {
 	return fileDescriptor_478ffa937eb23bb9, []int{2}
 }
+
 func (m *MetricValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *MetricValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *MetricValue) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricValue.Merge(m, src)
 }
+
 func (m *MetricValue) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricValue) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricValue.DiscardUnknown(m)
 }
@@ -133,9 +150,11 @@ func (*MetricValueList) ProtoMessage() {}
 func (*MetricValueList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_478ffa937eb23bb9, []int{3}
 }
+
 func (m *MetricValueList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricValueList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -144,12 +163,15 @@ func (m *MetricValueList) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *MetricValueList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricValueList.Merge(m, src)
 }
+
 func (m *MetricValueList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricValueList) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricValueList.DiscardUnknown(m)
 }
@@ -411,6 +433,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *MetricIdentifier) Size() (n int) {
 	if m == nil {
 		return 0
@@ -479,36 +502,43 @@ func (m *MetricValueList) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *MetricIdentifier) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MetricIdentifier{`,
+	s := strings.Join([]string{
+		`&MetricIdentifier{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *MetricListOptions) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MetricListOptions{`,
+	s := strings.Join([]string{
+		`&MetricListOptions{`,
 		`LabelSelector:` + fmt.Sprintf("%v", this.LabelSelector) + `,`,
 		`MetricLabelSelector:` + fmt.Sprintf("%v", this.MetricLabelSelector) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *MetricValue) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MetricValue{`,
+	s := strings.Join([]string{
+		`&MetricValue{`,
 		`DescribedObject:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.DescribedObject), "ObjectReference", "v11.ObjectReference", 1), `&`, ``, 1) + `,`,
 		`Metric:` + strings.Replace(strings.Replace(this.Metric.String(), "MetricIdentifier", "MetricIdentifier", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -518,6 +548,7 @@ func (this *MetricValue) String() string {
 	}, "")
 	return s
 }
+
 func (this *MetricValueList) String() string {
 	if this == nil {
 		return "nil"
@@ -527,13 +558,15 @@ func (this *MetricValueList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "MetricValue", "MetricValue", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&MetricValueList{`,
+	s := strings.Join([]string{
+		`&MetricValueList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -542,6 +575,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *MetricIdentifier) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -660,6 +694,7 @@ func (m *MetricIdentifier) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MetricListOptions) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -774,6 +809,7 @@ func (m *MetricListOptions) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MetricValue) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -976,6 +1012,7 @@ func (m *MetricValue) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MetricValueList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1093,6 +1130,7 @@ func (m *MetricValueList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

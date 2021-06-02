@@ -333,7 +333,6 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 	for _, pv := range apiPVs {
 		env.reactor.AddVolume(pv)
 	}
-
 }
 
 func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, waitCache bool) {

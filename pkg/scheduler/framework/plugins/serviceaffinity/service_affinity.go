@@ -92,10 +92,12 @@ type ServiceAffinity struct {
 	serviceLister corelisters.ServiceLister
 }
 
-var _ framework.PreFilterPlugin = &ServiceAffinity{}
-var _ framework.FilterPlugin = &ServiceAffinity{}
-var _ framework.ScorePlugin = &ServiceAffinity{}
-var _ framework.EnqueueExtensions = &ServiceAffinity{}
+var (
+	_ framework.PreFilterPlugin   = &ServiceAffinity{}
+	_ framework.FilterPlugin      = &ServiceAffinity{}
+	_ framework.ScorePlugin       = &ServiceAffinity{}
+	_ framework.EnqueueExtensions = &ServiceAffinity{}
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ServiceAffinity) Name() string {
@@ -379,7 +381,7 @@ func (pl *ServiceAffinity) updateNodeScoresForLabel(sharedLister framework.Share
 		podCounts[labelValue] += nodePriority.Score
 	}
 
-	//score int - scale of 0-maxPriority
+	// score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for i, nodePriority := range mapResult {
 		labelValue, ok := labelNodesStatus[nodePriority.Name]

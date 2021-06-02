@@ -184,6 +184,7 @@ func TestServiceAffinity(t *testing.T) {
 		})
 	}
 }
+
 func TestServiceAffinityScore(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
@@ -246,9 +247,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			pod:    new(v1.Pod),
 			nodes:  labeledNodes,
 			labels: []string{"zone"},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
-				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: framework.MaxNodeScore},
+				{Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore},
+				{Name: "machine22", Score: framework.MaxNodeScore},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "nothing scheduled",
 		},
 		{
@@ -256,9 +262,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			pods:   []*v1.Pod{{Spec: zone1Spec}},
 			nodes:  labeledNodes,
 			labels: []string{"zone"},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
-				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: framework.MaxNodeScore},
+				{Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore},
+				{Name: "machine22", Score: framework.MaxNodeScore},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "no services",
 		},
 		{
@@ -267,9 +278,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
-				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: framework.MaxNodeScore},
+				{Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore},
+				{Name: "machine22", Score: framework.MaxNodeScore},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "different services",
 		},
 		{
@@ -282,9 +298,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
-				{Name: "machine21", Score: 0}, {Name: "machine22", Score: 0},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: framework.MaxNodeScore},
+				{Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: 0},
+				{Name: "machine22", Score: 0},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "three pods, one service pod",
 		},
 		{
@@ -297,9 +318,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 50}, {Name: "machine12", Score: 50},
-				{Name: "machine21", Score: 50}, {Name: "machine22", Score: 50},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 50},
+				{Name: "machine12", Score: 50},
+				{Name: "machine21", Score: 50},
+				{Name: "machine22", Score: 50},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "three pods, two service pods on different machines",
 		},
 		{
@@ -313,9 +339,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 0}, {Name: "machine12", Score: 0},
-				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 0},
+				{Name: "machine12", Score: 0},
+				{Name: "machine21", Score: framework.MaxNodeScore},
+				{Name: "machine22", Score: framework.MaxNodeScore},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "three service label match pods in different namespaces",
 		},
 		{
@@ -329,9 +360,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 66}, {Name: "machine12", Score: 66},
-				{Name: "machine21", Score: 33}, {Name: "machine22", Score: 33},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 66},
+				{Name: "machine12", Score: 66},
+				{Name: "machine21", Score: 33},
+				{Name: "machine22", Score: 33},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "four pods, three service pods",
 		},
 		{
@@ -344,9 +380,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 33}, {Name: "machine12", Score: 33},
-				{Name: "machine21", Score: 66}, {Name: "machine22", Score: 66},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 33},
+				{Name: "machine12", Score: 33},
+				{Name: "machine21", Score: 66},
+				{Name: "machine22", Score: 66},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "service with partial pod label matches",
 		},
 		{
@@ -360,9 +401,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    labeledNodes,
 			labels:   []string{"zone"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 75}, {Name: "machine12", Score: 75},
-				{Name: "machine21", Score: 50}, {Name: "machine22", Score: 50},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 75},
+				{Name: "machine12", Score: 75},
+				{Name: "machine21", Score: 50},
+				{Name: "machine22", Score: 50},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "service pod on non-zoned node",
 		},
 		{
@@ -375,9 +421,14 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes:    nodesWithZoneAndRackLabels,
 			labels:   []string{"zone", "rack"},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 25}, {Name: "machine12", Score: 75},
-				{Name: "machine21", Score: 25}, {Name: "machine22", Score: 25},
-				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
+			expectedList: []framework.NodeScore{
+				{Name: "machine11", Score: 25},
+				{Name: "machine12", Score: 75},
+				{Name: "machine21", Score: 25},
+				{Name: "machine22", Score: 25},
+				{Name: "machine01", Score: 0},
+				{Name: "machine02", Score: 0},
+			},
 			name: "three pods, two service pods, with rack label",
 		},
 	}
@@ -422,15 +473,15 @@ func TestServiceAffinityScore(t *testing.T) {
 }
 
 func TestPreFilterStateAddRemovePod(t *testing.T) {
-	var label1 = map[string]string{
+	label1 := map[string]string{
 		"region": "r1",
 		"zone":   "z11",
 	}
-	var label2 = map[string]string{
+	label2 := map[string]string{
 		"region": "r1",
 		"zone":   "z12",
 	}
-	var label3 = map[string]string{
+	label3 := map[string]string{
 		"region": "r2",
 		"zone":   "z21",
 	}
@@ -450,11 +501,13 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{NodeName: "nodeC"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec:       v1.PodSpec{NodeName: "nodeC"},
 				},
 			},
 			addedPod: &v1.Pod{
@@ -473,11 +526,13 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{NodeName: "nodeC"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec:       v1.PodSpec{NodeName: "nodeC"},
 				},
 			},
 			addedPod: &v1.Pod{

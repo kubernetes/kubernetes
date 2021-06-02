@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var testPodName = "test-pod-name"
-var testPodNamespace = "test-namespace"
+var (
+	testPodName      = "test-pod-name"
+	testPodNamespace = "test-namespace"
+)
 
 var testPod = &corev1.Pod{
 	TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},

@@ -17,15 +17,16 @@ limitations under the License.
 package queuesort
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"testing"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestLess(t *testing.T) {
 	prioritySort := &PrioritySort{}
-	var lowPriority, highPriority = int32(10), int32(100)
+	lowPriority, highPriority := int32(10), int32(100)
 	t1 := time.Now()
 	t2 := t1.Add(time.Second)
 	for _, tt := range []struct {

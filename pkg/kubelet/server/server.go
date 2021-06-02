@@ -132,6 +132,7 @@ func (a *filteringContainer) Handle(path string, handler http.Handler) {
 	a.HandleWithFilter(path, handler)
 	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
 }
+
 func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
 }
@@ -510,7 +511,8 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 	s.addMetricsBucketMatcher("logs")
 	paths := []string{
 		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/",
-		"/runningpods/", pprofBasePath, logsPath}
+		"/runningpods/", pprofBasePath, logsPath,
+	}
 	for _, p := range paths {
 		s.restfulCont.Handle(p, h)
 	}
@@ -884,7 +886,6 @@ func getURLRootPath(path string) string {
 
 	if parts[0] == "metrics" && len(parts) > 1 {
 		return fmt.Sprintf("%s/%s", parts[0], parts[1])
-
 	}
 	return parts[0]
 }
@@ -948,9 +949,11 @@ type prometheusHostAdapter struct {
 func (a prometheusHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return a.host.GetRequestedContainersInfo(containerName, options)
 }
+
 func (a prometheusHostAdapter) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return a.host.GetVersionInfo()
 }
+
 func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return a.host.GetCachedMachineInfo()
 }

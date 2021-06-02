@@ -39,7 +39,6 @@ import (
 
 // TestPodAdmission verifies various scenarios involving pod/namespace tolerations
 func TestPodAdmission(t *testing.T) {
-
 	CPU1000m := resource.MustParse("1000m")
 	CPU500m := resource.MustParse("500m")
 

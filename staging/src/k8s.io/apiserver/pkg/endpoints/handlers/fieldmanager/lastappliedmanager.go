@@ -90,17 +90,17 @@ func (f *lastAppliedManager) Apply(liveObj, newObj runtime.Object, managed Manag
 }
 
 func (f *lastAppliedManager) allowedConflictsFromLastApplied(liveObj runtime.Object) (*fieldpath.Set, error) {
-	var accessor, err = meta.Accessor(liveObj)
+	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
 
 	// If there is no client-side apply annotation, then there is nothing to do
-	var annotations = accessor.GetAnnotations()
+	annotations := accessor.GetAnnotations()
 	if annotations == nil {
 		return nil, fmt.Errorf("no last applied annotation")
 	}
-	var lastApplied, ok = annotations[corev1.LastAppliedConfigAnnotation]
+	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
 	if !ok || lastApplied == "" {
 		return nil, fmt.Errorf("no last applied annotation")
 	}
@@ -115,7 +115,7 @@ func (f *lastAppliedManager) allowedConflictsFromLastApplied(liveObj runtime.Obj
 		return nil, fmt.Errorf("failed to convert live obj to typed: %v", err)
 	}
 
-	var lastAppliedObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	lastAppliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	err = json.Unmarshal([]byte(lastApplied), lastAppliedObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode last applied obj: %v in '%s'", err, lastApplied)

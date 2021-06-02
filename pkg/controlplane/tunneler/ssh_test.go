@@ -92,7 +92,6 @@ func TestSecondsSinceSync(t *testing.T) {
 			assert.Equal(int64(tt.want), tunneler.SecondsSinceSync())
 		})
 	}
-
 }
 
 // generateTempFile creates a temporary file path

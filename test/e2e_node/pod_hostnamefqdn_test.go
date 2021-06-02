@@ -182,7 +182,6 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:Set
 		// Check Pod is in Pending Phase
 		err := checkPodIsPending(f, launchedPod.ObjectMeta.Name, launchedPod.ObjectMeta.Namespace)
 		framework.ExpectNoError(err)
-
 	})
 })
 

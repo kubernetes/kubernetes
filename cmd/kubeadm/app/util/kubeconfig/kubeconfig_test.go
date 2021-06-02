@@ -82,7 +82,7 @@ type configClientWithToken struct {
 }
 
 func TestCreateWithCerts(t *testing.T) {
-	var createBasicTest = []struct {
+	createBasicTest := []struct {
 		name        string
 		cc          configClient
 		ccWithCerts configClientWithCerts
@@ -113,7 +113,7 @@ func TestCreateWithCerts(t *testing.T) {
 }
 
 func TestCreateWithToken(t *testing.T) {
-	var createBasicTest = []struct {
+	createBasicTest := []struct {
 		name        string
 		cc          configClient
 		ccWithToken configClientWithToken
@@ -149,7 +149,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	var writeConfig = []struct {
+	writeConfig := []struct {
 		name        string
 		cc          configClient
 		ccWithToken configClientWithToken
@@ -190,7 +190,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 }
 
 func TestGetCurrentAuthInfo(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name     string
 		config   *clientcmdapi.Config
 		expected bool
@@ -268,7 +268,7 @@ func TestGetCurrentAuthInfo(t *testing.T) {
 }
 
 func TestHasCredentials(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name     string
 		config   *clientcmdapi.Config
 		expected bool

@@ -58,14 +58,12 @@ type PathOptions struct {
 	LoadingRules *ClientConfigLoadingRules
 }
 
-var (
-	// UseModifyConfigLock ensures that access to kubeconfig file using ModifyConfig method
-	// is being guarded by a lock file.
-	// This variable is intentionaly made public so other consumers of this library
-	// can modify its default behavior, but be caution when disabling it since
-	// this will make your code not threadsafe.
-	UseModifyConfigLock = true
-)
+// UseModifyConfigLock ensures that access to kubeconfig file using ModifyConfig method
+// is being guarded by a lock file.
+// This variable is intentionaly made public so other consumers of this library
+// can modify its default behavior, but be caution when disabling it since
+// this will make your code not threadsafe.
+var UseModifyConfigLock = true
 
 func (o *PathOptions) GetEnvVarFiles() []string {
 	if len(o.EnvVar) == 0 {

@@ -77,7 +77,6 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 			}
 			return false
 		}, gcTimeout, 10*time.Second).Should(gomega.BeTrue())
-
 	})
 
 	ginkgo.Context("When pod sandbox checkpoint is missing", func() {

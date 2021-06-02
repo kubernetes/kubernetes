@@ -122,7 +122,7 @@ func TestServeConfiguration(t *testing.T) {
 func TestServeKeys(t *testing.T) {
 	wantPubRSA := getPublicKey(rsaPublicKey).(*rsa.PublicKey)
 	wantPubECDSA := getPublicKey(ecdsaPublicKey).(*ecdsa.PublicKey)
-	var serveKeysTests = []struct {
+	serveKeysTests := []struct {
 		Name     string
 		Keys     []interface{}
 		WantKeys []jose.JSONWebKey

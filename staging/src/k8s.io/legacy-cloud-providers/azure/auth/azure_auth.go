@@ -35,10 +35,8 @@ const (
 	ADFSIdentitySystem = "adfs"
 )
 
-var (
-	// ErrorNoAuth indicates that no credentials are provided.
-	ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
-)
+// ErrorNoAuth indicates that no credentials are provided.
+var ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
 
 // AzureAuthConfig holds auth related part of cloud config
 type AzureAuthConfig struct {

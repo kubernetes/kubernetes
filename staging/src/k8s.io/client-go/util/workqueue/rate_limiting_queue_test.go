@@ -71,5 +71,4 @@ func TestRateLimitingQueue(t *testing.T) {
 	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-
 }

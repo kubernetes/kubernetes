@@ -241,7 +241,7 @@ func TestCIDRSet_RandomishAllocation(t *testing.T) {
 			}
 		}
 
-		//var err error
+		// var err error
 		_, err = a.AllocateNext()
 		if err == nil {
 			t.Fatalf("expected error because of fully-allocated range for %v", tc.description)
@@ -293,7 +293,7 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 		}
 		// allocate all the CIDRs
 		var cidrs []*net.IPNet
-		var numCIDRs = 256
+		numCIDRs := 256
 
 		for i := 0; i < numCIDRs; i++ {
 			if c, err := a.AllocateNext(); err == nil {
@@ -303,7 +303,7 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 			}
 		}
 
-		//var err error
+		// var err error
 		_, err = a.AllocateNext()
 		if err == nil {
 			t.Fatalf("expected error because of fully-allocated range for %v", tc.description)
@@ -875,7 +875,6 @@ func TestCidrSetMetrics(t *testing.T) {
 		allocTries: 0,
 	}
 	expectMetrics(t, cidr, em)
-
 }
 
 func TestCidrSetMetricsHistogram(t *testing.T) {
@@ -967,7 +966,6 @@ func TestCidrSetMetricsDual(t *testing.T) {
 		allocTries: 0,
 	}
 	expectMetrics(t, cidrIPv6, em)
-
 }
 
 // Metrics helpers

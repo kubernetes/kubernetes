@@ -113,12 +113,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *core.ReplicationControllerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			//j.TemplateRef = nil // this is required for round trip
+			// j.TemplateRef = nil // this is required for round trip
 		},
 		func(j *core.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// TODO: uncomment when round trip starts from a versioned object
-			if false { //j.Items == nil {
+			if false { // j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
 		},
@@ -407,8 +407,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *core.HostPathVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			types := []core.HostPathType{core.HostPathUnset, core.HostPathDirectoryOrCreate, core.HostPathDirectory,
-				core.HostPathFileOrCreate, core.HostPathFile, core.HostPathSocket, core.HostPathCharDev, core.HostPathBlockDev}
+			types := []core.HostPathType{
+				core.HostPathUnset, core.HostPathDirectoryOrCreate, core.HostPathDirectory,
+				core.HostPathFileOrCreate, core.HostPathFile, core.HostPathSocket, core.HostPathCharDev, core.HostPathBlockDev,
+			}
 			typeVol := types[c.Rand.Intn(len(types))]
 			if obj.Type == nil {
 				obj.Type = &typeVol

@@ -158,9 +158,11 @@ func TestPreemption(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		},
 	}
 
 	maxTokens := 1000
@@ -180,9 +182,11 @@ func TestPreemption(t *testing.T) {
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
 					},
 				}),
 			},
@@ -190,9 +194,11 @@ func TestPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{0: {}},
@@ -205,9 +211,11 @@ func TestPreemption(t *testing.T) {
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
 					},
 				}),
 			},
@@ -215,9 +223,11 @@ func TestPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{0: {}},
@@ -232,9 +242,11 @@ func TestPreemption(t *testing.T) {
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
 					},
 				}),
 			},
@@ -242,9 +254,11 @@ func TestPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{},
@@ -436,7 +450,7 @@ func TestPreemption(t *testing.T) {
 func TestNonPreemption(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
 
-	var preemptNever = v1.PreemptNever
+	preemptNever := v1.PreemptNever
 	// Initialize scheduler.
 	testCtx := initTest(t, "non-preemption")
 	defer testutils.CleanupTest(t, testCtx)
@@ -458,9 +472,11 @@ func TestNonPreemption(t *testing.T) {
 		Name:      "victim-pod",
 		Namespace: testCtx.NS.Name,
 		Priority:  &lowPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+			},
 		},
 	})
 
@@ -468,9 +484,11 @@ func TestNonPreemption(t *testing.T) {
 		Name:      "preemptor-pod",
 		Namespace: testCtx.NS.Name,
 		Priority:  &highPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+			},
 		},
 	})
 
@@ -532,9 +550,11 @@ func TestDisablePreemption(t *testing.T) {
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
 					},
 				}),
 			},
@@ -542,9 +562,11 @@ func TestDisablePreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 		},
@@ -604,7 +626,8 @@ func TestPodPriorityResolution(t *testing.T) {
 	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 		QPS:           -1,
 		Host:          testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
+	})
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
@@ -698,9 +721,11 @@ func TestPodPriorityResolution(t *testing.T) {
 }
 
 func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int32, grace int64) *v1.Pod {
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		},
 	}
 	pod := initPausePod(&pausePodConfig{
 		Name:      name,
@@ -739,9 +764,11 @@ func TestPreemptionStarvation(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 		},
@@ -840,9 +867,11 @@ func TestPreemptionRaces(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(4900, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(4900, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(4900, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(4900, resource.DecimalSI),
+					},
 				},
 			}),
 		},
@@ -977,9 +1006,11 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		Name:      "medium-priority",
 		Namespace: testCtx.NS.Name,
 		Priority:  &mediumPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+		Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+			},
 		},
 	})
 	medPriPod, err := createPausePod(cs, podConf)
@@ -995,9 +1026,11 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		Name:      "high-priority",
 		Namespace: testCtx.NS.Name,
 		Priority:  &highPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		Resources: &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+			},
 		},
 	})
 	highPriPod, err := createPausePod(cs, podConf)
@@ -1058,9 +1091,11 @@ func TestPDBInPreemption(t *testing.T) {
 
 	initDisruptionController(t, testCtx)
 
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
@@ -1115,9 +1150,11 @@ func TestPDBInPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{2: {}},
@@ -1153,9 +1190,11 @@ func TestPDBInPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{1: {}},
@@ -1233,9 +1272,11 @@ func TestPDBInPreemption(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+					},
 				},
 			}),
 			// The third node is chosen because PDB is not violated for node 3 and the victims have lower priority than node-2.
@@ -1341,9 +1382,11 @@ func TestPreferNominatedNode(t *testing.T) {
 		testutils.CleanupTest(t, testCtx)
 	})
 	cs := testCtx.ClientSet
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
@@ -1382,9 +1425,11 @@ func TestPreferNominatedNode(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			runnningNode: "node-1",
@@ -1408,9 +1453,11 @@ func TestPreferNominatedNode(t *testing.T) {
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
 				},
 			}),
 			runnningNode: "node-2",

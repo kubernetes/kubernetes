@@ -33,9 +33,11 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-const configDir = "/test-config-dir"
-const relativePath = "relative/path/test"
-const kubeletFile = "kubelet"
+const (
+	configDir    = "/test-config-dir"
+	relativePath = "relative/path/test"
+	kubeletFile  = "kubelet"
+)
 
 func TestLoad(t *testing.T) {
 	cases := []struct {

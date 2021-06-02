@@ -98,8 +98,10 @@ type csiBlockMapper struct {
 	volume.MetricsProvider
 }
 
-var _ volume.BlockVolumeMapper = &csiBlockMapper{}
-var _ volume.CustomBlockVolumeMapper = &csiBlockMapper{}
+var (
+	_ volume.BlockVolumeMapper       = &csiBlockMapper{}
+	_ volume.CustomBlockVolumeMapper = &csiBlockMapper{}
+)
 
 // GetGlobalMapPath returns a global map path (on the node) to a device file which will be symlinked to
 // Example: plugins/kubernetes.io/csi/volumeDevices/{specName}/dev
@@ -306,7 +308,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 		}
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if m.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
@@ -366,7 +368,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 		}
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if m.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
@@ -389,8 +391,10 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 	return publishPath, nil
 }
 
-var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}
-var _ volume.CustomBlockVolumeUnmapper = &csiBlockMapper{}
+var (
+	_ volume.BlockVolumeUnmapper       = &csiBlockMapper{}
+	_ volume.CustomBlockVolumeUnmapper = &csiBlockMapper{}
+)
 
 // unpublishVolumeForBlock unpublishes a block volume from publishPath
 func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiClient, publishPath string) error {

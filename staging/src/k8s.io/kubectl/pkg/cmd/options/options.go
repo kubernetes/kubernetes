@@ -25,11 +25,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	optionsExample = templates.Examples(i18n.T(`
+var optionsExample = templates.Examples(i18n.T(`
 		# Print flags inherited by all commands
 		kubectl options`))
-)
 
 // NewCmdOptions implements the options command
 func NewCmdOptions(out io.Writer) *cobra.Command {

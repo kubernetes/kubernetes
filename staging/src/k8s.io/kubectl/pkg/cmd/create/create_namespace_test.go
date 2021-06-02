@@ -17,9 +17,10 @@ limitations under the License.
 package create
 
 import (
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )

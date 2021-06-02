@@ -31,8 +31,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
-var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var (
+	testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+	resultsDir  = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+)
 
 const archiveName = "e2e_node_test.tar.gz"
 

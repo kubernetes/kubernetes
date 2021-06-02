@@ -273,7 +273,6 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 
 	for i, metricSpec := range metricSpecs {
 		replicaCountProposal, metricNameProposal, timestampProposal, condition, err := a.computeReplicasForMetric(hpa, metricSpec, specReplicas, statusReplicas, selector, &statuses[i])
-
 		if err != nil {
 			if invalidMetricsCount <= 0 {
 				invalidMetricCondition = condition
@@ -777,7 +776,8 @@ func (a *HorizontalController) normalizeDesiredReplicasWithBehaviors(hpa *autosc
 		MinReplicas:       minReplicas,
 		MaxReplicas:       hpa.Spec.MaxReplicas,
 		CurrentReplicas:   currentReplicas,
-		DesiredReplicas:   prenormalizedDesiredReplicas}
+		DesiredReplicas:   prenormalizedDesiredReplicas,
+	}
 	stabilizedRecommendation, reason, message := a.stabilizeRecommendationWithBehaviors(normalizationArg)
 	normalizationArg.DesiredReplicas = stabilizedRecommendation
 	if stabilizedRecommendation != prenormalizedDesiredReplicas {
@@ -815,7 +815,6 @@ func getReplicasChangePerPeriod(periodSeconds int32, scaleEvents []timestampedSc
 		}
 	}
 	return replicas
-
 }
 
 func (a *HorizontalController) getUnableComputeReplicaCountCondition(hpa runtime.Object, reason string, err error) (condition autoscalingv2.HorizontalPodAutoscalerCondition) {
@@ -978,7 +977,6 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 
 // convertDesiredReplicas performs the actual normalization, without depending on `HorizontalController` or `HorizontalPodAutoscaler`
 func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinReplicas, hpaMaxReplicas int32) (int32, string, string) {
-
 	var minimumAllowedReplicas int32
 	var maximumAllowedReplicas int32
 

@@ -68,7 +68,7 @@ func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 		// one core.
 		availablePods += 10
 	}
-	//avoid creating exactly max pods
+	// avoid creating exactly max pods
 	availablePods *= 8 / 10
 	// bound the top and bottom
 	if availablePods > max {
@@ -190,7 +190,7 @@ func newGCPod(name string) *v1.Pod {
 // verifyRemainingObjects verifies if the number of remaining objects.
 // It returns error if the communication with the API server fails.
 func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (bool, error) {
-	var ret = true
+	ret := true
 
 	for object, num := range objects {
 		switch object {
@@ -350,7 +350,6 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return true, nil
 			}
 			return false, nil
-
 		}); err != nil {
 			framework.Failf("failed to wait for the rc to create some pods: %v", err)
 		}
@@ -404,7 +403,6 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return true, nil
 			}
 			return false, nil
-
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -523,7 +521,6 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
 			return len(rsList.Items) > 0, nil
-
 		})
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
@@ -587,7 +584,6 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return true, nil
 			}
 			return false, nil
-
 		})
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
@@ -1006,7 +1002,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			Object: map[string]interface{}{
 				"apiVersion": apiVersion,
 				"kind":       definition.Spec.Names.Kind,
-				"metadata":   map[string]interface{}{"name": canaryName}},
+				"metadata":   map[string]interface{}{"name": canaryName},
+			},
 		}
 		_, err = resourceClient.Create(context.TODO(), canary, metav1.CreateOptions{})
 		if err != nil {

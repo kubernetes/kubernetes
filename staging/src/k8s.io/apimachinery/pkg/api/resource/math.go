@@ -49,8 +49,10 @@ var (
 	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
 )
 
-const mostNegative = -(mostPositive + 1)
-const mostPositive = 1<<63 - 1
+const (
+	mostNegative = -(mostPositive + 1)
+	mostPositive = 1<<63 - 1
+)
 
 // int64Add returns a+b, or false if that would overflow int64.
 func int64Add(a, b int64) (int64, bool) {

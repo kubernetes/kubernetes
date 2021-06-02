@@ -77,6 +77,7 @@ func (p *podHolder) getPod(name, namespace string) (*v1.Pod, error) {
 	defer p.Unlock()
 	return p.pod, nil
 }
+
 func (p *podHolder) setPod(pod *v1.Pod) {
 	p.Lock()
 	defer p.Unlock()
@@ -117,7 +118,6 @@ func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
 	}
 	if duration < 0 {
 		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute}}
-
 	} else {
 		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute, TolerationSeconds: &duration}}
 	}

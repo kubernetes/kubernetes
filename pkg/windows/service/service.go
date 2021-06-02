@@ -29,9 +29,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-var (
-	service *handler
-)
+var service *handler
 
 type handler struct {
 	tosvc   chan bool

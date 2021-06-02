@@ -84,7 +84,6 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 }
 
 func TestApplyToFallback(t *testing.T) {
-
 	f, err := ioutil.TempFile("", "authkubeconfig")
 	if err != nil {
 		t.Fatal(err)

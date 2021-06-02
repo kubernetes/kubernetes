@@ -80,7 +80,6 @@ func (c *FakeSecrets) List(ctx context.Context, opts v1.ListOptions) (result *co
 func (c *FakeSecrets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(secretsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.

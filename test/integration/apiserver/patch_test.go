@@ -122,7 +122,6 @@ func TestPatchConflicts(t *testing.T) {
 	} else {
 		t.Logf("Got %d successful patches for %s", successes, "secrets")
 	}
-
 }
 
 func findOwnerRefByUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {

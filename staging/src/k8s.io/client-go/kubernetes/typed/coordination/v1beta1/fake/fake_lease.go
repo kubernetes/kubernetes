@@ -80,7 +80,6 @@ func (c *FakeLeases) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 func (c *FakeLeases) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(leasesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a lease and creates it.  Returns the server's representation of the lease, and an error, if there is any.

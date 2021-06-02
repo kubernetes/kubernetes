@@ -61,8 +61,10 @@ func (a *args) Set(value string) error {
 }
 
 // kubeletArgs is the override kubelet args specified by the test runner.
-var kubeletArgs args
-var genKubeletConfigFile bool
+var (
+	kubeletArgs          args
+	genKubeletConfigFile bool
+)
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")

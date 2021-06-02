@@ -221,7 +221,6 @@ func (v *Version) String() string {
 // compareInternal returns -1 if v is less than other, 1 if it is greater than other, or 0
 // if they are equal
 func (v *Version) compareInternal(other *Version) int {
-
 	vLen := len(v.components)
 	oLen := len(other.components)
 	for i := 0; i < vLen && i < oLen; i++ {

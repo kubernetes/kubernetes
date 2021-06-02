@@ -87,7 +87,6 @@ func TestGetConntrackMax(t *testing.T) {
 
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
-
 	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: %s
 clientConnection:

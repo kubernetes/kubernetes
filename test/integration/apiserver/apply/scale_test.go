@@ -396,7 +396,6 @@ func retrieveObject(t *testing.T, client clientset.Interface, prefix, resource s
 
 func assertReplicasValue(t *testing.T, obj *unstructured.Unstructured, value int) {
 	actualValue, found, err := unstructured.NestedInt64(obj.Object, "spec", "replicas")
-
 	if err != nil {
 		t.Fatalf("Error when retriving replicas field: %v", err)
 	}

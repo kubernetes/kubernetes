@@ -20,12 +20,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
+
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -651,7 +652,7 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return false
 }
 
-//WriteVolumeCache flush disk data given the spcified mount path
+// WriteVolumeCache flush disk data given the spcified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {

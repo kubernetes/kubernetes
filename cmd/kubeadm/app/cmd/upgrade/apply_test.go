@@ -21,7 +21,7 @@ import (
 )
 
 func TestSessionIsInteractive(t *testing.T) {
-	var tcases = []struct {
+	tcases := []struct {
 		name     string
 		flags    *applyFlags
 		expected bool

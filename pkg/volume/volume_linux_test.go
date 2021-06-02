@@ -156,7 +156,6 @@ func TestSkipPermissionChange(t *testing.T) {
 
 			if test.permissionMatch {
 				mask |= execMask
-
 			}
 			if test.sgidMatch {
 				mask |= os.ModeSetgid
@@ -176,7 +175,6 @@ func TestSkipPermissionChange(t *testing.T) {
 			if ok != test.skipPermssion {
 				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
 			}
-
 		})
 	}
 }

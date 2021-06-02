@@ -53,7 +53,6 @@ func shredFile(filePath string) {
 	// Shred failed Try to remove the file for good meausure
 	err = os.Remove(filePath)
 	framework.ExpectNoError(err, "Failed to remove service account file %s", filePath)
-
 }
 
 // createGCESecrets downloads the GCP IAM Key for the default compute service account

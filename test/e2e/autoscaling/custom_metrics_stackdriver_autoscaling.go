@@ -63,7 +63,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			initialReplicas: initialReplicas,
 			scaledReplicas:  1,
 			deployment:      monitoring.SimpleStackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), metricValue),
-			hpa:             simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget)}
+			hpa:             simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget),
+		}
 		tc.Run()
 	})
 
@@ -80,7 +81,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			// Metric exported by deployment is ignored
 			deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
 			pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
-			hpa:        objectHPA(f.Namespace.ObjectMeta.Name, metricTarget)}
+			hpa:        objectHPA(f.Namespace.ObjectMeta.Name, metricTarget),
+		}
 		tc.Run()
 	})
 
@@ -103,7 +105,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			// Metric exported by deployment is ignored
 			deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
 			pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target", metricValue),
-			hpa:        externalHPA(f.Namespace.ObjectMeta.Name, metricTargets)}
+			hpa:        externalHPA(f.Namespace.ObjectMeta.Name, metricTargets),
+		}
 		tc.Run()
 	})
 
@@ -126,7 +129,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			// Metric exported by deployment is ignored
 			deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
 			pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target_average", externalMetricValue),
-			hpa:        externalHPA(f.Namespace.ObjectMeta.Name, metricTargets)}
+			hpa:        externalHPA(f.Namespace.ObjectMeta.Name, metricTargets),
+		}
 		tc.Run()
 	})
 
@@ -141,7 +145,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			initialReplicas: initialReplicas,
 			scaledReplicas:  1,
 			deployment:      monitoring.PrometheusExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), metricValue),
-			hpa:             simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget)}
+			hpa:             simplePodsHPA(f.Namespace.ObjectMeta.Name, metricTarget),
+		}
 		tc.Run()
 	})
 
@@ -172,7 +177,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			initialReplicas: initialReplicas,
 			scaledReplicas:  3,
 			deployment:      monitoring.StackdriverExporterDeployment(stackdriverExporterDeployment, f.Namespace.ObjectMeta.Name, int32(initialReplicas), containers),
-			hpa:             podsHPA(f.Namespace.ObjectMeta.Name, stackdriverExporterDeployment, metricTargets)}
+			hpa:             podsHPA(f.Namespace.ObjectMeta.Name, stackdriverExporterDeployment, metricTargets),
+		}
 		tc.Run()
 	})
 
@@ -212,7 +218,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			initialReplicas: initialReplicas,
 			scaledReplicas:  3,
 			deployment:      monitoring.StackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), containers),
-			hpa:             externalHPA(f.Namespace.ObjectMeta.Name, metricTargets)}
+			hpa:             externalHPA(f.Namespace.ObjectMeta.Name, metricTargets),
+		}
 		tc.Run()
 	})
 })

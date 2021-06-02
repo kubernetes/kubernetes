@@ -186,7 +186,6 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	}
 
 	volumesAreAttachedFunc := func() volumetypes.OperationContext {
-
 		// For each volume plugin, pass the list of volume specs to VolumesAreAttached to check
 		// whether the volumes are still attached.
 		for pluginName, volumesSpecs := range volumesPerPlugin {
@@ -314,7 +313,6 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, nil), "verify_volumes_are_attached"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
-
 }
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
@@ -768,7 +766,6 @@ func (og *operationGenerator) markDeviceErrorState(volumeToMount VolumeToMount, 
 			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainError).Error())
 		}
 	}
-
 }
 
 func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, markOpts MarkVolumeOpts, mountError error, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
@@ -788,7 +785,6 @@ func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, 
 			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", t).Error())
 		}
 	}
-
 }
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
@@ -877,10 +873,9 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	}
 
 	unmountDeviceFunc := func() volumetypes.OperationContext {
-
 		migrated := getMigratedStatusBySpec(deviceToDetach.VolumeSpec)
 
-		//deviceMountPath := deviceToDetach.DeviceMountPath
+		// deviceMountPath := deviceToDetach.DeviceMountPath
 		deviceMountPath, err :=
 			volumeDeviceMounter.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
@@ -1200,7 +1195,6 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	}
 
 	unmapVolumeFunc := func() volumetypes.OperationContext {
-
 		migrated := getMigratedStatusBySpec(volumeToUnmount.VolumeSpec)
 
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
@@ -1447,7 +1441,6 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "verify_controller_attached_volume"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
-
 }
 
 func (og *operationGenerator) verifyVolumeIsSafeToDetach(
@@ -1500,7 +1493,6 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	}
 
 	expandVolumeFunc := func() volumetypes.OperationContext {
-
 		migrated := false
 
 		newSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -1821,7 +1813,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 	if !isDevicePath && devicePathErr == nil ||
 		(devicePathErr != nil && strings.Contains(devicePathErr.Error(), "does not exist")) {
 		// not a device path or path doesn't exist
-		//TODO: refer to #36092
+		// TODO: refer to #36092
 		klog.V(3).Infof("The path isn't device path or doesn't exist. Skip checking device path: %s", deviceToDetach.DevicePath)
 		deviceOpened = false
 	} else if devicePathErr != nil {

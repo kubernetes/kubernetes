@@ -21,6 +21,13 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,22 +36,18 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
-	"testing"
-	"time"
 )
 
-type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
-type streamContext struct {
-	conn         io.Closer
-	stdinStream  io.ReadCloser
-	stdoutStream io.WriteCloser
-	stderrStream io.WriteCloser
-	writeStatus  func(status *apierrors.StatusError) error
-}
+type (
+	AttachFunc    func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
+	streamContext struct {
+		conn         io.Closer
+		stdinStream  io.ReadCloser
+		stdoutStream io.WriteCloser
+		stderrStream io.WriteCloser
+		writeStatus  func(status *apierrors.StatusError) error
+	}
+)
 
 type streamAndReply struct {
 	httpstream.Stream
@@ -64,7 +67,6 @@ func (s *fakeMassiveDataPty) Write(p []byte) (int, error) {
 }
 
 func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan TerminalSize) error {
-
 	copyDone := make(chan struct{}, 3)
 
 	if stdin == nil {
@@ -147,7 +149,6 @@ func TestSPDYExecutorStream(t *testing.T) {
 
 		server.Close()
 	}
-
 }
 
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {

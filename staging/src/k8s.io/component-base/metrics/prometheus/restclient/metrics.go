@@ -119,7 +119,6 @@ var (
 )
 
 func init() {
-
 	legacyregistry.MustRegister(requestLatency)
 	legacyregistry.MustRegister(rateLimiterLatency)
 	legacyregistry.MustRegister(requestResult)

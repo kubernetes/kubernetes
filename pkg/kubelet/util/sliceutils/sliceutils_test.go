@@ -18,11 +18,11 @@ package sliceutils
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"time"
 )
 
 func TestStringInSlice(t *testing.T) {

@@ -64,8 +64,10 @@ type persistentVolumeLabel struct {
 	vspherePVLabeler   cloudprovider.PVLabeler
 }
 
-var _ admission.MutationInterface = &persistentVolumeLabel{}
-var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
+var (
+	_ admission.MutationInterface             = &persistentVolumeLabel{}
+	_ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
+)
 
 // newPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,
 // based on the labels provided by the underlying cloud provider.
@@ -405,7 +407,6 @@ func (l *persistentVolumeLabel) getOpenStackPVLabeler() (cloudprovider.PVLabeler
 	}
 
 	return l.openStackPVLabeler, nil
-
 }
 
 func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
@@ -428,7 +429,6 @@ func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolum
 		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
 	}
 	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
-
 }
 
 func (l *persistentVolumeLabel) findVsphereVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {

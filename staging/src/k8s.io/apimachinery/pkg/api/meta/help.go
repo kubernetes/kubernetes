@@ -26,17 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var (
-	// isListCache maintains a cache of types that are checked for lists
-	// which is used by IsListType.
-	// TODO: remove and replace with an interface check
-	isListCache = struct {
-		lock   sync.RWMutex
-		byType map[reflect.Type]bool
-	}{
-		byType: make(map[reflect.Type]bool, 1024),
-	}
-)
+// isListCache maintains a cache of types that are checked for lists
+// which is used by IsListType.
+// TODO: remove and replace with an interface check
+var isListCache = struct {
+	lock   sync.RWMutex
+	byType map[reflect.Type]bool
+}{
+	byType: make(map[reflect.Type]bool, 1024),
+}
 
 // IsListType returns true if the provided Object has a slice called Items.
 // TODO: Replace the code in this check with an interface comparison by

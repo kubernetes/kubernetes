@@ -48,9 +48,7 @@ type VSphereConnection struct {
 	credentialsLock   sync.Mutex
 }
 
-var (
-	clientLock sync.Mutex
-)
+var clientLock sync.Mutex
 
 // Connect makes connection to vCenter and sets VSphereConnection.Client.
 // If connection.Client is already set, it obtains the existing user session.

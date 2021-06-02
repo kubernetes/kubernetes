@@ -697,9 +697,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	//     b.  If a source is defined for an environment variable, resolve the source
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
-	var (
-		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
-	)
+
+	mappingFunc := expansion.MappingFuncFor(tmpEnv, serviceEnv)
+
 	for _, envVar := range container.Env {
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {

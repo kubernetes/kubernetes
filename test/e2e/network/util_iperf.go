@@ -21,10 +21,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )

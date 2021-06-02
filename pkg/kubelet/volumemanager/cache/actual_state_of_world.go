@@ -732,7 +732,6 @@ func (asw *actualStateOfWorld) GetAllMountedVolumes() []MountedVolume {
 					mountedVolume,
 					getMountedVolume(&podObj, &volumeObj))
 			}
-
 		}
 	}
 
@@ -812,7 +811,8 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			PluginIsAttachable: attachedVolume.pluginIsAttachable,
 			DevicePath:         attachedVolume.devicePath,
 			DeviceMountPath:    attachedVolume.deviceMountPath,
-			PluginName:         attachedVolume.pluginName},
+			PluginName:         attachedVolume.pluginName,
+		},
 		DeviceMountState: attachedVolume.deviceMountState,
 	}
 }
@@ -909,5 +909,7 @@ func getMountedVolume(
 			BlockVolumeMapper:   mountedPod.blockVolumeMapper,
 			VolumeGidValue:      mountedPod.volumeGidValue,
 			VolumeSpec:          mountedPod.volumeSpec,
-			DeviceMountPath:     attachedVolume.deviceMountPath}}
+			DeviceMountPath:     attachedVolume.deviceMountPath,
+		},
+	}
 }

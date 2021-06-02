@@ -37,7 +37,6 @@ var _ volume.DeviceUnmounter = &flexVolumeDetacher{}
 
 // Detach is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) error {
-
 	call := d.plugin.NewDriverCall(detachCmd)
 	call.Append(volumeName)
 	call.Append(string(hostName))
@@ -51,7 +50,6 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
-
 	pathExists, pathErr := mount.PathExists(deviceMountPath)
 	if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)

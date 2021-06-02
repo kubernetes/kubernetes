@@ -242,6 +242,8 @@ func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, er
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
-var _ http.CloseNotifier = &fancyResponseWriterDelegator{}
-var _ http.Flusher = &fancyResponseWriterDelegator{}
-var _ http.Hijacker = &fancyResponseWriterDelegator{}
+var (
+	_ http.CloseNotifier = &fancyResponseWriterDelegator{}
+	_ http.Flusher       = &fancyResponseWriterDelegator{}
+	_ http.Hijacker      = &fancyResponseWriterDelegator{}
+)

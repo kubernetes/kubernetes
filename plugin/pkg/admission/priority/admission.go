@@ -57,11 +57,13 @@ type Plugin struct {
 	nonPreemptingPriority bool
 }
 
-var _ admission.MutationInterface = &Plugin{}
-var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninitializers.WantsFeatures = &Plugin{}
-var _ = genericadmissioninitializers.WantsExternalKubeInformerFactory(&Plugin{})
-var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&Plugin{})
+var (
+	_ admission.MutationInterface                = &Plugin{}
+	_ admission.ValidationInterface              = &Plugin{}
+	_ genericadmissioninitializers.WantsFeatures = &Plugin{}
+	_                                            = genericadmissioninitializers.WantsExternalKubeInformerFactory(&Plugin{})
+	_                                            = genericadmissioninitializers.WantsExternalKubeClientSet(&Plugin{})
+)
 
 // NewPlugin creates a new priority admission plugin.
 func NewPlugin() *Plugin {

@@ -212,7 +212,6 @@ func TestPluginGetFSGroupPolicy(t *testing.T) {
 			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
 		}
 	}
-
 }
 
 func TestPluginGetVolumeName(t *testing.T) {
@@ -362,7 +361,6 @@ func TestPluginCanSupport(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			actual := plug.CanSupport(tc.spec)
 			if tc.canSupport != actual {
 				t.Errorf("expecting canSupport %t, got %t", tc.canSupport, actual)
@@ -401,7 +399,6 @@ func TestPluginCanSupportWithInline(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			actual := plug.CanSupport(tc.spec)
 			if tc.canSupport != actual {
 				t.Errorf("expecting canSupport %t, got %t", tc.canSupport, actual)
@@ -500,7 +497,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			if spec.Name() != tc.specVolID {
 				t.Errorf("Unexpected spec name constructed %s", spec.Name())
 			}
-
 		})
 	}
 }
@@ -640,7 +636,6 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			default:
 				t.Fatal("invalid volume.Spec constructed")
 			}
-
 		})
 	}
 }

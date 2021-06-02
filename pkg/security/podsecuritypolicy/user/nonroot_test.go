@@ -17,9 +17,10 @@ limitations under the License.
 package user
 
 import (
+	"testing"
+
 	api "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	"testing"
 )
 
 func TestNonRootOptions(t *testing.T) {

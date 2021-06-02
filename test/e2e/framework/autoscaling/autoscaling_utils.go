@@ -62,9 +62,7 @@ const (
 	serviceInitializationInterval   = 15 * time.Second
 )
 
-var (
-	resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
-)
+var resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
 
 var (
 	// KindRC is the GVK for ReplicationController

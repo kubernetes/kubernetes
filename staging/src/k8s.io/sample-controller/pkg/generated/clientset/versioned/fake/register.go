@@ -27,8 +27,10 @@ import (
 	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
 	samplecontrollerv1alpha1.AddToScheme,

@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*ExtraValue) ProtoMessage() {}
 func (*ExtraValue) Descriptor() ([]byte, []int) {
 	return fileDescriptor_77c9b20d3ad27844, []int{0}
 }
+
 func (m *ExtraValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExtraValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *ExtraValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *ExtraValue) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExtraValue.Merge(m, src)
 }
+
 func (m *ExtraValue) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExtraValue) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExtraValue.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*TokenReview) ProtoMessage() {}
 func (*TokenReview) Descriptor() ([]byte, []int) {
 	return fileDescriptor_77c9b20d3ad27844, []int{1}
 }
+
 func (m *TokenReview) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *TokenReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *TokenReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *TokenReview) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_TokenReview.Merge(m, src)
 }
+
 func (m *TokenReview) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *TokenReview) XXX_DiscardUnknown() {
 	xxx_messageInfo_TokenReview.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*TokenReviewSpec) ProtoMessage() {}
 func (*TokenReviewSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_77c9b20d3ad27844, []int{2}
 }
+
 func (m *TokenReviewSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *TokenReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *TokenReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *TokenReviewSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_TokenReviewSpec.Merge(m, src)
 }
+
 func (m *TokenReviewSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *TokenReviewSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_TokenReviewSpec.DiscardUnknown(m)
 }
@@ -133,9 +150,11 @@ func (*TokenReviewStatus) ProtoMessage() {}
 func (*TokenReviewStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_77c9b20d3ad27844, []int{3}
 }
+
 func (m *TokenReviewStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *TokenReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -144,12 +163,15 @@ func (m *TokenReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *TokenReviewStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_TokenReviewStatus.Merge(m, src)
 }
+
 func (m *TokenReviewStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *TokenReviewStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_TokenReviewStatus.DiscardUnknown(m)
 }
@@ -161,9 +183,11 @@ func (*UserInfo) ProtoMessage() {}
 func (*UserInfo) Descriptor() ([]byte, []int) {
 	return fileDescriptor_77c9b20d3ad27844, []int{4}
 }
+
 func (m *UserInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *UserInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -172,12 +196,15 @@ func (m *UserInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *UserInfo) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_UserInfo.Merge(m, src)
 }
+
 func (m *UserInfo) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *UserInfo) XXX_DiscardUnknown() {
 	xxx_messageInfo_UserInfo.DiscardUnknown(m)
 }
@@ -502,6 +529,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m ExtraValue) Size() (n int) {
 	if m == nil {
 		return 0
@@ -600,14 +628,17 @@ func (m *UserInfo) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *TokenReview) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&TokenReview{`,
+	s := strings.Join([]string{
+		`&TokenReview{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "TokenReviewSpec", "TokenReviewSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "TokenReviewStatus", "TokenReviewStatus", 1), `&`, ``, 1) + `,`,
@@ -615,22 +646,26 @@ func (this *TokenReview) String() string {
 	}, "")
 	return s
 }
+
 func (this *TokenReviewSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&TokenReviewSpec{`,
+	s := strings.Join([]string{
+		`&TokenReviewSpec{`,
 		`Token:` + fmt.Sprintf("%v", this.Token) + `,`,
 		`Audiences:` + fmt.Sprintf("%v", this.Audiences) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *TokenReviewStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&TokenReviewStatus{`,
+	s := strings.Join([]string{
+		`&TokenReviewStatus{`,
 		`Authenticated:` + fmt.Sprintf("%v", this.Authenticated) + `,`,
 		`User:` + strings.Replace(strings.Replace(this.User.String(), "UserInfo", "UserInfo", 1), `&`, ``, 1) + `,`,
 		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
@@ -639,6 +674,7 @@ func (this *TokenReviewStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *UserInfo) String() string {
 	if this == nil {
 		return "nil"
@@ -653,7 +689,8 @@ func (this *UserInfo) String() string {
 		mapStringForExtra += fmt.Sprintf("%v: %v,", k, this.Extra[k])
 	}
 	mapStringForExtra += "}"
-	s := strings.Join([]string{`&UserInfo{`,
+	s := strings.Join([]string{
+		`&UserInfo{`,
 		`Username:` + fmt.Sprintf("%v", this.Username) + `,`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`Groups:` + fmt.Sprintf("%v", this.Groups) + `,`,
@@ -662,6 +699,7 @@ func (this *UserInfo) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -670,6 +708,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ExtraValue) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -752,6 +791,7 @@ func (m *ExtraValue) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *TokenReview) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -901,6 +941,7 @@ func (m *TokenReview) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *TokenReviewSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1015,6 +1056,7 @@ func (m *TokenReviewSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *TokenReviewStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1182,6 +1224,7 @@ func (m *TokenReviewStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *UserInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1457,6 +1500,7 @@ func (m *UserInfo) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

@@ -22,8 +22,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ cache.GenericLister = &metadataListerShim{}
-var _ cache.GenericNamespaceLister = &metadataNamespaceListerShim{}
+var (
+	_ cache.GenericLister          = &metadataListerShim{}
+	_ cache.GenericNamespaceLister = &metadataNamespaceListerShim{}
+)
 
 // metadataListerShim implements the cache.GenericLister interface.
 type metadataListerShim struct {

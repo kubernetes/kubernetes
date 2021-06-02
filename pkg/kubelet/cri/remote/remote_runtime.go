@@ -495,7 +495,6 @@ func (r *remoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.Run
 	_, err := r.runtimeClient.UpdateRuntimeConfig(ctx, &runtimeapi.UpdateRuntimeConfigRequest{
 		RuntimeConfig: runtimeConfig,
 	})
-
 	if err != nil {
 		return err
 	}

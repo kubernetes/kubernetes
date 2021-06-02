@@ -68,8 +68,7 @@ func NewBlockVolumePathHandler() BlockVolumePathHandler {
 }
 
 // VolumePathHandler is path related operation handlers for block volume
-type VolumePathHandler struct {
-}
+type VolumePathHandler struct{}
 
 // MapDevice creates a symbolic link to block device under specified map path
 func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName string, bindMount bool) error {

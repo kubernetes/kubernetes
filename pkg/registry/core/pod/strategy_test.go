@@ -699,6 +699,7 @@ func TestPodIndexFunc(t *testing.T) {
 
 	}
 }
+
 func TestApplySeccompVersionSkew(t *testing.T) {
 	const containerName = "container"
 	testProfile := "test"
@@ -1209,21 +1210,23 @@ func newPodtWithHugePageValue(reousreceName api.ResourceName, value resource.Qua
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSDefault,
-			Containers: []api.Container{{
-				Name:                     "foo",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("10"),
-						reousreceName:   value,
+			Containers: []api.Container{
+				{
+					Name:                     "foo",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU: resource.MustParse("10"),
+							reousreceName:   value,
+						},
+						Limits: api.ResourceList{
+							api.ResourceCPU: resource.MustParse("10"),
+							reousreceName:   value,
+						},
 					},
-					Limits: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("10"),
-						reousreceName:   value,
-					},
-				}},
+				},
 			},
 		},
 	}
@@ -1249,19 +1252,21 @@ func TestPodStrategyValidate(t *testing.T) {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+					InitContainers: []api.Container{
+						{
+							Name:                     containerName,
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+								},
 							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
-							},
-						}},
+						},
 					},
 				},
 			},
@@ -1276,33 +1281,37 @@ func TestPodStrategyValidate(t *testing.T) {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+					InitContainers: []api.Container{
+						{
+							Name:                     containerName,
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+								},
 							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
-							},
-						}},
+						},
 					},
-					Containers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+					Containers: []api.Container{
+						{
+							Name:                     containerName,
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+								},
 							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
-							},
-						}},
+						},
 					},
 				},
 			},
@@ -1331,21 +1340,23 @@ func TestPodStrategyValidate(t *testing.T) {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+					Containers: []api.Container{
+						{
+							Name:                     containerName,
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+									api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+									api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+								},
 							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
-							},
-						}},
+						},
 					},
 				},
 			},

@@ -50,7 +50,6 @@ type operationGenerator struct {
 
 // NewOperationGenerator is returns instance of operationGenerator
 func NewOperationGenerator(recorder record.EventRecorder) OperationGenerator {
-
 	return &operationGenerator{
 		recorder: recorder,
 	}
@@ -183,7 +182,6 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
 	}

@@ -29,7 +29,7 @@ import (
 
 func TestGauge(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		GaugeOpts
 		registryVersion     *semver.Version
@@ -113,7 +113,7 @@ func TestGauge(t *testing.T) {
 
 func TestGaugeVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		GaugeOpts
 		labels              []string
@@ -201,11 +201,11 @@ func TestGaugeFunc(t *testing.T) {
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
 
-	var function = func() float64 {
+	function := func() float64 {
 		return 1
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		GaugeOpts
 		expectedMetrics string
@@ -279,7 +279,7 @@ func TestGaugeWithLabelValueAllowList(t *testing.T) {
 		Name:      "metric_allowlist_test",
 		Subsystem: "subsystem",
 	}
-	var tests = []struct {
+	tests := []struct {
 		desc               string
 		labelValues        [][]string
 		expectMetricValues map[string]float64

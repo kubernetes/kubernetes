@@ -77,7 +77,6 @@ func (c *FakeFlunders) List(ctx context.Context, opts v1.ListOptions) (result *v
 func (c *FakeFlunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(flundersResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.

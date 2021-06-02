@@ -75,11 +75,13 @@ type VolumeBinding struct {
 	scorer                               volumeCapacityScorer
 }
 
-var _ framework.PreFilterPlugin = &VolumeBinding{}
-var _ framework.FilterPlugin = &VolumeBinding{}
-var _ framework.ReservePlugin = &VolumeBinding{}
-var _ framework.PreBindPlugin = &VolumeBinding{}
-var _ framework.ScorePlugin = &VolumeBinding{}
+var (
+	_ framework.PreFilterPlugin = &VolumeBinding{}
+	_ framework.FilterPlugin    = &VolumeBinding{}
+	_ framework.ReservePlugin   = &VolumeBinding{}
+	_ framework.PreBindPlugin   = &VolumeBinding{}
+	_ framework.ScorePlugin     = &VolumeBinding{}
+)
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"
@@ -200,7 +202,6 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	}
 
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
-
 	if err != nil {
 		return framework.AsStatus(err)
 	}
@@ -220,19 +221,17 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	return nil
 }
 
-var (
-	// TODO (for alpha) make it configurable in config.VolumeBindingArgs
-	defaultShapePoint = []config.UtilizationShapePoint{
-		{
-			Utilization: 0,
-			Score:       0,
-		},
-		{
-			Utilization: 100,
-			Score:       int32(config.MaxCustomPriorityScore),
-		},
-	}
-)
+// TODO (for alpha) make it configurable in config.VolumeBindingArgs
+var defaultShapePoint = []config.UtilizationShapePoint{
+	{
+		Utilization: 0,
+		Score:       0,
+	},
+	{
+		Utilization: 100,
+		Score:       int32(config.MaxCustomPriorityScore),
+	},
+}
 
 // Score invoked at the score extension point.
 func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {

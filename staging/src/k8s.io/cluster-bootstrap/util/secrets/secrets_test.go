@@ -26,7 +26,7 @@ import (
 )
 
 func TestGetSecretString(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		secret      *v1.Secret
 		key         string

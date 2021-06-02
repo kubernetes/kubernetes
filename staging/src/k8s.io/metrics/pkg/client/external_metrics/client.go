@@ -91,7 +91,6 @@ func (m *namespacedMetrics) List(metricName string, metricSelector labels.Select
 		}, metav1.ParameterCodec).
 		Do(context.TODO()).
 		Into(res)
-
 	if err != nil {
 		return nil, err
 	}

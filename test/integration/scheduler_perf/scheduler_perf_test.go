@@ -69,16 +69,14 @@ const (
 	Create = "create"
 )
 
-var (
-	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
-			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
-		},
-	}
-)
+var defaultMetricsCollectorConfig = metricsCollectorConfig{
+	Metrics: []string{
+		"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
+		"scheduler_scheduling_algorithm_priority_evaluation_seconds",
+		"scheduler_e2e_scheduling_duration_seconds",
+		"scheduler_pod_scheduling_duration_seconds",
+	},
+}
 
 // testCase defines a set of test cases that intend to test the performance of
 // similar workloads of varying sizes with shared overall settings such as

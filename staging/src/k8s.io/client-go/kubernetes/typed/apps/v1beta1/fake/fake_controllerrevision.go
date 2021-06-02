@@ -80,7 +80,6 @@ func (c *FakeControllerRevisions) List(ctx context.Context, opts v1.ListOptions)
 func (c *FakeControllerRevisions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(controllerrevisionsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.

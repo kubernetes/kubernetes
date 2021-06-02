@@ -66,9 +66,11 @@ type NodeLabel struct {
 	args   config.NodeLabelArgs
 }
 
-var _ framework.FilterPlugin = &NodeLabel{}
-var _ framework.ScorePlugin = &NodeLabel{}
-var _ framework.EnqueueExtensions = &NodeLabel{}
+var (
+	_ framework.FilterPlugin      = &NodeLabel{}
+	_ framework.ScorePlugin       = &NodeLabel{}
+	_ framework.EnqueueExtensions = &NodeLabel{}
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeLabel) Name() string {

@@ -53,31 +53,36 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
 		},
-		{"with properties",
+		{
+			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
 		},
-		{"type only",
+		{
+			"type only",
 			`{"type":"object"}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
 		},
-		{"preserve unknown at root v2",
+		{
+			"preserve unknown at root v2",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
 		},
-		{"preserve unknown at root v3",
+		{
+			"preserve unknown at root v3",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true,"properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			false,
 		},
-		{"with extensions",
+		{
+			"with extensions",
 			`
 {
   "type":"object",
@@ -180,7 +185,8 @@ func TestNewBuilder(t *testing.T) {
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
 		},
-		{"with extensions as v3 schema",
+		{
+			"with extensions as v3 schema",
 			`
 {
   "type":"object",

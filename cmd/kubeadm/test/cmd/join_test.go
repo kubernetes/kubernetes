@@ -26,7 +26,7 @@ func kubeadmReset() error {
 }
 
 func TestCmdJoinConfig(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -54,7 +54,7 @@ func TestCmdJoinConfig(t *testing.T) {
 }
 
 func TestCmdJoinDiscoveryFile(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -82,7 +82,7 @@ func TestCmdJoinDiscoveryFile(t *testing.T) {
 }
 
 func TestCmdJoinDiscoveryToken(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -110,7 +110,7 @@ func TestCmdJoinDiscoveryToken(t *testing.T) {
 }
 
 func TestCmdJoinNodeName(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -137,7 +137,7 @@ func TestCmdJoinNodeName(t *testing.T) {
 }
 
 func TestCmdJoinTLSBootstrapToken(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -165,7 +165,7 @@ func TestCmdJoinTLSBootstrapToken(t *testing.T) {
 }
 
 func TestCmdJoinToken(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -194,7 +194,7 @@ func TestCmdJoinToken(t *testing.T) {
 
 func TestCmdJoinBadArgs(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool
@@ -221,7 +221,7 @@ func TestCmdJoinBadArgs(t *testing.T) {
 }
 
 func TestCmdJoinArgsMixed(t *testing.T) {
-	var initTest = []struct {
+	initTest := []struct {
 		name     string
 		args     string
 		expected bool

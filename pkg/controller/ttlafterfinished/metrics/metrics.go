@@ -26,19 +26,17 @@ import (
 // TTLAfterFinishedSubsystem - subsystem name used for this controller.
 const TTLAfterFinishedSubsystem = "ttl_after_finished_controller"
 
-var (
-	// JobDeletionDurationSeconds tracks the time it took to delete the job since it
-	// became eligible for deletion.
-	JobDeletionDurationSeconds = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:      TTLAfterFinishedSubsystem,
-			Name:           "job_deletion_duration_seconds",
-			Help:           "The time it took to delete the job since it became eligible for deletion",
-			StabilityLevel: metrics.ALPHA,
-			// Start with 100ms with the last bucket being [~27m, Inf).
-			Buckets: metrics.ExponentialBuckets(0.1, 2, 14),
-		},
-	)
+// JobDeletionDurationSeconds tracks the time it took to delete the job since it
+// became eligible for deletion.
+var JobDeletionDurationSeconds = metrics.NewHistogram(
+	&metrics.HistogramOpts{
+		Subsystem:      TTLAfterFinishedSubsystem,
+		Name:           "job_deletion_duration_seconds",
+		Help:           "The time it took to delete the job since it became eligible for deletion",
+		StabilityLevel: metrics.ALPHA,
+		// Start with 100ms with the last bucket being [~27m, Inf).
+		Buckets: metrics.ExponentialBuckets(0.1, 2, 14),
+	},
 )
 
 var registerMetrics sync.Once

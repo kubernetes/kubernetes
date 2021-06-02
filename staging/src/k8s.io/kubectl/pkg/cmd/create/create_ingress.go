@@ -291,8 +291,7 @@ func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
 }
 
 func (o *CreateIngressOptions) buildAnnotations() map[string]string {
-
-	var annotations = make(map[string]string)
+	annotations := make(map[string]string)
 
 	for _, annotation := range o.Annotations {
 		an := strings.SplitN(annotation, "=", 2)

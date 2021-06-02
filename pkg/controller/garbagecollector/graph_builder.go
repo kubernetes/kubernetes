@@ -412,7 +412,7 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 
 func (gb *GraphBuilder) reportInvalidNamespaceOwnerRef(n *node, invalidOwnerUID types.UID) {
 	var invalidOwnerRef metav1.OwnerReference
-	var found = false
+	found := false
 	for _, ownerRef := range n.owners {
 		if ownerRef.UID == invalidOwnerUID {
 			invalidOwnerRef = ownerRef
@@ -706,7 +706,6 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 			// this is a virtual delete event, not one observed from an informer
 			deletedIdentity := identityFromEvent(event, accessor)
 			if existingNode.virtual {
-
 				// our existing node is also virtual, we're not sure of its coordinates.
 				// see if any dependents reference this owner with coordinates other than the one we got a virtual delete event for.
 				if matchingDependents, nonmatchingDependents := partitionDependents(existingNode.getDependents(), deletedIdentity); len(nonmatchingDependents) > 0 {
@@ -737,7 +736,6 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 						}
 					}
 				}
-
 			} else if existingNode.identity != deletedIdentity {
 				// do not remove the existing real node from the graph based on a virtual delete event
 				removeExistingNode = false

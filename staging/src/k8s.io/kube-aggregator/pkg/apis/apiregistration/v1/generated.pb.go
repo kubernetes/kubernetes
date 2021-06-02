@@ -33,9 +33,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -48,9 +50,11 @@ func (*APIService) ProtoMessage() {}
 func (*APIService) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{0}
 }
+
 func (m *APIService) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *APIService) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -59,12 +63,15 @@ func (m *APIService) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *APIService) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_APIService.Merge(m, src)
 }
+
 func (m *APIService) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *APIService) XXX_DiscardUnknown() {
 	xxx_messageInfo_APIService.DiscardUnknown(m)
 }
@@ -76,9 +83,11 @@ func (*APIServiceCondition) ProtoMessage() {}
 func (*APIServiceCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{1}
 }
+
 func (m *APIServiceCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *APIServiceCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -87,12 +96,15 @@ func (m *APIServiceCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 	}
 	return b[:n], nil
 }
+
 func (m *APIServiceCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_APIServiceCondition.Merge(m, src)
 }
+
 func (m *APIServiceCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *APIServiceCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_APIServiceCondition.DiscardUnknown(m)
 }
@@ -104,9 +116,11 @@ func (*APIServiceList) ProtoMessage() {}
 func (*APIServiceList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{2}
 }
+
 func (m *APIServiceList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *APIServiceList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -115,12 +129,15 @@ func (m *APIServiceList) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *APIServiceList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_APIServiceList.Merge(m, src)
 }
+
 func (m *APIServiceList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *APIServiceList) XXX_DiscardUnknown() {
 	xxx_messageInfo_APIServiceList.DiscardUnknown(m)
 }
@@ -132,9 +149,11 @@ func (*APIServiceSpec) ProtoMessage() {}
 func (*APIServiceSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{3}
 }
+
 func (m *APIServiceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *APIServiceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -143,12 +162,15 @@ func (m *APIServiceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *APIServiceSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_APIServiceSpec.Merge(m, src)
 }
+
 func (m *APIServiceSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *APIServiceSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_APIServiceSpec.DiscardUnknown(m)
 }
@@ -160,9 +182,11 @@ func (*APIServiceStatus) ProtoMessage() {}
 func (*APIServiceStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{4}
 }
+
 func (m *APIServiceStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *APIServiceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -171,12 +195,15 @@ func (m *APIServiceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *APIServiceStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_APIServiceStatus.Merge(m, src)
 }
+
 func (m *APIServiceStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *APIServiceStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_APIServiceStatus.DiscardUnknown(m)
 }
@@ -188,9 +215,11 @@ func (*ServiceReference) ProtoMessage() {}
 func (*ServiceReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0d3d63d6a1e30d64, []int{5}
 }
+
 func (m *ServiceReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -199,12 +228,15 @@ func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *ServiceReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ServiceReference.Merge(m, src)
 }
+
 func (m *ServiceReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ServiceReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_ServiceReference.DiscardUnknown(m)
 }
@@ -586,6 +618,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *APIService) Size() (n int) {
 	if m == nil {
 		return 0
@@ -695,14 +728,17 @@ func (m *ServiceReference) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *APIService) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&APIService{`,
+	s := strings.Join([]string{
+		`&APIService{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "APIServiceSpec", "APIServiceSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "APIServiceStatus", "APIServiceStatus", 1), `&`, ``, 1) + `,`,
@@ -710,11 +746,13 @@ func (this *APIService) String() string {
 	}, "")
 	return s
 }
+
 func (this *APIServiceCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&APIServiceCondition{`,
+	s := strings.Join([]string{
+		`&APIServiceCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -724,6 +762,7 @@ func (this *APIServiceCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *APIServiceList) String() string {
 	if this == nil {
 		return "nil"
@@ -733,18 +772,21 @@ func (this *APIServiceList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "APIService", "APIService", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&APIServiceList{`,
+	s := strings.Join([]string{
+		`&APIServiceList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *APIServiceSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&APIServiceSpec{`,
+	s := strings.Join([]string{
+		`&APIServiceSpec{`,
 		`Service:` + strings.Replace(this.Service.String(), "ServiceReference", "ServiceReference", 1) + `,`,
 		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
@@ -756,6 +798,7 @@ func (this *APIServiceSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *APIServiceStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -765,17 +808,20 @@ func (this *APIServiceStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "APIServiceCondition", "APIServiceCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&APIServiceStatus{`,
+	s := strings.Join([]string{
+		`&APIServiceStatus{`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ServiceReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ServiceReference{`,
+	s := strings.Join([]string{
+		`&ServiceReference{`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Port:` + valueToStringGenerated(this.Port) + `,`,
@@ -783,6 +829,7 @@ func (this *ServiceReference) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -791,6 +838,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *APIService) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -940,6 +988,7 @@ func (m *APIService) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *APIServiceCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1151,6 +1200,7 @@ func (m *APIServiceCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *APIServiceList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1268,6 +1318,7 @@ func (m *APIServiceList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *APIServiceSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1510,6 +1561,7 @@ func (m *APIServiceSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *APIServiceStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1594,6 +1646,7 @@ func (m *APIServiceStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1728,6 +1781,7 @@ func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

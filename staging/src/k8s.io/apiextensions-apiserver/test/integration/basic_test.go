@@ -169,7 +169,6 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1.Cus
 			if disabledVersions[version2] {
 				if !errors.IsNotFound(err) {
 					t.Errorf("expected the get operation fail with NotFound for disabled version %s, got error: %v", version2, err)
-
 				}
 			} else {
 				if err != nil {
@@ -186,7 +185,6 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1.Cus
 			if disabledVersions[version2] {
 				if !errors.IsNotFound(err) {
 					t.Errorf("expected the list operation fail with NotFound for disabled version %s, got error: %v", version2, err)
-
 				}
 			} else {
 				if err != nil {
@@ -623,7 +621,6 @@ func TestSameNameDiffNamespace(t *testing.T) {
 	testSimpleCRUD(t, ns1, noxuDefinition, dynamicClient)
 	ns2 := "namespace-2"
 	testSimpleCRUD(t, ns2, noxuDefinition, dynamicClient)
-
 }
 
 func TestSelfLink(t *testing.T) {
@@ -1042,6 +1039,7 @@ func expectInt64(t *testing.T, obj map[string]interface{}, value int64, pth ...s
 		t.Fatalf("wanted %d at .%s, got %d", value, strings.Join(pth, "."), v)
 	}
 }
+
 func expectString(t *testing.T, obj map[string]interface{}, value string, pth ...string) {
 	if v, found, err := unstructured.NestedString(obj, pth...); err != nil {
 		t.Fatalf("failed to access .%s: %v", strings.Join(pth, "."), err)

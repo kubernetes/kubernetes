@@ -88,6 +88,7 @@ func TestInt64AmountAdd(t *testing.T) {
 		}
 	}
 }
+
 func TestInt64AsCanonicalString(t *testing.T) {
 	for _, test := range []struct {
 		value    int64

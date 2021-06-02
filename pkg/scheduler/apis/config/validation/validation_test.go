@@ -366,7 +366,8 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
-				}},
+				},
+			},
 			expected: errors.New("extenders: Invalid value: \"found 2 extenders implementing bind\": only one extender can implement bind"),
 		},
 		{
@@ -375,7 +376,8 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
-				}},
+				},
+			},
 			expected: errors.New("extenders[1].managedResources[0].name: Invalid value: \"foo.com/bar\": duplicate extender managed resource name"),
 		},
 		{
@@ -383,7 +385,8 @@ func TestValidatePolicy(t *testing.T) {
 			policy: config.Policy{
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
-				}},
+				},
+			},
 			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": is an invalid extended resource name"),
 		},
 		{

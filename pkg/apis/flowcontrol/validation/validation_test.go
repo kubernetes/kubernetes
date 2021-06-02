@@ -404,7 +404,8 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("matchingPrecedence"), int32(1), "only the schema named 'exempt' may have matchingPrecedence 1")},
+				field.Invalid(field.NewPath("spec").Child("matchingPrecedence"), int32(1), "only the schema named 'exempt' may have matchingPrecedence 1"),
+			},
 		},
 		{
 			name: "flow-schema mixes * verbs/apiGroups/resources should fail",
@@ -912,7 +913,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 			AssuredConcurrencyShares: 42,
 			LimitResponse: flowcontrol.LimitResponse{
-				Type: flowcontrol.LimitResponseTypeReject},
+				Type: flowcontrol.LimitResponseTypeReject,
+			},
 		},
 	}
 	testCases := []struct {
@@ -968,7 +970,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 42,
 						LimitResponse: flowcontrol.LimitResponse{
-							Type: flowcontrol.LimitResponseTypeReject},
+							Type: flowcontrol.LimitResponseTypeReject,
+						},
 					},
 				},
 			},
@@ -990,7 +993,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								Queues:           512,
 								HandSize:         4,
 								QueueLengthLimit: 100,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited")},
 		},
@@ -1016,7 +1022,9 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 						AssuredConcurrencyShares: 5,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
-						}}},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -1032,7 +1040,9 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 						AssuredConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
-						}}},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must not be empty if limited.limitResponse.type is Limited")},
 		},
@@ -1052,7 +1062,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								Queues:           512,
 								HandSize:         4,
 								QueueLengthLimit: 100,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -1072,7 +1085,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								QueueLengthLimit: 100,
 								Queues:           512,
 								HandSize:         8,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "required entropy bits of deckSize 512 and handSize 8 should not be greater than 60"),
@@ -1094,7 +1110,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								QueueLengthLimit: 100,
 								Queues:           128,
 								HandSize:         10,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(10), "required entropy bits of deckSize 128 and handSize 10 should not be greater than 60"),
@@ -1116,7 +1135,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								QueueLengthLimit: 100,
 								Queues:           math.MaxInt32,
 								HandSize:         3,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(3), "required entropy bits of deckSize 2147483647 and handSize 3 should not be greater than 60"),
@@ -1139,7 +1161,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								QueueLengthLimit: 100,
 								Queues:           10 * 1000 * 1000, // 10^7
 								HandSize:         2,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -1159,7 +1184,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 								QueueLengthLimit: 100,
 								Queues:           7,
 								HandSize:         8,
-							}}}},
+							},
+						},
+					},
+				},
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),

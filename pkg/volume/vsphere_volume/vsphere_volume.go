@@ -50,10 +50,12 @@ type vsphereVolumePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &vsphereVolumePlugin{}
-var _ volume.PersistentVolumePlugin = &vsphereVolumePlugin{}
-var _ volume.DeletableVolumePlugin = &vsphereVolumePlugin{}
-var _ volume.ProvisionableVolumePlugin = &vsphereVolumePlugin{}
+var (
+	_ volume.VolumePlugin              = &vsphereVolumePlugin{}
+	_ volume.PersistentVolumePlugin    = &vsphereVolumePlugin{}
+	_ volume.DeletableVolumePlugin     = &vsphereVolumePlugin{}
+	_ volume.ProvisionableVolumePlugin = &vsphereVolumePlugin{}
+)
 
 const (
 	vsphereVolumePluginName = "kubernetes.io/vsphere-volume"
@@ -146,7 +148,8 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 			mounter:         mounter,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -339,7 +342,8 @@ func (plugin *vsphereVolumePlugin) newDeleterInternal(spec *volume.Spec, manager
 			volPath: spec.PersistentVolume.Spec.VsphereVolume.VolumePath,
 			manager: manager,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (r *vsphereVolumeDeleter) Delete() error {

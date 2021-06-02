@@ -178,7 +178,7 @@ func BenchmarkKeyFunc(b *testing.B) {
 }
 
 func TestSharedLookup(t *testing.T) {
-	var chewie = &authenticator.Response{User: &user.DefaultInfo{Name: "chewbacca"}}
+	chewie := &authenticator.Response{User: &user.DefaultInfo{Name: "chewbacca"}}
 
 	t.Run("actually shared", func(t *testing.T) {
 		var lookups uint32

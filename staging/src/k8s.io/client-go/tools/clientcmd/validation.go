@@ -87,8 +87,10 @@ func IsEmptyConfig(err error) bool {
 type errConfigurationInvalid []error
 
 // errConfigurationInvalid implements error and Aggregate
-var _ error = errConfigurationInvalid{}
-var _ utilerrors.Aggregate = errConfigurationInvalid{}
+var (
+	_ error                = errConfigurationInvalid{}
+	_ utilerrors.Aggregate = errConfigurationInvalid{}
+)
 
 func newErrConfigurationInvalid(errs []error) error {
 	switch len(errs) {

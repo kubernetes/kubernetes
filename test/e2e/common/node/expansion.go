@@ -147,7 +147,6 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
 	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [Slow]", func() {
-
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
@@ -220,7 +219,6 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
 	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow]", func() {
-
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
@@ -292,7 +290,6 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 	*/
 	framework.ConformanceIt("should succeed in writing subpaths in container [Slow]", func() {
-
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",

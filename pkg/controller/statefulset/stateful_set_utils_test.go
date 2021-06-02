@@ -323,7 +323,6 @@ func TestRollingUpdateApplyRevision(t *testing.T) {
 }
 
 func TestGetPersistentVolumeClaims(t *testing.T) {
-
 	// nil inherits statefulset labels
 	pod := newPod()
 	statefulSet := newStatefulSet(1)
@@ -520,7 +519,8 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 							HostPath: &v1.HostPathVolumeSource{
 								Path: fmt.Sprintf("/tmp/%v", "home"),
 							},
-						}}},
+						},
+					}},
 				},
 			},
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{

@@ -66,7 +66,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
-		}, {
+		},
+		{
 			name: "should fail on bad AdmissionReviewVersion value",
 			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
@@ -659,7 +660,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
-		}, {
+		},
+		{
 			name: "path no empty step 2",
 			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
@@ -808,7 +810,6 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -994,7 +995,6 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -1035,7 +1035,8 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				},
 			}, false),
 			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
-		}, {
+		},
+		{
 			name: "should fail on bad AdmissionReviewVersion value",
 			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
@@ -1628,7 +1629,8 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
-		}, {
+		},
+		{
 			name: "path no empty step 2",
 			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
@@ -1777,7 +1779,6 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -2016,6 +2017,5 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }

@@ -91,8 +91,7 @@ var (
 	}
 )
 
-type prometheusMetricsProvider struct {
-}
+type prometheusMetricsProvider struct{}
 
 func init() {
 	for _, m := range metrics {

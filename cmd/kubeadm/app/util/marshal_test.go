@@ -157,7 +157,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 }
 
 func TestSplitYAMLDocuments(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name         string
 		fileContents []byte
 		gvkmap       kubeadmapi.DocumentMap
@@ -202,7 +202,6 @@ func TestSplitYAMLDocuments(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
 			gvkmap, err := SplitYAMLDocuments(rt.fileContents)
 			if (err != nil) != rt.expectedErr {
 				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
@@ -216,7 +215,7 @@ func TestSplitYAMLDocuments(t *testing.T) {
 }
 
 func TestGroupVersionKindsFromBytes(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name         string
 		fileContents []byte
 		gvks         []string
@@ -265,7 +264,6 @@ func TestGroupVersionKindsFromBytes(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
 			gvks, err := GroupVersionKindsFromBytes(rt.fileContents)
 			if (err != nil) != rt.expectedErr {
 				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
@@ -286,7 +284,7 @@ func TestGroupVersionKindsFromBytes(t *testing.T) {
 }
 
 func TestGroupVersionKindsHasKind(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
 		kind     string
@@ -322,7 +320,6 @@ func TestGroupVersionKindsHasKind(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
 			actual := GroupVersionKindsHasKind(rt.gvks, rt.kind)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has kind: %t\n\tactual: %t\n", rt.expected, actual)
@@ -332,7 +329,7 @@ func TestGroupVersionKindsHasKind(t *testing.T) {
 }
 
 func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
 		kind     string
@@ -357,7 +354,6 @@ func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
 			actual := GroupVersionKindsHasInitConfiguration(rt.gvks...)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has InitConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
@@ -367,7 +363,7 @@ func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
 }
 
 func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
 		kind     string
@@ -392,7 +388,6 @@ func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-
 			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks...)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has JoinConfiguration: %t\n\tactual: %t\n", rt.expected, actual)

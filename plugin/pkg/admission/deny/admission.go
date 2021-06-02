@@ -39,8 +39,10 @@ func Register(plugins *admission.Plugins) {
 // alwaysDeny is an implementation of admission.Interface which always says no to an admission request.
 type alwaysDeny struct{}
 
-var _ admission.MutationInterface = alwaysDeny{}
-var _ admission.ValidationInterface = alwaysDeny{}
+var (
+	_ admission.MutationInterface   = alwaysDeny{}
+	_ admission.ValidationInterface = alwaysDeny{}
+)
 
 // Admit makes an admission decision based on the request attributes.
 func (alwaysDeny) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {

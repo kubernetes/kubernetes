@@ -40,9 +40,7 @@ var (
 )
 
 var _ = utils.SIGDescribe("Ephemeralstorage", func() {
-	var (
-		c clientset.Interface
-	)
+	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("pv")
 
@@ -72,9 +70,7 @@ type ephemeralTestInfo struct {
 }
 
 func testEphemeralVolumePod(f *framework.Framework, volumeType string, source *v1.VolumeSource) *v1.Pod {
-	var (
-		suffix = strings.ToLower(fmt.Sprintf("%s-%s", volumeType, rand.String(4)))
-	)
+	suffix := strings.ToLower(fmt.Sprintf("%s-%s", volumeType, rand.String(4)))
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("pod-ephm-test-%s", suffix),

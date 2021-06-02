@@ -168,7 +168,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 
 		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
 			var err error
-			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
+			volumeFileContent := "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
 			framework.ExpectNoError(err)
@@ -198,7 +198,6 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			ginkgo.By("wait for the pv and pvc to bind")
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 			verifyContentOfVSpherePV(c, f.Timeouts, pvc, volumeFileContent)
-
 		})
 	})
 })

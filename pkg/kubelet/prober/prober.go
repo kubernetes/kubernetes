@@ -271,11 +271,11 @@ func (eic *execInContainer) Output() ([]byte, error) {
 }
 
 func (eic *execInContainer) SetDir(dir string) {
-	//unimplemented
+	// unimplemented
 }
 
 func (eic *execInContainer) SetStdin(in io.Reader) {
-	//unimplemented
+	// unimplemented
 }
 
 func (eic *execInContainer) SetStdout(out io.Writer) {
@@ -287,11 +287,11 @@ func (eic *execInContainer) SetStderr(out io.Writer) {
 }
 
 func (eic *execInContainer) SetEnv(env []string) {
-	//unimplemented
+	// unimplemented
 }
 
 func (eic *execInContainer) Stop() {
-	//unimplemented
+	// unimplemented
 }
 
 func (eic *execInContainer) Start() error {

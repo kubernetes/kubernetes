@@ -41,8 +41,10 @@ import (
 	"sigs.k8s.io/kustomize/api/filesys"
 )
 
-var FileExtensions = []string{".json", ".yaml", ".yml"}
-var InputExtensions = append(FileExtensions, "stdin")
+var (
+	FileExtensions  = []string{".json", ".yaml", ".yml"}
+	InputExtensions = append(FileExtensions, "stdin")
+)
 
 const defaultHttpGetAttempts int = 3
 
@@ -186,9 +188,11 @@ type noopClientGetter struct{}
 func (noopClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return nil, fmt.Errorf("local operation only")
 }
+
 func (noopClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return nil, fmt.Errorf("local operation only")
 }
+
 func (noopClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	return nil, fmt.Errorf("local operation only")
 }

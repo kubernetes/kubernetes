@@ -48,6 +48,7 @@ func (ms byFQName) Len() int { return len(ms) }
 func (ms byFQName) Less(i, j int) bool {
 	return ms[i].buildFQName() < ms[j].buildFQName()
 }
+
 func (ms byFQName) Swap(i, j int) {
 	ms[i], ms[j] = ms[j], ms[i]
 }

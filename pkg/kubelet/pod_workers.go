@@ -243,6 +243,7 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 		delete(p.lastUndeliveredWorkUpdate, uid)
 	}
 }
+
 func (p *podWorkers) ForgetWorker(uid types.UID) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()

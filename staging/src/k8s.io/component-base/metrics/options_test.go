@@ -19,7 +19,7 @@ package metrics
 import "testing"
 
 func TestValidateAllowMetricLabel(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		input         map[string]string
 		expectedError bool

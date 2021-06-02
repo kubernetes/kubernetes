@@ -19,9 +19,10 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/onsi/ginkgo"
 
@@ -110,7 +111,6 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		dDriver := driver.(storageframework.DynamicPVTestDriver)
 		if dDriver == nil {
 			e2eskipper.Skipf("Test driver does not support dynamically created volumes")
-
 		}
 		dInfo = dDriver.GetDriverInfo()
 		if dInfo == nil {
@@ -208,7 +208,6 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
 		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
-
 }
 
 // createPerformanceStats calculates individual metrics for an operation

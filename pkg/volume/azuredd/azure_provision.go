@@ -46,8 +46,10 @@ type azureDiskDeleter struct {
 	plugin *azureDataDiskPlugin
 }
 
-var _ volume.Provisioner = &azureDiskProvisioner{}
-var _ volume.Deleter = &azureDiskDeleter{}
+var (
+	_ volume.Provisioner = &azureDiskProvisioner{}
+	_ volume.Deleter     = &azureDiskDeleter{}
+)
 
 func (d *azureDiskDeleter) GetPath() string {
 	return getPath(d.podUID, d.dataDisk.diskName, d.plugin.host)

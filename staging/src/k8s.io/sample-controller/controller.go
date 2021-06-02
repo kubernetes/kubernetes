@@ -228,7 +228,6 @@ func (c *Controller) processNextWorkItem() bool {
 		klog.Infof("Successfully synced '%s'", key)
 		return nil
 	}(obj)
-
 	if err != nil {
 		utilruntime.HandleError(err)
 		return true

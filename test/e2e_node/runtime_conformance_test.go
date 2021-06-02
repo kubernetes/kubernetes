@@ -36,7 +36,6 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
-
 		ginkgo.Context("when running a container with a new image", func() {
 			// The service account only has pull permission
 			auth := `

@@ -189,5 +189,4 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
 
 	}
-
 }

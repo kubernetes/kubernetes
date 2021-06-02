@@ -38,7 +38,6 @@ import (
 )
 
 func TestExecInContainer(t *testing.T) {
-
 	testcases := []struct {
 		description        string
 		timeout            time.Duration
@@ -61,7 +60,8 @@ func TestExecInContainer(t *testing.T) {
 			ContainerID: "12345678",
 			Running:     false,
 			ExitCode:    0,
-			Pid:         100},
+			Pid:         100,
+		},
 		returnInspectExec2: nil,
 		execProbeTimeout:   true,
 		expectError:        nil,
@@ -106,7 +106,8 @@ func TestExecInContainer(t *testing.T) {
 			ContainerID: "12345678",
 			Running:     true,
 			ExitCode:    0,
-			Pid:         100},
+			Pid:         100,
+		},
 		returnInspectExec2: nil,
 		execProbeTimeout:   true,
 		expectError:        context.DeadlineExceeded,

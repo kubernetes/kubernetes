@@ -18,9 +18,10 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLazyTruncatedUserAgent(t *testing.T) {

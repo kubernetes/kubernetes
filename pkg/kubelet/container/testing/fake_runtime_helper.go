@@ -50,7 +50,8 @@ func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error
 	return &runtimeapi.DNSConfig{
 		Servers:  f.DNSServers,
 		Searches: f.DNSSearches,
-		Options:  f.DNSOptions}, f.Err
+		Options:  f.DNSOptions,
+	}, f.Err
 }
 
 // This is not used by docker runtime.

@@ -43,8 +43,10 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
-var labelSelectorPath = ".status.labelSelector"
-var anotherLabelSelectorPath = ".status.anotherLabelSelector"
+var (
+	labelSelectorPath        = ".status.labelSelector"
+	anotherLabelSelectorPath = ".status.anotherLabelSelector"
+)
 
 func NewNoxuSubresourcesCRDs(scope apiextensionsv1.ResourceScope) []*apiextensionsv1.CustomResourceDefinition {
 	return []*apiextensionsv1.CustomResourceDefinition{

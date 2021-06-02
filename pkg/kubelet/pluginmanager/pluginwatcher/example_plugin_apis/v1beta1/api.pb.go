@@ -22,22 +22,25 @@ package v1beta1
 import (
 	context "context"
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -57,9 +60,11 @@ func (*ExampleRequest) ProtoMessage() {}
 func (*ExampleRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *ExampleRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExampleRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ExampleRequest.Marshal(b, m, deterministic)
@@ -72,12 +77,15 @@ func (m *ExampleRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return b[:n], nil
 	}
 }
+
 func (m *ExampleRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExampleRequest.Merge(m, src)
 }
+
 func (m *ExampleRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExampleRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExampleRequest.DiscardUnknown(m)
 }
@@ -109,9 +117,11 @@ func (*ExampleResponse) ProtoMessage() {}
 func (*ExampleResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *ExampleResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExampleResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ExampleResponse.Marshal(b, m, deterministic)
@@ -124,12 +134,15 @@ func (m *ExampleResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
+
 func (m *ExampleResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExampleResponse.Merge(m, src)
 }
+
 func (m *ExampleResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExampleResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExampleResponse.DiscardUnknown(m)
 }
@@ -170,8 +183,10 @@ var fileDescriptor_00212fb1f9d3bf1c = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -207,8 +222,7 @@ type ExampleServer interface {
 }
 
 // UnimplementedExampleServer can be embedded to have forward compatible implementations.
-type UnimplementedExampleServer struct {
-}
+type UnimplementedExampleServer struct{}
 
 func (*UnimplementedExampleServer) GetExampleInfo(ctx context.Context, req *ExampleRequest) (*ExampleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExampleInfo not implemented")
@@ -327,6 +341,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ExampleRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -360,30 +375,36 @@ func (m *ExampleResponse) Size() (n int) {
 func sovApi(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ExampleRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExampleRequest{`,
+	s := strings.Join([]string{
+		`&ExampleRequest{`,
 		`Request:` + fmt.Sprintf("%v", this.Request) + `,`,
 		`V1Beta1Field:` + fmt.Sprintf("%v", this.V1Beta1Field) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ExampleResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExampleResponse{`,
+	s := strings.Join([]string{
+		`&ExampleResponse{`,
 		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -392,6 +413,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ExampleRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -506,6 +528,7 @@ func (m *ExampleRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ExampleResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -588,6 +611,7 @@ func (m *ExampleResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

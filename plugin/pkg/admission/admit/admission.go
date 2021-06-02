@@ -37,8 +37,10 @@ func Register(plugins *admission.Plugins) {
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
 type alwaysAdmit struct{}
 
-var _ admission.MutationInterface = alwaysAdmit{}
-var _ admission.ValidationInterface = alwaysAdmit{}
+var (
+	_ admission.MutationInterface   = alwaysAdmit{}
+	_ admission.ValidationInterface = alwaysAdmit{}
+)
 
 // Admit makes an admission decision based on the request attributes
 func (alwaysAdmit) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {

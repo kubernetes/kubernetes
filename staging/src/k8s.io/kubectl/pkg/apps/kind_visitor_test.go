@@ -22,7 +22,6 @@ import (
 )
 
 var _ = Describe("When KindVisitor accepts a GroupKind", func() {
-
 	var visitor *TestKindVisitor
 
 	BeforeEach(func() {
@@ -78,7 +77,6 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		Expect(visitor.visits).To(Equal(map[string]int{
 			"Job": 1,
 		}))
-
 	})
 
 	It("should Visit Pod iff the Kind is a Pod", func() {

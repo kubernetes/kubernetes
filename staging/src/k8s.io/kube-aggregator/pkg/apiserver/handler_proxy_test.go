@@ -671,7 +671,6 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if !strings.Contains(string(body), "context deadline exceeded") {
 		t.Error(string(body))
 	}
-
 }
 
 func TestNewRequestForProxyWithAuditID(t *testing.T) {

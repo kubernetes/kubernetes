@@ -35,9 +35,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -50,9 +52,11 @@ func (*Carp) ProtoMessage() {}
 func (*Carp) Descriptor() ([]byte, []int) {
 	return fileDescriptor_b7eb07c7d80facdf, []int{0}
 }
+
 func (m *Carp) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Carp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -61,12 +65,15 @@ func (m *Carp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Carp) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Carp.Merge(m, src)
 }
+
 func (m *Carp) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Carp) XXX_DiscardUnknown() {
 	xxx_messageInfo_Carp.DiscardUnknown(m)
 }
@@ -78,9 +85,11 @@ func (*CarpCondition) ProtoMessage() {}
 func (*CarpCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_b7eb07c7d80facdf, []int{1}
 }
+
 func (m *CarpCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CarpCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -89,12 +98,15 @@ func (m *CarpCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error
 	}
 	return b[:n], nil
 }
+
 func (m *CarpCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CarpCondition.Merge(m, src)
 }
+
 func (m *CarpCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CarpCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_CarpCondition.DiscardUnknown(m)
 }
@@ -106,9 +118,11 @@ func (*CarpList) ProtoMessage() {}
 func (*CarpList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_b7eb07c7d80facdf, []int{2}
 }
+
 func (m *CarpList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CarpList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -117,12 +131,15 @@ func (m *CarpList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *CarpList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CarpList.Merge(m, src)
 }
+
 func (m *CarpList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CarpList) XXX_DiscardUnknown() {
 	xxx_messageInfo_CarpList.DiscardUnknown(m)
 }
@@ -134,9 +151,11 @@ func (*CarpSpec) ProtoMessage() {}
 func (*CarpSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_b7eb07c7d80facdf, []int{3}
 }
+
 func (m *CarpSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CarpSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -145,12 +164,15 @@ func (m *CarpSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *CarpSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CarpSpec.Merge(m, src)
 }
+
 func (m *CarpSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CarpSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_CarpSpec.DiscardUnknown(m)
 }
@@ -162,9 +184,11 @@ func (*CarpStatus) ProtoMessage() {}
 func (*CarpStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_b7eb07c7d80facdf, []int{4}
 }
+
 func (m *CarpStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CarpStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -173,12 +197,15 @@ func (m *CarpStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *CarpStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CarpStatus.Merge(m, src)
 }
+
 func (m *CarpStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CarpStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_CarpStatus.DiscardUnknown(m)
 }
@@ -638,6 +665,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *Carp) Size() (n int) {
 	if m == nil {
 		return 0
@@ -763,14 +791,17 @@ func (m *CarpStatus) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *Carp) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Carp{`,
+	s := strings.Join([]string{
+		`&Carp{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "CarpSpec", "CarpSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "CarpStatus", "CarpStatus", 1), `&`, ``, 1) + `,`,
@@ -778,11 +809,13 @@ func (this *Carp) String() string {
 	}, "")
 	return s
 }
+
 func (this *CarpCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CarpCondition{`,
+	s := strings.Join([]string{
+		`&CarpCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastProbeTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastProbeTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -793,6 +826,7 @@ func (this *CarpCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *CarpList) String() string {
 	if this == nil {
 		return "nil"
@@ -802,13 +836,15 @@ func (this *CarpList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Carp", "Carp", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&CarpList{`,
+	s := strings.Join([]string{
+		`&CarpList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *CarpSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -823,7 +859,8 @@ func (this *CarpSpec) String() string {
 		mapStringForNodeSelector += fmt.Sprintf("%v: %v,", k, this.NodeSelector[k])
 	}
 	mapStringForNodeSelector += "}"
-	s := strings.Join([]string{`&CarpSpec{`,
+	s := strings.Join([]string{
+		`&CarpSpec{`,
 		`RestartPolicy:` + fmt.Sprintf("%v", this.RestartPolicy) + `,`,
 		`TerminationGracePeriodSeconds:` + valueToStringGenerated(this.TerminationGracePeriodSeconds) + `,`,
 		`ActiveDeadlineSeconds:` + valueToStringGenerated(this.ActiveDeadlineSeconds) + `,`,
@@ -841,6 +878,7 @@ func (this *CarpSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *CarpStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -850,7 +888,8 @@ func (this *CarpStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "CarpCondition", "CarpCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&CarpStatus{`,
+	s := strings.Join([]string{
+		`&CarpStatus{`,
 		`Phase:` + fmt.Sprintf("%v", this.Phase) + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
@@ -862,6 +901,7 @@ func (this *CarpStatus) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -870,6 +910,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *Carp) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1019,6 +1060,7 @@ func (m *Carp) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CarpCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1263,6 +1305,7 @@ func (m *CarpCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CarpList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1380,6 +1423,7 @@ func (m *CarpList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CarpSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1881,6 +1925,7 @@ func (m *CarpSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CarpStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2161,6 +2206,7 @@ func (m *CarpStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

@@ -182,7 +182,6 @@ func TestCardDuplication(t *testing.T) {
 				t.Errorf("test case %s fails in duplication check", test.name)
 				return
 			}
-
 		})
 	}
 }

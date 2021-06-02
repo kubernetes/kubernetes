@@ -53,5 +53,4 @@ func TestExportRejection(t *testing.T) {
 	if statusCode != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, statusCode)
 	}
-
 }

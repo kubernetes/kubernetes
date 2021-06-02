@@ -104,7 +104,6 @@ func (d *Desc) toPrometheusDesc() *prometheus.Desc {
 // DeprecatedVersion returns a pointer to the Version or nil
 func (d *Desc) DeprecatedVersion() *semver.Version {
 	return parseSemver(d.deprecatedVersion)
-
 }
 
 func (d *Desc) determineDeprecationStatus(version semver.Version) {

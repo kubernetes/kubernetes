@@ -148,7 +148,6 @@ func init() {
 	})
 	addNamespaceRoleBinding(metav1.NamespacePublic,
 		rbacv1helpers.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespacePublic).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
-
 }
 
 // NamespaceRoles returns a map of namespace to slice of roles to create

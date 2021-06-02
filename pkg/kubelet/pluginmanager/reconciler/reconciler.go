@@ -100,7 +100,7 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 	rc.RLock()
 	defer rc.RUnlock()
 
-	var copyHandlers = make(map[string]cache.PluginHandler)
+	copyHandlers := make(map[string]cache.PluginHandler)
 	for pluginType, handler := range rc.handlers {
 		copyHandlers[pluginType] = handler
 	}

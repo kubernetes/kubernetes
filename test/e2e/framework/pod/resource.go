@@ -107,7 +107,6 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 			Name(string(pod.Name)).
 			Do(ctx).
 			Raw()
-
 		if err != nil {
 			if ctx.Err() != nil {
 				// We may encounter errors here because of a race between the pod readiness and apiserver

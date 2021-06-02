@@ -500,7 +500,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 	// There are more than one node with minimum number PDB violating pods. Find
 	// the one with minimum highest priority victim.
 	minHighestPriority := int32(math.MaxInt32)
-	var minNodes2 = make([]string, lenNodes1)
+	minNodes2 := make([]string, lenNodes1)
 	lenNodes2 := 0
 	for i := 0; i < lenNodes1; i++ {
 		node := minNodes1[i]

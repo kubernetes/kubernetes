@@ -56,8 +56,10 @@ type CSILimits struct {
 	translator InTreeToCSITranslator
 }
 
-var _ framework.FilterPlugin = &CSILimits{}
-var _ framework.EnqueueExtensions = &CSILimits{}
+var (
+	_ framework.FilterPlugin      = &CSILimits{}
+	_ framework.EnqueueExtensions = &CSILimits{}
+)
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = "NodeVolumeLimits"
@@ -157,7 +159,6 @@ func (pl *CSILimits) filterAttachableVolumes(
 		}
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
-
 		if err != nil {
 			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
 			continue

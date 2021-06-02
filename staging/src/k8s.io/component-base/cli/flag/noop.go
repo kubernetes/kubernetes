@@ -18,6 +18,7 @@ package flag
 
 import (
 	goflag "flag"
+
 	"github.com/spf13/pflag"
 )
 
@@ -25,8 +26,10 @@ import (
 // but has a noop Set implementation
 type NoOp struct{}
 
-var _ goflag.Value = NoOp{}
-var _ pflag.Value = NoOp{}
+var (
+	_ goflag.Value = NoOp{}
+	_ pflag.Value  = NoOp{}
+)
 
 func (NoOp) String() string {
 	return ""

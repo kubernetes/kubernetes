@@ -207,7 +207,6 @@ func (cnc *CloudNodeController) processNextWorkItem() bool {
 		cnc.workqueue.Forget(obj)
 		return nil
 	}(obj)
-
 	if err != nil {
 		utilruntime.HandleError(err)
 		return true
@@ -298,7 +297,6 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 			// Secondary label exists, but not consistent with the primary
 			// label. Need to reconcile.
 			labelsToUpdate[r.secondaryKey] = primaryValue
-
 		} else if !secondaryExists && r.ensureSecondaryExists {
 			// Apply secondary label based on primary label.
 			labelsToUpdate[r.secondaryKey] = primaryValue

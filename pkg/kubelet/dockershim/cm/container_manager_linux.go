@@ -52,9 +52,7 @@ const (
 	dockerOOMScoreAdj = -999
 )
 
-var (
-	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
-)
+var memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 
 // NewContainerManager creates a new instance of ContainerManager
 func NewContainerManager(cgroupsName string, client libdocker.Interface) ContainerManager {

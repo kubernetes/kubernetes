@@ -41,11 +41,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
-type disruptiveTest struct {
-	testItStmt string
-	runTest    testBody
-}
+type (
+	testBody       func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
+	disruptiveTest struct {
+		testItStmt string
+		runTest    testBody
+	}
+)
 
 // checkForControllerManagerHealthy checks that the controller manager does not crash within "duration"
 func checkForControllerManagerHealthy(duration time.Duration) error {
@@ -64,7 +66,7 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 			if PID == "" {
 				PID = result.Stdout
 			} else {
-				//its dead
+				// its dead
 				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
 			}
 		} else {
@@ -75,7 +77,6 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 }
 
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
-
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
 		c                           clientset.Interface
@@ -226,7 +227,6 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			err = checkForControllerManagerHealthy(2 * time.Minute)
 			framework.ExpectNoError(err)
 		})
-
 	})
 
 	ginkgo.Context("when kubelet restarts", func() {

@@ -36,7 +36,6 @@ import (
 )
 
 var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
-
 	f := framework.NewDefaultFramework("etcd-failure")
 
 	ginkgo.BeforeEach(func() {

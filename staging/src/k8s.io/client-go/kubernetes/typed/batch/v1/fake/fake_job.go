@@ -80,7 +80,6 @@ func (c *FakeJobs) List(ctx context.Context, opts v1.ListOptions) (result *batch
 func (c *FakeJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(jobsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.

@@ -58,6 +58,7 @@ var IdentityTransformer Transformer = identityTransformer{}
 func (identityTransformer) TransformFromStorage(b []byte, ctx Context) ([]byte, bool, error) {
 	return b, false, nil
 }
+
 func (identityTransformer) TransformToStorage(b []byte, ctx Context) ([]byte, error) {
 	return b, nil
 }
@@ -92,6 +93,7 @@ func (t *MutableTransformer) TransformFromStorage(data []byte, context Context) 
 	t.lock.RUnlock()
 	return transformer.TransformFromStorage(data, context)
 }
+
 func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (out []byte, err error) {
 	t.lock.RLock()
 	transformer := t.transformer

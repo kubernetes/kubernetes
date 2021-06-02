@@ -94,7 +94,6 @@ func (v *validatingWebhookConfigurationManager) HasSynced() bool {
 		return true
 	}
 	return false
-
 }
 
 func (v *validatingWebhookConfigurationManager) updateConfiguration() {

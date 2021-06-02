@@ -31,7 +31,7 @@ func TestHandleGetAction(t *testing.T) {
 	serviceSubnet := "10.96.0.1/12"
 	idr := NewInitDryRunGetter(controlPlaneName, serviceSubnet)
 
-	var tests = []struct {
+	tests := []struct {
 		name               string
 		action             core.GetActionImpl
 		expectedHandled    bool

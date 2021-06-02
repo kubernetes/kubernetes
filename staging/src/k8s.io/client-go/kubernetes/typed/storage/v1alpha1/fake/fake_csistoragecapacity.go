@@ -80,7 +80,6 @@ func (c *FakeCSIStorageCapacities) List(ctx context.Context, opts v1.ListOptions
 func (c *FakeCSIStorageCapacities) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(csistoragecapacitiesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a cSIStorageCapacity and creates it.  Returns the server's representation of the cSIStorageCapacity, and an error, if there is any.

@@ -256,6 +256,7 @@ func (c *checkConvertor) Convert(in, out, context interface{}) error {
 	}
 	return c.err
 }
+
 func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion runtime.GroupVersioner) (out runtime.Object, err error) {
 	if c.directConvert {
 		return nil, fmt.Errorf("unexpected call to ConvertToVersion")
@@ -268,12 +269,12 @@ func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion runtime.
 	}
 	return c.obj, c.err
 }
+
 func (c *checkConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	return "", "", fmt.Errorf("unexpected call to ConvertFieldLabel")
 }
 
-type mockConvertor struct {
-}
+type mockConvertor struct{}
 
 func (c *mockConvertor) Convert(in, out, context interface{}) error {
 	return fmt.Errorf("unexpect call to Convert")

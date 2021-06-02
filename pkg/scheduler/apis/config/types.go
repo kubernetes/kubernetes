@@ -297,7 +297,6 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 }
 
 func mergePluginSets(defaultPluginSet, customPluginSet PluginSet) PluginSet {
-
 	disabledPlugins := sets.NewString()
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)

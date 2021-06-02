@@ -22,8 +22,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ cache.GenericLister = &dynamicListerShim{}
-var _ cache.GenericNamespaceLister = &dynamicNamespaceListerShim{}
+var (
+	_ cache.GenericLister          = &dynamicListerShim{}
+	_ cache.GenericNamespaceLister = &dynamicNamespaceListerShim{}
+)
 
 // dynamicListerShim implements the cache.GenericLister interface.
 type dynamicListerShim struct {

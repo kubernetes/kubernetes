@@ -210,6 +210,4 @@ func (p *protobufPackage) OutputPath() string {
 	return filepath.Join(p.PackagePath, "generated.pb.go")
 }
 
-var (
-	_ = generator.Package(&protobufPackage{})
-)
+var _ = generator.Package(&protobufPackage{})

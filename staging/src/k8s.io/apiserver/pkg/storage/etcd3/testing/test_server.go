@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -30,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	"context"
 
 	etcd "go.etcd.io/etcd/client"
 	"go.etcd.io/etcd/clientv3"

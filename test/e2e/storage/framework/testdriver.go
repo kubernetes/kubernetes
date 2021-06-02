@@ -17,13 +17,14 @@ limitations under the License.
 package framework
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"time"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.

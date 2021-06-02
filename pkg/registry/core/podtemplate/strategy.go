@@ -85,7 +85,6 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	if !apiequality.Semantic.DeepEqual(newTemplate.Template, oldTemplate.Template) {
 		newTemplate.Generation = oldTemplate.Generation + 1
 	}
-
 }
 
 // ValidateUpdate is the default update validation for an end user.

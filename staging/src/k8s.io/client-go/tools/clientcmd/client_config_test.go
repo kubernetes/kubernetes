@@ -41,7 +41,7 @@ func TestMergoSemantics(t *testing.T) {
 		Y int64
 		U U
 	}
-	var testDataStruct = []struct {
+	testDataStruct := []struct {
 		dst      T
 		src      T
 		expected T
@@ -80,7 +80,7 @@ func TestMergoSemantics(t *testing.T) {
 		}
 	}
 
-	var testDataMap = []struct {
+	testDataMap := []struct {
 		dst      map[string]int
 		src      map[string]int
 		expected map[string]int
@@ -133,7 +133,6 @@ func createValidTestConfig() *clientcmdapi.Config {
 }
 
 func createCAValidTestConfig() *clientcmdapi.Config {
-
 	config := createValidTestConfig()
 	config.Clusters["clean"].CertificateAuthorityData = []byte{0, 0}
 	return config
@@ -371,7 +370,6 @@ func TestProxyURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.proxyURL, func(t *testing.T) {
-
 			config := clientcmdapi.NewConfig()
 			config.Clusters["clean"] = &clientcmdapi.Cluster{
 				Server:   "https://localhost:8443",
@@ -817,7 +815,6 @@ func TestNamespaceOverride(t *testing.T) {
 	}
 
 	ns, overridden, err := config.Namespace()
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

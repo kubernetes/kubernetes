@@ -34,6 +34,5 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Name() string {
 
 // Check try to validates IPVS required kernel modules exists or not.
 func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []error) {
-
 	return nil, nil
 }

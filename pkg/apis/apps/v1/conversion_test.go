@@ -432,7 +432,6 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "appsv1 -> apps", k, tc.deploymentSpec1, internal)
 		}
 	}
-
 }
 
 func TestV1DeploymentStrategyConversion(t *testing.T) {

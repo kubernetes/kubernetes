@@ -168,7 +168,8 @@ var _ = SIGDescribe("Secrets", func() {
 						Args: []string{
 							"mounttest",
 							"--file_content=/etc/secret-volume/data-1",
-							"--file_mode=/etc/secret-volume/data-1"},
+							"--file_mode=/etc/secret-volume/data-1",
+						},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -496,7 +497,8 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/secret-volume/data-1",
-						"--file_mode=/etc/secret-volume/data-1"},
+						"--file_mode=/etc/secret-volume/data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -571,7 +573,8 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/secret-volume/new-path-data-1",
-						"--file_mode=/etc/secret-volume/new-path-data-1"},
+						"--file_mode=/etc/secret-volume/new-path-data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,

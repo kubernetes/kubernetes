@@ -336,7 +336,6 @@ func TestTopNodeWithSortByCpuMetricsFrom(t *testing.T) {
 	if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
 		t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
 	}
-
 }
 
 func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
@@ -422,5 +421,4 @@ func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
 	if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
 		t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
 	}
-
 }

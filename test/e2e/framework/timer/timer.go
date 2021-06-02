@@ -17,14 +17,13 @@ limitations under the License.
 package timer
 
 import (
-	"time"
-
 	"bytes"
 	"fmt"
+	"sync"
+	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
-	"sync"
 )
 
 var now = time.Now
@@ -115,7 +114,9 @@ func (timer *TestPhaseTimer) PrintJSON() string {
 		DataItems: []perftype.DataItem{{
 			Unit:   "s",
 			Labels: map[string]string{"test": "phases"},
-			Data:   make(map[string]float64)}}}
+			Data:   make(map[string]float64),
+		}},
+	}
 	timer.lock.Lock()
 	defer timer.lock.Unlock()
 	for _, phase := range timer.phases {

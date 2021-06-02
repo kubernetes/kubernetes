@@ -105,7 +105,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	ep := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Subsets: []v1.EndpointSubset{{
-		Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}}}}}
+		Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}},
+	}}}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, mount.NewFakeMounter(nil))
 	volumePath := mounter.GetPath()

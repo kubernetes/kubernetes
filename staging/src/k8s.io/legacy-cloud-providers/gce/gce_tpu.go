@@ -127,7 +127,7 @@ func (g *Cloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node, erro
 
 	parent := getTPUParentName(g.projectID, zone)
 	var nodes []*tpuapi.Node
-	var accumulator = func(response *tpuapi.ListNodesResponse) error {
+	accumulator := func(response *tpuapi.ListNodesResponse) error {
 		nodes = append(nodes, response.Nodes...)
 		return nil
 	}
@@ -143,7 +143,7 @@ func (g *Cloud) ListLocations(ctx context.Context) ([]*tpuapi.Location, error) {
 	mc := newTPUMetricContext("list_locations", "")
 	parent := getTPUProjectURL(g.projectID)
 	var locations []*tpuapi.Location
-	var accumulator = func(response *tpuapi.ListLocationsResponse) error {
+	accumulator := func(response *tpuapi.ListLocationsResponse) error {
 		locations = append(locations, response.Locations...)
 		return nil
 	}

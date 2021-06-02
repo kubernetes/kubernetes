@@ -41,7 +41,6 @@ import (
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
-
 	testCases := []struct {
 		testName           string
 		node               *v1.Node
@@ -1668,7 +1667,6 @@ func Test_reconcileNodeLabels(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // Tests that node address changes are detected correctly

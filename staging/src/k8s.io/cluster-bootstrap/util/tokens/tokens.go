@@ -23,9 +23,7 @@ import (
 	"k8s.io/cluster-bootstrap/token/api"
 )
 
-var (
-	bootstrapTokenRe = regexp.MustCompile(api.BootstrapTokenPattern)
-)
+var bootstrapTokenRe = regexp.MustCompile(api.BootstrapTokenPattern)
 
 // ParseToken tries and parse a valid token from a string.
 // A token ID and token secret are returned in case of success, an error otherwise.

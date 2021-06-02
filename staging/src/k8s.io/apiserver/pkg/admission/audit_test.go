@@ -42,9 +42,11 @@ type fakeHandler struct {
 	handles bool
 }
 
-var _ Interface = &fakeHandler{}
-var _ MutationInterface = &fakeHandler{}
-var _ ValidationInterface = &fakeHandler{}
+var (
+	_ Interface           = &fakeHandler{}
+	_ MutationInterface   = &fakeHandler{}
+	_ ValidationInterface = &fakeHandler{}
+)
 
 func (h fakeHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	for k, v := range h.admitAnnotations {
@@ -69,7 +71,7 @@ func attributes() Attributes {
 }
 
 func TestWithAudit(t *testing.T) {
-	var testCases = map[string]struct {
+	testCases := map[string]struct {
 		admit               error
 		admitAnnotations    map[string]string
 		validate            error

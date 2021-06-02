@@ -45,9 +45,11 @@ type fcPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &fcPlugin{}
-var _ volume.PersistentVolumePlugin = &fcPlugin{}
-var _ volume.BlockVolumePlugin = &fcPlugin{}
+var (
+	_ volume.VolumePlugin           = &fcPlugin{}
+	_ volume.PersistentVolumePlugin = &fcPlugin{}
+	_ volume.BlockVolumePlugin      = &fcPlugin{}
+)
 
 const (
 	fcPluginName = "kubernetes.io/fc"
@@ -180,7 +182,8 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID t
 			wwids:   wwids,
 			manager: manager,
 			io:      &osIOHandler{},
-			plugin:  plugin},
+			plugin:  plugin,
+		},
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
@@ -415,8 +418,10 @@ type fcDiskUnmapper struct {
 	exec       utilexec.Interface
 }
 
-var _ volume.BlockVolumeUnmapper = &fcDiskUnmapper{}
-var _ volume.CustomBlockVolumeUnmapper = &fcDiskUnmapper{}
+var (
+	_ volume.BlockVolumeUnmapper       = &fcDiskUnmapper{}
+	_ volume.CustomBlockVolumeUnmapper = &fcDiskUnmapper{}
+)
 
 func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	err := c.manager.DetachBlockFCDisk(*c, mapPath, devicePath)

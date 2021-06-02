@@ -59,7 +59,7 @@ func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 	setupCert, setupKey := certstestutil.CreateCACert(t)
 	caCert, caKey := certstestutil.CreateCACert(t)
 
-	var tests = []struct {
+	tests := []struct {
 		setupFunc     func(pkiDir string) error
 		expectedError bool
 		expectedCa    *x509.Certificate
@@ -142,7 +142,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 	setupCert, setupKey, _ := certstestutil.CreateTestCert(t, caCert, caKey, altNames)
 	cert, key, config := certstestutil.CreateTestCert(t, caCert, caKey, altNames)
 
-	var tests = []struct {
+	tests := []struct {
 		setupFunc     func(pkiDir string) error
 		expectedError bool
 		expectedCert  *x509.Certificate
@@ -239,7 +239,7 @@ func TestWriteCSRFilesIfNotExist(t *testing.T) {
 	csr, key := createTestCSR(t)
 	csr2, key2 := createTestCSR(t)
 
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		setupFunc     func(csrPath string) error
 		expectedError bool
@@ -298,10 +298,8 @@ func TestWriteCSRFilesIfNotExist(t *testing.T) {
 			if sha256.Sum256(test.expectedCSR.Raw) != sha256.Sum256(parsedCSR.Raw) {
 				t.Error("expected csr's fingerprint does not match ")
 			}
-
 		})
 	}
-
 }
 
 func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
@@ -371,7 +369,7 @@ func TestSharedCertificateExists(t *testing.T) {
 	_, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
 	publicKey := key.Public()
 
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		files         certstestutil.PKIFiles
 		expectedError bool
@@ -510,7 +508,6 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 			assertCertsExist(t, tmpdir)
 		})
 	}
-
 }
 
 func TestUsingExternalCA(t *testing.T) {
@@ -623,7 +620,6 @@ func TestUsingExternalCA(t *testing.T) {
 }
 
 func TestValidateMethods(t *testing.T) {
-
 	caCert, caKey := certstestutil.CreateCACert(t)
 	cert, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
 
@@ -721,7 +717,6 @@ func TestNewCSR(t *testing.T) {
 	}
 
 	csr, _, err := NewCSR(kubeadmCert, cfg)
-
 	if err != nil {
 		t.Errorf("invalid signature on CSR: %v", err)
 	}
@@ -744,8 +739,7 @@ func TestNewCSR(t *testing.T) {
 }
 
 func TestCreateCertificateFilesMethods(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		createFunc    func(cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles []string
 		externalEtcd  bool

@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 type bestEffortPolicy struct {
-	//List of NUMA Nodes available on the underlying machine
+	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
 }
 

@@ -48,7 +48,6 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 
 		return true, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("%v: %v", err, lastErr)
 	}

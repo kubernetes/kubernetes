@@ -280,7 +280,6 @@ func TestShouldSkipService(t *testing.T) {
 }
 
 func TestNewFilteredDialContext(t *testing.T) {
-
 	_, cidr, _ := net.ParseCIDR("1.1.1.1/28")
 
 	testCases := []struct {
@@ -1252,7 +1251,6 @@ func TestWriteBytesLine(t *testing.T) {
 }
 
 func TestWriteCountLines(t *testing.T) {
-
 	testCases := []struct {
 		name     string
 		expected int

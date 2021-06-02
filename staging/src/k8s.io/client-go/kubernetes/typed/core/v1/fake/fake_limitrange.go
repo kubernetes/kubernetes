@@ -80,7 +80,6 @@ func (c *FakeLimitRanges) List(ctx context.Context, opts v1.ListOptions) (result
 func (c *FakeLimitRanges) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(limitrangesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.

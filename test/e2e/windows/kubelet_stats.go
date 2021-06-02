@@ -42,7 +42,6 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 		ginkgo.Context("when running 10 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
 			ginkgo.It("should return within 10 seconds", func() {
-
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
 				framework.ExpectNoError(err, "Error finding Windows node")
@@ -104,7 +103,6 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 func findWindowsNode(f *framework.Framework) (v1.Node, error) {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
-
 	if err != nil {
 		return v1.Node{}, err
 	}

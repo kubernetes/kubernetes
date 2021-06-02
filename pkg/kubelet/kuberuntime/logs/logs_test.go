@@ -20,11 +20,12 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
 	"os"
 	"testing"
 	"time"
+
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 

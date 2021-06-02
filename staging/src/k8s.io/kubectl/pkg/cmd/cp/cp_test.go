@@ -193,6 +193,7 @@ func TestStripPathShortcuts(t *testing.T) {
 		}
 	}
 }
+
 func TestIsDestRelative(t *testing.T) {
 	tests := []struct {
 		base     string
@@ -509,7 +510,7 @@ func TestBadTar(t *testing.T) {
 	// More or less cribbed from https://golang.org/pkg/archive/tar/#example__minimal
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	var files = []struct {
+	files := []struct {
 		name string
 		body string
 	}{
@@ -615,9 +616,9 @@ func TestCopyToPod(t *testing.T) {
 		opts.Complete(tf, cmd)
 		t.Run(name, func(t *testing.T) {
 			err = opts.copyToPod(src, dest, &kexec.ExecOptions{})
-			//If error is NotFound error , it indicates that the
-			//request has been sent correctly.
-			//Treat this as no error.
+			// If error is NotFound error , it indicates that the
+			// request has been sent correctly.
+			// Treat this as no error.
 			if test.expectedErr && errors.IsNotFound(err) {
 				t.Errorf("expected error but didn't get one")
 			}

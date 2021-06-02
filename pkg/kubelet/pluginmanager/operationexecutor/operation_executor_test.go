@@ -31,8 +31,10 @@ const (
 	numPluginsToUnregister = 2
 )
 
-var _ OperationGenerator = &fakeOperationGenerator{}
-var socketDir string
+var (
+	_         OperationGenerator = &fakeOperationGenerator{}
+	socketDir string
+)
 
 func init() {
 	d, err := ioutil.TempDir("", "operation_executor_test")
@@ -58,7 +60,6 @@ func TestOperationExecutor_RegisterPlugin_SerialRegisterPlugin(t *testing.T) {
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToRegister; i++ {
 		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
-
 	}
 	if !isOperationRunSerially(ch, quit) {
 		t.Fatalf("Unable to start register operations serially for plugins")

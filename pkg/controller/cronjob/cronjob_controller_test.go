@@ -402,7 +402,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitTwo, &limitOne, 1},
+			}, justBeforeTheHour(), &limitTwo, &limitOne, 1,
+		},
 
 		"success. jobs not processed by Sync yet": {
 			[]CleanupJobSpec{
@@ -412,7 +413,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, T},
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, T},
-			}, justBeforeTheHour(), &limitTwo, &limitOne, 4},
+			}, justBeforeTheHour(), &limitTwo, &limitOne, 4,
+		},
 
 		"failed job limit reached": {
 			[]CleanupJobSpec{
@@ -422,7 +424,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitTwo, &limitTwo, 0},
+			}, justBeforeTheHour(), &limitTwo, &limitTwo, 0,
+		},
 
 		"success. job limit set to zero": {
 			[]CleanupJobSpec{
@@ -432,7 +435,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, T, F},
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitZero, &limitOne, 1},
+			}, justBeforeTheHour(), &limitZero, &limitOne, 1,
+		},
 
 		"failed job limit set to zero": {
 			[]CleanupJobSpec{
@@ -442,7 +446,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, T, F},
-			}, justBeforeTheHour(), &limitThree, &limitZero, 1},
+			}, justBeforeTheHour(), &limitThree, &limitZero, 1,
+		},
 
 		"no limits reached": {
 			[]CleanupJobSpec{
@@ -452,7 +457,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitThree, &limitThree, 0},
+			}, justBeforeTheHour(), &limitThree, &limitThree, 0,
+		},
 
 		// This test case should trigger the short-circuit
 		"limits disabled": {
@@ -463,7 +469,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), nil, nil, 0},
+			}, justBeforeTheHour(), nil, nil, 0,
+		},
 
 		"success limit disabled": {
 			[]CleanupJobSpec{
@@ -473,7 +480,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), nil, &limitThree, 0},
+			}, justBeforeTheHour(), nil, &limitThree, 0,
+		},
 
 		"failure limit disabled": {
 			[]CleanupJobSpec{
@@ -483,7 +491,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", T, T, F, F},
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitThree, nil, 0},
+			}, justBeforeTheHour(), &limitThree, nil, 0,
+		},
 
 		"no limits reached because still active": {
 			[]CleanupJobSpec{
@@ -493,7 +502,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T07:00:00Z", F, F, F, F},
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", F, F, F, F},
-			}, justBeforeTheHour(), &limitZero, &limitZero, 6},
+			}, justBeforeTheHour(), &limitZero, &limitZero, 6,
+		},
 	}
 
 	for name, tc := range testCases {

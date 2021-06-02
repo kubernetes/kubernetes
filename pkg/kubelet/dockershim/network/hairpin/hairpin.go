@@ -38,9 +38,7 @@ const (
 	hairpinEnable           = "1"
 )
 
-var (
-	ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
-)
+var ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
 
 func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")

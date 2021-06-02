@@ -56,8 +56,10 @@ var (
 	_ admission.Interface                             = &Webhook{}
 )
 
-type sourceFactory func(f informers.SharedInformerFactory) Source
-type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
+type (
+	sourceFactory     func(f informers.SharedInformerFactory) Source
+	dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
+)
 
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {

@@ -209,6 +209,7 @@ func continueLine(w io.Writer) {
 	_, err := fmt.Fprint(w, ",\t")
 	runtime.HandleError(err)
 }
+
 func endLine(w io.Writer) {
 	_, err := fmt.Fprint(w, "\n")
 	runtime.HandleError(err)

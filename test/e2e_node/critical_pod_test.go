@@ -106,7 +106,6 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
-
 		})
 	})
 })

@@ -28,9 +28,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-var (
-	latencyBuckets = metrics.ExponentialBuckets(0.001, 2, 15)
-)
+var latencyBuckets = metrics.ExponentialBuckets(0.001, 2, 15)
 
 // converterMetricFactory holds metrics for all CRD converters
 type converterMetricFactory struct {

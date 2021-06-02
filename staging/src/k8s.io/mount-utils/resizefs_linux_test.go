@@ -19,9 +19,10 @@ limitations under the License.
 package mount
 
 import (
+	"testing"
+
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
-	"testing"
 )
 
 func TestGetFileSystemSize(t *testing.T) {

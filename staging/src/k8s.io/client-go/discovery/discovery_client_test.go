@@ -747,7 +747,7 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 	}
 
 	response := func(numErrors int) http.HandlerFunc {
-		var i = 0
+		i := 0
 		return func(w http.ResponseWriter, req *http.Request) {
 			var list interface{}
 			switch req.URL.Path {

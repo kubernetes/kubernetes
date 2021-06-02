@@ -22,8 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
-var jsTrue = []byte("true")
-var jsFalse = []byte("false")
+var (
+	jsTrue  = []byte("true")
+	jsFalse = []byte("false")
+)
 
 func (s JSONSchemaPropsOrBool) MarshalJSON() ([]byte, error) {
 	if s.Schema != nil {
@@ -124,7 +126,6 @@ func (s JSON) MarshalJSON() ([]byte, error) {
 		return s.Raw, nil
 	}
 	return []byte("null"), nil
-
 }
 
 func (s *JSON) UnmarshalJSON(data []byte) error {

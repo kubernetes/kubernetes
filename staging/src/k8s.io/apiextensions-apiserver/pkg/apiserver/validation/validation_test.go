@@ -134,7 +134,8 @@ func TestValidateCustomResource(t *testing.T) {
 		objects        []interface{}
 		failingObjects []failingObject
 	}{
-		{name: "!nullable",
+		{
+			name: "!nullable",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -156,7 +157,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": nil}, expectErrs: []string{`field: Invalid value: "null": field in body must be of type object: "null"`}},
 			},
 		},
-		{name: "nullable",
+		{
+			name: "nullable",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -178,7 +180,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type object: "array"`}},
 			},
 		},
-		{name: "nullable and no type",
+		{
+			name: "nullable and no type",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -197,7 +200,8 @@ func TestValidateCustomResource(t *testing.T) {
 				map[string]interface{}{"field": []interface{}{}},
 			},
 		},
-		{name: "x-kubernetes-int-or-string",
+		{
+			name: "x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -218,7 +222,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type integer,string: "array"`}},
 			},
 		},
-		{name: "nullable and x-kubernetes-int-or-string",
+		{
+			name: "nullable and x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -240,7 +245,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{`field: Invalid value: "array": field in body must be of type integer,string: "array"`}},
 			},
 		},
-		{name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
+		{
+			name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -282,7 +288,8 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
-		{name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
+		{
+			name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -332,7 +339,8 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
-		{name: "invalid regex",
+		{
+			name: "invalid regex",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -345,7 +353,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{"field: Invalid value: \"foo\": field in body should match '+, but pattern is invalid: error parsing regexp: missing argument to repetition operator: `+`'"}},
 			},
 		},
-		{name: "required field",
+		{
+			name: "required field",
 			schema: apiextensions.JSONSchemaProps{
 				Required: []string{"field"},
 				Properties: map[string]apiextensions.JSONSchemaProps{
@@ -363,7 +372,8 @@ func TestValidateCustomResource(t *testing.T) {
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{`field.nested: Required value`}},
 			},
 		},
-		{name: "enum",
+		{
+			name: "enum",
 			schema: apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {

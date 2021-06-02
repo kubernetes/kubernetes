@@ -438,7 +438,6 @@ func iptablesRestoreCommand(protocol Protocol) string {
 		return cmdIP6TablesRestore
 	}
 	return cmdIPTablesRestore
-
 }
 
 func iptablesCommand(protocol Protocol) string {
@@ -504,7 +503,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 	argset := sets.NewString(argsCopy...)
 
 	for _, line := range strings.Split(string(out), "\n") {
-		var fields = strings.Fields(line)
+		fields := strings.Fields(line)
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
@@ -596,7 +595,6 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 			}
 			return true, nil
 		}, stopCh)
-
 		if err != nil {
 			// stopCh was closed
 			for _, table := range tables {

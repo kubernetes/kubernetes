@@ -225,7 +225,6 @@ func TestCreateRenewCSR(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestCertToConfig(t *testing.T) {
@@ -257,7 +256,6 @@ func TestCertToConfig(t *testing.T) {
 
 	if len(cfg.Organization) != 1 || cfg.Organization[0] != expectedConfig.Organization[0] {
 		t.Errorf("expected organization %v, got %v", expectedConfig.Organization, cfg.Organization)
-
 	}
 
 	if len(cfg.Usages) != 1 || cfg.Usages[0] != expectedConfig.Usages[0] {

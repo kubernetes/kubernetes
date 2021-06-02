@@ -74,5 +74,4 @@ func (c *FakePodMetricses) List(opts v1.ListOptions) (result *v1beta1.PodMetrics
 func (c *FakePodMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podmetricsesResource, c.ns, opts))
-
 }

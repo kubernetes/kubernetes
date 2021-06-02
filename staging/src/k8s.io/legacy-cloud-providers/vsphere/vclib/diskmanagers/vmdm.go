@@ -136,7 +136,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	if err != nil {
 		fileAlreadyExist = isAlreadyExists(vmdisk.diskPath, err)
 		if fileAlreadyExist {
-			//Skip error and continue to detach the disk as the disk was already created on the datastore.
+			// Skip error and continue to detach the disk as the disk was already created on the datastore.
 			klog.V(vclib.LogLevel).Infof("File: %v already exists", vmdisk.diskPath)
 		} else {
 			klog.Errorf("Failed to attach the disk to VM: %q with err: %+v", dummyVMFullName, err)

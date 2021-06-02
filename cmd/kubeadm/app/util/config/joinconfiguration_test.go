@@ -36,7 +36,7 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// cfgFiles is in cluster_test.go
-	var tests = []struct {
+	tests := []struct {
 		name         string
 		fileContents string
 		expectErr    bool

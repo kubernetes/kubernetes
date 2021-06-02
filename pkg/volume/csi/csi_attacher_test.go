@@ -504,7 +504,6 @@ func TestAttacherWaitForAttach(t *testing.T) {
 			name:   "successful attach",
 			driver: "attachable",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
@@ -517,7 +516,6 @@ func TestAttacherWaitForAttach(t *testing.T) {
 		{
 			name: "failed attach with vol source",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
@@ -587,7 +585,6 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 		{
 			name: "successful attach with PV",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
@@ -600,7 +597,6 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 		{
 			name: "failed attach with volSrc",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
@@ -1244,7 +1240,6 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			// Run
 			err := csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
-
 			// Verify
 			if err != nil {
 				if !tc.shouldFail {

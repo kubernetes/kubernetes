@@ -227,7 +227,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 		// In a legacy cluster, the pod IP is guaranteed to be usable
 		endpointIP = pod.Status.PodIP
 	} else {
-		//feature flag enabled and pods may have multiple IPs
+		// feature flag enabled and pods may have multiple IPs
 		if len(svc.Spec.IPFamilies) > 0 {
 			// controller is connected to an api-server that correctly sets IPFamilies
 			ipFamily = svc.Spec.IPFamilies[0] // this works for headful and headless

@@ -64,7 +64,7 @@ func TestClaimPods(t *testing.T) {
 		pods    []*v1.Pod
 		claimed []*v1.Pod
 	}
-	var tests = []test{
+	tests := []test{
 		{
 			name: "Claim pods with correct label",
 			manager: NewPodControllerRefManager(&FakePodControl{},

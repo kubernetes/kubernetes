@@ -34,12 +34,14 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 		{name: "nil"},
 		{name: "no schema", obj: make(map[string]interface{})},
 		{name: "no object", schema: &schema.Structural{}},
-		{name: "list without schema",
+		{
+			name: "list without schema",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b", "a"},
 			},
 		},
-		{name: "list without items",
+		{
+			name: "list without items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b", "a"},
 			},
@@ -57,7 +59,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			},
 		},
 
-		{name: "set list with one item",
+		{
+			name: "set list with one item",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a"},
 			},
@@ -77,7 +80,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				},
 			},
 		},
-		{name: "set list with two equal items",
+		{
+			name: "set list with two equal items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "a"},
 			},
@@ -100,7 +104,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				duplicate("root", "array[1]"),
 			},
 		},
-		{name: "set list with two different items",
+		{
+			name: "set list with two different items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b"},
 			},
@@ -120,7 +125,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				},
 			},
 		},
-		{name: "set list with multiple duplicated items",
+		{
+			name: "set list with multiple duplicated items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "a", "b", "c", "d", "c"},
 			},
@@ -145,7 +151,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			},
 		},
 
-		{name: "normal list with items",
+		{
+			name: "normal list with items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b", "a"},
 			},
@@ -167,7 +174,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				},
 			},
 		},
-		{name: "set list with items",
+		{
+			name: "set list with items",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b", "a"},
 			},
@@ -195,7 +203,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				duplicate("root", "array[2]"),
 			},
 		},
-		{name: "set list with items under additionalProperties",
+		{
+			name: "set list with items under additionalProperties",
 			obj: map[string]interface{}{
 				"array": []interface{}{"a", "b", "a"},
 			},
@@ -223,7 +232,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				duplicate("root[array][2]"),
 			},
 		},
-		{name: "set list with items under items",
+		{
+			name: "set list with items under items",
 			obj: map[string]interface{}{
 				"array": []interface{}{
 					[]interface{}{"a", "b", "a"},
@@ -261,7 +271,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			},
 		},
 
-		{name: "nested set lists",
+		{
+			name: "nested set lists",
 			obj: map[string]interface{}{
 				"array": []interface{}{
 					"a", "b", "a", []interface{}{"b", "b", "a"},
@@ -296,7 +307,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			},
 		},
 
-		{name: "set list with compound map items",
+		{
+			name: "set list with compound map items",
 			obj: map[string]interface{}{
 				"strings":             []interface{}{"a", "b", "a"},
 				"integers":            []interface{}{int64(1), int64(2), int64(1)},
@@ -514,7 +526,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 				duplicate("root", "multiple duplicates[3]"),
 			},
 		},
-		{name: "set list with compound array items",
+		{
+			name: "set list with compound array items",
 			obj: map[string]interface{}{
 				"array": []interface{}{[]interface{}{}, []interface{}{"a"}, []interface{}{"a"}},
 			},
@@ -543,7 +556,8 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			},
 		},
 
-		{name: "map list with compound map items",
+		{
+			name: "map list with compound map items",
 			obj: map[string]interface{}{
 				"strings":                []interface{}{"a"},
 				"integers":               []interface{}{int64(1)},
@@ -933,6 +947,7 @@ func (v validationMatch) matches(err *field.Error) bool {
 func duplicate(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeDuplicate}
 }
+
 func invalid(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }

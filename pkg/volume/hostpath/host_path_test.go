@@ -158,7 +158,8 @@ func TestProvisioner(t *testing.T) {
 		nil,
 		volumetest.NewFakeKubeletVolumeHost(t, "/tmp/fake", nil, nil))
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
-		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
+		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}},
+	}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
@@ -198,7 +199,6 @@ func TestProvisioner(t *testing.T) {
 	}
 
 	os.RemoveAll(hostPathCreator.basePath)
-
 }
 
 func TestInvalidHostPath(t *testing.T) {
@@ -494,7 +494,6 @@ func TestOSFileTypeChecker(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 type fakeHostPathTypeChecker struct {
@@ -605,5 +604,4 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 			}
 		}
 	}
-
 }

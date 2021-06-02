@@ -28,7 +28,6 @@ import (
 )
 
 func TestAdmit(t *testing.T) {
-
 	plugin := admissiontesting.WithReinvocationTesting(t, newExtendedResourceToleration())
 
 	containerRequestingCPU := core.Container{

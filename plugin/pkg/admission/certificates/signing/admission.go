@@ -61,8 +61,10 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
+var (
+	_ admission.ValidationInterface        = &Plugin{}
+	_ genericadmissioninit.WantsAuthorizer = &Plugin{}
+)
 
 // NewPlugin creates a new CSR approval admission plugin
 func NewPlugin() *Plugin {

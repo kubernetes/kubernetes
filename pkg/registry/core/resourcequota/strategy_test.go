@@ -66,9 +66,10 @@ func TestResourceQuotaStrategy(t *testing.T) {
 }
 
 func TestGetValidationOptionsFromResourceQuota(t *testing.T) {
-	crossNamespaceAffinity := api.ResourceQuota{Spec: api.ResourceQuotaSpec{
-		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeCrossNamespacePodAffinity},
-	},
+	crossNamespaceAffinity := api.ResourceQuota{
+		Spec: api.ResourceQuotaSpec{
+			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeCrossNamespacePodAffinity},
+		},
 	}
 
 	for name, tc := range map[string]struct {

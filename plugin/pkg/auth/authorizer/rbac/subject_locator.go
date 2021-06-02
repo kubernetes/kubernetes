@@ -68,7 +68,6 @@ func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.At
 
 	if clusterRoleBindings, err := r.clusterRoleBindingLister.ListClusterRoleBindings(); err != nil {
 		errorlist = append(errorlist, err)
-
 	} else {
 		for _, clusterRoleBinding := range clusterRoleBindings {
 			rules, err := r.roleToRuleMapper.GetRoleReferenceRules(clusterRoleBinding.RoleRef, "")
@@ -87,7 +86,6 @@ func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.At
 	if namespace := requestAttributes.GetNamespace(); len(namespace) > 0 {
 		if roleBindings, err := r.roleBindingLister.ListRoleBindings(namespace); err != nil {
 			errorlist = append(errorlist, err)
-
 		} else {
 			for _, roleBinding := range roleBindings {
 				rules, err := r.roleToRuleMapper.GetRoleReferenceRules(roleBinding.RoleRef, namespace)

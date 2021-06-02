@@ -93,7 +93,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 		}}
 	}
 
-	//create CRD and waits for the resource to be recognized and available.
+	// create CRD and waits for the resource to be recognized and available.
 	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
 		framework.Failf("failed to create CustomResourceDefinition: %v", err)

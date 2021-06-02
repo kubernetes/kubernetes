@@ -41,6 +41,7 @@ type Recorder interface {
 func WithWarningRecorder(ctx context.Context, recorder Recorder) context.Context {
 	return context.WithValue(ctx, warningRecorderKey, recorder)
 }
+
 func warningRecorderFrom(ctx context.Context) (Recorder, bool) {
 	recorder, ok := ctx.Value(warningRecorderKey).(Recorder)
 	return recorder, ok

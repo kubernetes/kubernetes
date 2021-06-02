@@ -28,9 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
-var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
-var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
-var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
+var (
+	_ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
+	_ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
+	_ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
+)
 
 // CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v2 format
 type CPUManagerCheckpoint struct {

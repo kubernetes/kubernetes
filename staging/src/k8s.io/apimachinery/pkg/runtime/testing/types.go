@@ -210,6 +210,7 @@ func (obj *MyWeirdCustomEmbeddedVersionKindField) GetObjectKind() schema.ObjectK
 func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.ObjectKind = gvk.ToAPIVersionAndKind()
 }
+
 func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
 }

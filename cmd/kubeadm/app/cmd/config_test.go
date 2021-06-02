@@ -205,7 +205,6 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 }
 
 func TestConfigImagesListOutput(t *testing.T) {
-
 	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
 	if !ok {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)

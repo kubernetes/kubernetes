@@ -90,18 +90,23 @@ func (g *ClientConfigGetter) Load() (*clientcmdapi.Config, error) {
 func (g *ClientConfigGetter) GetLoadingPrecedence() []string {
 	return nil
 }
+
 func (g *ClientConfigGetter) GetStartingConfig() (*clientcmdapi.Config, error) {
 	return g.kubeconfigGetter()
 }
+
 func (g *ClientConfigGetter) GetDefaultFilename() string {
 	return ""
 }
+
 func (g *ClientConfigGetter) IsExplicitFile() bool {
 	return false
 }
+
 func (g *ClientConfigGetter) GetExplicitFile() string {
 	return ""
 }
+
 func (g *ClientConfigGetter) IsDefaultConfig(config *restclient.Config) bool {
 	return false
 }

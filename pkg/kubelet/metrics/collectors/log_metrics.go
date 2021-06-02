@@ -22,19 +22,17 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
-var (
-	descLogSize = metrics.NewDesc(
-		"kubelet_container_log_filesystem_used_bytes",
-		"Bytes used by the container's logs on the filesystem.",
-		[]string{
-			"uid",
-			"namespace",
-			"pod",
-			"container",
-		}, nil,
-		metrics.ALPHA,
-		"",
-	)
+var descLogSize = metrics.NewDesc(
+	"kubelet_container_log_filesystem_used_bytes",
+	"Bytes used by the container's logs on the filesystem.",
+	[]string{
+		"uid",
+		"namespace",
+		"pod",
+		"container",
+	}, nil,
+	metrics.ALPHA,
+	"",
 )
 
 type logMetricsCollector struct {

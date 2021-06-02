@@ -416,6 +416,7 @@ func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 		parsedRows: parsedRows,
 	}, nil
 }
+
 func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
 	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
 		return parser.FindResults(unstructuredObj.Object)

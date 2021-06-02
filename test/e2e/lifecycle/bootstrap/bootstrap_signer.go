@@ -18,6 +18,7 @@ package bootstrap
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,6 @@ const (
 )
 
 var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
-
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-signer")

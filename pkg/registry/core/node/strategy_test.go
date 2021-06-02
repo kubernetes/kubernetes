@@ -237,6 +237,7 @@ func TestDropFields(t *testing.T) {
 		}()
 	}
 }
+
 func TestValidateUpdate(t *testing.T) {
 	tests := []struct {
 		oldNode api.Node
@@ -298,6 +299,7 @@ func TestValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		node  api.Node

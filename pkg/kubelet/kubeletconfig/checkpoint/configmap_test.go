@@ -123,7 +123,8 @@ func TestConfigMapPayloadFiles(t *testing.T) {
 	}{
 		{"nil", nil, nil},
 		{"empty", map[string]string{}, map[string]string{}},
-		{"populated",
+		{
+			"populated",
 			map[string]string{
 				"foo": "1",
 				"bar": "2",
@@ -131,7 +132,8 @@ func TestConfigMapPayloadFiles(t *testing.T) {
 			map[string]string{
 				"foo": "1",
 				"bar": "2",
-			}},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {

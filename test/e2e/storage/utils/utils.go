@@ -778,7 +778,7 @@ func GetSizeRangesIntersection(first e2evolume.SizeRange, second e2evolume.SizeR
 	var firstMin, firstMax, secondMin, secondMax resource.Quantity
 	var err error
 
-	//if SizeRange is not set, assign a minimum or maximum size
+	// if SizeRange is not set, assign a minimum or maximum size
 	if len(first.Min) == 0 {
 		first.Min = minValidSize
 	}
@@ -811,8 +811,8 @@ func GetSizeRangesIntersection(first e2evolume.SizeRange, second e2evolume.SizeR
 	// the minimum of the intersection shall be returned as the claim size
 	var intersectionMin resource.Quantity
 
-	if intersectionEnd-interSectionStart >= 0 { //have intersection
-		intersectionMin = *resource.NewQuantity(int64(interSectionStart), "BinarySI") //convert value to BinarySI format. E.g. 5Gi
+	if intersectionEnd-interSectionStart >= 0 { // have intersection
+		intersectionMin = *resource.NewQuantity(int64(interSectionStart), "BinarySI") // convert value to BinarySI format. E.g. 5Gi
 		// return the minimum of the intersection as the claim size
 		return intersectionMin.String(), nil
 	}

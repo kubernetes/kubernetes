@@ -18,17 +18,16 @@ package componentstatus
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-
-	"net/http"
-	"net/url"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -138,7 +137,8 @@ func TestList_FailedCheck(t *testing.T) {
 	}
 	expect := &api.ComponentStatusList{
 		Items: []api.ComponentStatus{
-			*(createTestStatus("test1", api.ConditionFalse, "", ""))},
+			*(createTestStatus("test1", api.ConditionFalse, "", "")),
+		},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
 		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
@@ -153,7 +153,8 @@ func TestList_UnknownError(t *testing.T) {
 	}
 	expect := &api.ComponentStatusList{
 		Items: []api.ComponentStatus{
-			*(createTestStatus("test1", api.ConditionUnknown, "", "fizzbuzz error"))},
+			*(createTestStatus("test1", api.ConditionUnknown, "", "fizzbuzz error")),
+		},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
 		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))

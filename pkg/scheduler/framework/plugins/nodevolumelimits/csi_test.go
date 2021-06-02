@@ -514,7 +514,6 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 			}
 			pvLister = append(pvLister, pv)
 		}
-
 	}
 	return pvLister
 }

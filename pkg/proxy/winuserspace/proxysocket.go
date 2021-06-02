@@ -308,7 +308,6 @@ func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int
 		msg.Answer[0].Header().Name = origName
 	}
 	mbuf, err := msg.PackBuffer(buffer)
-
 	if err != nil {
 		klog.Warningf("Unable to pack DNS packet. Error is: %v", err)
 		return length, err

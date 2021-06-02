@@ -68,6 +68,7 @@ func (d *testDecodable) DeepCopyObject() runtime.Object {
 	d.DeepCopyInto(out)
 	return out
 }
+
 func (d *testDecodable) DeepCopyInto(out *testDecodable) {
 	*out = *d
 	out.Other = d.Other
@@ -148,7 +149,7 @@ func TestDecode(t *testing.T) {
 			expectedObject: &testDecodable{},
 			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 		},
-		//gvk defaulting if kind not provided in data and defaultGVK use into's kind
+		// gvk defaulting if kind not provided in data and defaultGVK use into's kind
 		{
 			data:           []byte(`{"apiVersion":"b1/c1"}`),
 			into:           &testDecodable{gvk: schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},

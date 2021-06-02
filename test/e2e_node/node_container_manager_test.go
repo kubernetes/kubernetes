@@ -65,7 +65,6 @@ var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 			framework.ExpectNoError(runTest(f))
 		})
 	})
-
 })
 
 func expectFileValToEqual(filePath string, expectedValue, delta int64) error {

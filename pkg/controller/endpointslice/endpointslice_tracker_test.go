@@ -219,6 +219,7 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		})
 	}
 }
+
 func TestEndpointSliceTrackerDeletion(t *testing.T) {
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -325,7 +326,6 @@ func TestEndpointSliceTrackerDeletion(t *testing.T) {
 			if esTracker.Has(epSlice1) != false {
 				t.Errorf("esTracker.Has(%+v) == %t, expected false", epSlice1, esTracker.Has(epSlice1))
 			}
-
 		})
 	}
 }

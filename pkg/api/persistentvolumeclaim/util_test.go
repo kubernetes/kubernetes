@@ -126,7 +126,7 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 		},
 	}
 
-	var tests = map[string]struct {
+	tests := map[string]struct {
 		spec core.PersistentVolumeClaimSpec
 		want *core.TypedLocalObjectReference
 	}{
@@ -157,11 +157,8 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 			if test.spec.DataSource != test.want {
 				t.Errorf("expected drop datasource condition was not met, test: %s, spec: %v, expected: %v", testName, test.spec, test.want)
 			}
-
 		})
-
 	}
-
 }
 
 // TestAnyDataSourceFilter checks to ensure the AnyVolumeDataSource feature gate works
@@ -178,7 +175,7 @@ func TestAnyDataSourceFilter(t *testing.T) {
 	snapshotDataSource := makeDataSource("snapshot.storage.k8s.io", "VolumeSnapshot", "my-snap")
 	genericDataSource := makeDataSource("generic.storage.k8s.io", "Generic", "my-foo")
 
-	var tests = map[string]struct {
+	tests := map[string]struct {
 		spec       core.PersistentVolumeClaimSpec
 		anyEnabled bool
 		want       *core.TypedLocalObjectReference

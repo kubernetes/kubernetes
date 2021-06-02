@@ -51,9 +51,11 @@ type sortedPods []*v1.Pod
 func (s sortedPods) Len() int {
 	return len(s)
 }
+
 func (s sortedPods) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
 func (s sortedPods) Less(i, j int) bool {
 	return s[i].Namespace < s[j].Namespace
 }
@@ -411,5 +413,4 @@ func TestPodUpdateLabels(t *testing.T) {
 	podUpdate = CreatePodUpdate(kubetypes.SET, TestSource, pod)
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
-
 }

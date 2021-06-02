@@ -56,7 +56,7 @@ func TestExtractFromHttpBadness(t *testing.T) {
 }
 
 func TestExtractInvalidPods(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		desc string
 		pod  *v1.Pod
 	}{
@@ -129,7 +129,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
-	var testCases = []struct {
+	testCases := []struct {
 		desc     string
 		pods     runtime.Object
 		expected kubetypes.PodUpdate

@@ -134,6 +134,7 @@ func commonVersionTrueCondition() []v1alpha1.StorageVersionCondition {
 		Message: "Common encoding version set",
 	}}
 }
+
 func commonVersionFalseCondition() []v1alpha1.StorageVersionCondition {
 	return []v1alpha1.StorageVersionCondition{{
 		Type:    v1alpha1.AllEncodingVersionsEqual,

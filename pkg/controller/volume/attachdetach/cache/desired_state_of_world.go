@@ -386,7 +386,8 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 						VolumeSpec:               volumeObj.spec,
 						NodeName:                 nodeName,
 						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
-					}})
+					},
+				})
 		}
 	}
 

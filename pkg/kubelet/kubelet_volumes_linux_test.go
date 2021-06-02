@@ -180,7 +180,6 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 					t.Errorf("%s failed validation: %v", name, err)
 				}
 			}
-
 		})
 	}
 }

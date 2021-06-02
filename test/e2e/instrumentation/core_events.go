@@ -169,7 +169,8 @@ var _ = common.SIGDescribe("Events", func() {
 
 		framework.Logf("requesting DeleteCollection of events")
 		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-			LabelSelector: "testevent-set=true"})
+			LabelSelector: "testevent-set=true",
+		})
 		framework.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("check that the list of events matches the requested quantity")
@@ -177,7 +178,6 @@ var _ = common.SIGDescribe("Events", func() {
 		err = wait.PollImmediate(eventRetryPeriod, eventRetryTimeout, checkEventListQuantity(f, "testevent-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required events")
 	})
-
 })
 
 func checkEventListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
@@ -187,8 +187,8 @@ func checkEventListQuantity(f *framework.Framework, label string, quantity int) 
 		framework.Logf("requesting list of events to confirm quantity")
 
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: label})
-
+			LabelSelector: label,
+		})
 		if err != nil {
 			return false, err
 		}

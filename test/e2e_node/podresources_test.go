@@ -306,7 +306,6 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 				cpuCount: 1,
 			},
 		}
-
 	}
 	tpd.createPodsForTest(f, expected)
 	expectPodResources(1, cli, expected)
@@ -369,7 +368,6 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 			cntName:  "cnt-00",
 			cpuCount: 1,
 		}
-
 	}
 
 	tpd.createPodsForTest(f, []podDesc{
@@ -526,7 +524,6 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			podresourcesListTests(f, cli, sd)
 			ginkgo.By("checking GetAllocatableResources()")
 			podresourcesGetAllocatableResourcesTests(f, cli, sd, onlineCPUs, reservedSystemCPUs)
-
 		})
 
 		ginkgo.It("should return the expected responses with cpumanager none policy", func() {
@@ -564,7 +561,6 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
 			podresourcesGetAllocatableResourcesTests(f, cli, sd, cpuset.CPUSet{}, cpuset.CPUSet{})
 		})
-
 	})
 
 	ginkgo.Context("Without SRIOV devices in the system", func() {
@@ -647,7 +643,6 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			_, err = cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 			framework.ExpectError(err, "With feature gate disabled, the call must fail")
 		})
-
 	})
 })
 

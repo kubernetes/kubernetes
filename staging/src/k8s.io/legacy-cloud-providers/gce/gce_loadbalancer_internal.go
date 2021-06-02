@@ -913,8 +913,9 @@ func ilbIPToUse(svc *v1.Service, fwdRule *compute.ForwardingRule, requestedSubne
 }
 
 func getILBOptions(svc *v1.Service) ILBOptions {
-	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
-		SubnetName: GetLoadBalancerAnnotationSubnet(svc),
+	return ILBOptions{
+		AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
+		SubnetName:        GetLoadBalancerAnnotationSubnet(svc),
 	}
 }
 

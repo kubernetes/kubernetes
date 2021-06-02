@@ -40,7 +40,6 @@ var _ = SIGDescribe("Container Runtime", func() {
 
 	ginkgo.Describe("blackbox test", func() {
 		ginkgo.Context("when starting a container that exits", func() {
-
 			/*
 				Release: v1.13
 				Testname: Container Runtime, Restart Policy, Pod Phases
@@ -264,7 +263,6 @@ while true; do sleep 1; done
 		})
 
 		ginkgo.Context("when running a container with a new image", func() {
-
 			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.

@@ -572,7 +572,6 @@ func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error)
 	}
 
 	csrBytes, err := x509.CreateCertificateRequest(cryptorand.Reader, template, key)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create a CSR")
 	}

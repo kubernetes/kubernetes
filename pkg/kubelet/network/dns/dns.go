@@ -41,10 +41,8 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-var (
-	// The default dns opt strings.
-	defaultDNSOptions = []string{"ndots:5"}
-)
+// The default dns opt strings.
+var defaultDNSOptions = []string{"ndots:5"}
 
 type podDNSType int
 

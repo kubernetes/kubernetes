@@ -370,8 +370,10 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
 	expectedList = []Deltas{
-		{{Added, mkFifoObj("baz", 10)},
-			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
+		{
+			{Added, mkFifoObj("baz", 10)},
+			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}},
+		},
 		{{Sync, mkFifoObj("foo", 5)}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
@@ -391,8 +393,10 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
 	expectedList = []Deltas{
-		{{Added, mkFifoObj("baz", 10)},
-			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
+		{
+			{Added, mkFifoObj("baz", 10)},
+			{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}},
+		},
 		{{Sync, mkFifoObj("foo", 5)}},
 	}
 

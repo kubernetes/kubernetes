@@ -272,7 +272,8 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		podDistribution := []podBatch{
 			{numNodes: fullNodesNum, podsPerNode: fullPerNodeReplicas},
-			{numNodes: underutilizedNodesNum, podsPerNode: underutilizedPerNodeReplicas}}
+			{numNodes: underutilizedNodesNum, podsPerNode: underutilizedPerNodeReplicas},
+		}
 
 		cleanup := distributeLoad(f, f.Namespace.Name, "10-70", podDistribution, perPodReservation,
 			int(0.95*float64(memCapacityMb)), map[string]string{}, largeScaleUpTimeout)
@@ -367,7 +368,6 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		testCleanup := simpleScaleUpTestWithTolerance(f, config, 0, unschedulablePodReplicas)
 		defer testCleanup()
 	})
-
 })
 
 func anyKey(input map[string]int) string {

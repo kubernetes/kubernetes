@@ -46,9 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 )
 
-var (
-	nextScheduleDelta = 100 * time.Millisecond
-)
+var nextScheduleDelta = 100 * time.Millisecond
 
 // ControllerV2 is a controller for CronJobs.
 // Refactored Cronjob controller that uses DelayingQueue and informers
@@ -517,7 +515,8 @@ func (jm *ControllerV2) syncCronJob(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getJobName(cj, *scheduledTime),
 			Namespace: cj.Namespace,
-		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
+		},
+	}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", scheduledTime)
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil

@@ -116,7 +116,8 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 			externalConfig.Plugins = append(externalConfig.Plugins,
 				apiserverv1.AdmissionPluginConfiguration{
 					Name: pluginName,
-					Path: configFilePath})
+					Path: configFilePath,
+				})
 		}
 	}
 	configScheme.Default(externalConfig)

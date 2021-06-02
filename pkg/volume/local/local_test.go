@@ -526,7 +526,6 @@ func TestConstructVolumeSpec(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestConstructBlockVolumeSpec(t *testing.T) {
@@ -702,12 +701,16 @@ func TestFilterPodMounts(t *testing.T) {
 			[]string{},
 		},
 		"mix": {
-			[]string{"/mnt/outside",
+			[]string{
+				"/mnt/outside",
 				filepath.Join(podsDir, "pod-mount"),
 				"/another/outside",
-				filepath.Join(podsDir, "pod-mount2")},
-			[]string{filepath.Join(podsDir, "pod-mount"),
-				filepath.Join(podsDir, "pod-mount2")},
+				filepath.Join(podsDir, "pod-mount2"),
+			},
+			[]string{
+				filepath.Join(podsDir, "pod-mount"),
+				filepath.Join(podsDir, "pod-mount2"),
+			},
 		},
 	}
 	for name, test := range cases {

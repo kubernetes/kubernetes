@@ -17,8 +17,9 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +61,6 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -105,7 +105,6 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -277,7 +276,6 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 			}
 		}
 	}
-
 }
 
 // Populates data struct with a new volume/pod
@@ -729,7 +727,6 @@ func verifyDesiredSizeLimitInVolumeDsw(
 						volumeName,
 						expectedDesiredSize,
 						v.DesiredSizeLimit)
-
 				}
 			}
 		}

@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,6 @@ func CreateNewTokens(client clientset.Interface, tokens []kubeadmapi.BootstrapTo
 
 // UpdateOrCreateTokens attempts to update a token with the given ID, or create if it does not already exist.
 func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens []kubeadmapi.BootstrapToken) error {
-
 	for _, token := range tokens {
 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)

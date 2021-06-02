@@ -43,4 +43,4 @@ find_files() {
     \) -name '*.go'
 }
 
-find_files | xargs gofmt -s -w
+find_files | xargs gofumpt -s -w

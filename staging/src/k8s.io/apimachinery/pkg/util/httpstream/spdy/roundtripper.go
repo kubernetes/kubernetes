@@ -45,8 +45,8 @@ import (
 // multiplexed streams. After RoundTrip() is invoked, Conn will be set
 // and usable. SpdyRoundTripper implements the UpgradeRoundTripper interface.
 type SpdyRoundTripper struct {
-	//tlsConfig holds the TLS configuration settings to use when connecting
-	//to the remote server.
+	// tlsConfig holds the TLS configuration settings to use when connecting
+	// to the remote server.
 	tlsConfig *tls.Config
 
 	/* TODO according to http://golang.org/pkg/net/http/#RoundTripper, a RoundTripper
@@ -76,9 +76,11 @@ type SpdyRoundTripper struct {
 	pingPeriod time.Duration
 }
 
-var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
-var _ httpstream.UpgradeRoundTripper = &SpdyRoundTripper{}
-var _ utilnet.Dialer = &SpdyRoundTripper{}
+var (
+	_ utilnet.TLSClientConfigHolder  = &SpdyRoundTripper{}
+	_ httpstream.UpgradeRoundTripper = &SpdyRoundTripper{}
+	_ utilnet.Dialer                 = &SpdyRoundTripper{}
+)
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use the specified
 // tlsConfig.

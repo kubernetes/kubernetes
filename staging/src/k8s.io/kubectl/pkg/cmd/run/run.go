@@ -313,7 +313,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	params["annotations"] = cmdutil.GetFlagStringArray(cmd, "annotations")
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
-	var createdObjects = []*RunObject{}
+	createdObjects := []*RunObject{}
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.Overrides)
 	if err != nil {
 		return err

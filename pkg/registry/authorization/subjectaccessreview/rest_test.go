@@ -19,10 +19,9 @@ package subjectaccessreview
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
-
-	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"

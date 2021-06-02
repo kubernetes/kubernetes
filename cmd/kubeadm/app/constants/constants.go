@@ -140,7 +140,7 @@ const (
 	// FrontProxyClientKeyName defines front proxy key name
 	FrontProxyClientKeyName = "front-proxy-client.key"
 	// FrontProxyClientCertCommonName defines front proxy certificate common name
-	FrontProxyClientCertCommonName = "front-proxy-client" //used as subject.commonname attribute (CN)
+	FrontProxyClientCertCommonName = "front-proxy-client" // used as subject.commonname attribute (CN)
 
 	// AdminKubeConfigFileName defines name for the kubeconfig aimed to be used by the superuser/admin of the cluster
 	AdminKubeConfigFileName = "admin.conf"

@@ -38,9 +38,7 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
-var (
-	pauseImage = imageutils.GetE2EImage(imageutils.Pause)
-)
+var pauseImage = imageutils.GetE2EImage(imageutils.Pause)
 
 func getTestTaint() v1.Taint {
 	now := metav1.Now()

@@ -25,7 +25,6 @@ import (
 )
 
 func TestBuildKubeletArgMap(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		opts     kubeletFlagsOpts

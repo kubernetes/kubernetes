@@ -692,7 +692,6 @@ func (oe *operationExecutor) DetachVolume(
 	}
 	return oe.pendingOperations.Run(
 		volumeToDetach.VolumeName, "" /* podName */, "" /* nodeName */, generatedOperations)
-
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
@@ -815,7 +814,6 @@ func (oe *operationExecutor) MountVolume(
 		// Mount/remount a volume when a volume is attached
 		generatedOperations = oe.operationGenerator.GenerateMountVolumeFunc(
 			waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
-
 	} else {
 		// Block volume case
 		// Creates a map to device if a volume is attached

@@ -69,8 +69,9 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 	}, nil
 }
 
-const fakeCurrentEtcdVersion = "3.1.12"
-const etcdStaticPod = `apiVersion: v1
+const (
+	fakeCurrentEtcdVersion = "3.1.12"
+	etcdStaticPod          = `apiVersion: v1
 kind: Pod
 metadata:
   labels:
@@ -82,6 +83,7 @@ spec:
   containers:
   - name: etcd
     image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
+)
 
 func getEtcdVersion(v *versionutil.Version) string {
 	return constants.SupportedEtcdVersion[uint8(v.Minor())]
@@ -90,7 +92,6 @@ func getEtcdVersion(v *versionutil.Version) string {
 const fakeCurrentCoreDNSVersion = "1.0.6"
 
 func TestGetAvailableUpgrades(t *testing.T) {
-
 	// constansts for test cases
 	// variables are in the form v{MAJOR}{MINOR}{PATCH}, where MINOR is a variable so test are automatically uptodate to the latest MinimumControlPlaneVersion/
 
@@ -612,7 +613,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-
 			dnsName := constants.CoreDNSDeploymentName
 
 			client := clientsetfake.NewSimpleClientset(&apps.Deployment{

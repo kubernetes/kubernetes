@@ -351,7 +351,8 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
-					}},
+					},
+				},
 			}, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -428,7 +429,8 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
-					}},
+					},
+				},
 			}, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {

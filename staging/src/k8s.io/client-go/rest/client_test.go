@@ -84,8 +84,10 @@ func TestDoRequestSuccess(t *testing.T) {
 	}
 	body, err := c.Get().Prefix("test").Do(context.Background()).Raw()
 
-	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
-		expStatus: status, testBody: true, testBodyErrorIsNotNil: false}
+	testParam := TestParam{
+		actualError: err, expectingError: false, expCreated: true,
+		expStatus: status, testBody: true, testBodyErrorIsNotNil: false,
+	}
 	validate(testParam, t, body, fakeHandler)
 }
 
@@ -175,8 +177,10 @@ func TestDoRequestCreated(t *testing.T) {
 	created := false
 	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
 
-	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
-		expStatus: status, testBody: false}
+	testParam := TestParam{
+		actualError: err, expectingError: false, expCreated: true,
+		expStatus: status, testBody: false,
+	}
 	validate(testParam, t, body, fakeHandler)
 }
 
@@ -189,8 +193,10 @@ func TestDoRequestNotCreated(t *testing.T) {
 	}
 	created := false
 	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
-	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
-		expStatus: expectedStatus, testBody: false}
+	testParam := TestParam{
+		actualError: err, expectingError: false, expCreated: false,
+		expStatus: expectedStatus, testBody: false,
+	}
 	validate(testParam, t, body, fakeHandler)
 }
 
@@ -204,8 +210,10 @@ func TestDoRequestAcceptedNoContentReturned(t *testing.T) {
 	}
 	created := false
 	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
-	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
-		testBody: false}
+	testParam := TestParam{
+		actualError: err, expectingError: false, expCreated: false,
+		testBody: false,
+	}
 	validate(testParam, t, body, fakeHandler)
 }
 
@@ -218,8 +226,10 @@ func TestBadRequest(t *testing.T) {
 	}
 	created := false
 	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
-	testParam := TestParam{actualError: err, expectingError: true, expCreated: false,
-		testBody: true}
+	testParam := TestParam{
+		actualError: err, expectingError: true, expCreated: false,
+		testBody: true,
+	}
 	validate(testParam, t, body, fakeHandler)
 }
 
@@ -251,7 +261,6 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 		}
 	}
 	fakeHandler.ValidateRequest(t, "/"+v1.SchemeGroupVersion.String()+"/test", "GET", nil)
-
 }
 
 func TestHTTPMethods(t *testing.T) {
@@ -337,7 +346,6 @@ func TestHTTPProxy(t *testing.T) {
 }
 
 func TestCreateBackoffManager(t *testing.T) {
-
 	theUrl, _ := url.Parse("http://localhost")
 
 	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
@@ -369,7 +377,6 @@ func TestCreateBackoffManager(t *testing.T) {
 	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
 		t.Errorf("Backoff should have been 0.")
 	}
-
 }
 
 func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {

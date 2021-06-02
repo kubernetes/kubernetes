@@ -579,7 +579,8 @@ func getScopeSelectorsFromQuota(quota corev1.ResourceQuota) []corev1.ScopedResou
 	for _, scope := range quota.Spec.Scopes {
 		selectors = append(selectors, corev1.ScopedResourceSelectorRequirement{
 			ScopeName: scope,
-			Operator:  corev1.ScopeSelectorOpExists})
+			Operator:  corev1.ScopeSelectorOpExists,
+		})
 	}
 	if quota.Spec.ScopeSelector != nil {
 		for _, scopeSelector := range quota.Spec.ScopeSelector.MatchExpressions {

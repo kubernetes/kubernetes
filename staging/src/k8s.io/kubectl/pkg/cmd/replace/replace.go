@@ -172,7 +172,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	//Replace will create a resource if it doesn't exist already, so ignore not found error
+	// Replace will create a resource if it doesn't exist already, so ignore not found error
 	deleteOpts.IgnoreNotFound = true
 	if o.PrintFlags.OutputFormat != nil {
 		deleteOpts.Output = *o.PrintFlags.OutputFormat

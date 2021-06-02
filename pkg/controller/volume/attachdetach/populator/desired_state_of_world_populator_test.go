@@ -89,14 +89,14 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 		intreeToCSITranslator:    csiTranslator,
 	}
 
-	//add the given node to the list of nodes managed by dsw
+	// add the given node to the list of nodes managed by dsw
 	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
 
 	dswp.findAndAddActivePods()
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
-	//check if the given volume referenced by the pod is added to dsw
+	// check if the given volume referenced by the pod is added to dsw
 	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if !volumeExists {
 		t.Fatalf(
@@ -105,10 +105,10 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			volumeExists)
 	}
 
-	//delete the pod and volume manually
+	// delete the pod and volume manually
 	dswp.desiredStateOfWorld.DeletePod(podName, expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 
-	//check if the given volume referenced by the pod still exists in dsw
+	// check if the given volume referenced by the pod still exists in dsw
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if volumeExists {
 		t.Fatalf(
@@ -117,10 +117,10 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			volumeExists)
 	}
 
-	//add pod and volume again
+	// add pod and volume again
 	dswp.findAndAddActivePods()
 
-	//check if the given volume referenced by the pod is added to dsw for the second time
+	// check if the given volume referenced by the pod is added to dsw for the second time
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if !volumeExists {
 		t.Fatalf(
@@ -131,7 +131,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	fakePodInformer.Informer().GetStore().Delete(pod)
 	dswp.findAndRemoveDeletedPods()
-	//check if the given volume referenced by the pod still exists in dsw
+	// check if the given volume referenced by the pod still exists in dsw
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if volumeExists {
 		t.Fatalf(
@@ -139,7 +139,6 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			expectedVolumeName,
 			volumeExists)
 	}
-
 }
 
 func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
@@ -194,14 +193,14 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 		intreeToCSITranslator:    csiTranslator,
 	}
 
-	//add the given node to the list of nodes managed by dsw
+	// add the given node to the list of nodes managed by dsw
 	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
 
 	dswp.findAndAddActivePods()
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
-	//check if the given volume referenced by the pod is added to dsw
+	// check if the given volume referenced by the pod is added to dsw
 	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if !volumeExists {
 		t.Fatalf(

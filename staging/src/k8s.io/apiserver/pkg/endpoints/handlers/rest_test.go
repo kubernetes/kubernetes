@@ -513,7 +513,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			continue
 		}
 	}
-
 }
 
 func TestNumberConversion(t *testing.T) {
@@ -922,7 +921,6 @@ func TestUpdateToCreateOptions(t *testing.T) {
 got:  %#+v
 want: %#+v`, got, update)
 			}
-
 		})
 	}
 }
@@ -977,7 +975,6 @@ func TestPatchToUpdateOptions(t *testing.T) {
 got:  %#+v
 want: %#+v`, got, converted)
 					}
-
 				})
 			}
 		})

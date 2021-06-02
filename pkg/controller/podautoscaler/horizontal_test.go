@@ -2561,7 +2561,7 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{20000, 10000, 30000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		//useMetricsAPI:       true,
+		// useMetricsAPI:       true,
 		lastScaleTime: &time,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
@@ -2656,7 +2656,6 @@ func TestStabilizeDownscale(t *testing.T) {
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
 func TestComputedToleranceAlgImplementation(t *testing.T) {
-
 	startPods := int32(10)
 	// 150 mCPU per pod.
 	totalUsedCPUOfAllPods := uint64(startPods * 150)
@@ -3595,7 +3594,6 @@ func TestScalingWithRules(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			if tc.testThis {
 				return
 			}
@@ -3622,7 +3620,6 @@ func TestScalingWithRules(t *testing.T) {
 			assert.Equal(t, tc.expectedCondition, condition, "HPA condition does not match with expected condition")
 		})
 	}
-
 }
 
 // TestStoreScaleEvents tests events storage and usage
@@ -3819,7 +3816,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{4, now.Add(-2 * time.Minute)},
-				{5, now.Add(-1 * time.Minute)}},
+				{5, now.Add(-1 * time.Minute)},
+			},
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   5,
@@ -3835,7 +3833,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{4, now.Add(-2 * time.Minute)},
-				{5, now.Add(-1 * time.Minute)}},
+				{5, now.Add(-1 * time.Minute)},
+			},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 7,
 			expectedStabilizedReplicas:   4,
@@ -3851,7 +3850,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{1, now.Add(-2 * time.Minute)},
-				{2, now.Add(-1 * time.Minute)}},
+				{2, now.Add(-1 * time.Minute)},
+			},
 			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
@@ -3867,7 +3867,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{4, now.Add(-2 * time.Minute)},
-				{5, now.Add(-1 * time.Minute)}},
+				{5, now.Add(-1 * time.Minute)},
+			},
 			currentReplicas:              1, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
@@ -3883,7 +3884,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-10 * time.Minute)},
-				{9, now.Add(-9 * time.Minute)}},
+				{9, now.Add(-9 * time.Minute)},
+			},
 			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
@@ -3897,7 +3899,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-10 * time.Minute)},
-				{9, now.Add(-9 * time.Minute)}},
+				{9, now.Add(-9 * time.Minute)},
+			},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   100,
@@ -3913,7 +3916,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 				{10, now.Add(-10 * time.Minute)},
 				{4, now.Add(-1 * time.Minute)},
 				{5, now.Add(-2 * time.Minute)},
-				{9, now.Add(-9 * time.Minute)}},
+				{9, now.Add(-9 * time.Minute)},
+			},
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   5,
@@ -3935,7 +3939,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 				{10, now.Add(-100 * time.Minute)},
 				{6, now.Add(-1 * time.Minute)},
 				{5, now.Add(-2 * time.Minute)},
-				{9, now.Add(-3 * time.Minute)}},
+				{9, now.Add(-3 * time.Minute)},
+			},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   5,
@@ -3946,7 +3951,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 				{9, now},
 			},
 			scaleUpStabilizationWindowSeconds: 300,
-		}, {
+		},
+		{
 			name: "scale up and down stabilization, do not scale up when prenormalized rec goes down",
 			key:  "",
 			recommendations: []timestampedRecommendation{
@@ -3958,7 +3964,8 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			expectedStabilizedReplicas:          2,
 			scaleUpStabilizationWindowSeconds:   300,
 			scaleDownStabilizationWindowSeconds: 300,
-		}, {
+		},
+		{
 			name: "scale up and down stabilization, do not scale down when prenormalized rec goes up",
 			key:  "",
 			recommendations: []timestampedRecommendation{

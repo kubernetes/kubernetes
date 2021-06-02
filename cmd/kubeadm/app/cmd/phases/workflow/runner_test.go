@@ -36,8 +36,7 @@ func phaseBuilder(name string, phases ...Phase) Phase {
 }
 
 func TestComputePhaseRunFlags(t *testing.T) {
-
-	var usecases = []struct {
+	usecases := []struct {
 		name          string
 		options       RunnerOptions
 		expected      map[string]bool
@@ -89,7 +88,7 @@ func TestComputePhaseRunFlags(t *testing.T) {
 	}
 	for _, u := range usecases {
 		t.Run(u.name, func(t *testing.T) {
-			var w = Runner{
+			w := Runner{
 				Phases: []Phase{
 					phaseBuilder("foo",
 						phaseBuilder("bar"),
@@ -143,7 +142,7 @@ func runConditionFalse(data RunData) (bool, error) {
 }
 
 func TestRunOrderAndConditions(t *testing.T) {
-	var w = Runner{
+	w := Runner{
 		Phases: []Phase{
 			phaseBuilder1("foo", nil,
 				phaseBuilder1("bar", runConditionTrue),
@@ -153,7 +152,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 		},
 	}
 
-	var usecases = []struct {
+	usecases := []struct {
 		name          string
 		options       RunnerOptions
 		expectedOrder []string
@@ -210,7 +209,7 @@ func runConditionFails(data RunData) (bool, error) {
 }
 
 func TestRunHandleErrors(t *testing.T) {
-	var w = Runner{
+	w := Runner{
 		Phases: []Phase{
 			phaseBuilder2("foo", runConditionPass, runPass),
 			phaseBuilder2("bar", runConditionPass, runFails),
@@ -218,7 +217,7 @@ func TestRunHandleErrors(t *testing.T) {
 		},
 	}
 
-	var usecases = []struct {
+	usecases := []struct {
 		name          string
 		options       RunnerOptions
 		expectedError bool
@@ -259,7 +258,7 @@ func phaseBuilder3(name string, hidden bool, phases ...Phase) Phase {
 }
 
 func TestHelp(t *testing.T) {
-	var w = Runner{
+	w := Runner{
 		Phases: []Phase{
 			phaseBuilder3("foo", false,
 				phaseBuilder3("bar [arg]", false),
@@ -323,10 +322,9 @@ func customArgs(cmd *cobra.Command, args []string) error {
 }
 
 func TestBindToCommandArgRequirements(t *testing.T) {
-
 	// because cobra.ExactArgs(1) == cobra.ExactArgs(3), it is needed
 	// to run test argument sets that both pass and fail to ensure the correct function was set.
-	var usecases = []struct {
+	usecases := []struct {
 		name      string
 		runner    Runner
 		testCases map[string]argTest
@@ -383,7 +381,6 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 
 	for _, rt := range usecases {
 		t.Run(rt.name, func(t *testing.T) {
-
 			rt.runner.BindToCommand(rt.cmd)
 
 			// Checks that cmd gets a new phase subcommand
@@ -408,7 +405,6 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 
 				// Test passing argument set
 				err := cCmd.Args(cCmd, args.pass)
-
 				if err != nil {
 					t.Errorf("command %s should validate the args: %v\n %v", cCmd.Name(), args.pass, err)
 				}
@@ -420,18 +416,16 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 					t.Errorf("command %s should fail to validate the args: %v\n %v", cCmd.Name(), args.pass, err)
 				}
 			}
-
 		})
 	}
 }
 
 func TestBindToCommand(t *testing.T) {
-
 	var dummy string
 	localFlags := pflag.NewFlagSet("dummy", pflag.ContinueOnError)
 	localFlags.StringVarP(&dummy, "flag4", "d", "d", "d")
 
-	var usecases = []struct {
+	usecases := []struct {
 		name                string
 		runner              Runner
 		expectedCmdAndFlags map[string][]string
@@ -456,7 +450,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{phaseBuilder4("foo", []string{"flag1"})},
 			},
 			expectedCmdAndFlags: map[string][]string{
-				"phase foo": {"flag1"}, //not "flag2"
+				"phase foo": {"flag1"}, // not "flag2"
 			},
 		},
 		{
@@ -465,7 +459,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{
 					phaseBuilder4("foo", []string{"flag3"}),
 					phaseBuilder4("bar", []string{"flag1", "flag2", "flag3"}),
-					phaseBuilder4("baz", []string{"flag1"}), //test if additional flags are filtered too
+					phaseBuilder4("baz", []string{"flag1"}), // test if additional flags are filtered too
 				},
 			},
 			setAdditionalFlags: func(flags *pflag.FlagSet) {
@@ -493,7 +487,7 @@ func TestBindToCommand(t *testing.T) {
 				Phases: []Phase{
 					phaseBuilder4("foo", []string{"flag3"},
 						phaseBuilder4("bar", []string{"flag1", "flag2", "flag3"}),
-						phaseBuilder4("baz", []string{"flag1"}), //test if additional flags are filtered too
+						phaseBuilder4("baz", []string{"flag1"}), // test if additional flags are filtered too
 						phaseBuilder5("qux", localFlags),
 					),
 				},
@@ -512,7 +506,6 @@ func TestBindToCommand(t *testing.T) {
 	}
 	for _, rt := range usecases {
 		t.Run(rt.name, func(t *testing.T) {
-
 			var dummy1, dummy2 string
 			cmd := &cobra.Command{
 				Use: "init",
@@ -578,7 +571,6 @@ func TestBindToCommand(t *testing.T) {
 					t.Errorf("command %s didn't have expected flags: %v\n", c, err)
 				}
 			}
-
 		})
 	}
 }

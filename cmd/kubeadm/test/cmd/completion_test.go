@@ -20,7 +20,7 @@ import "testing"
 
 func TestCmdCompletion(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		args     string
 		expected bool

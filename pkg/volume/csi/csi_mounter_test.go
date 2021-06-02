@@ -24,10 +24,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
-
-	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -236,7 +235,7 @@ func TestMounterSetUp(t *testing.T) {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
-			//Test the default value of file system type is not overridden
+			// Test the default value of file system type is not overridden
 			if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != 0 {
 				t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
 			}
@@ -843,7 +842,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 
-		//Test the default value of file system type is not overridden
+		// Test the default value of file system type is not overridden
 		if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != len(tc.fsType) {
 			t.Errorf("file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
 		}
@@ -903,7 +902,6 @@ func TestUnmounterTeardown(t *testing.T) {
 	if _, ok := pubs[csiUnmounter.volumeID]; ok {
 		t.Error("csi server may not have received NodeUnpublishVolume call")
 	}
-
 }
 
 func TestIsCorruptedDir(t *testing.T) {

@@ -106,7 +106,6 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 // are still attached to the node and update the status if they are not.
 func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
-
 		rc.reconcile()
 
 		if rc.disableReconciliationSync {

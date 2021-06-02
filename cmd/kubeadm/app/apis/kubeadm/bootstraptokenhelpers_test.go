@@ -30,8 +30,7 @@ import (
 var refTime = time.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
 
 func TestToSecret(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		bt     *BootstrapToken
 		secret *v1.Secret
 	}{
@@ -78,7 +77,7 @@ func TestToSecret(t *testing.T) {
 }
 
 func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		bt *BootstrapToken
 	}{
 		{
@@ -111,7 +110,7 @@ func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 }
 
 func TestEncodeTokenSecretData(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name string
 		bt   *BootstrapToken
 		data map[string][]byte
@@ -256,7 +255,7 @@ func mustParseDuration(durationStr string, t *testing.T) time.Duration {
 }
 
 func TestBootstrapTokenFromSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc          string
 		name          string
 		data          map[string][]byte

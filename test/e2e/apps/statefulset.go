@@ -317,7 +317,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 						Partition: func() *int32 {
 							i := int32(3)
 							return &i
-						}()}
+						}(),
+					}
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
@@ -372,7 +373,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 						Partition: func() *int32 {
 							i := int32(2)
 							return &i
-						}()}
+						}(),
+					}
 				}(),
 			}
 			ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -383,7 +385,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 							Partition: func() *int32 {
 								i := int32(2)
 								return &i
-							}()}
+							}(),
+						}
 					}(),
 				}
 			})
@@ -493,7 +496,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 				ss.Name,
 				ss.Status.CurrentRevision,
 				updateRevision))
-
 		})
 
 		// Do not mark this as Conformance.
@@ -1120,6 +1122,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
+
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))

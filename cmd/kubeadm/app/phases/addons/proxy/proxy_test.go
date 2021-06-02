@@ -90,7 +90,7 @@ func TestCreateServiceAccount(t *testing.T) {
 }
 
 func TestCompileManifests(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		manifest string
 		data     interface{}
@@ -136,7 +136,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 		IPv6SetBindAddress
 	)
 
-	var testCases = []struct {
+	testCases := []struct {
 		name           string
 		simError       SimulatedError
 		expErrString   string

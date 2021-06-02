@@ -54,8 +54,10 @@ type HumanReadableGenerator struct {
 	handlerMap map[reflect.Type]*handlerEntry
 }
 
-var _ TableGenerator = &HumanReadableGenerator{}
-var _ PrintHandler = &HumanReadableGenerator{}
+var (
+	_ TableGenerator = &HumanReadableGenerator{}
+	_ PrintHandler   = &HumanReadableGenerator{}
+)
 
 // NewTableGenerator creates a HumanReadableGenerator suitable for calling GenerateTable().
 func NewTableGenerator() *HumanReadableGenerator {

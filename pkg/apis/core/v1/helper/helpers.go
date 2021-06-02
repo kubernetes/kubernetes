@@ -88,7 +88,7 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 // <size><unit-prefix>B (1024 = "1KB", 1048576 = "1MB", etc).
 func HugePageUnitSizeFromByteSize(size int64) (string, error) {
 	// hugePageSizeUnitList is borrowed from opencontainers/runc/libcontainer/cgroups/utils.go
-	var hugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	hugePageSizeUnitList := []string{"B", "KB", "MB", "GB", "TB", "PB"}
 	idx := 0
 	len := len(hugePageSizeUnitList) - 1
 	for size%1024 == 0 && idx < len {

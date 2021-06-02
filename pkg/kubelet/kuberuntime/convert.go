@@ -49,7 +49,7 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 }
 
 func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageSpec {
-	var annotations = make(map[string]string)
+	annotations := make(map[string]string)
 	if imageSpec.Annotations != nil {
 		for _, a := range imageSpec.Annotations {
 			annotations[a.Name] = a.Value

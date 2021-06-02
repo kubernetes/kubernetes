@@ -57,8 +57,10 @@ var waitingMark = &requestWatermark{
 	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
 }
 
-var atomicMutatingExecuting, atomicReadOnlyExecuting int32
-var atomicMutatingWaiting, atomicReadOnlyWaiting int32
+var (
+	atomicMutatingExecuting, atomicReadOnlyExecuting int32
+	atomicMutatingWaiting, atomicReadOnlyWaiting     int32
+)
 
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
@@ -97,7 +99,8 @@ func WithPriorityAndFairness(
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
 				PriorityLevelName: pl.Name,
-				PriorityLevelUID:  pl.UID}
+				PriorityLevelUID:  pl.UID,
+			}
 		}
 
 		var served bool
@@ -145,7 +148,6 @@ func WithPriorityAndFairness(
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
 		}
-
 	})
 }
 

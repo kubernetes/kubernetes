@@ -172,7 +172,6 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

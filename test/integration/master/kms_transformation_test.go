@@ -23,7 +23,6 @@ import (
 	"context"
 	"crypto/aes"
 	"encoding/binary"
-
 	"fmt"
 	"net/http"
 	"strings"

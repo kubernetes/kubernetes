@@ -30,35 +30,45 @@ func TestStringColonSeparatedMultimapStringString(t *testing.T) {
 	}{
 		{"nil", NewColonSeparatedMultimapStringString(&nilMap), ""},
 		{"empty", NewColonSeparatedMultimapStringString(&map[string][]string{}), ""},
-		{"empty key", NewColonSeparatedMultimapStringString(
-			&map[string][]string{
-				"": {"foo"},
-			}),
-			":foo"},
-		{"one key", NewColonSeparatedMultimapStringString(
-			&map[string][]string{
-				"one": {"foo"},
-			}),
-			"one:foo"},
-		{"two keys", NewColonSeparatedMultimapStringString(
-			&map[string][]string{
-				"one": {"foo"},
-				"two": {"bar"},
-			}),
-			"one:foo,two:bar"},
-		{"two keys, multiple items in one key", NewColonSeparatedMultimapStringString(
-			&map[string][]string{
-				"one": {"foo", "baz"},
-				"two": {"bar"},
-			}),
-			"one:foo,one:baz,two:bar"},
-		{"three keys, multiple items in one key", NewColonSeparatedMultimapStringString(
-			&map[string][]string{
-				"a": {"hello"},
-				"b": {"again", "beautiful"},
-				"c": {"world"},
-			}),
-			"a:hello,b:again,b:beautiful,c:world"},
+		{
+			"empty key", NewColonSeparatedMultimapStringString(
+				&map[string][]string{
+					"": {"foo"},
+				}),
+			":foo",
+		},
+		{
+			"one key", NewColonSeparatedMultimapStringString(
+				&map[string][]string{
+					"one": {"foo"},
+				}),
+			"one:foo",
+		},
+		{
+			"two keys", NewColonSeparatedMultimapStringString(
+				&map[string][]string{
+					"one": {"foo"},
+					"two": {"bar"},
+				}),
+			"one:foo,two:bar",
+		},
+		{
+			"two keys, multiple items in one key", NewColonSeparatedMultimapStringString(
+				&map[string][]string{
+					"one": {"foo", "baz"},
+					"two": {"bar"},
+				}),
+			"one:foo,one:baz,two:bar",
+		},
+		{
+			"three keys, multiple items in one key", NewColonSeparatedMultimapStringString(
+				&map[string][]string{
+					"a": {"hello"},
+					"b": {"again", "beautiful"},
+					"c": {"world"},
+				}),
+			"a:hello,b:again,b:beautiful,c:world",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
@@ -80,63 +90,96 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 		err    string
 	}{
 		// we initialize the map with a default key that should be cleared by Set
-		{"clears defaults", []string{""},
+		{
+			"clears defaults",
+			[]string{""},
 			NewColonSeparatedMultimapStringString(&map[string][]string{"default": {}}),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
-				Multimap:    &map[string][]string{}}, ""},
+				Multimap:    &map[string][]string{},
+			}, "",
+		},
 		// make sure we still allocate for "initialized" multimaps where Multimap was initially set to a nil map
-		{"allocates map if currently nil", []string{""},
+		{
+			"allocates map if currently nil",
+			[]string{""},
 			&ColonSeparatedMultimapStringString{initialized: true, Multimap: &nilMap},
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap:    &map[string][]string{},
-			}, ""},
+			}, "",
+		},
 		// for most cases, we just reuse nilMap, which should be allocated by Set, and is reset before each test case
-		{"empty", []string{""},
+		{
+			"empty",
+			[]string{""},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
-				Multimap:    &map[string][]string{}}, ""},
-		{"empty key", []string{":foo"},
+				Multimap:    &map[string][]string{},
+			}, "",
+		},
+		{
+			"empty key",
+			[]string{":foo"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap: &map[string][]string{
 					"": {"foo"},
-				}}, ""},
-		{"one key", []string{"one:foo"},
+				},
+			}, "",
+		},
+		{
+			"one key",
+			[]string{"one:foo"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap: &map[string][]string{
 					"one": {"foo"},
-				}}, ""},
-		{"two keys", []string{"one:foo,two:bar"},
+				},
+			}, "",
+		},
+		{
+			"two keys",
+			[]string{"one:foo,two:bar"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap: &map[string][]string{
 					"one": {"foo"},
 					"two": {"bar"},
-				}}, ""},
-		{"two keys with space", []string{"one:foo, two:bar"},
+				},
+			}, "",
+		},
+		{
+			"two keys with space",
+			[]string{"one:foo, two:bar"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap: &map[string][]string{
 					"one": {"foo"},
 					"two": {"bar"},
-				}}, ""},
-		{"two keys, multiple items in one key", []string{"one: foo, two:bar, one:baz"},
+				},
+			}, "",
+		},
+		{
+			"two keys, multiple items in one key",
+			[]string{"one: foo, two:bar, one:baz"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap: &map[string][]string{
 					"one": {"foo", "baz"},
 					"two": {"bar"},
-				}}, ""},
-		{"three keys, multiple items in one key", []string{"a:hello,b:again,c:world,b:beautiful"},
+				},
+			}, "",
+		},
+		{
+			"three keys, multiple items in one key",
+			[]string{"a:hello,b:again,c:world,b:beautiful"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
@@ -144,8 +187,12 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 					"a": {"hello"},
 					"b": {"again", "beautiful"},
 					"c": {"world"},
-				}}, ""},
-		{"three keys, multiple items in one key, multiple Set invocations", []string{"a:hello,b:again", "c:world", "b:beautiful"},
+				},
+			}, "",
+		},
+		{
+			"three keys, multiple items in one key, multiple Set invocations",
+			[]string{"a:hello,b:again", "c:world", "b:beautiful"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
@@ -153,15 +200,23 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 					"a": {"hello"},
 					"b": {"again", "beautiful"},
 					"c": {"world"},
-				}}, ""},
-		{"missing value", []string{"a"},
+				},
+			}, "",
+		},
+		{
+			"missing value",
+			[]string{"a"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			nil,
-			"malformed pair, expect string:string"},
-		{"no target", []string{"a:foo"},
+			"malformed pair, expect string:string",
+		},
+		{
+			"no target",
+			[]string{"a:foo"},
 			NewColonSeparatedMultimapStringString(nil),
 			nil,
-			"no target (nil pointer to map[string][]string)"},
+			"no target (nil pointer to map[string][]string)",
+		},
 	}
 
 	for _, c := range cases {

@@ -35,9 +35,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -50,9 +52,11 @@ func (*Pod) ProtoMessage() {}
 func (*Pod) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e51f083472f439e3, []int{0}
 }
+
 func (m *Pod) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Pod) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -61,12 +65,15 @@ func (m *Pod) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Pod) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Pod.Merge(m, src)
 }
+
 func (m *Pod) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Pod) XXX_DiscardUnknown() {
 	xxx_messageInfo_Pod.DiscardUnknown(m)
 }
@@ -78,9 +85,11 @@ func (*PodCondition) ProtoMessage() {}
 func (*PodCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e51f083472f439e3, []int{1}
 }
+
 func (m *PodCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -89,12 +98,15 @@ func (m *PodCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	}
 	return b[:n], nil
 }
+
 func (m *PodCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodCondition.Merge(m, src)
 }
+
 func (m *PodCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodCondition.DiscardUnknown(m)
 }
@@ -106,9 +118,11 @@ func (*PodList) ProtoMessage() {}
 func (*PodList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e51f083472f439e3, []int{2}
 }
+
 func (m *PodList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -117,12 +131,15 @@ func (m *PodList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PodList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodList.Merge(m, src)
 }
+
 func (m *PodList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodList) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodList.DiscardUnknown(m)
 }
@@ -134,9 +151,11 @@ func (*PodSpec) ProtoMessage() {}
 func (*PodSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e51f083472f439e3, []int{3}
 }
+
 func (m *PodSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -145,12 +164,15 @@ func (m *PodSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PodSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodSpec.Merge(m, src)
 }
+
 func (m *PodSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodSpec.DiscardUnknown(m)
 }
@@ -162,9 +184,11 @@ func (*PodStatus) ProtoMessage() {}
 func (*PodStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e51f083472f439e3, []int{4}
 }
+
 func (m *PodStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -173,12 +197,15 @@ func (m *PodStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PodStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodStatus.Merge(m, src)
 }
+
 func (m *PodStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodStatus.DiscardUnknown(m)
 }
@@ -638,6 +665,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *Pod) Size() (n int) {
 	if m == nil {
 		return 0
@@ -763,14 +791,17 @@ func (m *PodStatus) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *Pod) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Pod{`,
+	s := strings.Join([]string{
+		`&Pod{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "PodSpec", "PodSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "PodStatus", "PodStatus", 1), `&`, ``, 1) + `,`,
@@ -778,11 +809,13 @@ func (this *Pod) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PodCondition{`,
+	s := strings.Join([]string{
+		`&PodCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastProbeTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastProbeTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -793,6 +826,7 @@ func (this *PodCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodList) String() string {
 	if this == nil {
 		return "nil"
@@ -802,13 +836,15 @@ func (this *PodList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Pod", "Pod", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&PodList{`,
+	s := strings.Join([]string{
+		`&PodList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PodSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -823,7 +859,8 @@ func (this *PodSpec) String() string {
 		mapStringForNodeSelector += fmt.Sprintf("%v: %v,", k, this.NodeSelector[k])
 	}
 	mapStringForNodeSelector += "}"
-	s := strings.Join([]string{`&PodSpec{`,
+	s := strings.Join([]string{
+		`&PodSpec{`,
 		`RestartPolicy:` + fmt.Sprintf("%v", this.RestartPolicy) + `,`,
 		`TerminationGracePeriodSeconds:` + valueToStringGenerated(this.TerminationGracePeriodSeconds) + `,`,
 		`ActiveDeadlineSeconds:` + valueToStringGenerated(this.ActiveDeadlineSeconds) + `,`,
@@ -841,6 +878,7 @@ func (this *PodSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -850,7 +888,8 @@ func (this *PodStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "PodCondition", "PodCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&PodStatus{`,
+	s := strings.Join([]string{
+		`&PodStatus{`,
 		`Phase:` + fmt.Sprintf("%v", this.Phase) + `,`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
@@ -862,6 +901,7 @@ func (this *PodStatus) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -870,6 +910,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *Pod) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1019,6 +1060,7 @@ func (m *Pod) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1263,6 +1305,7 @@ func (m *PodCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1380,6 +1423,7 @@ func (m *PodList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1881,6 +1925,7 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2161,6 +2206,7 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

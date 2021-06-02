@@ -556,7 +556,6 @@ func TestDropDisabledField(t *testing.T) {
 			}
 		}()
 	}
-
 }
 
 func TestNormalizeClusterIPs(t *testing.T) {
@@ -700,12 +699,10 @@ func TestNormalizeClusterIPs(t *testing.T) {
 			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
 				if clusterIP != tc.expectedClusterIPs[idx] {
 					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
-
 				}
 			}
 		})
 	}
-
 }
 
 func TestDropTypeDependentFields(t *testing.T) {
@@ -952,7 +949,8 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
 			patch:  nil,
 			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
-		}}
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1097,7 +1095,6 @@ func TestTrimFieldsForDualStackDowngrade(t *testing.T) {
 					t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
 				}
 			}
-
 		})
 	}
 }

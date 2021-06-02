@@ -124,8 +124,10 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	case runtime.IsNotRegisteredError(err):
 		// fall back to generic JSON merge patch
 		patchType = types.MergePatchType
-		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
-			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
+		preconditions := []mergepatch.PreconditionFunc{
+			mergepatch.RequireKeyUnchanged("apiVersion"),
+			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name"),
+		}
 		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
 		if err != nil {
 			if mergepatch.IsPreconditionFailed(err) {

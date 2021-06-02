@@ -55,9 +55,7 @@ const (
 	flagCacheDir         = "cache-dir"
 )
 
-var (
-	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
-)
+var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -324,7 +322,6 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Timeout != nil {
 		flags.StringVar(f.Timeout, flagTimeout, *f.Timeout, "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.")
 	}
-
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags

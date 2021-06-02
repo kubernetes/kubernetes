@@ -115,7 +115,6 @@ func TestEventProcessorOrdersEvents(t *testing.T) {
 	if numProcessed != 1000 {
 		t.Errorf("unexpected number of events processed: %d", numProcessed)
 	}
-
 }
 
 type byEventTypeAndName []watch.Event
@@ -275,7 +274,6 @@ func TestNewInformerWatcher(t *testing.T) {
 			<-done
 		})
 	}
-
 }
 
 // TestInformerWatcherDeletedFinalStateUnknown tests the code path when `DeleteFunc`

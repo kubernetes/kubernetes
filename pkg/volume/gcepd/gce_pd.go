@@ -49,12 +49,14 @@ type gcePersistentDiskPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
+var (
+	_ volume.VolumePlugin                 = &gcePersistentDiskPlugin{}
+	_ volume.PersistentVolumePlugin       = &gcePersistentDiskPlugin{}
+	_ volume.DeletableVolumePlugin        = &gcePersistentDiskPlugin{}
+	_ volume.ProvisionableVolumePlugin    = &gcePersistentDiskPlugin{}
+	_ volume.ExpandableVolumePlugin       = &gcePersistentDiskPlugin{}
+	_ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
+)
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
@@ -204,7 +206,8 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		mountOptions: util.MountOptionFromSpec(spec),
-		readOnly:     readOnly}, nil
+		readOnly:     readOnly,
+	}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -237,7 +240,8 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 			pdName:  spec.PersistentVolume.Spec.GCEPersistentDisk.PDName,
 			manager: manager,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -263,13 +267,11 @@ func (plugin *gcePersistentDiskPlugin) ExpandVolumeDevice(
 	newSize resource.Quantity,
 	oldSize resource.Quantity) (resource.Quantity, error) {
 	cloud, err := getCloudProvider(plugin.host.GetCloudProvider())
-
 	if err != nil {
 		return oldSize, err
 	}
 	pdName := spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
 	updatedQuantity, err := cloud.ResizeDisk(pdName, oldSize, newSize)
-
 	if err != nil {
 		return oldSize, err
 	}

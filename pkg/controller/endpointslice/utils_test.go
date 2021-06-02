@@ -214,7 +214,6 @@ func TestNewEndpointSlice(t *testing.T) {
 			assert.EqualValues(t, tc.expectedSlice, generatedSlice)
 		})
 	}
-
 }
 
 func TestPodToEndpoint(t *testing.T) {
@@ -634,7 +633,6 @@ func TestGetEndpointPorts(t *testing.T) {
 }
 
 func TestSetEndpointSliceLabels(t *testing.T) {
-
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec: v1.ServiceSpec{
@@ -912,7 +910,6 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 			assert.EqualValues(t, tc.expectedLabels, labels)
 		})
 	}
-
 }
 
 // Test helpers

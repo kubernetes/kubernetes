@@ -37,7 +37,7 @@ func TestZapLoggerInfo(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
-	var testDataInfo = []struct {
+	testDataInfo := []struct {
 		msg        string
 		format     string
 		keysValues []interface{}
@@ -67,7 +67,7 @@ func TestZapLoggerInfo(t *testing.T) {
 	for _, data := range testDataInfo {
 		var buffer bytes.Buffer
 		writer := bufio.NewWriter(&buffer)
-		var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
+		sampleInfoLogger := NewJSONLogger(zapcore.AddSync(writer))
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		writer.Flush()
 		logStr := buffer.String()
@@ -85,7 +85,7 @@ func TestZapLoggerInfo(t *testing.T) {
 
 // TestZapLoggerEnabled test ZapLogger enabled
 func TestZapLoggerEnabled(t *testing.T) {
-	var sampleInfoLogger = NewJSONLogger(nil)
+	sampleInfoLogger := NewJSONLogger(nil)
 	for i := 0; i < 11; i++ {
 		if !sampleInfoLogger.V(i).Enabled() {
 			t.Errorf("V(%d).Info should be enabled", i)
@@ -102,7 +102,7 @@ func TestZapLoggerV(t *testing.T) {
 	for i := 0; i < 11; i++ {
 		var buffer bytes.Buffer
 		writer := bufio.NewWriter(&buffer)
-		var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
+		sampleInfoLogger := NewJSONLogger(zapcore.AddSync(writer))
 		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		writer.Flush()
 		logStr := buffer.String()
@@ -131,7 +131,7 @@ func TestZapLoggerError(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
-	var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
+	sampleInfoLogger := NewJSONLogger(zapcore.AddSync(writer))
 	sampleInfoLogger.Error(fmt.Errorf("ivailid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
 	writer.Flush()
 	logStr := buffer.String()

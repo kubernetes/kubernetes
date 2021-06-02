@@ -21,15 +21,13 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-var (
-	regenerationCounter = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Name:           "apiextensions_openapi_v2_regeneration_count",
-			Help:           "Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name and reason.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"crd", "reason"},
-	)
+var regenerationCounter = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "apiextensions_openapi_v2_regeneration_count",
+		Help:           "Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name and reason.",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"crd", "reason"},
 )
 
 func init() {

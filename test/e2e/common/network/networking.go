@@ -28,7 +28,6 @@ var _ = SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
-
 		checkPodToPodConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
 			// breadth first poll to quickly estimate failure.
 			failedPodsByHost := map[string][]*v1.Pod{}
@@ -144,6 +143,5 @@ var _ = SIGDescribe("Networking", func() {
 				}
 			}
 		})
-
 	})
 })

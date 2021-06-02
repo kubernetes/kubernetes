@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"encoding/json"
-
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -152,7 +151,8 @@ var _ = SIGDescribe("PodTemplates", func() {
 
 		framework.Logf("requesting DeleteCollection of pod templates")
 		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-			LabelSelector: "podtemplate-set=true"})
+			LabelSelector: "podtemplate-set=true",
+		})
 		framework.ExpectNoError(err, "failed to delete all pod templates")
 
 		ginkgo.By("check that the list of pod templates matches the requested quantity")
@@ -160,7 +160,6 @@ var _ = SIGDescribe("PodTemplates", func() {
 		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(f, "podtemplate-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required pod templates")
 	})
-
 })
 
 func checkPodTemplateListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
@@ -170,8 +169,8 @@ func checkPodTemplateListQuantity(f *framework.Framework, label string, quantity
 		framework.Logf("requesting list of pod templates to confirm quantity")
 
 		list, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: label})
-
+			LabelSelector: label,
+		})
 		if err != nil {
 			return false, err
 		}

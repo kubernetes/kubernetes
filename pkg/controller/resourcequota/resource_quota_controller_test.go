@@ -88,15 +88,16 @@ func newErrorLister() cache.GenericLister {
 	return errorLister{}
 }
 
-type errorLister struct {
-}
+type errorLister struct{}
 
 func (errorLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	return nil, fmt.Errorf("error listing")
 }
+
 func (errorLister) Get(name string) (runtime.Object, error) {
 	return nil, fmt.Errorf("error getting")
 }
+
 func (errorLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	return errorLister{}
 }
@@ -304,7 +305,8 @@ func TestSyncResourceQuota(t *testing.T) {
 						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: v1.ResourceQuotaScopePriorityClass,
-								Operator:  v1.ScopeSelectorOpExists},
+								Operator:  v1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},
@@ -340,7 +342,8 @@ func TestSyncResourceQuota(t *testing.T) {
 						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: v1.ResourceQuotaScopePriorityClass,
-								Operator:  v1.ScopeSelectorOpExists},
+								Operator:  v1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},

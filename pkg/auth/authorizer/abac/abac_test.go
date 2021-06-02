@@ -359,7 +359,6 @@ func TestAuthorizeV1beta1(t *testing.T) {
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectAnyGroup",   "apiGroup": "*"}}
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectEmptyGroup", "apiGroup": "" }}
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectXGroup",     "apiGroup": "x"}}`)
-
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)
 	}

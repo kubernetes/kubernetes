@@ -55,7 +55,8 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-				}},
+				},
+			},
 			probVolumePlugins: gcepd.ProbeVolumePlugins(),
 		},
 		{
@@ -64,7 +65,8 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
-				}},
+				},
+			},
 			probVolumePlugins: awsebs.ProbeVolumePlugins(),
 		},
 	}

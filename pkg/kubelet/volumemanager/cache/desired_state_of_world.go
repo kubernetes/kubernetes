@@ -407,7 +407,9 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
 						ReportedInUse:           volumeObj.reportedInUse,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+					},
+				})
 		}
 	}
 	return volumesToMount

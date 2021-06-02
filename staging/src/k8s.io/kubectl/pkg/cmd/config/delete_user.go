@@ -29,11 +29,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	deleteUserExample = templates.Examples(`
+var deleteUserExample = templates.Examples(`
 		# Delete the minikube user
 		kubectl config delete-user minikube`)
-)
 
 // DeleteUserOptions holds the data needed to run the command
 type DeleteUserOptions struct {

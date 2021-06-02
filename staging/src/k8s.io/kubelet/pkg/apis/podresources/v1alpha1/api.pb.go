@@ -22,22 +22,25 @@ package v1alpha1
 import (
 	context "context"
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	io "io"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+
+	_ "github.com/gogo/protobuf/gogoproto"
+	proto "github.com/gogo/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -56,9 +59,11 @@ func (*ListPodResourcesRequest) ProtoMessage() {}
 func (*ListPodResourcesRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *ListPodResourcesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ListPodResourcesRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ListPodResourcesRequest.Marshal(b, m, deterministic)
@@ -71,12 +76,15 @@ func (m *ListPodResourcesRequest) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return b[:n], nil
 	}
 }
+
 func (m *ListPodResourcesRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ListPodResourcesRequest.Merge(m, src)
 }
+
 func (m *ListPodResourcesRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ListPodResourcesRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ListPodResourcesRequest.DiscardUnknown(m)
 }
@@ -95,9 +103,11 @@ func (*ListPodResourcesResponse) ProtoMessage() {}
 func (*ListPodResourcesResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *ListPodResourcesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ListPodResourcesResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ListPodResourcesResponse.Marshal(b, m, deterministic)
@@ -110,12 +120,15 @@ func (m *ListPodResourcesResponse) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
+
 func (m *ListPodResourcesResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ListPodResourcesResponse.Merge(m, src)
 }
+
 func (m *ListPodResourcesResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ListPodResourcesResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ListPodResourcesResponse.DiscardUnknown(m)
 }
@@ -143,9 +156,11 @@ func (*PodResources) ProtoMessage() {}
 func (*PodResources) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
+
 func (m *PodResources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_PodResources.Marshal(b, m, deterministic)
@@ -158,12 +173,15 @@ func (m *PodResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 		return b[:n], nil
 	}
 }
+
 func (m *PodResources) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodResources.Merge(m, src)
 }
+
 func (m *PodResources) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodResources) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodResources.DiscardUnknown(m)
 }
@@ -204,9 +222,11 @@ func (*ContainerResources) ProtoMessage() {}
 func (*ContainerResources) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
+
 func (m *ContainerResources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerResources.Marshal(b, m, deterministic)
@@ -219,12 +239,15 @@ func (m *ContainerResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerResources) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerResources.Merge(m, src)
 }
+
 func (m *ContainerResources) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerResources) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerResources.DiscardUnknown(m)
 }
@@ -258,9 +281,11 @@ func (*ContainerDevices) ProtoMessage() {}
 func (*ContainerDevices) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
+
 func (m *ContainerDevices) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerDevices) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ContainerDevices.Marshal(b, m, deterministic)
@@ -273,12 +298,15 @@ func (m *ContainerDevices) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 		return b[:n], nil
 	}
 }
+
 func (m *ContainerDevices) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerDevices.Merge(m, src)
 }
+
 func (m *ContainerDevices) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerDevices) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerDevices.DiscardUnknown(m)
 }
@@ -336,8 +364,10 @@ var fileDescriptor_00212fb1f9d3bf1c = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -373,8 +403,7 @@ type PodResourcesListerServer interface {
 }
 
 // UnimplementedPodResourcesListerServer can be embedded to have forward compatible implementations.
-type UnimplementedPodResourcesListerServer struct {
-}
+type UnimplementedPodResourcesListerServer struct{}
 
 func (*UnimplementedPodResourcesListerServer) List(ctx context.Context, req *ListPodResourcesRequest) (*ListPodResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
@@ -620,6 +649,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ListPodResourcesRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -708,18 +738,22 @@ func (m *ContainerDevices) Size() (n int) {
 func sovApi(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ListPodResourcesRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ListPodResourcesRequest{`,
+	s := strings.Join([]string{
+		`&ListPodResourcesRequest{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ListPodResourcesResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -729,12 +763,14 @@ func (this *ListPodResourcesResponse) String() string {
 		repeatedStringForPodResources += strings.Replace(f.String(), "PodResources", "PodResources", 1) + ","
 	}
 	repeatedStringForPodResources += "}"
-	s := strings.Join([]string{`&ListPodResourcesResponse{`,
+	s := strings.Join([]string{
+		`&ListPodResourcesResponse{`,
 		`PodResources:` + repeatedStringForPodResources + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PodResources) String() string {
 	if this == nil {
 		return "nil"
@@ -744,7 +780,8 @@ func (this *PodResources) String() string {
 		repeatedStringForContainers += strings.Replace(f.String(), "ContainerResources", "ContainerResources", 1) + ","
 	}
 	repeatedStringForContainers += "}"
-	s := strings.Join([]string{`&PodResources{`,
+	s := strings.Join([]string{
+		`&PodResources{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
 		`Containers:` + repeatedStringForContainers + `,`,
@@ -752,6 +789,7 @@ func (this *PodResources) String() string {
 	}, "")
 	return s
 }
+
 func (this *ContainerResources) String() string {
 	if this == nil {
 		return "nil"
@@ -761,24 +799,28 @@ func (this *ContainerResources) String() string {
 		repeatedStringForDevices += strings.Replace(f.String(), "ContainerDevices", "ContainerDevices", 1) + ","
 	}
 	repeatedStringForDevices += "}"
-	s := strings.Join([]string{`&ContainerResources{`,
+	s := strings.Join([]string{
+		`&ContainerResources{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ContainerDevices) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerDevices{`,
+	s := strings.Join([]string{
+		`&ContainerDevices{`,
 		`ResourceName:` + fmt.Sprintf("%v", this.ResourceName) + `,`,
 		`DeviceIds:` + fmt.Sprintf("%v", this.DeviceIds) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -787,6 +829,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ListPodResourcesRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -840,6 +883,7 @@ func (m *ListPodResourcesRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ListPodResourcesResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -927,6 +971,7 @@ func (m *ListPodResourcesResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodResources) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1078,6 +1123,7 @@ func (m *PodResources) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerResources) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1197,6 +1243,7 @@ func (m *ContainerResources) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerDevices) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1314,6 +1361,7 @@ func (m *ContainerDevices) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

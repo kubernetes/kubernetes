@@ -65,7 +65,6 @@ const (
 // Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
 var _ = common.SIGDescribe("Conntrack", func() {
-
 	fr := framework.NewDefaultFramework("conntrack")
 
 	type nodeInfo struct {
@@ -128,7 +127,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func() {
-
 		// Create a NodePort service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
 		ginkgo.By("creating a UDP service " + serviceName + " with type=NodePort in " + ns)
@@ -204,7 +202,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func() {
-
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in " + ns)

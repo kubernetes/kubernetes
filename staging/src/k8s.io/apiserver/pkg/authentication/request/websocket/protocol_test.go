@@ -106,15 +106,19 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		Req *http.Request
 	}{
 		{Req: &http.Request{}},
-		{Req: &http.Request{Header: http.Header{
-			"Connection":             []string{"upgrade"},
-			"Upgrade":                []string{"websocket"},
-			"Sec-Websocket-Protocol": []string{"other-protocol"}}},
+		{
+			Req: &http.Request{Header: http.Header{
+				"Connection":             []string{"upgrade"},
+				"Upgrade":                []string{"websocket"},
+				"Sec-Websocket-Protocol": []string{"other-protocol"},
+			}},
 		},
-		{Req: &http.Request{Header: http.Header{
-			"Connection":             []string{"upgrade"},
-			"Upgrade":                []string{"websocket"},
-			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io."}}},
+		{
+			Req: &http.Request{Header: http.Header{
+				"Connection":             []string{"upgrade"},
+				"Upgrade":                []string{"websocket"},
+				"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io."},
+			}},
 		},
 	}
 	for i, testCase := range testCases {

@@ -141,11 +141,12 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{
-					Projected: &api.ProjectedVolumeSource{
-						Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+				{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+						},
 					},
-				},
 				},
 			},
 		},
@@ -269,7 +270,6 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetExternalKubeInformerFactory(informerFactory)

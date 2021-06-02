@@ -90,7 +90,6 @@ func waitForUnregistration(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Timed out waiting for plugin to be unregistered:\n%s.", socketPath)
 	}

@@ -782,7 +782,6 @@ profiles:
 		t.Run(tc.name, func(t *testing.T) {
 			// create the config
 			config, err := tc.options.Config()
-
 			// handle errors
 			if err != nil {
 				if tc.expectedError != "" || tc.checkErrFn != nil {

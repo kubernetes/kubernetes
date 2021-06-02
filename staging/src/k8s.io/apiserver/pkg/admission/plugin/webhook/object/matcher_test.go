@@ -112,7 +112,8 @@ func TestObjectSelector(t *testing.T) {
 			Rules: []v1.RuleWithOperations{{
 				Operations: []v1.OperationType{"*"},
 				Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
-			}}}
+			}},
+		}
 
 		t.Run(testcase.name, func(t *testing.T) {
 			match, err := matcher.MatchObjectSelector(webhook.NewValidatingWebhookAccessor("mock-hook", "mock-cfg", hook), testcase.attrs)

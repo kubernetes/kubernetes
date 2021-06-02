@@ -775,9 +775,11 @@ func TestSchedulerInformers(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+		},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",

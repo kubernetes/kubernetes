@@ -303,7 +303,6 @@ func runKubeletFromTest(t *testing.T, perform func(gvk schema.GroupVersionKind, 
 	yaml := fmt.Sprintf("apiVersion: %s\nkind: %s\nclusterDomain: %s", kubeletHandler.GroupVersion, kind, clusterDomain)
 
 	cfg, err := perform(gvk, yaml)
-
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}

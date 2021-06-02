@@ -55,9 +55,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 }
 
 func fetchContainerStats(c hcsshim.ContainerProperties) (stats hcsshim.Statistics, err error) {
-	var (
-		container hcsshim.Container
-	)
+	var container hcsshim.Container
 	container, err = hcsshim.OpenContainer(c.ID)
 	if err != nil {
 		return

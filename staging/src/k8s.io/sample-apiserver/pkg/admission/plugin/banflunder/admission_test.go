@@ -36,7 +36,7 @@ import (
 // TestBanfluderAdmissionPlugin tests various test cases against
 // ban flunder admission plugin
 func TestBanflunderAdmissionPlugin(t *testing.T) {
-	var scenarios = []struct {
+	scenarios := []struct {
 		informersOutput        wardle.FischerList
 		admissionInput         wardle.Flunder
 		admissionInputKind     schema.GroupVersionKind

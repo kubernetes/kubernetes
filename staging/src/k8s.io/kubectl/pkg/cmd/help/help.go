@@ -58,7 +58,7 @@ func RunHelp(cmd *cobra.Command, args []string) {
 		cmd.Println(err)
 
 		argsString := strings.Join(args, " ")
-		var matchedMsgIsPrinted = false
+		matchedMsgIsPrinted := false
 		for _, foundCmd := range foundCmd.Commands() {
 			if strings.Contains(foundCmd.Short, argsString) {
 				if !matchedMsgIsPrinted {

@@ -21,7 +21,9 @@ package cinder
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,9 +31,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"fmt"
-	"sort"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -42,8 +41,10 @@ const (
 	VolumeStatusDone    = "done"
 )
 
-var attachStatus = "Attach"
-var detachStatus = "Detach"
+var (
+	attachStatus = "Attach"
+	detachStatus = "Detach"
+)
 
 func TestGetDeviceName_Volume(t *testing.T) {
 	plugin := newPlugin(t)
@@ -83,7 +84,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 		host: host,
 	}
 
-	//test the path
+	// test the path
 	path, err := attacher.GetDeviceMountPath(spec)
 	if err != nil {
 		t.Errorf("Get device mount path error")

@@ -131,7 +131,8 @@ func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, obsPair met
 		factory: qsf,
 		obsPair: obsPair,
 		qCfg:    qCfg,
-		dealer:  dealer}, nil
+		dealer:  dealer,
+	}, nil
 }
 
 // checkConfig returns a non-nil Dealer if the config is valid and
@@ -182,7 +183,8 @@ func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetComplet
 	return &queueSetCompleter{
 		theSet: qs,
 		qCfg:   qCfg,
-		dealer: dealer}, nil
+		dealer: dealer,
+	}, nil
 }
 
 // SetConfiguration is used to set the configuration for a queueSet.

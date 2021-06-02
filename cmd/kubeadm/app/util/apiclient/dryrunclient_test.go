@@ -28,7 +28,7 @@ import (
 )
 
 func TestLogDryRunAction(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		action        core.Action
 		expectedBytes []byte

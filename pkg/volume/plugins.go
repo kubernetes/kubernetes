@@ -46,12 +46,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
-type ProbeOperation uint32
-type ProbeEvent struct {
-	Plugin     VolumePlugin // VolumePlugin that was added/updated/removed. if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
-	PluginName string
-	Op         ProbeOperation // The operation to the plugin
-}
+type (
+	ProbeOperation uint32
+	ProbeEvent     struct {
+		Plugin     VolumePlugin // VolumePlugin that was added/updated/removed. if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
+		PluginName string
+		Op         ProbeOperation // The operation to the plugin
+	}
+)
 
 // CSIVolumePhaseType stores information about CSI volume path.
 type CSIVolumePhaseType string
@@ -69,14 +71,12 @@ const (
 	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
-var (
-	deprecatedVolumeProviders = map[string]string{
-		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
-	}
-)
+var deprecatedVolumeProviders = map[string]string{
+	"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
+	"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
+	"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
+	"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
+}
 
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {

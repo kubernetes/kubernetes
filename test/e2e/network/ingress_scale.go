@@ -27,9 +27,7 @@ import (
 
 var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 	defer ginkgo.GinkgoRecover()
-	var (
-		ns string
-	)
+	var ns string
 	f := framework.NewDefaultFramework("ingress-scale")
 
 	ginkgo.BeforeEach(func() {
@@ -37,9 +35,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 	})
 
 	ginkgo.Describe("GCE [Slow] [Serial] [Feature:IngressScale]", func() {
-		var (
-			scaleFramework *scale.IngressScaleFramework
-		)
+		var scaleFramework *scale.IngressScaleFramework
 
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
@@ -60,7 +56,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 			if errs := scaleFramework.RunScaleTest(); len(errs) != 0 {
 				framework.Failf("Unexpected error while running ingress scale test: %v", errs)
 			}
-
 		})
 	})
 })

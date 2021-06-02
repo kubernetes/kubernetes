@@ -21,8 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type podContainerManagerStub struct {
-}
+type podContainerManagerStub struct{}
 
 var _ PodContainerManager = &podContainerManagerStub{}
 

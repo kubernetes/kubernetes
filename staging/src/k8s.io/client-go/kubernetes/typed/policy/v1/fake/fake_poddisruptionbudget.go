@@ -80,7 +80,6 @@ func (c *FakePodDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions
 func (c *FakePodDisruptionBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(poddisruptionbudgetsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.

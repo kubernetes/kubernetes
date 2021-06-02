@@ -188,7 +188,6 @@ func (o *SetSelectorOptions) RunSelector() error {
 		}
 
 		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
-
 			if len(o.resourceVersion) != 0 {
 				accessor, err := meta.Accessor(info.Object)
 				if err != nil {

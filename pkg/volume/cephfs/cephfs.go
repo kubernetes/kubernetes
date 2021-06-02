@@ -165,7 +165,8 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 			podUID:  podUID,
 			volName: volName,
 			mounter: mounter,
-			plugin:  plugin},
+			plugin:  plugin,
+		},
 	}, nil
 }
 

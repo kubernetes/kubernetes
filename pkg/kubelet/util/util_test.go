@@ -60,16 +60,16 @@ func TestGetNodenameForKernel(t *testing.T) {
 		expectError:       false,
 	}, {
 		description:       "FQDN is too long, setHostnameAsFQDN false",
-		hostname:          "1234567.1234567",                                         //8*2-1=15 chars
-		hostDomain:        "1234567.1234567.1234567.1234567.1234567.1234567.1234567", //8*7-1=55 chars
-		setHostnameAsFQDN: false,                                                     //FQDN=15 + 1(dot) + 55 = 71 chars
+		hostname:          "1234567.1234567",                                         // 8*2-1=15 chars
+		hostDomain:        "1234567.1234567.1234567.1234567.1234567.1234567.1234567", // 8*7-1=55 chars
+		setHostnameAsFQDN: false,                                                     // FQDN=15 + 1(dot) + 55 = 71 chars
 		expectedHostname:  "1234567.1234567",
 		expectError:       false,
 	}, {
 		description:       "FQDN is too long, setHostnameAsFQDN true",
-		hostname:          "1234567.1234567",                                         //8*2-1=15 chars
-		hostDomain:        "1234567.1234567.1234567.1234567.1234567.1234567.1234567", //8*7-1=55 chars
-		setHostnameAsFQDN: true,                                                      //FQDN=15 + 1(dot) + 55 = 71 chars
+		hostname:          "1234567.1234567",                                         // 8*2-1=15 chars
+		hostDomain:        "1234567.1234567.1234567.1234567.1234567.1234567.1234567", // 8*7-1=55 chars
+		setHostnameAsFQDN: true,                                                      // FQDN=15 + 1(dot) + 55 = 71 chars
 		expectedHostname:  "",
 		expectError:       true,
 	}}
@@ -84,5 +84,4 @@ func TestGetNodenameForKernel(t *testing.T) {
 		}
 		assert.Equal(t, tc.expectedHostname, outputHostname)
 	}
-
 }

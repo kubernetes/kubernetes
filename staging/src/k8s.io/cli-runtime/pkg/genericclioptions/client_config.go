@@ -22,9 +22,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-var (
-	// ErrEmptyConfig is the error message to be displayed if the configuration info is missing or incomplete
-	ErrEmptyConfig = clientcmd.NewEmptyConfigError(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
+// ErrEmptyConfig is the error message to be displayed if the configuration info is missing or incomplete
+var ErrEmptyConfig = clientcmd.NewEmptyConfigError(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
 
 
   1. Via the command-line flag --kubeconfig
@@ -32,7 +31,6 @@ var (
   3. In your home directory as ~/.kube/config
 
 To view or setup config directly use the 'config' command.`)
-)
 
 var _ = clientcmd.ClientConfig(&clientConfig{})
 

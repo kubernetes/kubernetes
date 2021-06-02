@@ -108,7 +108,6 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 	nodeLimit := 25
 
 	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, true, false, true, false, false, false)
-
 	if err != nil {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}

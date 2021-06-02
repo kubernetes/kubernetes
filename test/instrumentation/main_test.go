@@ -43,7 +43,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Skip alpha metric created via function call",
 			src: `
@@ -58,7 +59,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Skip metric without stability set",
 			src: `
@@ -69,7 +71,8 @@ var _ = metrics.NewCounter(
 			Name: "metric",
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Skip functions of similar signature (not imported from framework path) with import rename",
 			src: `
@@ -80,7 +83,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Skip functions of similar signature (not imported from framework path)",
 			src: `
@@ -91,7 +95,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Skip . package import of non metric framework",
 			src: `
@@ -102,7 +107,8 @@ var _ = NewCounter(
 			StabilityLevel: STABLE,
 		},
 	)
-`},
+`,
+		},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
 			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src)
@@ -146,7 +152,8 @@ var _ = metrics.NewCounter(
 		StabilityLevel: metrics.STABLE,
 	},
 )
-`},
+`,
+		},
 		{
 			testName: "CounterVec",
 			metric: metric{
@@ -173,7 +180,8 @@ var _ = metrics.NewCounterVec(
 		},
 		[]string{"label-1"},
 	)
-`},
+`,
+		},
 		{
 			testName: "Gauge",
 			metric: metric{
@@ -198,7 +206,8 @@ var _ = metrics.NewGauge(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "GaugeVec",
 			metric: metric{
@@ -225,7 +234,8 @@ var _ = metrics.NewGaugeVec(
 		},
 		[]string{"label-2", "label-1"},
 	)
-`},
+`,
+		},
 		{
 			testName: "Histogram",
 			metric: metric{
@@ -252,7 +262,8 @@ var _ = metrics.NewHistogram(
 			Buckets: []float64{0.001, 0.01, 0.1, 1, 10, 100},
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "HistogramVec",
 			metric: metric{
@@ -281,7 +292,8 @@ var _ = metrics.NewHistogramVec(
 		},
 		[]string{"label-2", "label-1"},
 	)
-`},
+`,
+		},
 		{
 			testName: "Custom import",
 			metric: metric{
@@ -298,7 +310,8 @@ var _ = custom.NewCounter(
 			StabilityLevel: custom.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Const",
 			metric: metric{
@@ -316,7 +329,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Variable",
 			metric: metric{
@@ -334,7 +348,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Multiple consts in block",
 			metric: metric{
@@ -356,7 +371,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Multiple variables in Block",
 			metric: metric{
@@ -377,7 +393,8 @@ var (
 		},
 	)
 )
-`},
+`,
+		},
 		{
 			testName: "Histogram with linear buckets",
 			metric: metric{
@@ -396,7 +413,8 @@ var _ = metrics.NewHistogram(
 			Buckets: metrics.LinearBuckets(1, 1, 3),
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Histogram with exponential buckets",
 			metric: metric{
@@ -415,7 +433,8 @@ var _ = metrics.NewHistogram(
 			Buckets: metrics.ExponentialBuckets(1, 2, 3),
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Histogram with default buckets",
 			metric: metric{
@@ -434,7 +453,8 @@ var _ = metrics.NewHistogram(
 			Buckets: metrics.DefBuckets,
 		},
 	)
-`},
+`,
+		},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
 			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src)
@@ -471,7 +491,8 @@ var _ = metrics.NewSummary(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Fail on stable metric with attribute set to unknown variable",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Metric attribute was not correctly set. Please use only global consts in same file"),
@@ -484,7 +505,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Fail on stable metric with attribute set to local function return",
 			err:      fmt.Errorf("testdata/metric.go:9:4: Non string attribute it not supported"),
@@ -500,7 +522,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Fail on stable metric with attribute set to imported function return",
 			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute it not supported"),
@@ -514,7 +537,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "Fail on metric with stability set to function return",
 			err:      fmt.Errorf("testdata/metric.go:9:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
@@ -529,7 +553,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: getMetricsStability(),
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error for passing stability as string",
 			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
@@ -541,7 +566,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: "stable",
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error for passing stability as unknown const",
 			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
@@ -553,7 +579,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: metrics.UNKNOWN,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error for passing stability as variable",
 			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
@@ -566,7 +593,8 @@ var _ = metrics.NewCounter(
 			StabilityLevel: stable,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error for stable metric created via function call",
 			err:      fmt.Errorf("testdata/metric.go:6:10: Opts for STABLE metric was not directly passed to new metric function"),
@@ -579,7 +607,8 @@ func getStableCounterOpts() *metrics.CounterOpts {
 		StabilityLevel: metrics.STABLE,
 	}
 }
-`},
+`,
+		},
 		{
 			testName: "error . package import of metric framework",
 			err:      fmt.Errorf(`testdata/metric.go:3:8: Importing using "." is not supported`),
@@ -591,7 +620,8 @@ var _ = NewCounter(
 			StabilityLevel: STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable metric opts passed to local function",
 			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
@@ -603,7 +633,8 @@ var _ = RegisterMetric(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable metric opts passed to imported function",
 			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
@@ -615,7 +646,8 @@ var _ = test.RegisterMetric(
 			StabilityLevel: metrics.STABLE,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable metric opts passed to imported function",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Positional arguments are not supported"),
@@ -627,7 +659,8 @@ var _ = metrics.NewCounter(
 			"counter",
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable historgram with unknown prometheus bucket variable",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
@@ -642,7 +675,8 @@ var _ = metrics.NewHistogram(
 			Buckets: prometheus.FakeBuckets,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable historgram with unknown bucket variable",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
@@ -657,7 +691,8 @@ var _ = metrics.NewHistogram(
 			Buckets: buckets,
 		},
 	)
-`},
+`,
+		},
 		{
 			testName: "error stable historgram with unknown bucket variable from unknown library",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
@@ -672,7 +707,8 @@ var _ = metrics.NewHistogram(
 			Buckets: prometheus.DefBuckets,
 		},
 	)
-`},
+`,
+		},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
 			_, errors := searchFileForStableMetrics(fakeFilename, test.src)

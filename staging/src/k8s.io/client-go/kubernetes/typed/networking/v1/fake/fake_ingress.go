@@ -80,7 +80,6 @@ func (c *FakeIngresses) List(ctx context.Context, opts v1.ListOptions) (result *
 func (c *FakeIngresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(ingressesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.

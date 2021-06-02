@@ -79,8 +79,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
-type RegistrationHandler struct {
-}
+type RegistrationHandler struct{}
 
 // TODO (verult) consider using a struct instead of global variables
 // csiDrivers map keep track of all registered CSI drivers on the node and their
@@ -215,7 +214,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	var migratedPlugins = map[string](func() bool){
+	migratedPlugins := map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
@@ -547,7 +546,7 @@ func (p *csiPlugin) constructVolSourceSpec(volSpecName, driverName string) *volu
 	return volume.NewSpecFromVolume(vol)
 }
 
-//constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
+// constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
 func (p *csiPlugin) constructPVSourceSpec(volSpecName, driverName, volumeHandle string) *volume.Spec {
 	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{

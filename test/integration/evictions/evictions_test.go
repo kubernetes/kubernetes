@@ -131,7 +131,6 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 					return false, e
 				}
 			})
-
 			if err != nil {
 				errCh <- err
 				// should not return here otherwise we would leak the pod
@@ -155,7 +154,6 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			if e != nil {
 				errCh <- e
 			}
-
 		}(i, errCh)
 	}
 

@@ -37,9 +37,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -52,9 +54,11 @@ func (*AdmissionRequest) ProtoMessage() {}
 func (*AdmissionRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4b73421fd5edef9f, []int{0}
 }
+
 func (m *AdmissionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AdmissionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -63,12 +67,15 @@ func (m *AdmissionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *AdmissionRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AdmissionRequest.Merge(m, src)
 }
+
 func (m *AdmissionRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AdmissionRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_AdmissionRequest.DiscardUnknown(m)
 }
@@ -80,9 +87,11 @@ func (*AdmissionResponse) ProtoMessage() {}
 func (*AdmissionResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4b73421fd5edef9f, []int{1}
 }
+
 func (m *AdmissionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AdmissionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -91,12 +100,15 @@ func (m *AdmissionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *AdmissionResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AdmissionResponse.Merge(m, src)
 }
+
 func (m *AdmissionResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AdmissionResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_AdmissionResponse.DiscardUnknown(m)
 }
@@ -108,9 +120,11 @@ func (*AdmissionReview) ProtoMessage() {}
 func (*AdmissionReview) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4b73421fd5edef9f, []int{2}
 }
+
 func (m *AdmissionReview) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AdmissionReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -119,12 +133,15 @@ func (m *AdmissionReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *AdmissionReview) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AdmissionReview.Merge(m, src)
 }
+
 func (m *AdmissionReview) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AdmissionReview) XXX_DiscardUnknown() {
 	xxx_messageInfo_AdmissionReview.DiscardUnknown(m)
 }
@@ -504,6 +521,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *AdmissionRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -606,14 +624,17 @@ func (m *AdmissionReview) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *AdmissionRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&AdmissionRequest{`,
+	s := strings.Join([]string{
+		`&AdmissionRequest{`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`Kind:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Kind), "GroupVersionKind", "v1.GroupVersionKind", 1), `&`, ``, 1) + `,`,
 		`Resource:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Resource), "GroupVersionResource", "v1.GroupVersionResource", 1), `&`, ``, 1) + `,`,
@@ -633,6 +654,7 @@ func (this *AdmissionRequest) String() string {
 	}, "")
 	return s
 }
+
 func (this *AdmissionResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -647,7 +669,8 @@ func (this *AdmissionResponse) String() string {
 		mapStringForAuditAnnotations += fmt.Sprintf("%v: %v,", k, this.AuditAnnotations[k])
 	}
 	mapStringForAuditAnnotations += "}"
-	s := strings.Join([]string{`&AdmissionResponse{`,
+	s := strings.Join([]string{
+		`&AdmissionResponse{`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`Allowed:` + fmt.Sprintf("%v", this.Allowed) + `,`,
 		`Result:` + strings.Replace(fmt.Sprintf("%v", this.Result), "Status", "v1.Status", 1) + `,`,
@@ -659,17 +682,20 @@ func (this *AdmissionResponse) String() string {
 	}, "")
 	return s
 }
+
 func (this *AdmissionReview) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&AdmissionReview{`,
+	s := strings.Join([]string{
+		`&AdmissionReview{`,
 		`Request:` + strings.Replace(this.Request.String(), "AdmissionRequest", "AdmissionRequest", 1) + `,`,
 		`Response:` + strings.Replace(this.Response.String(), "AdmissionResponse", "AdmissionResponse", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -678,6 +704,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *AdmissionRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1211,6 +1238,7 @@ func (m *AdmissionRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AdmissionResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1575,6 +1603,7 @@ func (m *AdmissionResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AdmissionReview) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1697,6 +1726,7 @@ func (m *AdmissionReview) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

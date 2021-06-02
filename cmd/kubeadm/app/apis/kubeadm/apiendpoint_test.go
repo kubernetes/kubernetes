@@ -22,7 +22,7 @@ import (
 )
 
 func TestAPIEndpointFromString(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		apiEndpoint      string
 		expectedEndpoint APIEndpoint
 		expectedErr      bool

@@ -127,7 +127,7 @@ var preemptionPolicyClass = &scheduling.PriorityClass{
 }
 
 func TestPriorityClassAdmission(t *testing.T) {
-	var systemClass = &scheduling.PriorityClass{
+	systemClass := &scheduling.PriorityClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PriorityClass",
 		},
@@ -308,8 +308,10 @@ func TestDefaultPriority(t *testing.T) {
 	}
 }
 
-var zeroPriority = int32(0)
-var intPriority = int32(1000)
+var (
+	zeroPriority = int32(0)
+	intPriority  = int32(1000)
+)
 
 func TestPodAdmission(t *testing.T) {
 	containerName := "container"

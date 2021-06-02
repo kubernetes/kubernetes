@@ -201,7 +201,6 @@ func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 		result[gr] = value.NewMutableTransformer(value.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...))
 	}
 	return result, nil
-
 }
 
 func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {

@@ -82,30 +82,28 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		secretNamespace = podNamespace
 	}
 
-	var (
-		pv = &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				// Must be unique per disk as it is used as the unique part of the
-				// staging path
-				Name: fmt.Sprintf("%s-%s", AzureFileDriverName, azureSource.ShareName),
-			},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					CSI: &v1.CSIPersistentVolumeSource{
-						Driver:           AzureFileDriverName,
-						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
-						ReadOnly:         azureSource.ReadOnly,
-						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
-						NodeStageSecretRef: &v1.SecretReference{
-							Name:      azureSource.SecretName,
-							Namespace: secretNamespace,
-						},
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			// Must be unique per disk as it is used as the unique part of the
+			// staging path
+			Name: fmt.Sprintf("%s-%s", AzureFileDriverName, azureSource.ShareName),
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           AzureFileDriverName,
+					VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
+					ReadOnly:         azureSource.ReadOnly,
+					VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
+					NodeStageSecretRef: &v1.SecretReference{
+						Name:      azureSource.SecretName,
+						Namespace: secretNamespace,
 					},
 				},
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 			},
-		}
-	)
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+		},
+	}
 
 	return pv, nil
 }
@@ -131,19 +129,17 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 	}
 	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, "")
 
-	var (
-		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
-		csiSource = &v1.CSIPersistentVolumeSource{
-			Driver: AzureFileDriverName,
-			NodeStageSecretRef: &v1.SecretReference{
-				Name:      azureSource.SecretName,
-				Namespace: defaultSecretNamespace,
-			},
-			ReadOnly:         azureSource.ReadOnly,
-			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
-			VolumeHandle:     volumeID,
-		}
-	)
+	// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
+	csiSource := &v1.CSIPersistentVolumeSource{
+		Driver: AzureFileDriverName,
+		NodeStageSecretRef: &v1.SecretReference{
+			Name:      azureSource.SecretName,
+			Namespace: defaultSecretNamespace,
+		},
+		ReadOnly:         azureSource.ReadOnly,
+		VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
+		VolumeHandle:     volumeID,
+	}
 
 	if azureSource.SecretNamespace != nil {
 		csiSource.NodeStageSecretRef.Namespace = *azureSource.SecretNamespace

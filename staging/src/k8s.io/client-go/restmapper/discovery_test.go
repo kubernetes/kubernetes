@@ -297,62 +297,83 @@ func TestGetAPIGroupResources(t *testing.T) {
 
 	for _, test := range []Test{
 		{"nil", &fakeFailingDiscovery{nil, nil, nil, nil}, nil, nil},
-		{"normal",
+		{
+			"normal",
 			&fakeFailingDiscovery{
-				[]metav1.APIGroup{aGroup, bGroup}, nil,
-				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+				[]metav1.APIGroup{aGroup, bGroup},
+				nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources},
+				nil,
 			},
 			[]*APIGroupResources{
 				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
 				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
-			}, nil,
+			},
+			nil,
 		},
-		{"groups failed, but has fallback with a only",
+		{
+			"groups failed, but has fallback with a only",
 			&fakeFailingDiscovery{
-				[]metav1.APIGroup{aGroup}, fmt.Errorf("error fetching groups"),
-				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+				[]metav1.APIGroup{aGroup},
+				fmt.Errorf("error fetching groups"),
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources},
+				nil,
 			},
 			[]*APIGroupResources{
 				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
-			}, nil,
+			},
+			nil,
 		},
-		{"groups failed, but has no fallback",
+		{
+			"groups failed, but has no fallback",
 			&fakeFailingDiscovery{
 				nil, fmt.Errorf("error fetching groups"),
-				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources},
+				nil,
 			},
 			nil, fmt.Errorf("error fetching groups"),
 		},
-		{"a failed, but has fallback",
+		{
+			"a failed, but has fallback",
 			&fakeFailingDiscovery{
-				[]metav1.APIGroup{aGroup, bGroup}, nil,
-				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, map[string]error{"a/v1": fmt.Errorf("a failed")},
+				[]metav1.APIGroup{aGroup, bGroup},
+				nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources},
+				map[string]error{"a/v1": fmt.Errorf("a failed")},
 			},
 			[]*APIGroupResources{
 				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
 				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
-			}, nil, // TODO: do we want this?
+			},
+			nil, // TODO: do we want this?
 		},
-		{"a failed, but has no fallback",
+		{
+			"a failed, but has no fallback",
 			&fakeFailingDiscovery{
-				[]metav1.APIGroup{aGroup, bGroup}, nil,
-				map[string]*metav1.APIResourceList{"b/v1": &bResources}, map[string]error{"a/v1": fmt.Errorf("a failed")},
+				[]metav1.APIGroup{aGroup, bGroup},
+				nil,
+				map[string]*metav1.APIResourceList{"b/v1": &bResources},
+				map[string]error{"a/v1": fmt.Errorf("a failed")},
 			},
 			[]*APIGroupResources{
 				{aGroup, map[string][]metav1.APIResource{}},
 				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
-			}, nil, // TODO: do we want this?
+			},
+			nil, // TODO: do we want this?
 		},
-		{"a and b failed, but have fallbacks",
+		{
+			"a and b failed, but have fallbacks",
 			&fakeFailingDiscovery{
-				[]metav1.APIGroup{aGroup, bGroup}, nil,
+				[]metav1.APIGroup{aGroup, bGroup},
+				nil,
 				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, // TODO: both fallbacks are ignored
 				map[string]error{"a/v1": fmt.Errorf("a failed"), "b/v1": fmt.Errorf("b failed")},
 			},
 			[]*APIGroupResources{
 				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
 				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
-			}, nil, // TODO: do we want this?
+			},
+			nil, // TODO: do we want this?
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -367,7 +388,6 @@ func TestGetAPIGroupResources(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 var _ DiscoveryInterface = &fakeFailingDiscovery{}
@@ -394,6 +414,7 @@ func (d *fakeFailingDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 func (d *fakeFailingDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return ServerGroupsAndResources(d)
 }
+
 func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	if rs, found := d.resourcesForGroupVersion[groupVersion]; found {
 		return rs, d.resourcesForGroupVersionErr[groupVersion]

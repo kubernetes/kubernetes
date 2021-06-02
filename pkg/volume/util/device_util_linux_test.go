@@ -194,6 +194,7 @@ func (fi *fakeFileInfo) Mode() os.FileMode {
 func (fi *fakeFileInfo) ModTime() time.Time {
 	return time.Now()
 }
+
 func (fi *fakeFileInfo) IsDir() bool {
 	return false
 }
@@ -240,7 +241,6 @@ func TestFindDeviceForPath(t *testing.T) {
 	if err == nil {
 		t.Fatalf("path shouldn't exist but still doesn't give an error")
 	}
-
 }
 
 func TestFindSlaveDevicesOnMultipath(t *testing.T) {

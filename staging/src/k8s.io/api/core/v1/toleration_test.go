@@ -21,7 +21,6 @@ import (
 )
 
 func TestTolerationToleratesTaint(t *testing.T) {
-
 	testCases := []struct {
 		description     string
 		toleration      Toleration

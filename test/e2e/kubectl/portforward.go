@@ -78,7 +78,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 							Exec: &v1.ExecAction{
 								Command: []string{
 									"sh", "-c", "netstat -na | grep LISTEN | grep -v 8080 | grep 80",
-								}},
+								},
+							},
 						},
 						InitialDelaySeconds: 5,
 						TimeoutSeconds:      60,

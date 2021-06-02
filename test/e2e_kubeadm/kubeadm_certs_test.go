@@ -51,7 +51,6 @@ var (
 // Important! please note that kubeadm-certs is not created by default (still alpha)
 // in case you want to skip this test use SKIP=copy-certs
 var _ = Describe("kubeadm-certs [copy-certs]", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-certs")
 

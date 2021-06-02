@@ -998,7 +998,6 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 
 				err := dsc.podControl.CreatePods(ds.Namespace, podTemplate,
 					ds, metav1.NewControllerRef(ds, controllerKind))
-
 				if err != nil {
 					if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 						// If the namespace is being torn down, we can safely ignore

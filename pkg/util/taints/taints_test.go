@@ -83,7 +83,6 @@ func TestTaintsVar(t *testing.T) {
 			t.Errorf("[%v] unexpected taints:\n\texpected:\n\t\t%#v\n\tgot:\n\t\t%#v", i, c.t, taints)
 		}
 	}
-
 }
 
 func TestAddOrUpdateTaint(t *testing.T) {

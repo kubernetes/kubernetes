@@ -19,10 +19,9 @@ limitations under the License.
 package volume
 
 import (
+	"os"
 	"path/filepath"
 	"syscall"
-
-	"os"
 	"time"
 
 	v1 "k8s.io/api/core/v1"

@@ -80,7 +80,6 @@ func (c *FakeConfigMaps) List(ctx context.Context, opts v1.ListOptions) (result 
 func (c *FakeConfigMaps) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(configmapsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.

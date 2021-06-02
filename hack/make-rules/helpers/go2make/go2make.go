@@ -29,9 +29,11 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var flPrune = pflag.StringSlice("prune", nil, "sub-packages to prune (recursive, may be specified multiple times)")
-var flDebug = pflag.BoolP("debug", "d", false, "enable debugging output")
-var flHelp = pflag.BoolP("help", "h", false, "print help and exit")
+var (
+	flPrune = pflag.StringSlice("prune", nil, "sub-packages to prune (recursive, may be specified multiple times)")
+	flDebug = pflag.BoolP("debug", "d", false, "enable debugging output")
+	flHelp  = pflag.BoolP("help", "h", false, "print help and exit")
+)
 
 func main() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

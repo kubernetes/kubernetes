@@ -112,9 +112,11 @@ type waitForPriorityQueue []*waitFor
 func (pq waitForPriorityQueue) Len() int {
 	return len(pq)
 }
+
 func (pq waitForPriorityQueue) Less(i, j int) bool {
 	return pq[i].readyAt.Before(pq[j].readyAt)
 }
+
 func (pq waitForPriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i

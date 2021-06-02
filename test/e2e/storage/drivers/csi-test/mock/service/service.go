@@ -246,7 +246,6 @@ func (s *service) findVolByID(
 }
 
 func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) cache.Snapshot {
-
 	ptime := ptypes.TimestampNow()
 	return cache.Snapshot{
 		Name:       name,

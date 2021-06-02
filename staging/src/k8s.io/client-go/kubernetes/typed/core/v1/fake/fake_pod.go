@@ -80,7 +80,6 @@ func (c *FakePods) List(ctx context.Context, opts v1.ListOptions) (result *corev
 func (c *FakePods) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.

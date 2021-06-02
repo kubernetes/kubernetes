@@ -36,8 +36,10 @@ func TestPodPriority(t *testing.T) {
 		{
 			name: "no priority pod resolves to static default priority",
 			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container", Image: "image"},
+					},
 				},
 			},
 			expectedPriority: 0,
@@ -45,8 +47,10 @@ func TestPodPriority(t *testing.T) {
 		{
 			name: "pod with priority resolves correctly",
 			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container", Image: "image"},
+					},
 					Priority: &p,
 				},
 			},
@@ -57,7 +61,6 @@ func TestPodPriority(t *testing.T) {
 		if PodPriority(test.pod) != test.expectedPriority {
 			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, PodPriority(test.pod))
 		}
-
 	}
 }
 
@@ -186,24 +189,28 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 		{
 			name: "labelSelectorTerm and fieldSelectorTerm was set, both node fields and labels (both matched)",
 			args: args{
-				nodeSelector: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						MatchExpressions: []v1.NodeSelectorRequirement{{
-							Key:      "label_1",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"label_1_val"},
-						}},
-						MatchFields: []v1.NodeSelectorRequirement{{
-							Key:      "metadata.name",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"host_1"},
-						}},
-					}},
+				nodeSelector: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{{
+								Key:      "label_1",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"label_1_val"},
+							}},
+							MatchFields: []v1.NodeSelectorRequirement{{
+								Key:      "metadata.name",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"host_1"},
+							}},
+						},
+					},
 				},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val",
-					}}},
+					},
+				}},
 			},
 			want: true,
 		},
@@ -224,10 +231,12 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val-failed",
-					}}},
+					},
+				}},
 			},
 			want: false,
 		},
@@ -250,10 +259,12 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val-failed",
-					}}},
+					},
+				}},
 			},
 			want: true,
 		},
@@ -403,10 +414,12 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val",
-					}}},
+					},
+				}},
 			},
 			want: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
@@ -440,10 +453,12 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val",
-					}}},
+					},
+				}},
 			},
 			want: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
@@ -477,10 +492,12 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val",
-					}}},
+					},
+				}},
 			},
 			want: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
@@ -514,10 +531,12 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 						}},
 					},
 				}},
-				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1",
+				node: &v1.Node{ObjectMeta: metav1.ObjectMeta{
+					Name: "host_1",
 					Labels: map[string]string{
 						"label_1": "label_1_val",
-					}}},
+					},
+				}},
 			},
 			want: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{

@@ -130,7 +130,6 @@ func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4}
 	}
 	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
-
 }
 
 // IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections

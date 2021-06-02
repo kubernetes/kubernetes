@@ -175,7 +175,6 @@ func TestServingCert(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func createListener(network, addr string) (net.Listener, int, error) {

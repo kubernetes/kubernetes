@@ -277,22 +277,25 @@ func newDeploymentWithHugePageValue(reousreceName api.ResourceName, value resour
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{{
-						Name:                     fakeImageName,
-						Image:                    fakeImage,
-						ImagePullPolicy:          api.PullNever,
-						TerminationMessagePolicy: api.TerminationMessageReadFile,
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
+					Containers: []api.Container{
+						{
+							Name:                     fakeImageName,
+							Image:                    fakeImage,
+							ImagePullPolicy:          api.PullNever,
+							TerminationMessagePolicy: api.TerminationMessageReadFile,
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+									api.ResourceName(reousreceName):   value,
+								},
+								Limits: api.ResourceList{
+									api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+									api.ResourceName(reousreceName):   value,
+								},
 							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
-							},
-						}},
-					}},
+						},
+					},
+				},
 			},
 		},
 	}

@@ -132,7 +132,7 @@ func parseAPIEndpoint(localEndpoint *kubeadmapi.APIEndpoint) (net.IP, string, er
 	}
 
 	// parse the AdvertiseAddress
-	var ip = net.ParseIP(localEndpoint.AdvertiseAddress)
+	ip := net.ParseIP(localEndpoint.AdvertiseAddress)
 	if ip == nil {
 		return nil, "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
 	}

@@ -152,7 +152,6 @@ func TestEdit(t *testing.T) {
 			}
 		}
 		return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
-
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

@@ -20,9 +20,8 @@ package gce
 
 import (
 	"context"
-	"testing"
-
 	"fmt"
+	"testing"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
@@ -66,9 +65,7 @@ func TestCreateDisk_Basic(t *testing.T) {
 
 	/* Act */
 	_, err := gce.CreateDisk(diskName, diskType, zone, sizeGb, tags)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(err)
 	}
 	if !fakeManager.createDiskCalled {
@@ -120,9 +117,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 
 	/* Act */
 	_, err := gce.CreateRegionalDisk(diskName, diskType, replicaZones, sizeGb, tags)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(err)
 	}
 	if !fakeManager.createDiskCalled {
@@ -169,9 +164,7 @@ func TestCreateDisk_DiskAlreadyExists(t *testing.T) {
 
 	/* Act */
 	_, err := gce.CreateDisk("disk", DiskTypeSSD, "zone1", 128, nil)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(
 			"Expected success when a disk with the given name already exists, but an error is returned.")
 	}
@@ -187,7 +180,8 @@ func TestCreateDisk_WrongZone(t *testing.T) {
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true }}
+		nodeInformerSynced: func() bool { return true },
+	}
 
 	diskName := "disk"
 	diskType := DiskTypeSSD
@@ -212,7 +206,8 @@ func TestCreateDisk_NoManagedZone(t *testing.T) {
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true }}
+		nodeInformerSynced: func() bool { return true },
+	}
 
 	diskName := "disk"
 	diskType := DiskTypeSSD
@@ -233,10 +228,12 @@ func TestCreateDisk_BadDiskType(t *testing.T) {
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
 	fakeManager := newFakeManager(gceProjectID, gceRegion)
-	gce := Cloud{manager: fakeManager,
+	gce := Cloud{
+		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true }}
+		nodeInformerSynced: func() bool { return true },
+	}
 
 	diskName := "disk"
 	diskType := "arbitrary-disk"
@@ -304,15 +301,12 @@ func TestDeleteDisk_Basic(t *testing.T) {
 
 	/* Act */
 	err := gce.DeleteDisk(diskName)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(err)
 	}
 	if !fakeManager.deleteDiskCalled {
 		t.Error("Never called GCE disk delete.")
 	}
-
 }
 
 func TestDeleteDisk_NotFound(t *testing.T) {
@@ -333,9 +327,7 @@ func TestDeleteDisk_NotFound(t *testing.T) {
 
 	/* Act */
 	err := gce.DeleteDisk(diskName)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error("Expected successful operation when disk is not found, but an error is returned.")
 	}
 }
@@ -479,9 +471,7 @@ func TestGetLabelsForVolume_Basic(t *testing.T) {
 	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
 	/* Act */
 	labels, err := gce.GetLabelsForVolume(ctx, pv(diskName, zone))
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(err)
 	}
 	if labels[v1.LabelTopologyZone] != zone {
@@ -519,9 +509,7 @@ func TestGetLabelsForVolume_NoZone(t *testing.T) {
 
 	/* Act */
 	labels, err := gce.GetLabelsForVolume(ctx, pv)
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error(err)
 	}
 	if labels[v1.LabelTopologyZone] != zone {
@@ -542,10 +530,12 @@ func TestGetLabelsForVolume_DiskNotFound(t *testing.T) {
 	zonesWithNodes := []string{zone}
 	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
-	gce := Cloud{manager: fakeManager,
+	gce := Cloud{
+		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true }}
+		nodeInformerSynced: func() bool { return true },
+	}
 
 	/* Act */
 	_, err := gce.GetLabelsForVolume(ctx, pv(diskName, zone))
@@ -612,9 +602,7 @@ func TestGetLabelsForVolume_DupDisk(t *testing.T) {
 
 	/* Act */
 	labels, err := gce.GetLabelsForVolume(ctx, pv(diskName, zone))
-
-	/* Assert */
-	if err != nil {
+	/* Assert */ if err != nil {
 		t.Error("Disk name and zone uniquely identifies a disk, yet an error is returned.")
 	}
 	if labels[v1.LabelTopologyZone] != zone {

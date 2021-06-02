@@ -111,14 +111,12 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
 			printAllPodsOnNode(cs, node.Name)
 		}
-
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	ginkgo.It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
-
 		e2eskipper.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
 
 		nodeMaxAllocatable := int64(0)
@@ -652,7 +650,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	ginkgo.It("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
-
 		nodeName := GetNodeThatCanRunPod(f)
 		localhost := "127.0.0.1"
 		if framework.TestContext.ClusterIsIPv6() {
@@ -681,7 +678,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
 		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, nodeSelector, true)
-
 	})
 
 	/*
@@ -812,7 +808,7 @@ func printAllPodsOnNode(c clientset.Interface, nodeName string) {
 }
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	var gracePeriod = int64(1)
+	gracePeriod := int64(1)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            conf.Name,

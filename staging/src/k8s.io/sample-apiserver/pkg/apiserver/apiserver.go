@@ -59,8 +59,7 @@ func init() {
 }
 
 // ExtraConfig holds custom apiserver config
-type ExtraConfig struct {
-	// Place you custom config here.
+type ExtraConfig struct { // Place you custom config here.
 }
 
 // Config defines the config for the apiserver

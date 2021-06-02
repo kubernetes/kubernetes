@@ -17,9 +17,8 @@ limitations under the License.
 package portallocator
 
 import (
-	"testing"
-
 	"strconv"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"

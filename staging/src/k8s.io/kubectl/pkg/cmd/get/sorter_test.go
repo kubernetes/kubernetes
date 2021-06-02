@@ -41,6 +41,7 @@ func toUnstructuredOrDie(data []byte) *unstructured.Unstructured {
 	}
 	return &unstructured.Unstructured{Object: unstrBody}
 }
+
 func encodeOrDie(obj runtime.Object) []byte {
 	data, err := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), obj)
 	if err != nil {
@@ -48,6 +49,7 @@ func encodeOrDie(obj runtime.Object) []byte {
 	}
 	return data
 }
+
 func createPodSpecResource(t *testing.T, memReq, memLimit, cpuReq, cpuLimit string) corev1.PodSpec {
 	t.Helper()
 	podSpec := corev1.PodSpec{
@@ -94,6 +96,7 @@ func createPodSpecResource(t *testing.T, memReq, memLimit, cpuReq, cpuLimit stri
 
 	return podSpec
 }
+
 func createUnstructuredPodResource(t *testing.T, memReq, memLimit, cpuReq, cpuLimit string) unstructured.Unstructured {
 	t.Helper()
 	pod := &corev1.Pod{

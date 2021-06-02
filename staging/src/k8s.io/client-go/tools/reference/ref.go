@@ -26,10 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var (
-	// Errors that could be returned by GetReference.
-	ErrNilObject = errors.New("can't reference a nil object")
-)
+// Errors that could be returned by GetReference.
+var ErrNilObject = errors.New("can't reference a nil object")
 
 // GetReference returns an ObjectReference which refers to the given
 // object, or an error if the object doesn't follow the conventions

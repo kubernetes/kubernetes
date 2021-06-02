@@ -44,7 +44,8 @@ func NewFakePVControllerSource() *FakePVControllerSource {
 		FakeControllerSource{
 			Items:       map[nnu]runtime.Object{},
 			Broadcaster: watch.NewBroadcaster(100, watch.WaitIfChannelFull),
-		}}
+		},
+	}
 }
 
 func NewFakePVCControllerSource() *FakePVCControllerSource {
@@ -52,7 +53,8 @@ func NewFakePVCControllerSource() *FakePVCControllerSource {
 		FakeControllerSource{
 			Items:       map[nnu]runtime.Object{},
 			Broadcaster: watch.NewBroadcaster(100, watch.WaitIfChannelFull),
-		}}
+		},
+	}
 }
 
 // FakeControllerSource implements listing/watching for testing.

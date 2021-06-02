@@ -36,11 +36,14 @@ import (
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
 	return clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"red-user": {Token: "red-token"}},
+			"red-user": {Token: "red-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster": {Server: "http://cow.org:8080"}},
+			"cow-cluster": {Server: "http://cow.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"}},
+			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
+		},
 		CurrentContext: "federal-context",
 	}
 }
@@ -842,13 +845,11 @@ func TestToBool(t *testing.T) {
 		}
 		if (err != nil) && (err.Error() != curr.err) {
 			t.Errorf("Expected %v, got %v", curr.err, err)
-
 		}
 		if b != curr.out {
 			t.Errorf("Expected %v, got %v", curr.out, b)
 		}
 	}
-
 }
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
@@ -905,6 +906,7 @@ func (test configCommandTest) run(t *testing.T) string {
 
 	return out
 }
+
 func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 	for key, obj := range config.AuthInfos {
 		obj.LocationOfOrigin = ""
@@ -919,6 +921,7 @@ func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 		config.Contexts[key] = obj
 	}
 }
+
 func testSetNilMapsToEmpties(curr reflect.Value) {
 	actualCurrValue := curr
 	if curr.Kind() == reflect.Ptr {
@@ -945,5 +948,4 @@ func testSetNilMapsToEmpties(curr reflect.Value) {
 		}
 
 	}
-
 }

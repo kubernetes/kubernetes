@@ -20,7 +20,6 @@ package json
 
 import (
 	gojson "encoding/json"
-
 	"fmt"
 	"math"
 	"reflect"

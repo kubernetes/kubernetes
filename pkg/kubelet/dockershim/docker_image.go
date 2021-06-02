@@ -187,5 +187,4 @@ func filterHTTPError(err error, image string) error {
 		return fmt.Errorf("RegistryUnavailable: %v", err)
 	}
 	return err
-
 }

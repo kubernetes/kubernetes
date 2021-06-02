@@ -82,7 +82,6 @@ func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result
 func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.

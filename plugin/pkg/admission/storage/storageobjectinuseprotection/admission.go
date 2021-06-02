@@ -49,8 +49,10 @@ type storageProtectionPlugin struct {
 	storageObjectInUseProtection bool
 }
 
-var _ admission.Interface = &storageProtectionPlugin{}
-var _ initializer.WantsFeatures = &storageProtectionPlugin{}
+var (
+	_ admission.Interface       = &storageProtectionPlugin{}
+	_ initializer.WantsFeatures = &storageProtectionPlugin{}
+)
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *storageProtectionPlugin {

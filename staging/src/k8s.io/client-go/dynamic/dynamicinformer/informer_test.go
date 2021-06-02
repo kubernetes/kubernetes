@@ -127,7 +127,6 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestDynamicSharedInformerFactory(t *testing.T) {

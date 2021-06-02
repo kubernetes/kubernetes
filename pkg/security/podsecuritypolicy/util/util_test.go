@@ -258,7 +258,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 		ServiceAccountToken: &api.ServiceAccountTokenProjection{
 			Path:              "token",
 			ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
-		}}
+		},
+	}
 	configMap := api.VolumeProjection{
 		ConfigMap: &api.ConfigMapProjection{
 			LocalObjectReference: api.LocalObjectReference{

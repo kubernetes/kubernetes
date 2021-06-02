@@ -207,10 +207,10 @@ func TestTaintTolerationScore(t *testing.T) {
 		},
 		{
 			name: "Default behaviour No taints and tolerations, lands on node with no taints",
-			//pod without tolerations
+			// pod without tolerations
 			pod: podWithTolerations("pod1", []v1.Toleration{}),
 			nodes: []*v1.Node{
-				//Node without taints
+				// Node without taints
 				nodeWithTaints("nodeA", []v1.Taint{}),
 				nodeWithTaints("nodeB", []v1.Taint{
 					{

@@ -54,9 +54,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var (
-	singleStackIPv4 = []api.IPFamily{api.IPv4Protocol}
-)
+var singleStackIPv4 = []api.IPFamily{api.IPv4Protocol}
 
 // TODO(wojtek-t): Cleanup this file.
 // It is now testing mostly the same things as other resources but
@@ -264,6 +262,7 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	}
 	return net
 }
+
 func makeIPNet6(t *testing.T) *net.IPNet {
 	_, net, err := net.ParseCIDR("2000::/108")
 	if err != nil {
@@ -665,7 +664,6 @@ func TestDryRunNodePort(t *testing.T) {
 }
 
 func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
-
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
@@ -899,7 +897,6 @@ func TestServiceRegistryUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
-
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
@@ -926,7 +923,8 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
+			ResourceVersion: svc.ResourceVersion,
+		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -959,7 +957,8 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
+			ResourceVersion: svc.ResourceVersion,
+		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -1005,7 +1004,8 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
+			ResourceVersion: svc.ResourceVersion,
+		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -1048,7 +1048,8 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
+			ResourceVersion: svc.ResourceVersion,
+		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -1160,6 +1161,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		storage.serviceNodePorts.Release(nodePort)
 	}
 }
+
 func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 	testcases := []struct {
 		name                 string
@@ -1878,7 +1880,8 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 				Protocol:   api.ProtocolTCP,
 				TargetPort: intstr.FromInt(6502),
 			}},
-		}}
+		},
+	}
 	ctx = genericapirequest.NewDefaultContext()
 	createdSvc2, _ := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	createdService2 := createdSvc2.(*api.Service)
@@ -2696,7 +2699,6 @@ func TestInitClusterIP(t *testing.T) {
 			if !shouldUpgrade && len(newSvc.Spec.ClusterIPs) > 1 {
 				t.Fatalf("Service should not have been upgraded %+v", newSvc)
 			}
-
 		})
 	}
 }

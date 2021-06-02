@@ -60,7 +60,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
+	tests := []struct {
 		cfg           *kubeadmapi.ClusterConfiguration
 		expectedError bool
 	}{
@@ -162,7 +162,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 }
 
 func TestGetEtcdCommand(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		advertiseAddress string
 		nodeName         string

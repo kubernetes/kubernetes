@@ -131,9 +131,7 @@ type FIFO struct {
 	closed bool
 }
 
-var (
-	_ = Queue(&FIFO{}) // FIFO is a Queue
-)
+var _ = Queue(&FIFO{}) // FIFO is a Queue
 
 // Close the queue.
 func (f *FIFO) Close() {

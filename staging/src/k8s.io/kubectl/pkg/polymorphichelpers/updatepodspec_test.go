@@ -62,7 +62,8 @@ func TestUpdatePodSpecForObject(t *testing.T) {
 		{
 			object: &extensionsv1beta1.DaemonSet{},
 			expect: true,
-		}, {
+		},
+		{
 			object: &appsv1beta2.DaemonSet{},
 			expect: true,
 		},

@@ -467,21 +467,24 @@ func TestWatchParamParsing(t *testing.T) {
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       metav1.NamespaceAll,
-		}, {
+		},
+		{
 			path:            rootPath,
 			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       metav1.NamespaceAll,
-		}, {
+		},
+		{
 			path:            rootPath,
 			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
 			namespace:       metav1.NamespaceAll,
-		}, {
+		},
+		{
 			path:            rootPath,
 			rawQuery:        "",
 			resourceVersion: "",
@@ -496,21 +499,24 @@ func TestWatchParamParsing(t *testing.T) {
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       "other",
-		}, {
+		},
+		{
 			path:            namespacedPath,
 			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       "other",
-		}, {
+		},
+		{
 			path:            namespacedPath,
 			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
 			namespace:       "other",
-		}, {
+		},
+		{
 			path:            namespacedPath,
 			rawQuery:        "",
 			resourceVersion: "",
@@ -594,7 +600,6 @@ func TestWatchProtocolSelection(t *testing.T) {
 			t.Errorf("Unexpected response %#v", response)
 		}
 	}
-
 }
 
 type fakeTimeoutFactory struct {

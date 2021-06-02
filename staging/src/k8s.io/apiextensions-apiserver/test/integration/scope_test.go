@@ -42,7 +42,6 @@ func TestHandlerScope(t *testing.T) {
 
 	for _, scope := range []apiextensionsv1.ResourceScope{apiextensionsv1.ClusterScoped, apiextensionsv1.NamespaceScoped} {
 		t.Run(string(scope), func(t *testing.T) {
-
 			crd := &apiextensionsv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        strings.ToLower(string(scope)) + "s.test.apiextensions-apiserver.k8s.io",

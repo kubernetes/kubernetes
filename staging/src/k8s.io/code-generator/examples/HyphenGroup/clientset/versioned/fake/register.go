@@ -27,8 +27,10 @@ import (
 	examplegroupv1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
 	examplegroupv1.AddToScheme,

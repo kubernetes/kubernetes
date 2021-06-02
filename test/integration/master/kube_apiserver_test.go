@@ -435,8 +435,8 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 }
 
 func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
-	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
-	var masterCountServers = make([]*kubeapiservertesting.TestServer, masterCount)
+	leaseServers := make([]*kubeapiservertesting.TestServer, leaseCount)
+	masterCountServers := make([]*kubeapiservertesting.TestServer, masterCount)
 	etcd := framework.SharedEtcd()
 
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
@@ -615,5 +615,4 @@ func TestMultiMasterNodePortAllocation(t *testing.T) {
 	for _, server := range kubeAPIServers {
 		server.TearDownFn()
 	}
-
 }

@@ -33,7 +33,7 @@ import (
 
 func TestCompileManifests(t *testing.T) {
 	replicas := int32(coreDNSReplicas)
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		manifest string
 		data     interface{}
@@ -71,7 +71,7 @@ func TestCompileManifests(t *testing.T) {
 }
 
 func TestGetDNSIP(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name, svcSubnet, expectedDNSIP string
 		isDualStack                    bool
 	}{

@@ -157,7 +157,6 @@ func TestUpdatePod(t *testing.T) {
 		last := len(processed[uid]) - 1
 		if processed[uid][first].name != "0" {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, first, processed[uid][first])
-
 		}
 		if processed[uid][last].name != strconv.Itoa(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])

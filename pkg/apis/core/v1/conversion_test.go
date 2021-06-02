@@ -397,6 +397,7 @@ func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {
 		}
 	}
 }
+
 func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
 	asymmetricInputs := []struct {
 		name string
@@ -519,7 +520,7 @@ func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
 		}
 
 		if len(testInput.PodIP) == 0 && len(testInput.PodIPs) == 0 {
-			continue //no more work needed
+			continue // no more work needed
 		}
 
 		// List should have at least 1 IP == v1.PodIP || v1.PodIPs[0] (whichever provided)

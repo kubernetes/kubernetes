@@ -20,15 +20,14 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-
-	"net/http"
-	"os"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -186,14 +185,15 @@ func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 }
 
 func TestRunInitNodeChecks(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name                    string
 		cfg                     *kubeadmapi.InitConfiguration
 		expected                bool
 		isSecondaryControlPlane bool
 		downloadCerts           bool
 	}{
-		{name: "Test valid advertised address",
+		{
+			name: "Test valid advertised address",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
 			},
@@ -261,7 +261,7 @@ func TestRunInitNodeChecks(t *testing.T) {
 }
 
 func TestRunJoinNodeChecks(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
@@ -309,7 +309,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 }
 
 func TestRunChecks(t *testing.T) {
-	var tokenTest = []struct {
+	tokenTest := []struct {
 		p        []Checker
 		expected bool
 		output   string
@@ -347,6 +347,7 @@ func TestRunChecks(t *testing.T) {
 		}
 	}
 }
+
 func TestConfigRootCAs(t *testing.T) {
 	f, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-cafile")
 	if err != nil {
@@ -373,6 +374,7 @@ func TestConfigRootCAs(t *testing.T) {
 		)
 	}
 }
+
 func TestConfigCertAndKey(t *testing.T) {
 	certFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-certfile")
 	if err != nil {
@@ -430,41 +432,41 @@ func TestConfigCertAndKey(t *testing.T) {
 }
 
 func TestKubernetesVersionCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		check          KubernetesVersionCheck
 		expectWarnings bool
 	}{
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //Same version
+				KubeadmVersion:    "v1.6.6", // Same version
 				KubernetesVersion: "v1.6.6",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion version older than KubeadmVersion
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion version older than KubeadmVersion
 				KubernetesVersion: "v1.5.5",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
 				KubernetesVersion: "v1.6.7",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
 				KubernetesVersion: "v1.7.0-alpha.0",
 			},
 			expectWarnings: true,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/stable
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/stable
 				KubernetesVersion: "v1.7.0",
 			},
 			expectWarnings: true,
@@ -493,7 +495,7 @@ func TestKubernetesVersionCheck(t *testing.T) {
 }
 
 func TestHTTPProxyCIDRCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		check          HTTPProxyCIDRCheck
 		expectWarnings bool
 	}{
@@ -553,7 +555,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 }
 
 func TestHTTPProxyCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		check          HTTPProxyCheck
 		expectWarnings bool
@@ -725,7 +727,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 }
 
 func TestSetHasItemOrAll(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		ignoreSet      sets.String
 		testString     string
 		expectedResult bool
@@ -836,7 +838,7 @@ func TestImagePullCheck(t *testing.T) {
 }
 
 func TestNumCPUCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		numCPU      int
 		numErrors   int
 		numWarnings int
@@ -864,7 +866,7 @@ func TestMemCheck(t *testing.T) {
 		t.Skip("unsupported OS for memory check test ")
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		minimum        uint64
 		expectedErrors int
 	}{

@@ -203,6 +203,7 @@ func (spm *fakeStaticPodPathManager) PatchesDir() string {
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.realManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) RealManifestDir() string {
 	return spm.realManifestDir
 }
@@ -210,6 +211,7 @@ func (spm *fakeStaticPodPathManager) RealManifestDir() string {
 func (spm *fakeStaticPodPathManager) TempManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.tempManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) TempManifestDir() string {
 	return spm.tempManifestDir
 }
@@ -217,6 +219,7 @@ func (spm *fakeStaticPodPathManager) TempManifestDir() string {
 func (spm *fakeStaticPodPathManager) BackupManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.backupManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
 }
@@ -893,7 +896,6 @@ func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
 }
 
 func TestGetPathManagerForUpgrade(t *testing.T) {
-
 	externalEtcd := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
@@ -981,7 +983,6 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestGetEtcdImageTagFromStaticPod(t *testing.T) {

@@ -494,7 +494,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.It(t.name, func() {
 				init(testParameters{
 					registerDriver: test.deployClusterRegistrar,
-					podInfo:        test.podInfoOnMount})
+					podInfo:        test.podInfoOnMount,
+				})
 
 				defer cleanup()
 
@@ -727,7 +728,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				pvcConditions := pvc.Status.Conditions
 				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
-
 			})
 		}
 	})
@@ -1276,7 +1276,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
 				if !ok {
 					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
-
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
 				defer cancel()
@@ -1373,9 +1372,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSIServiceAccountToken", func() {
-		var (
-			err error
-		)
+		var err error
 		tests := []struct {
 			desc                  string
 			deployCSIDriverObject bool
@@ -1518,7 +1515,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource]", func() {
-
 		var (
 			// CSISnapshotterSecretName is the name of the secret to be created
 			CSISnapshotterSecretName string = "snapshot-secret"
@@ -2127,7 +2123,6 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getC
 	}
 	// All calls were correct
 	return allCalls, len(calls), nil
-
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
@@ -2371,7 +2366,6 @@ func (scm *snapshotControllerMetrics) grabSnapshotControllerMetrics() error {
 	}
 
 	for method, samples := range metrics {
-
 		for _, sample := range samples {
 			operationName := string(sample.Metric["operation_name"])
 			driverName := string(sample.Metric["driver_name"])

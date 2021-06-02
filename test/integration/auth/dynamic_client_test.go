@@ -91,7 +91,6 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	saName := "dt"
 	dymClient, err := clientBuilder.Client(saName)
-
 	if err != nil {
 		t.Fatalf("build client via dynamic client builder failed: %v", err)
 	}

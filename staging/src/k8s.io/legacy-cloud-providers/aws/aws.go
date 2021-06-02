@@ -530,12 +530,14 @@ type InstanceGroupInfo interface {
 	CurrentSize() (int, error)
 }
 
-var _ cloudprovider.Interface = (*Cloud)(nil)
-var _ cloudprovider.Instances = (*Cloud)(nil)
-var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
-var _ cloudprovider.Routes = (*Cloud)(nil)
-var _ cloudprovider.Zones = (*Cloud)(nil)
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var (
+	_ cloudprovider.Interface    = (*Cloud)(nil)
+	_ cloudprovider.Instances    = (*Cloud)(nil)
+	_ cloudprovider.LoadBalancer = (*Cloud)(nil)
+	_ cloudprovider.Routes       = (*Cloud)(nil)
+	_ cloudprovider.Zones        = (*Cloud)(nil)
+	_ cloudprovider.PVLabeler    = (*Cloud)(nil)
+)
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
@@ -617,9 +619,9 @@ type CloudConfig struct {
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
 
-		//AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
-		//can cause the max number of security groups to be reached. If this is set instead of creating a new
-		//Security group for each ELB this security group will be used instead.
+		// AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
+		// can cause the max number of security groups to be reached. If this is set instead of creating a new
+		// Security group for each ELB this security group will be used instead.
 		ElbSecurityGroup string
 
 		//During the instantiation of an new AWS cloud provider, the detected region
@@ -1020,7 +1022,6 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeVolumes(request)
-
 		if err != nil {
 			recordAWSMetric("describe_volume", 0, err)
 			return nil, err
@@ -1505,7 +1506,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine public IP from AWS metadata.")
 		} else {
@@ -1514,7 +1515,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		localHostname, err := c.metadata.GetMetadata("local-hostname")
 		if err != nil || len(localHostname) == 0 {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine private DNS from AWS metadata.")
 		} else {
@@ -1527,7 +1528,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		externalDNS, err := c.metadata.GetMetadata("public-hostname")
 		if err != nil || len(externalDNS) == 0 {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine public DNS from AWS metadata.")
 		} else {
@@ -1863,7 +1864,6 @@ func (c *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) 
 	}
 
 	return zone, nil
-
 }
 
 func isAWSErrorInstanceNotFound(err error) bool {
@@ -2098,7 +2098,6 @@ func (d *awsDisk) describeVolumeModification() (*ec2.VolumeModification, error) 
 		VolumeIds: []*string{volumeID.awsString()},
 	}
 	volumeMods, err := d.ec2.DescribeVolumeModifications(request)
-
 	if err != nil {
 		return nil, fmt.Errorf("error describing volume modification %s with %v", volumeID, err)
 	}
@@ -2137,7 +2136,6 @@ func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
 
 	checkForResize := func() (bool, error) {
 		volumeModification, err := d.describeVolumeModification()
-
 		if err != nil {
 			return false, err
 		}
@@ -2428,7 +2426,6 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	attachment, err := disk.waitForAttachmentStatus("attached", awsInstance.awsID, ec2Device, alreadyAttached)
-
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
 			c.applyUnSchedulableTaint(nodeName, "Volume stuck in attaching state - node needs reboot to fix impaired state.")
@@ -2687,7 +2684,6 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 
 func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) (bool, error) {
 	info, err := disk.describeVolume()
-
 	if err != nil {
 		klog.Errorf("Error describing volume %q: %q", disk.awsID, err)
 		// if for some reason we can not describe volume we will return error
@@ -3705,7 +3701,7 @@ func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, load
 	var err error
 	var securityGroupID string
 	// We do not want to make changes to a Global defined SG
-	var setupSg = false
+	setupSg := false
 
 	sgList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerSecurityGroups])
 
@@ -4653,7 +4649,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
 		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
 
-		var loadBalancerSGs = aws.StringValueSlice(lb.SecurityGroups)
+		loadBalancerSGs := aws.StringValueSlice(lb.SecurityGroups)
 
 		describeRequest := &ec2.DescribeSecurityGroupsInput{}
 		describeRequest.Filters = []*ec2.Filter{
@@ -4679,7 +4675,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			sgID := aws.StringValue(sg.GroupId)
 
 			if sgID == c.cfg.Global.ElbSecurityGroup {
-				//We don't want to delete a security group that was defined in the Cloud Configuration.
+				// We don't want to delete a security group that was defined in the Cloud Configuration.
 				continue
 			}
 			if sgID == "" {

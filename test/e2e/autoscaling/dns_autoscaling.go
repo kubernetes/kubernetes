@@ -167,7 +167,6 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	})
 
 	ginkgo.It("kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios", func() {
-
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
 		err := updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)

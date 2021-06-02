@@ -80,7 +80,6 @@ func (c *FakePersistentVolumeClaims) List(ctx context.Context, opts v1.ListOptio
 func (c *FakePersistentVolumeClaims) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.

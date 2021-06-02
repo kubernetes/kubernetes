@@ -28,9 +28,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	secretNameRe = regexp.MustCompile(`^` + regexp.QuoteMeta(api.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`)
-)
+var secretNameRe = regexp.MustCompile(`^` + regexp.QuoteMeta(api.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`)
 
 // GetData returns the string value for the given key in the specified Secret
 // If there is an error or if the key doesn't exist, an empty string is returned.

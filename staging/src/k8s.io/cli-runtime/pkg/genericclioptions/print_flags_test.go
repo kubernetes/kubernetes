@@ -41,7 +41,8 @@ func TestNamePrinter(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			"pod/foo\n"},
+			"pod/foo\n",
+		},
 		"List": {
 			&unstructured.UnstructuredList{
 				Object: map[string]interface{}{
@@ -60,7 +61,8 @@ func TestNamePrinter(t *testing.T) {
 					},
 				},
 			},
-			"pod/bar\n"},
+			"pod/bar\n",
+		},
 	}
 
 	printFlags := NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("name")

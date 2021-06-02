@@ -173,7 +173,6 @@ spec:
 				},
 			},
 		})))
-
 	})
 
 	It("fails because volume is not an array of object", func() {

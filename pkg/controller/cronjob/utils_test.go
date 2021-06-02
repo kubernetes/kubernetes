@@ -205,7 +205,6 @@ func TestGetParentUIDFromJob(t *testing.T) {
 			t.Errorf("Wrong UID: %v", uid)
 		}
 	}
-
 }
 
 func TestGroupJobsByParent(t *testing.T) {

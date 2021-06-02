@@ -17,7 +17,7 @@ limitations under the License.
 package latest
 
 import (
-	//Init the abac api package
+	// Init the abac api package
 	_ "k8s.io/kubernetes/pkg/apis/abac"
 	_ "k8s.io/kubernetes/pkg/apis/abac/v0"
 	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"

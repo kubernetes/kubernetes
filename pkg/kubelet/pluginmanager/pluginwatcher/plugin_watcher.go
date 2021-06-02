@@ -72,7 +72,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 		for {
 			select {
 			case event := <-fsWatcher.Events:
-				//TODO: Handle errors by taking corrective measures
+				// TODO: Handle errors by taking corrective measures
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					err := w.handleCreateEvent(event)
 					if err != nil {
@@ -141,7 +141,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				Name: path,
 				Op:   fsnotify.Create,
 			}
-			//TODO: Handle errors by taking corrective measures
+			// TODO: Handle errors by taking corrective measures
 			if err := w.handleCreateEvent(event); err != nil {
 				klog.ErrorS(err, "Error when handling create", "event", event)
 			}

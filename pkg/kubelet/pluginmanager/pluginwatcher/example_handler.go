@@ -160,7 +160,6 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
 	}

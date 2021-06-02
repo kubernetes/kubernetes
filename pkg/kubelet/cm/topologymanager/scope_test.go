@@ -17,11 +17,12 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
+	"testing"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
-	"reflect"
-	"testing"
 )
 
 func TestGetAffinity(t *testing.T) {
@@ -123,5 +124,4 @@ func TestRemoveContainer(t *testing.T) {
 			t.Error("Remove Pod from podTopologyHints resulted in error")
 		}
 	}
-
 }

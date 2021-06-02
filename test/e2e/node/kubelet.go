@@ -154,7 +154,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever, //don't restart pod
+			RestartPolicy: v1.RestartPolicyNever, // don't restart pod
 			Volumes: []v1.Volume{
 				{
 					Name: "nfs-vol",
@@ -385,7 +385,6 @@ var _ = SIGDescribe("kubelet", func() {
 
 	// Test host cleanup when disrupting the volume environment.
 	ginkgo.Describe("host cleanup with volume mounts [HostCleanup][Flaky]", func() {
-
 		type hostCleanupTest struct {
 			itDescr string
 			podCmd  string

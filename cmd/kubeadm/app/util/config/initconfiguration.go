@@ -42,15 +42,13 @@ import (
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
-var (
-	// PlaceholderToken is only set statically to make kubeadm not randomize the token on every run
-	PlaceholderToken = kubeadmapiv1.BootstrapToken{
-		Token: &kubeadmapiv1.BootstrapTokenString{
-			ID:     "abcdef",
-			Secret: "0123456789abcdef",
-		},
-	}
-)
+// PlaceholderToken is only set statically to make kubeadm not randomize the token on every run
+var PlaceholderToken = kubeadmapiv1.BootstrapToken{
+	Token: &kubeadmapiv1.BootstrapTokenString{
+		ID:     "abcdef",
+		Secret: "0123456789abcdef",
+	},
+}
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
 func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {

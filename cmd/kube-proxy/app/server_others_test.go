@@ -71,7 +71,7 @@ func (fake *fakeKernelHandler) GetKernelVersion() (string, error) {
 }
 
 func Test_getProxyMode(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		flag          string
 		ipsetVersion  string
 		kmods         []string
@@ -501,7 +501,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			ipt:    [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14", utiliptablestest.NewFake())),
-				proxyutiliptables.NewNoOpLocalDetector()},
+				proxyutiliptables.NewNoOpLocalDetector(),
+			},
 			errExpected: false,
 		},
 		{
@@ -510,7 +511,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			ipt:    [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				proxyutiliptables.NewNoOpLocalDetector(),
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/64", utiliptablestest.NewIPv6Fake()))},
+				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/64", utiliptablestest.NewIPv6Fake())),
+			},
 			errExpected: false,
 		},
 		{
@@ -547,7 +549,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			ipt:    [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake())),
-				proxyutiliptables.NewNoOpLocalDetector()},
+				proxyutiliptables.NewNoOpLocalDetector(),
+			},
 			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0/24"),
 			errExpected: false,
 		},
@@ -557,7 +560,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			ipt:    [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				proxyutiliptables.NewNoOpLocalDetector(),
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake()))},
+				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
+			},
 			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96"),
 			errExpected: false,
 		},

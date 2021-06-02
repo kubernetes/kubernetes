@@ -70,7 +70,6 @@ func (t *VolumeModeDowngradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 
 // Setup creates a block pv and then verifies that a pod can consume it.  The pod writes data to the volume.
 func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
-
 	var err error
 
 	cs := f.ClientSet

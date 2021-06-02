@@ -62,9 +62,7 @@ const (
 	ImagePolicyAuditRequiredKeySuffix string = "audit-required"
 )
 
-var (
-	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
-)
+var groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {

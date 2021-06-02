@@ -72,7 +72,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 	if sc == nil {
 		return nil, fmt.Errorf("sc is nil")
 	}
-	var params = map[string]string{}
+	params := map[string]string{}
 	for k, v := range sc.Parameters {
 		switch strings.ToLower(k) {
 		case fsTypeKey:

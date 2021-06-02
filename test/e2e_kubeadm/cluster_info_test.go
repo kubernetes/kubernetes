@@ -32,20 +32,17 @@ const (
 	clusterInfoRoleBindingName = clusterInfoRoleName
 )
 
-var (
-	clusterInfoConfigMapResource = &authv1.ResourceAttributes{
-		Namespace: kubePublicNamespace,
-		Name:      clusterInfoConfigMapName,
-		Resource:  "configmaps",
-		Verb:      "get",
-	}
-)
+var clusterInfoConfigMapResource = &authv1.ResourceAttributes{
+	Namespace: kubePublicNamespace,
+	Name:      clusterInfoConfigMapName,
+	Resource:  "configmaps",
+	Verb:      "get",
+}
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the cluster-info ConfigMap, that it is properly configured
 // and that all the related RBAC rules are in place
 var _ = Describe("cluster-info ConfigMap", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("cluster-info")
 
@@ -60,7 +57,7 @@ var _ = Describe("cluster-info ConfigMap", func() {
 		gomega.Expect(cm.Data).To(gomega.HaveKey(gomega.HavePrefix(bootstrapapi.JWSSignatureKeyPrefix)))
 		gomega.Expect(cm.Data).To(gomega.HaveKey(bootstrapapi.KubeConfigKey))
 
-		//TODO: What else? server?
+		// TODO: What else? server?
 	})
 
 	ginkgo.It("should have related Role and RoleBinding", func() {

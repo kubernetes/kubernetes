@@ -91,7 +91,6 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 }
 
 func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
-
 	klog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for AWS", nodeName)
 	volumeNodeMap := map[types.NodeName][]*volume.Spec{
 		nodeName: specs,
@@ -117,7 +116,6 @@ func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode ma
 	for nodeName, volumeSpecs := range volumesByNode {
 		for _, volumeSpec := range volumeSpecs {
 			volumeSource, _, err := getVolumeSource(volumeSpec)
-
 			if err != nil {
 				klog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
 				continue
@@ -137,7 +135,6 @@ func (attacher *awsElasticBlockStoreAttacher) BulkVerifyVolumes(volumesByNode ma
 		}
 	}
 	attachedResult, err := attacher.awsVolumes.DisksAreAttached(diskNamesByNode)
-
 	if err != nil {
 		klog.Errorf("Error checking if volumes are attached to nodes err = %v", err)
 		return volumesAttachedCheck, err

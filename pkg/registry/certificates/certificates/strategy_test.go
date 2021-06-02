@@ -112,7 +112,8 @@ func TestStrategyCreate(t *testing.T) {
 			},
 			expectedObj: &certapi.CertificateSigningRequest{
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
-			}},
+			},
+		},
 	}
 
 	for k, tc := range tests {

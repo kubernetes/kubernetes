@@ -28,10 +28,8 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
+// BusyBoxImage is the image URI of BusyBox.
+var BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 // Config is a struct containing all arguments for creating a pod.
 // SELinux testing requires to pass HostIPC and HostPID as boolean arguments.
@@ -221,9 +219,9 @@ func MakePodSpec(podConfig *Config) *v1.PodSpec {
 }
 
 func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, pvcsReadOnly bool) {
-	var volumeMounts = make([]v1.VolumeMount, 0)
-	var volumeDevices = make([]v1.VolumeDevice, 0)
-	var volumes = make([]v1.Volume, len(pvcs)+len(inlineVolumeSources))
+	volumeMounts := make([]v1.VolumeMount, 0)
+	volumeDevices := make([]v1.VolumeDevice, 0)
+	volumes := make([]v1.Volume, len(pvcs)+len(inlineVolumeSources))
 	volumeIndex := 0
 	for _, pvclaim := range pvcs {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)

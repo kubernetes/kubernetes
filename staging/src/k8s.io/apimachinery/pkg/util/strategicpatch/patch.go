@@ -261,7 +261,6 @@ func handleDirectiveMarker(key string, originalValue, modifiedValue interface{},
 func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]interface{},
 	schema LookupPatchMeta, diffOptions DiffOptions) error {
 	subschema, patchMeta, err := schema.LookupPatchMetadataForStruct(key)
-
 	if err != nil {
 		// We couldn't look up metadata for the field
 		// If the values are identical, this doesn't matter, no patch is needed
@@ -1198,7 +1197,6 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, schema Looku
 		if len(patchMeta.GetPatchMergeKey()) == 0 {
 			// Primitives doesn't need merge key to do partitioning.
 			patchItems, serverOnlyItems = partitionPrimitivesByPresentInList(merged, typedSetElementOrderList)
-
 		} else {
 			// Maps need merge key to do partitioning.
 			patchItems, serverOnlyItems, err = partitionMapsByPresentInList(merged, typedSetElementOrderList, patchMeta.GetPatchMergeKey())

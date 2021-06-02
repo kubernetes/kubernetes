@@ -93,12 +93,10 @@ var (
 		    kubectl completion zsh > "${fpath[1]}/_kubectl"`))
 )
 
-var (
-	completionShells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
-		"bash": runCompletionBash,
-		"zsh":  runCompletionZsh,
-	}
-)
+var completionShells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
+	"bash": runCompletionBash,
+	"zsh":  runCompletionZsh,
+}
 
 // NewCmdCompletion creates the `completion` command
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {

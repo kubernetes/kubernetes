@@ -78,8 +78,7 @@ func New() Interface {
 }
 
 // procSysctl implements Interface by reading and writing files under /proc/sys
-type procSysctl struct {
-}
+type procSysctl struct{}
 
 // GetSysctl returns the value for the specified sysctl setting
 func (*procSysctl) GetSysctl(sysctl string) (int, error) {

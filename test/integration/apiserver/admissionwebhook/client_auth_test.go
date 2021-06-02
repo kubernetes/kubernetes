@@ -59,7 +59,6 @@ func TestWebhookClientAuthWithoutAggregatorRouting(t *testing.T) {
 }
 
 func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
-
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		t.Fatal("Failed to append Cert from PEM")
@@ -209,7 +208,6 @@ plugins:
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 type clientAuthRecorder struct {

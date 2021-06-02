@@ -35,7 +35,7 @@ import (
 
 func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.APIEndpoint) string, port int) {
 	portStr := strconv.Itoa(port)
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		advertiseAddress string
 		expectedURL      string
@@ -80,7 +80,7 @@ func TestGetPeerURL(t *testing.T) {
 
 func TestGetClientURLByIP(t *testing.T) {
 	portStr := strconv.Itoa(constants.EtcdListenClientPort)
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		ip          string
 		expectedURL string
@@ -116,7 +116,7 @@ func TestGetClientURLByIP(t *testing.T) {
 }
 
 func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		expectedEndpoints []string
@@ -167,7 +167,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 }
 
 func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
@@ -251,7 +251,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 }
 
 func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)

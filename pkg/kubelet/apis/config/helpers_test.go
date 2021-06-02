@@ -85,6 +85,7 @@ func allPrimitiveFieldPaths(t *testing.T, tp reflect.Type, path *field.Path) set
 type foo struct {
 	foo int
 }
+
 type bar struct {
 	str    string
 	strptr *string

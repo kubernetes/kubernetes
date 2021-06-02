@@ -231,7 +231,6 @@ func TestBetaAndV1StatusUpdate(t *testing.T) {
 			t.Errorf("expected status to be %v got %v", test.expectedStatus, newAttachment.Status.Attached)
 		}
 	}
-
 }
 
 func TestBetaAndV1StatusCreate(t *testing.T) {
@@ -340,7 +339,6 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			testValidation := func(va *storage.VolumeAttachment, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",

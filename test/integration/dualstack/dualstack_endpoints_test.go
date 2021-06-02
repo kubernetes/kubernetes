@@ -128,7 +128,7 @@ func TestDualStackEndpoints(t *testing.T) {
 	go epController.Run(1, stopCh)
 	go epsController.Run(1, stopCh)
 
-	var testcases = []struct {
+	testcases := []struct {
 		name           string
 		serviceType    v1.ServiceType
 		ipFamilies     []v1.IPFamily

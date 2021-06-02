@@ -427,7 +427,6 @@ func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
 		if nextBlock == nil {
 			if block == nil {
 				return nil, fmt.Errorf("no certificate found in %q", bundlePath)
-
 			}
 			return x509.ParseCertificate(block.Bytes)
 		}

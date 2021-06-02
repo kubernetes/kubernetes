@@ -93,7 +93,6 @@ func factory() (framework.ProviderInterface, error) {
 		UseMetadataServer:  false,
 		AlphaFeatureGate:   gcecloud.NewAlphaFeatureGate([]string{}),
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("Error building GCE/GKE provider: %v", err)
 	}
@@ -247,7 +246,6 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
 	err := p.gceCloud.DeleteDisk(pdName)
-
 	if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
 			// PD already exists, ignore error.
@@ -306,7 +304,6 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 	if err := p.gceCloud.DeleteRegionForwardingRule(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
-
 	}
 	if err := p.gceCloud.DeleteRegionAddress(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {

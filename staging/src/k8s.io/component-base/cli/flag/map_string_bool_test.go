@@ -53,68 +53,101 @@ func TestSetMapStringBool(t *testing.T) {
 		err    string
 	}{
 		// we initialize the map with a default key that should be cleared by Set
-		{"clears defaults", []string{""},
+		{
+			"clears defaults",
+			[]string{""},
 			NewMapStringBool(&map[string]bool{"default": true}),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
+			}, "",
+		},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
-		{"allocates map if currently nil", []string{""},
+		{
+			"allocates map if currently nil",
+			[]string{""},
 			&MapStringBool{initialized: true, Map: &nilMap},
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
+			}, "",
+		},
 		// for most cases, we just reuse nilMap, which should be allocated by Set, and is reset before each test case
-		{"empty", []string{""},
+		{
+			"empty",
+			[]string{""},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
-		{"one key", []string{"one=true"},
+			}, "",
+		},
+		{
+			"one key",
+			[]string{"one=true"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true},
-			}, ""},
-		{"two keys", []string{"one=true,two=false"},
+			}, "",
+		},
+		{
+			"two keys",
+			[]string{"one=true,two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"two keys, multiple Set invocations", []string{"one=true", "two=false"},
+			}, "",
+		},
+		{
+			"two keys, multiple Set invocations",
+			[]string{"one=true", "two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"two keys with space", []string{"one=true, two=false"},
+			}, "",
+		},
+		{
+			"two keys with space",
+			[]string{"one=true, two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"empty key", []string{"=true"},
+			}, "",
+		},
+		{
+			"empty key",
+			[]string{"=true"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"": true},
-			}, ""},
-		{"missing value", []string{"one"},
+			}, "",
+		},
+		{
+			"missing value",
+			[]string{"one"},
 			NewMapStringBool(&nilMap),
 			nil,
-			"malformed pair, expect string=bool"},
-		{"non-boolean value", []string{"one=foo"},
+			"malformed pair, expect string=bool",
+		},
+		{
+			"non-boolean value",
+			[]string{"one=foo"},
 			NewMapStringBool(&nilMap),
 			nil,
-			`invalid value of one: foo, err: strconv.ParseBool: parsing "foo": invalid syntax`},
-		{"no target", []string{"one=true"},
+			`invalid value of one: foo, err: strconv.ParseBool: parsing "foo": invalid syntax`,
+		},
+		{
+			"no target",
+			[]string{"one=true"},
 			NewMapStringBool(nil),
 			nil,
-			"no target (nil pointer to map[string]bool)"},
+			"no target (nil pointer to map[string]bool)",
+		},
 	}
 	for _, c := range cases {
 		nilMap = nil

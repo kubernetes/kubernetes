@@ -42,8 +42,7 @@ type FlunderSpec struct {
 	ReferenceType *ReferenceType `json:"referenceType,omitempty" protobuf:"bytes,2,opt,name=referenceType"`
 }
 
-type FlunderStatus struct {
-}
+type FlunderStatus struct{}
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

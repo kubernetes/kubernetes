@@ -316,7 +316,6 @@ func TestListLB(t *testing.T) {
 		assert.Equal(t, test.expectedErr, err)
 		assert.Empty(t, pips)
 	}
-
 }
 
 func TestListPIP(t *testing.T) {
@@ -558,5 +557,4 @@ func TestRequestBackoff(t *testing.T) {
 
 	backoff := az.RequestBackoff()
 	assert.Equal(t, wait.Backoff{Steps: 3}, backoff)
-
 }

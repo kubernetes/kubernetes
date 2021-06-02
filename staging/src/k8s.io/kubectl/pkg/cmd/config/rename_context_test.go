@@ -35,9 +35,7 @@ const (
 	existentNewContext        = "existent-new-context"
 )
 
-var (
-	contextData = clientcmdapi.NewContext()
-)
+var contextData = clientcmdapi.NewContext()
 
 type renameContextTest struct {
 	description    string
@@ -51,11 +49,13 @@ type renameContextTest struct {
 func TestRenameContext(t *testing.T) {
 	initialConfig := clientcmdapi.Config{
 		CurrentContext: currentContext,
-		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData}}
+		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData},
+	}
 
 	expectedConfig := clientcmdapi.Config{
 		CurrentContext: newContext,
-		Contexts:       map[string]*clientcmdapi.Context{newContext: contextData}}
+		Contexts:       map[string]*clientcmdapi.Context{newContext: contextData},
+	}
 
 	test := renameContextTest{
 		description:    "Testing for kubectl config rename-context whose context to be renamed is the CurrentContext",
@@ -71,7 +71,8 @@ func TestRenameContext(t *testing.T) {
 func TestRenameNonexistentContext(t *testing.T) {
 	initialConfig := clientcmdapi.Config{
 		CurrentContext: currentContext,
-		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData}}
+		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData},
+	}
 
 	test := renameContextTest{
 		description:    "Testing for kubectl config rename-context whose context to be renamed no exists",
@@ -89,7 +90,9 @@ func TestRenameToAlreadyExistingContext(t *testing.T) {
 		CurrentContext: currentContext,
 		Contexts: map[string]*clientcmdapi.Context{
 			currentContext:     contextData,
-			existentNewContext: contextData}}
+			existentNewContext: contextData,
+		},
+	}
 
 	test := renameContextTest{
 		description:    "Testing for kubectl config rename-context whose the new name is already in another context.",

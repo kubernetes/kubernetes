@@ -46,7 +46,6 @@ func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubre
 			strings.HasPrefix(ruleResource, "*/") &&
 			strings.HasSuffix(ruleResource, requestedSubresource) {
 			return true
-
 		}
 	}
 

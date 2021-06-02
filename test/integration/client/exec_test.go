@@ -958,7 +958,6 @@ func assertInformerEvents(t *testing.T, informerSpy *informerSpy, created, updat
 	if diff := cmp.Diff([]interface{}{deleted}, informerSpy.deletes, objectMetaSansResourceVersionComparer); diff != "" {
 		t.Errorf("unexpected deleted event(s), -want, +got:\n%s", diff)
 	}
-
 }
 
 func TestExecPluginGlobalCache(t *testing.T) {

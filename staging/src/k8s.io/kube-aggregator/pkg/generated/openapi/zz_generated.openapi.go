@@ -166,7 +166,8 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR",
+		},
 	}
 }
 
@@ -210,7 +211,8 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup",
+		},
 	}
 }
 
@@ -374,7 +376,8 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource",
+		},
 	}
 }
 
@@ -433,7 +436,8 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR",
+		},
 	}
 }
 
@@ -554,7 +558,8 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 
@@ -674,7 +679,8 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions",
+		},
 	}
 }
 
@@ -944,7 +950,8 @@ func schema_pkg_apis_meta_v1_InternalEvent(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.Object"},
+			"k8s.io/apimachinery/pkg/runtime.Object",
+		},
 	}
 }
 
@@ -994,7 +1001,8 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement",
+		},
 	}
 }
 
@@ -1096,7 +1104,8 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension",
+		},
 	}
 }
 
@@ -1289,7 +1298,8 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1", "k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 
@@ -1478,7 +1488,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry", "k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry", "k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 
@@ -1579,7 +1590,8 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadata(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+		},
 	}
 }
 
@@ -1630,7 +1642,8 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata",
+		},
 	}
 }
 
@@ -1853,7 +1866,8 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails",
+		},
 	}
 }
 
@@ -1951,7 +1965,8 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause",
+		},
 	}
 }
 
@@ -2016,7 +2031,8 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.TableRow"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.TableRow",
+		},
 	}
 }
 
@@ -2155,7 +2171,8 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition", "k8s.io/apimachinery/pkg/runtime.RawExtension",
+		},
 	}
 }
 
@@ -2347,7 +2364,8 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/apimachinery/pkg/runtime.RawExtension",
+		},
 	}
 }
 
@@ -2559,7 +2577,8 @@ func schema_pkg_apis_apiregistration_v1_APIService(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceSpec", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceStatus"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceSpec", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceStatus",
+		},
 	}
 }
 
@@ -2612,7 +2631,8 @@ func schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 
@@ -2663,7 +2683,8 @@ func schema_pkg_apis_apiregistration_v1_APIServiceList(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService",
+		},
 	}
 }
 
@@ -2734,7 +2755,8 @@ func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.ServiceReference"},
+			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.ServiceReference",
+		},
 	}
 }
 
@@ -2773,7 +2795,8 @@ func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceCondition"},
+			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceCondition",
+		},
 	}
 }
 
@@ -2857,7 +2880,8 @@ func schema_pkg_apis_apiregistration_v1beta1_APIService(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceSpec", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceStatus"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceSpec", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceStatus",
+		},
 	}
 }
 
@@ -2910,7 +2934,8 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 
@@ -2961,7 +2986,8 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIService"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIService",
+		},
 	}
 }
 
@@ -3032,7 +3058,8 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.ServiceReference"},
+			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.ServiceReference",
+		},
 	}
 }
 
@@ -3071,7 +3098,8 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceCondition"},
+			"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceCondition",
+		},
 	}
 }
 

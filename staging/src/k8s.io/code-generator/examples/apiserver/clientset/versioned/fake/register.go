@@ -29,8 +29,10 @@ import (
 	thirdexamplev1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
 	examplev1.AddToScheme,

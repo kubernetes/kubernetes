@@ -161,6 +161,7 @@ var aPod = `
   }
 }
 `
+
 var aRC = `
 {
   "kind": "ReplicationController",
@@ -194,6 +195,7 @@ var aRC = `
   }
 }
 `
+
 var aService = `
 {
   "kind": "Service",
@@ -218,6 +220,7 @@ var aService = `
   }
 }
 `
+
 var aNode = `
 {
   "kind": "Node",
@@ -645,7 +648,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 					}
 				}
 			}
-
 		}()
 	}
 }
@@ -872,7 +874,6 @@ func TestImpersonateIsForbidden(t *testing.T) {
 			}
 		}()
 	}
-
 }
 
 func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {
@@ -1059,7 +1060,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 					}
 				}
 			}
-
 		}()
 	}
 }

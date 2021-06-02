@@ -344,13 +344,14 @@ func TestSync(t *testing.T) {
 		{
 			// syncClaim with claim pre-bound to a PV that exists and is
 			// unbound, but its size is smaller than requested.
-			//Check that the claim status is reset to Pending
+			// Check that the claim status is reset to Pending
 			"2-9 - claim prebound to unbound volume that size is smaller than requested",
 			newVolumeArray("volume2-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
 			newVolumeArray("volume2-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
 			newClaimArray("claim2-9", "uid2-9", "2Gi", "volume2-9", v1.ClaimBound, nil),
 			newClaimArray("claim2-9", "uid2-9", "2Gi", "volume2-9", v1.ClaimPending, nil),
-			[]string{"Warning VolumeMismatch"}, noerrors, testSyncClaim,
+			[]string{"Warning VolumeMismatch"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim with claim pre-bound to a PV that exists and is
@@ -360,7 +361,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume2-10", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
 			newClaimArray("claim2-10", "uid2-10", "1Gi", "volume2-10", v1.ClaimBound, nil),
 			newClaimArray("claim2-10", "uid2-10", "1Gi", "volume2-10", v1.ClaimPending, nil),
-			[]string{"Warning VolumeMismatch"}, noerrors, testSyncClaim,
+			[]string{"Warning VolumeMismatch"},
+			noerrors, testSyncClaim,
 		},
 
 		// [Unit test set 3] Syncing bound claim
@@ -372,7 +374,8 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim3-1", "uid3-1", "10Gi", "", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			newClaimArray("claim3-1", "uid3-1", "10Gi", "", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			[]string{"Warning ClaimLost"}, noerrors, testSyncClaim,
+			[]string{"Warning ClaimLost"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to non-existing volume. Check it's
@@ -382,7 +385,8 @@ func TestSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim3-2", "uid3-2", "10Gi", "volume3-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			newClaimArray("claim3-2", "uid3-2", "10Gi", "volume3-2", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			[]string{"Warning ClaimLost"}, noerrors, testSyncClaim,
+			[]string{"Warning ClaimLost"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to unbound volume. Check it's bound.
@@ -402,7 +406,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-4", "10Gi", "claim3-4-x", "claim3-4", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
 			newClaimArray("claim3-4", "uid3-4", "10Gi", "volume3-4", v1.ClaimPending, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			newClaimArray("claim3-4", "uid3-4", "10Gi", "volume3-4", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			[]string{"Warning ClaimMisbound"}, noerrors, testSyncClaim,
+			[]string{"Warning ClaimMisbound"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to bound volume. Check that the
@@ -424,7 +429,8 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume3-6", "10Gi", "uid3-6-x", "claim3-6-x", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", v1.ClaimPending, nil, pvutil.AnnBindCompleted),
 			newClaimArray("claim3-6", "uid3-6", "10Gi", "volume3-6", v1.ClaimLost, nil, pvutil.AnnBindCompleted),
-			[]string{"Warning ClaimMisbound"}, noerrors, testSyncClaim,
+			[]string{"Warning ClaimMisbound"},
+			noerrors, testSyncClaim,
 		},
 		{
 			// syncClaim with claim bound to unbound volume. Check it's bound

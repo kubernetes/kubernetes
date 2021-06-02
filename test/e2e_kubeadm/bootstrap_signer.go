@@ -29,7 +29,6 @@ const (
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the bootstrap signer
 var _ = Describe("bootstrap signer", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("bootstrap token")
 
@@ -38,7 +37,7 @@ var _ = Describe("bootstrap signer", func() {
 	f.SkipNamespaceCreation = true
 
 	ginkgo.It("should be active", func() {
-		//NB. this is technically implemented a part of the control-plane phase
+		// NB. this is technically implemented a part of the control-plane phase
 		//    and more specifically if the controller manager is properly configured,
 		//    the bootstrapsigner controller is activated and the system:controller:bootstrap-signer
 		//    group will be automatically created

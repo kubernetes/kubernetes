@@ -80,12 +80,14 @@ func TestCommonAttachDisk(t *testing.T) {
 			desc:     "correct LUN and no error shall be returned if everything is good",
 			vmList:   map[string]string{"vm1": "PowerState/Running"},
 			nodeName: "vm1",
-			existedDisk: compute.Disk{Name: to.StringPtr("disk-name"),
+			existedDisk: compute.Disk{
+				Name: to.StringPtr("disk-name"),
 				DiskProperties: &compute.DiskProperties{
 					Encryption: &compute.Encryption{DiskEncryptionSetID: &diskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey},
 					DiskSizeGB: to.Int32Ptr(4096),
 				},
-				Tags: testTags},
+				Tags: testTags,
+			},
 			expectedLun: 1,
 			expectedErr: false,
 		},
@@ -479,7 +481,6 @@ func TestDisksAreAttached(t *testing.T) {
 }
 
 func TestFilteredDetachingDisks(t *testing.T) {
-
 	disks := []compute.DataDisk{
 		{
 			Name:         pointer.StringPtr("DiskName1"),

@@ -38,9 +38,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -53,9 +55,11 @@ func (*ContainerMetrics) ProtoMessage() {}
 func (*ContainerMetrics) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3e7a045767f4b09f, []int{0}
 }
+
 func (m *ContainerMetrics) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -64,12 +68,15 @@ func (m *ContainerMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *ContainerMetrics) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerMetrics.Merge(m, src)
 }
+
 func (m *ContainerMetrics) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerMetrics) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerMetrics.DiscardUnknown(m)
 }
@@ -81,9 +88,11 @@ func (*NodeMetrics) ProtoMessage() {}
 func (*NodeMetrics) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3e7a045767f4b09f, []int{1}
 }
+
 func (m *NodeMetrics) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *NodeMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -92,12 +101,15 @@ func (m *NodeMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *NodeMetrics) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NodeMetrics.Merge(m, src)
 }
+
 func (m *NodeMetrics) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *NodeMetrics) XXX_DiscardUnknown() {
 	xxx_messageInfo_NodeMetrics.DiscardUnknown(m)
 }
@@ -109,9 +121,11 @@ func (*NodeMetricsList) ProtoMessage() {}
 func (*NodeMetricsList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3e7a045767f4b09f, []int{2}
 }
+
 func (m *NodeMetricsList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *NodeMetricsList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -120,12 +134,15 @@ func (m *NodeMetricsList) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *NodeMetricsList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NodeMetricsList.Merge(m, src)
 }
+
 func (m *NodeMetricsList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *NodeMetricsList) XXX_DiscardUnknown() {
 	xxx_messageInfo_NodeMetricsList.DiscardUnknown(m)
 }
@@ -137,9 +154,11 @@ func (*PodMetrics) ProtoMessage() {}
 func (*PodMetrics) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3e7a045767f4b09f, []int{3}
 }
+
 func (m *PodMetrics) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -148,12 +167,15 @@ func (m *PodMetrics) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PodMetrics) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodMetrics.Merge(m, src)
 }
+
 func (m *PodMetrics) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodMetrics) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodMetrics.DiscardUnknown(m)
 }
@@ -165,9 +187,11 @@ func (*PodMetricsList) ProtoMessage() {}
 func (*PodMetricsList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3e7a045767f4b09f, []int{4}
 }
+
 func (m *PodMetricsList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodMetricsList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -176,12 +200,15 @@ func (m *PodMetricsList) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *PodMetricsList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodMetricsList.Merge(m, src)
 }
+
 func (m *PodMetricsList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodMetricsList) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodMetricsList.DiscardUnknown(m)
 }
@@ -559,6 +586,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ContainerMetrics) Size() (n int) {
 	if m == nil {
 		return 0
@@ -661,9 +689,11 @@ func (m *PodMetricsList) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ContainerMetrics) String() string {
 	if this == nil {
 		return "nil"
@@ -678,13 +708,15 @@ func (this *ContainerMetrics) String() string {
 		mapStringForUsage += fmt.Sprintf("%v: %v,", k, this.Usage[k8s_io_api_core_v1.ResourceName(k)])
 	}
 	mapStringForUsage += "}"
-	s := strings.Join([]string{`&ContainerMetrics{`,
+	s := strings.Join([]string{
+		`&ContainerMetrics{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Usage:` + mapStringForUsage + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *NodeMetrics) String() string {
 	if this == nil {
 		return "nil"
@@ -699,7 +731,8 @@ func (this *NodeMetrics) String() string {
 		mapStringForUsage += fmt.Sprintf("%v: %v,", k, this.Usage[k8s_io_api_core_v1.ResourceName(k)])
 	}
 	mapStringForUsage += "}"
-	s := strings.Join([]string{`&NodeMetrics{`,
+	s := strings.Join([]string{
+		`&NodeMetrics{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Window:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Window), "Duration", "v1.Duration", 1), `&`, ``, 1) + `,`,
@@ -708,6 +741,7 @@ func (this *NodeMetrics) String() string {
 	}, "")
 	return s
 }
+
 func (this *NodeMetricsList) String() string {
 	if this == nil {
 		return "nil"
@@ -717,13 +751,15 @@ func (this *NodeMetricsList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "NodeMetrics", "NodeMetrics", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&NodeMetricsList{`,
+	s := strings.Join([]string{
+		`&NodeMetricsList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PodMetrics) String() string {
 	if this == nil {
 		return "nil"
@@ -733,7 +769,8 @@ func (this *PodMetrics) String() string {
 		repeatedStringForContainers += strings.Replace(strings.Replace(f.String(), "ContainerMetrics", "ContainerMetrics", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForContainers += "}"
-	s := strings.Join([]string{`&PodMetrics{`,
+	s := strings.Join([]string{
+		`&PodMetrics{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Timestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Window:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Window), "Duration", "v1.Duration", 1), `&`, ``, 1) + `,`,
@@ -742,6 +779,7 @@ func (this *PodMetrics) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodMetricsList) String() string {
 	if this == nil {
 		return "nil"
@@ -751,13 +789,15 @@ func (this *PodMetricsList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "PodMetrics", "PodMetrics", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&PodMetricsList{`,
+	s := strings.Join([]string{
+		`&PodMetricsList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -766,6 +806,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ContainerMetrics) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -977,6 +1018,7 @@ func (m *ContainerMetrics) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *NodeMetrics) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1255,6 +1297,7 @@ func (m *NodeMetrics) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *NodeMetricsList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1372,6 +1415,7 @@ func (m *NodeMetricsList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodMetrics) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1555,6 +1599,7 @@ func (m *PodMetrics) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodMetricsList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1672,6 +1717,7 @@ func (m *PodMetricsList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

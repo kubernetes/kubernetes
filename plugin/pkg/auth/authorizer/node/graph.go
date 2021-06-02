@@ -45,9 +45,11 @@ func newNamedVertex(vertexType vertexType, namespace, name string, id int) *name
 		id:         id,
 	}
 }
+
 func (n *namedVertex) ID() int {
 	return n.id
 }
+
 func (n *namedVertex) String() string {
 	if len(n.namespace) == 0 {
 		return vertexTypes[n.vertexType] + ":" + n.name
@@ -396,6 +398,7 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		}
 	}
 }
+
 func (g *Graph) DeletePod(name, namespace string) {
 	start := time.Now()
 	defer func() {
@@ -437,6 +440,7 @@ func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 		})
 	}
 }
+
 func (g *Graph) DeletePV(name string) {
 	start := time.Now()
 	defer func() {
@@ -468,6 +472,7 @@ func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
 		g.graph.SetEdge(newDestinationEdge(vaVertex, nodeVertex, nodeVertex))
 	}
 }
+
 func (g *Graph) DeleteVolumeAttachment(name string) {
 	start := time.Now()
 	defer func() {
@@ -503,5 +508,4 @@ func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace str
 		g.graph.SetEdge(e)
 		g.addEdgeToDestinationIndex_locked(e)
 	}
-
 }

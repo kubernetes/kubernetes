@@ -222,10 +222,10 @@ func (info *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-//Uses mac prefix and IPv4 address to return a mac address
-//This ensures mac addresses are unique for proper load balancing
-//There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
-//and not sent on the wire.
+// Uses mac prefix and IPv4 address to return a mac address
+// This ensures mac addresses are unique for proper load balancing
+// There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
+// and not sent on the wire.
 func conjureMac(macPrefix string, ip net.IP) string {
 	if ip4 := ip.To4(); ip4 != nil {
 		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]
@@ -248,7 +248,6 @@ func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap prox
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
-
 	svc, exists := proxier.serviceMap[*svcPortName]
 
 	if exists {
@@ -295,7 +294,6 @@ func (proxier *Proxier) serviceMapChange(previous, current proxy.ServiceMap) {
 }
 
 func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
-
 	svc, exists := proxier.serviceMap[*svcPortName]
 
 	if exists {
@@ -313,9 +311,7 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 
 // returns a new proxy.Endpoint which abstracts a endpointsInfo
 func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.Endpoint {
-
 	portNumber, err := baseInfo.Port()
-
 	if err != nil {
 		portNumber = 0
 	}
@@ -605,7 +601,7 @@ func NewProxier(
 			return nil, fmt.Errorf("source-vip flag not set")
 		}
 
-		interfaces, _ := net.Interfaces() //TODO create interfaces
+		interfaces, _ := net.Interfaces() // TODO create interfaces
 		for _, inter := range interfaces {
 			addresses, _ := inter.Addrs()
 			for _, addr := range addresses {
@@ -675,7 +671,6 @@ func NewDualStackProxier(
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
 		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config)
-
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[0])
 	}
@@ -751,7 +746,6 @@ func deleteAllHnsLoadBalancerPolicy() {
 			klog.ErrorS(err, "Failed to delete policy list")
 		}
 	}
-
 }
 
 func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
@@ -859,7 +853,6 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 // OnEndpointsUpdate is called whenever modification of an existing
 // endpoints object is observed.
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-
 	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
 		proxier.Sync()
 	}
@@ -1179,7 +1172,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		klog.V(4).Infof("Trying to Apply Policies for service", "spewConfig", spewSdump(svcInfo))
 		var hnsLoadBalancer *loadBalancerInfo
-		var sourceVip = proxier.sourceVip
+		sourceVip := proxier.sourceVip
 		if containsPublicIP || containsNodeIP {
 			sourceVip = proxier.nodeIP.String()
 		}

@@ -18,10 +18,11 @@ package nfs
 
 import (
 	"fmt"
-	netutil "k8s.io/utils/net"
 	"os"
 	"runtime"
 	"time"
+
+	netutil "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -58,9 +59,11 @@ type nfsPlugin struct {
 	config volume.VolumeConfig
 }
 
-var _ volume.VolumePlugin = &nfsPlugin{}
-var _ volume.PersistentVolumePlugin = &nfsPlugin{}
-var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
+var (
+	_ volume.VolumePlugin           = &nfsPlugin{}
+	_ volume.PersistentVolumePlugin = &nfsPlugin{}
+	_ volume.RecyclableVolumePlugin = &nfsPlugin{}
+)
 
 const (
 	nfsPluginName  = "kubernetes.io/nfs"

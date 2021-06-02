@@ -40,6 +40,7 @@ func (obj *IgnoredList) GetObjectKind() schema.ObjectKind { return schema.EmptyO
 func (obj *Ignored) DeepCopyObject() runtime.Object {
 	panic("Ignored does not support DeepCopy")
 }
+
 func (obj *IgnoredList) DeepCopyObject() runtime.Object {
 	panic("IgnoredList does not support DeepCopy")
 }

@@ -73,7 +73,6 @@ func TestCoversMultipleRulesCoveringSingleRule(t *testing.T) {
 		expectedCovered:        true,
 		expectedUncoveredRules: []rbacv1.PolicyRule{},
 	}.test(t)
-
 }
 
 func TestCoversMultipleAPIGroupsCoveringSingleRule(t *testing.T) {
@@ -93,7 +92,6 @@ func TestCoversMultipleAPIGroupsCoveringSingleRule(t *testing.T) {
 		expectedCovered:        true,
 		expectedUncoveredRules: []rbacv1.PolicyRule{},
 	}.test(t)
-
 }
 
 func TestCoversSingleAPIGroupsCoveringMultiple(t *testing.T) {
@@ -113,7 +111,6 @@ func TestCoversSingleAPIGroupsCoveringMultiple(t *testing.T) {
 		expectedCovered:        true,
 		expectedUncoveredRules: []rbacv1.PolicyRule{},
 	}.test(t)
-
 }
 
 func TestCoversMultipleRulesMissingSingleVerbResourceCombination(t *testing.T) {

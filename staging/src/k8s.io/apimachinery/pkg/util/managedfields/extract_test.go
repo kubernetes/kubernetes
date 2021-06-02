@@ -167,9 +167,11 @@ type fakeDeploymentStatus struct {
 func (o *fakeDeployment) GetObjectMeta() metav1.ObjectMeta {
 	return o.ObjectMeta
 }
+
 func (o *fakeDeployment) GetObjectKind() runtimeschema.ObjectKind {
 	return runtimeschema.EmptyObjectKind
 }
+
 func (o *fakeDeployment) DeepCopyObject() runtime.Object {
 	return o
 }

@@ -132,7 +132,8 @@ func (plugin *awsElasticBlockStorePlugin) newUnmapperInternal(volName string, po
 			manager: manager,
 			mounter: mounter,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 type awsElasticBlockStoreUnmapper struct {

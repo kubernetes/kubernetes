@@ -69,7 +69,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 		QPS:           -1,
 		Host:          testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
+	})
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
 
 	admission.SetExternalKubeClientSet(externalClientset)

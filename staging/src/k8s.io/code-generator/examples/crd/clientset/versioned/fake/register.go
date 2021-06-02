@@ -28,8 +28,10 @@ import (
 	secondexamplev1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
 	examplev1.AddToScheme,

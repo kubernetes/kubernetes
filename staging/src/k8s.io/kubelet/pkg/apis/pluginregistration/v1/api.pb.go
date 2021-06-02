@@ -31,25 +31,31 @@ limitations under the License.
 */
 package pluginregistration
 
-import proto "github.com/gogo/protobuf/proto"
-import fmt "fmt"
-import math "math"
-import _ "github.com/gogo/protobuf/gogoproto"
+import (
+	proto "github.com/gogo/protobuf/proto"
+	fmt "fmt"
+	math "math"
+	_ "github.com/gogo/protobuf/gogoproto"
+)
 
 import (
 	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 )
 
-import strings "strings"
-import reflect "reflect"
+import (
+	strings "strings"
+	reflect "reflect"
+)
 
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -140,16 +146,14 @@ func (m *RegistrationStatus) GetError() string {
 }
 
 // RegistrationStatusResponse is sent by plugin to kubelet in response to RegistrationStatus RPC
-type RegistrationStatusResponse struct {
-}
+type RegistrationStatusResponse struct{}
 
 func (m *RegistrationStatusResponse) Reset()                    { *m = RegistrationStatusResponse{} }
 func (*RegistrationStatusResponse) ProtoMessage()               {}
 func (*RegistrationStatusResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 // InfoRequest is the empty request message from Kubelet
-type InfoRequest struct {
-}
+type InfoRequest struct{}
 
 func (m *InfoRequest) Reset()                    { *m = InfoRequest{} }
 func (*InfoRequest) ProtoMessage()               {}
@@ -163,8 +167,10 @@ func init() {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -397,6 +403,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+
 func (m *PluginInfo) Size() (n int) {
 	var l int
 	_ = l
@@ -456,14 +463,17 @@ func sovApi(x uint64) (n int) {
 	}
 	return n
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *PluginInfo) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PluginInfo{`,
+	s := strings.Join([]string{
+		`&PluginInfo{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Endpoint:` + fmt.Sprintf("%v", this.Endpoint) + `,`,
@@ -472,35 +482,42 @@ func (this *PluginInfo) String() string {
 	}, "")
 	return s
 }
+
 func (this *RegistrationStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegistrationStatus{`,
+	s := strings.Join([]string{
+		`&RegistrationStatus{`,
 		`PluginRegistered:` + fmt.Sprintf("%v", this.PluginRegistered) + `,`,
 		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *RegistrationStatusResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegistrationStatusResponse{`,
+	s := strings.Join([]string{
+		`&RegistrationStatusResponse{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *InfoRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&InfoRequest{`,
+	s := strings.Join([]string{
+		`&InfoRequest{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -509,6 +526,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *PluginInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -675,6 +693,7 @@ func (m *PluginInfo) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RegistrationStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -774,6 +793,7 @@ func (m *RegistrationStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RegistrationStatusResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -824,6 +844,7 @@ func (m *RegistrationStatusResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -874,6 +895,7 @@ func (m *InfoRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

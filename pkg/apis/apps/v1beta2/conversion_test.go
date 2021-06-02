@@ -485,7 +485,6 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "v1beta2 -> extensions", k, tc.deploymentSpec1, internal)
 		}
 	}
-
 }
 
 func TestV1beta2DeploymentStrategyConversion(t *testing.T) {

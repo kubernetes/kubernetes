@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*MutatingWebhook) ProtoMessage() {}
 func (*MutatingWebhook) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{0}
 }
+
 func (m *MutatingWebhook) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MutatingWebhook) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *MutatingWebhook) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *MutatingWebhook) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MutatingWebhook.Merge(m, src)
 }
+
 func (m *MutatingWebhook) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MutatingWebhook) XXX_DiscardUnknown() {
 	xxx_messageInfo_MutatingWebhook.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*MutatingWebhookConfiguration) ProtoMessage() {}
 func (*MutatingWebhookConfiguration) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{1}
 }
+
 func (m *MutatingWebhookConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MutatingWebhookConfiguration) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *MutatingWebhookConfiguration) XXX_Marshal(b []byte, deterministic bool)
 	}
 	return b[:n], nil
 }
+
 func (m *MutatingWebhookConfiguration) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MutatingWebhookConfiguration.Merge(m, src)
 }
+
 func (m *MutatingWebhookConfiguration) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MutatingWebhookConfiguration) XXX_DiscardUnknown() {
 	xxx_messageInfo_MutatingWebhookConfiguration.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*MutatingWebhookConfigurationList) ProtoMessage() {}
 func (*MutatingWebhookConfigurationList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{2}
 }
+
 func (m *MutatingWebhookConfigurationList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MutatingWebhookConfigurationList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *MutatingWebhookConfigurationList) XXX_Marshal(b []byte, deterministic b
 	}
 	return b[:n], nil
 }
+
 func (m *MutatingWebhookConfigurationList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MutatingWebhookConfigurationList.Merge(m, src)
 }
+
 func (m *MutatingWebhookConfigurationList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MutatingWebhookConfigurationList) XXX_DiscardUnknown() {
 	xxx_messageInfo_MutatingWebhookConfigurationList.DiscardUnknown(m)
 }
@@ -133,9 +150,11 @@ func (*Rule) ProtoMessage() {}
 func (*Rule) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{3}
 }
+
 func (m *Rule) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Rule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -144,12 +163,15 @@ func (m *Rule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Rule) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Rule.Merge(m, src)
 }
+
 func (m *Rule) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Rule) XXX_DiscardUnknown() {
 	xxx_messageInfo_Rule.DiscardUnknown(m)
 }
@@ -161,9 +183,11 @@ func (*RuleWithOperations) ProtoMessage() {}
 func (*RuleWithOperations) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{4}
 }
+
 func (m *RuleWithOperations) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RuleWithOperations) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -172,12 +196,15 @@ func (m *RuleWithOperations) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *RuleWithOperations) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RuleWithOperations.Merge(m, src)
 }
+
 func (m *RuleWithOperations) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RuleWithOperations) XXX_DiscardUnknown() {
 	xxx_messageInfo_RuleWithOperations.DiscardUnknown(m)
 }
@@ -189,9 +216,11 @@ func (*ServiceReference) ProtoMessage() {}
 func (*ServiceReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{5}
 }
+
 func (m *ServiceReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -200,12 +229,15 @@ func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *ServiceReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ServiceReference.Merge(m, src)
 }
+
 func (m *ServiceReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ServiceReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_ServiceReference.DiscardUnknown(m)
 }
@@ -217,9 +249,11 @@ func (*ValidatingWebhook) ProtoMessage() {}
 func (*ValidatingWebhook) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{6}
 }
+
 func (m *ValidatingWebhook) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ValidatingWebhook) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -228,12 +262,15 @@ func (m *ValidatingWebhook) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *ValidatingWebhook) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ValidatingWebhook.Merge(m, src)
 }
+
 func (m *ValidatingWebhook) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ValidatingWebhook) XXX_DiscardUnknown() {
 	xxx_messageInfo_ValidatingWebhook.DiscardUnknown(m)
 }
@@ -245,9 +282,11 @@ func (*ValidatingWebhookConfiguration) ProtoMessage() {}
 func (*ValidatingWebhookConfiguration) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{7}
 }
+
 func (m *ValidatingWebhookConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ValidatingWebhookConfiguration) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -256,12 +295,15 @@ func (m *ValidatingWebhookConfiguration) XXX_Marshal(b []byte, deterministic boo
 	}
 	return b[:n], nil
 }
+
 func (m *ValidatingWebhookConfiguration) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ValidatingWebhookConfiguration.Merge(m, src)
 }
+
 func (m *ValidatingWebhookConfiguration) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ValidatingWebhookConfiguration) XXX_DiscardUnknown() {
 	xxx_messageInfo_ValidatingWebhookConfiguration.DiscardUnknown(m)
 }
@@ -273,9 +315,11 @@ func (*ValidatingWebhookConfigurationList) ProtoMessage() {}
 func (*ValidatingWebhookConfigurationList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{8}
 }
+
 func (m *ValidatingWebhookConfigurationList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ValidatingWebhookConfigurationList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -284,12 +328,15 @@ func (m *ValidatingWebhookConfigurationList) XXX_Marshal(b []byte, deterministic
 	}
 	return b[:n], nil
 }
+
 func (m *ValidatingWebhookConfigurationList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ValidatingWebhookConfigurationList.Merge(m, src)
 }
+
 func (m *ValidatingWebhookConfigurationList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ValidatingWebhookConfigurationList) XXX_DiscardUnknown() {
 	xxx_messageInfo_ValidatingWebhookConfigurationList.DiscardUnknown(m)
 }
@@ -301,9 +348,11 @@ func (*WebhookClientConfig) ProtoMessage() {}
 func (*WebhookClientConfig) Descriptor() ([]byte, []int) {
 	return fileDescriptor_abeea74cbc46f55a, []int{9}
 }
+
 func (m *WebhookClientConfig) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *WebhookClientConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -312,12 +361,15 @@ func (m *WebhookClientConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 	}
 	return b[:n], nil
 }
+
 func (m *WebhookClientConfig) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WebhookClientConfig.Merge(m, src)
 }
+
 func (m *WebhookClientConfig) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *WebhookClientConfig) XXX_DiscardUnknown() {
 	xxx_messageInfo_WebhookClientConfig.DiscardUnknown(m)
 }
@@ -1036,6 +1088,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *MutatingWebhook) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1296,9 +1349,11 @@ func (m *WebhookClientConfig) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *MutatingWebhook) String() string {
 	if this == nil {
 		return "nil"
@@ -1308,7 +1363,8 @@ func (this *MutatingWebhook) String() string {
 		repeatedStringForRules += strings.Replace(strings.Replace(f.String(), "RuleWithOperations", "RuleWithOperations", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForRules += "}"
-	s := strings.Join([]string{`&MutatingWebhook{`,
+	s := strings.Join([]string{
+		`&MutatingWebhook{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`ClientConfig:` + strings.Replace(strings.Replace(this.ClientConfig.String(), "WebhookClientConfig", "WebhookClientConfig", 1), `&`, ``, 1) + `,`,
 		`Rules:` + repeatedStringForRules + `,`,
@@ -1324,6 +1380,7 @@ func (this *MutatingWebhook) String() string {
 	}, "")
 	return s
 }
+
 func (this *MutatingWebhookConfiguration) String() string {
 	if this == nil {
 		return "nil"
@@ -1333,13 +1390,15 @@ func (this *MutatingWebhookConfiguration) String() string {
 		repeatedStringForWebhooks += strings.Replace(strings.Replace(f.String(), "MutatingWebhook", "MutatingWebhook", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForWebhooks += "}"
-	s := strings.Join([]string{`&MutatingWebhookConfiguration{`,
+	s := strings.Join([]string{
+		`&MutatingWebhookConfiguration{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Webhooks:` + repeatedStringForWebhooks + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *MutatingWebhookConfigurationList) String() string {
 	if this == nil {
 		return "nil"
@@ -1349,18 +1408,21 @@ func (this *MutatingWebhookConfigurationList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "MutatingWebhookConfiguration", "MutatingWebhookConfiguration", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&MutatingWebhookConfigurationList{`,
+	s := strings.Join([]string{
+		`&MutatingWebhookConfigurationList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Rule) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Rule{`,
+	s := strings.Join([]string{
+		`&Rule{`,
 		`APIGroups:` + fmt.Sprintf("%v", this.APIGroups) + `,`,
 		`APIVersions:` + fmt.Sprintf("%v", this.APIVersions) + `,`,
 		`Resources:` + fmt.Sprintf("%v", this.Resources) + `,`,
@@ -1369,22 +1431,26 @@ func (this *Rule) String() string {
 	}, "")
 	return s
 }
+
 func (this *RuleWithOperations) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RuleWithOperations{`,
+	s := strings.Join([]string{
+		`&RuleWithOperations{`,
 		`Operations:` + fmt.Sprintf("%v", this.Operations) + `,`,
 		`Rule:` + strings.Replace(strings.Replace(this.Rule.String(), "Rule", "Rule", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ServiceReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ServiceReference{`,
+	s := strings.Join([]string{
+		`&ServiceReference{`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Path:` + valueToStringGenerated(this.Path) + `,`,
@@ -1393,6 +1459,7 @@ func (this *ServiceReference) String() string {
 	}, "")
 	return s
 }
+
 func (this *ValidatingWebhook) String() string {
 	if this == nil {
 		return "nil"
@@ -1402,7 +1469,8 @@ func (this *ValidatingWebhook) String() string {
 		repeatedStringForRules += strings.Replace(strings.Replace(f.String(), "RuleWithOperations", "RuleWithOperations", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForRules += "}"
-	s := strings.Join([]string{`&ValidatingWebhook{`,
+	s := strings.Join([]string{
+		`&ValidatingWebhook{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`ClientConfig:` + strings.Replace(strings.Replace(this.ClientConfig.String(), "WebhookClientConfig", "WebhookClientConfig", 1), `&`, ``, 1) + `,`,
 		`Rules:` + repeatedStringForRules + `,`,
@@ -1417,6 +1485,7 @@ func (this *ValidatingWebhook) String() string {
 	}, "")
 	return s
 }
+
 func (this *ValidatingWebhookConfiguration) String() string {
 	if this == nil {
 		return "nil"
@@ -1426,13 +1495,15 @@ func (this *ValidatingWebhookConfiguration) String() string {
 		repeatedStringForWebhooks += strings.Replace(strings.Replace(f.String(), "ValidatingWebhook", "ValidatingWebhook", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForWebhooks += "}"
-	s := strings.Join([]string{`&ValidatingWebhookConfiguration{`,
+	s := strings.Join([]string{
+		`&ValidatingWebhookConfiguration{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Webhooks:` + repeatedStringForWebhooks + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ValidatingWebhookConfigurationList) String() string {
 	if this == nil {
 		return "nil"
@@ -1442,18 +1513,21 @@ func (this *ValidatingWebhookConfigurationList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "ValidatingWebhookConfiguration", "ValidatingWebhookConfiguration", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&ValidatingWebhookConfigurationList{`,
+	s := strings.Join([]string{
+		`&ValidatingWebhookConfigurationList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *WebhookClientConfig) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&WebhookClientConfig{`,
+	s := strings.Join([]string{
+		`&WebhookClientConfig{`,
 		`Service:` + strings.Replace(this.Service.String(), "ServiceReference", "ServiceReference", 1) + `,`,
 		`CABundle:` + valueToStringGenerated(this.CABundle) + `,`,
 		`URL:` + valueToStringGenerated(this.URL) + `,`,
@@ -1461,6 +1535,7 @@ func (this *WebhookClientConfig) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -1469,6 +1544,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *MutatingWebhook) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1874,6 +1950,7 @@ func (m *MutatingWebhook) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MutatingWebhookConfiguration) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1991,6 +2068,7 @@ func (m *MutatingWebhookConfiguration) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MutatingWebhookConfigurationList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2108,6 +2186,7 @@ func (m *MutatingWebhookConfigurationList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Rule) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2287,6 +2366,7 @@ func (m *Rule) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *RuleWithOperations) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2402,6 +2482,7 @@ func (m *RuleWithOperations) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2569,6 +2650,7 @@ func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ValidatingWebhook) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2941,6 +3023,7 @@ func (m *ValidatingWebhook) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ValidatingWebhookConfiguration) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3058,6 +3141,7 @@ func (m *ValidatingWebhookConfiguration) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ValidatingWebhookConfigurationList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3175,6 +3259,7 @@ func (m *ValidatingWebhookConfigurationList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *WebhookClientConfig) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3328,6 +3413,7 @@ func (m *WebhookClientConfig) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

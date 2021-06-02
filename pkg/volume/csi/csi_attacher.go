@@ -158,7 +158,6 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 }
 
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
-
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
 	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 	if err != nil {
@@ -300,7 +299,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
 	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(err.Error())
 	}
@@ -354,7 +352,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return nil
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]

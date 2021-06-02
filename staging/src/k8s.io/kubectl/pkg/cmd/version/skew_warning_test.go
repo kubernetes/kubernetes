@@ -18,8 +18,9 @@ package version
 
 import (
 	"bytes"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestPrintVersionSkewWarning(t *testing.T) {

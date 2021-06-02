@@ -80,7 +80,6 @@ func (c *FakeResourceQuotas) List(ctx context.Context, opts v1.ListOptions) (res
 func (c *FakeResourceQuotas) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.

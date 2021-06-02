@@ -237,8 +237,9 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 		})
 	}
 }
+
 func TestGetEtcdProbeEndpoint(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		cfg              *kubeadmapi.Etcd
 		isIPv6           bool
@@ -251,7 +252,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381"},
+						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381",
+					},
 				},
 			},
 			isIPv6:           false,
@@ -264,7 +266,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://1.2.3.4:1234"},
+						"listen-metrics-urls": "http://1.2.3.4:1234",
+					},
 				},
 			},
 			isIPv6:           false,
@@ -277,7 +280,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "1.2.3.4"},
+						"listen-metrics-urls": "1.2.3.4",
+					},
 				},
 			},
 			isIPv6:           false,
@@ -290,7 +294,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4"},
+						"listen-metrics-urls": "https://1.2.3.4",
+					},
 				},
 			},
 			isIPv6:           false,
@@ -303,7 +308,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+						"listen-metrics-urls": "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381",
+					},
 				},
 			},
 			isIPv6:           true,
@@ -316,7 +322,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[::1]:1234"},
+						"listen-metrics-urls": "http://[::1]:1234",
+					},
 				},
 			},
 			isIPv6:           true,
@@ -329,7 +336,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[2001:abcd:bcda::1]:1234"},
+						"listen-metrics-urls": "http://[2001:abcd:bcda::1]:1234",
+					},
 				},
 			},
 			isIPv6:           true,
@@ -342,7 +350,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]"},
+						"listen-metrics-urls": "https://[2001:abcd:bcda::1]",
+					},
 				},
 			},
 			isIPv6:           true,
@@ -391,7 +400,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 }
 
 func TestComponentPod(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		expected v1.Pod
 	}{
@@ -443,7 +452,7 @@ func TestComponentPod(t *testing.T) {
 
 func TestNewVolume(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		path     string
 		expected v1.Volume
@@ -480,7 +489,7 @@ func TestNewVolume(t *testing.T) {
 }
 
 func TestNewVolumeMount(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		path     string
 		ro       bool
@@ -521,6 +530,7 @@ func TestNewVolumeMount(t *testing.T) {
 		})
 	}
 }
+
 func TestVolumeMapToSlice(t *testing.T) {
 	testVolumes := map[string]v1.Volume{
 		"foo": {
@@ -564,7 +574,7 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 }
 
 func TestGetExtraParameters(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name      string
 		overrides map[string]string
 		defaults  map[string]string
@@ -688,7 +698,7 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 }
 
 func TestManifestFilesAreEqual(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		description    string
 		podYamls       []string
 		expectedResult bool

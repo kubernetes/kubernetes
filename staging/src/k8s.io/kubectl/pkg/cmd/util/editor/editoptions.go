@@ -740,7 +740,6 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 		}
 
 		return nil
-
 	})
 	return err
 }

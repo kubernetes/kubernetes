@@ -24,8 +24,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ Lister = &dynamicLister{}
-var _ NamespaceLister = &dynamicNamespaceLister{}
+var (
+	_ Lister          = &dynamicLister{}
+	_ NamespaceLister = &dynamicNamespaceLister{}
+)
 
 // dynamicLister implements the Lister interface.
 type dynamicLister struct {

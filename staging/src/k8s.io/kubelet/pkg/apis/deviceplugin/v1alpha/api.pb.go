@@ -22,23 +22,26 @@ package deviceplugin
 import (
 	context "context"
 	fmt "fmt"
+	io "io"
+	math "math"
+	math_bits "math/bits"
+	reflect "reflect"
+	strings "strings"
+
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	io "io"
-	math "math"
-	math_bits "math/bits"
-	reflect "reflect"
-	strings "strings"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -63,9 +66,11 @@ func (*RegisterRequest) ProtoMessage() {}
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
 }
+
 func (m *RegisterRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *RegisterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_RegisterRequest.Marshal(b, m, deterministic)
@@ -78,12 +83,15 @@ func (m *RegisterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
+
 func (m *RegisterRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RegisterRequest.Merge(m, src)
 }
+
 func (m *RegisterRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *RegisterRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_RegisterRequest.DiscardUnknown(m)
 }
@@ -121,9 +129,11 @@ func (*Empty) ProtoMessage() {}
 func (*Empty) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
+
 func (m *Empty) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Empty) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Empty.Marshal(b, m, deterministic)
@@ -136,12 +146,15 @@ func (m *Empty) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Empty) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Empty.Merge(m, src)
 }
+
 func (m *Empty) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Empty) XXX_DiscardUnknown() {
 	xxx_messageInfo_Empty.DiscardUnknown(m)
 }
@@ -162,9 +175,11 @@ func (*ListAndWatchResponse) ProtoMessage() {}
 func (*ListAndWatchResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
+
 func (m *ListAndWatchResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ListAndWatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_ListAndWatchResponse.Marshal(b, m, deterministic)
@@ -177,12 +192,15 @@ func (m *ListAndWatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return b[:n], nil
 	}
 }
+
 func (m *ListAndWatchResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ListAndWatchResponse.Merge(m, src)
 }
+
 func (m *ListAndWatchResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ListAndWatchResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ListAndWatchResponse.DiscardUnknown(m)
 }
@@ -217,9 +235,11 @@ func (*Device) ProtoMessage() {}
 func (*Device) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
+
 func (m *Device) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Device) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Device.Marshal(b, m, deterministic)
@@ -232,12 +252,15 @@ func (m *Device) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Device) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Device.Merge(m, src)
 }
+
 func (m *Device) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Device) XXX_DiscardUnknown() {
 	xxx_messageInfo_Device.DiscardUnknown(m)
 }
@@ -275,9 +298,11 @@ func (*AllocateRequest) ProtoMessage() {}
 func (*AllocateRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
+
 func (m *AllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_AllocateRequest.Marshal(b, m, deterministic)
@@ -290,12 +315,15 @@ func (m *AllocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
+
 func (m *AllocateRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AllocateRequest.Merge(m, src)
 }
+
 func (m *AllocateRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AllocateRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_AllocateRequest.DiscardUnknown(m)
 }
@@ -335,9 +363,11 @@ func (*AllocateResponse) ProtoMessage() {}
 func (*AllocateResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
 }
+
 func (m *AllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *AllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_AllocateResponse.Marshal(b, m, deterministic)
@@ -350,12 +380,15 @@ func (m *AllocateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 		return b[:n], nil
 	}
 }
+
 func (m *AllocateResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_AllocateResponse.Merge(m, src)
 }
+
 func (m *AllocateResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *AllocateResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_AllocateResponse.DiscardUnknown(m)
 }
@@ -408,9 +441,11 @@ func (*Mount) ProtoMessage() {}
 func (*Mount) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
 }
+
 func (m *Mount) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Mount) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_Mount.Marshal(b, m, deterministic)
@@ -423,12 +458,15 @@ func (m *Mount) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *Mount) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Mount.Merge(m, src)
 }
+
 func (m *Mount) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Mount) XXX_DiscardUnknown() {
 	xxx_messageInfo_Mount.DiscardUnknown(m)
 }
@@ -476,9 +514,11 @@ func (*DeviceSpec) ProtoMessage() {}
 func (*DeviceSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
 }
+
 func (m *DeviceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *DeviceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
 		return xxx_messageInfo_DeviceSpec.Marshal(b, m, deterministic)
@@ -491,12 +531,15 @@ func (m *DeviceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
+
 func (m *DeviceSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeviceSpec.Merge(m, src)
 }
+
 func (m *DeviceSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *DeviceSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeviceSpec.DiscardUnknown(m)
 }
@@ -582,8 +625,10 @@ var fileDescriptor_00212fb1f9d3bf1c = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+var (
+	_ context.Context
+	_ grpc.ClientConn
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -619,8 +664,7 @@ type RegistrationServer interface {
 }
 
 // UnimplementedRegistrationServer can be embedded to have forward compatible implementations.
-type UnimplementedRegistrationServer struct {
-}
+type UnimplementedRegistrationServer struct{}
 
 func (*UnimplementedRegistrationServer) Register(ctx context.Context, req *RegisterRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
@@ -737,12 +781,12 @@ type DevicePluginServer interface {
 }
 
 // UnimplementedDevicePluginServer can be embedded to have forward compatible implementations.
-type UnimplementedDevicePluginServer struct {
-}
+type UnimplementedDevicePluginServer struct{}
 
 func (*UnimplementedDevicePluginServer) ListAndWatch(req *Empty, srv DevicePlugin_ListAndWatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method ListAndWatch not implemented")
 }
+
 func (*UnimplementedDevicePluginServer) Allocate(ctx context.Context, req *AllocateRequest) (*AllocateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Allocate not implemented")
 }
@@ -1173,6 +1217,7 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *RegisterRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1331,14 +1376,17 @@ func (m *DeviceSpec) Size() (n int) {
 func sovApi(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *RegisterRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RegisterRequest{`,
+	s := strings.Join([]string{
+		`&RegisterRequest{`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Endpoint:` + fmt.Sprintf("%v", this.Endpoint) + `,`,
 		`ResourceName:` + fmt.Sprintf("%v", this.ResourceName) + `,`,
@@ -1346,15 +1394,18 @@ func (this *RegisterRequest) String() string {
 	}, "")
 	return s
 }
+
 func (this *Empty) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Empty{`,
+	s := strings.Join([]string{
+		`&Empty{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ListAndWatchResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -1364,33 +1415,39 @@ func (this *ListAndWatchResponse) String() string {
 		repeatedStringForDevices += strings.Replace(f.String(), "Device", "Device", 1) + ","
 	}
 	repeatedStringForDevices += "}"
-	s := strings.Join([]string{`&ListAndWatchResponse{`,
+	s := strings.Join([]string{
+		`&ListAndWatchResponse{`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Device) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Device{`,
+	s := strings.Join([]string{
+		`&Device{`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`Health:` + fmt.Sprintf("%v", this.Health) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *AllocateRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&AllocateRequest{`,
+	s := strings.Join([]string{
+		`&AllocateRequest{`,
 		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *AllocateResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -1425,7 +1482,8 @@ func (this *AllocateResponse) String() string {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
 	}
 	mapStringForAnnotations += "}"
-	s := strings.Join([]string{`&AllocateResponse{`,
+	s := strings.Join([]string{
+		`&AllocateResponse{`,
 		`Envs:` + mapStringForEnvs + `,`,
 		`Mounts:` + repeatedStringForMounts + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
@@ -1434,11 +1492,13 @@ func (this *AllocateResponse) String() string {
 	}, "")
 	return s
 }
+
 func (this *Mount) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Mount{`,
+	s := strings.Join([]string{
+		`&Mount{`,
 		`ContainerPath:` + fmt.Sprintf("%v", this.ContainerPath) + `,`,
 		`HostPath:` + fmt.Sprintf("%v", this.HostPath) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
@@ -1446,11 +1506,13 @@ func (this *Mount) String() string {
 	}, "")
 	return s
 }
+
 func (this *DeviceSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&DeviceSpec{`,
+	s := strings.Join([]string{
+		`&DeviceSpec{`,
 		`ContainerPath:` + fmt.Sprintf("%v", this.ContainerPath) + `,`,
 		`HostPath:` + fmt.Sprintf("%v", this.HostPath) + `,`,
 		`Permissions:` + fmt.Sprintf("%v", this.Permissions) + `,`,
@@ -1458,6 +1520,7 @@ func (this *DeviceSpec) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringApi(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -1466,6 +1529,7 @@ func valueToStringApi(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1612,6 +1676,7 @@ func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Empty) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1662,6 +1727,7 @@ func (m *Empty) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ListAndWatchResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1746,6 +1812,7 @@ func (m *ListAndWatchResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Device) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1860,6 +1927,7 @@ func (m *Device) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1942,6 +2010,7 @@ func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *AllocateResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2314,6 +2383,7 @@ func (m *AllocateResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Mount) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2448,6 +2518,7 @@ func (m *Mount) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *DeviceSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2594,6 +2665,7 @@ func (m *DeviceSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipApi(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

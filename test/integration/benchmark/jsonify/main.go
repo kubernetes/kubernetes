@@ -98,7 +98,10 @@ func appendIfMeasured(items []DataItem, benchmark *benchparse.Benchmark, metricT
 		Unit: unit,
 		Labels: map[string]string{
 			"benchmark":  benchmark.Name,
-			"metricName": metricName},
+			"metricName": metricName,
+		},
 		Data: map[string]float64{
-			"value": value}})
+			"value": value,
+		},
+	})
 }

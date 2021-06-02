@@ -42,7 +42,6 @@ import (
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNodeShutdown]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	ginkgo.Context("when gracefully shutting down", func() {
-
 		const (
 			pollInterval                        = 1 * time.Second
 			podStatusUpdateTimeout              = 5 * time.Second

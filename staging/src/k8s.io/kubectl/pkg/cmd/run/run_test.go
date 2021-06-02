@@ -531,7 +531,6 @@ func TestRunValidations(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestExpose(t *testing.T) {
@@ -553,7 +552,6 @@ func TestExpose(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
@@ -626,6 +624,5 @@ func TestExpose(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }

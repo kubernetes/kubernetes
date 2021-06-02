@@ -64,7 +64,7 @@ func TestContainerLabels(t *testing.T) {
 		},
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		description string
 		expected    *labeledContainerInfo
 	}{

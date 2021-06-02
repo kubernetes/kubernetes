@@ -124,7 +124,8 @@ func TestControllerSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			[]string{"Warning ClaimLost"}, noerrors,
+			[]string{"Warning ClaimLost"},
+			noerrors,
 			// Custom test function that generates a delete event
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
@@ -637,7 +638,6 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
 			}
-
 		})
 	}
 }

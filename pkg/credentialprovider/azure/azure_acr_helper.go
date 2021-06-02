@@ -73,8 +73,10 @@ type acrAuthResponse struct {
 }
 
 // 5 minutes buffer time to allow timeshift between local machine and AAD
-const userAgentHeader = "User-Agent"
-const userAgent = "kubernetes-credentialprovider-acr"
+const (
+	userAgentHeader = "User-Agent"
+	userAgent       = "kubernetes-credentialprovider-acr"
+)
 
 const dockerTokenLoginUsernameGUID = "00000000-0000-0000-0000-000000000000"
 
@@ -206,7 +208,7 @@ func performTokenExchange(
 func parseAssignments(statements string) (*map[string]string, error) {
 	var cursor int
 	result := make(map[string]string)
-	var errorMsg = fmt.Errorf("malformed header value: %s", statements)
+	errorMsg := fmt.Errorf("malformed header value: %s", statements)
 	for {
 		// parse key
 		equalIndex := nextOccurrence(statements, cursor, "=")

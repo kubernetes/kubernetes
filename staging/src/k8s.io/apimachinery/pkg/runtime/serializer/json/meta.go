@@ -40,8 +40,7 @@ var DefaultMetaFactory = SimpleMetaFactory{}
 // that are identified with an "apiVersion" and "kind" fields in their JSON
 // serialization. It may be parameterized with the names of the fields in memory, or an
 // optional list of base structs to search for those fields in memory.
-type SimpleMetaFactory struct {
-}
+type SimpleMetaFactory struct{}
 
 // Interpret will return the APIVersion and Kind of the JSON wire-format
 // encoding of an object, or an error.

@@ -17,10 +17,11 @@ limitations under the License.
 package create
 
 import (
+	"testing"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -29,7 +30,6 @@ import (
 )
 
 func TestCreateServices(t *testing.T) {
-
 	tests := []struct {
 		name         string
 		serviceType  v1.ServiceType
@@ -50,11 +50,15 @@ func TestCreateServices(t *testing.T) {
 					Name:   "clusterip-ok",
 					Labels: map[string]string{"app": "clusterip-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "ClusterIP",
-					Ports: []v1.ServicePort{{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
-						{Name: "321-908", Protocol: "TCP", Port: 321, TargetPort: intstr.IntOrString{Type: 0, IntVal: 908, StrVal: ""}, NodePort: 0}},
+				Spec: v1.ServiceSpec{
+					Type: "ClusterIP",
+					Ports: []v1.ServicePort{
+						{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
+						{Name: "321-908", Protocol: "TCP", Port: 321, TargetPort: intstr.IntOrString{Type: 0, IntVal: 908, StrVal: ""}, NodePort: 0},
+					},
 					Selector:  map[string]string{"app": "clusterip-ok"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -80,10 +84,12 @@ func TestCreateServices(t *testing.T) {
 					Name:   "clusterip-none-ok",
 					Labels: map[string]string{"app": "clusterip-none-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "ClusterIP",
+				Spec: v1.ServiceSpec{
+					Type:      "ClusterIP",
 					Ports:     []v1.ServicePort{},
 					Selector:  map[string]string{"app": "clusterip-none-ok"},
-					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -97,10 +103,12 @@ func TestCreateServices(t *testing.T) {
 					Name:   "clusterip-none-and-port-mapping",
 					Labels: map[string]string{"app": "clusterip-none-and-port-mapping"},
 				},
-				Spec: v1.ServiceSpec{Type: "ClusterIP",
+				Spec: v1.ServiceSpec{
+					Type:      "ClusterIP",
 					Ports:     []v1.ServicePort{{Name: "456-9898", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 9898, StrVal: ""}, NodePort: 0}},
 					Selector:  map[string]string{"app": "clusterip-none-and-port-mapping"},
-					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -114,10 +122,12 @@ func TestCreateServices(t *testing.T) {
 					Name:   "loadbalancer-ok",
 					Labels: map[string]string{"app": "loadbalancer-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "LoadBalancer",
+				Spec: v1.ServiceSpec{
+					Type:      "LoadBalancer",
 					Ports:     []v1.ServicePort{{Name: "456-9898", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 9898, StrVal: ""}, NodePort: 0}},
 					Selector:  map[string]string{"app": "loadbalancer-ok"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -148,13 +158,15 @@ func TestCreateServices(t *testing.T) {
 					Name:   "validate-ok",
 					Labels: map[string]string{"app": "validate-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "ClusterIP",
+				Spec: v1.ServiceSpec{
+					Type: "ClusterIP",
 					Ports: []v1.ServicePort{
 						{Name: "123", Protocol: "TCP", Port: 123, TargetPort: intstr.IntOrString{Type: 0, IntVal: 123, StrVal: ""}, NodePort: 0},
 						{Name: "234-1234", Protocol: "TCP", Port: 234, TargetPort: intstr.IntOrString{Type: 0, IntVal: 1234, StrVal: ""}, NodePort: 0},
 					},
 					Selector:  map[string]string{"app": "validate-ok"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -190,13 +202,15 @@ func TestCreateServices(t *testing.T) {
 					Name:   "externalName-ok",
 					Labels: map[string]string{"app": "externalName-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "ExternalName",
+				Spec: v1.ServiceSpec{
+					Type: "ExternalName",
 					Ports: []v1.ServicePort{
 						{Name: "123", Protocol: "TCP", Port: 123, TargetPort: intstr.IntOrString{Type: 0, IntVal: 123, StrVal: ""}, NodePort: 0},
 						{Name: "234-1234", Protocol: "TCP", Port: 234, TargetPort: intstr.IntOrString{Type: 0, IntVal: 1234, StrVal: ""}, NodePort: 0},
 					},
 					Selector:  map[string]string{"app": "externalName-ok"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "", ExternalName: "www.externalname.com"},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "", ExternalName: "www.externalname.com",
+				},
 			},
 			expectErr: false,
 		},
@@ -210,13 +224,15 @@ func TestCreateServices(t *testing.T) {
 					Name:   "my-node-port-service-ok",
 					Labels: map[string]string{"app": "my-node-port-service-ok"},
 				},
-				Spec: v1.ServiceSpec{Type: "NodePort",
+				Spec: v1.ServiceSpec{
+					Type: "NodePort",
 					Ports: []v1.ServicePort{
 						{Name: "443-https", Protocol: "TCP", Port: 443, TargetPort: intstr.IntOrString{Type: 1, IntVal: 0, StrVal: "https"}, NodePort: 0},
 						{Name: "30000-8000", Protocol: "TCP", Port: 30000, TargetPort: intstr.IntOrString{Type: 0, IntVal: 8000, StrVal: ""}, NodePort: 0},
 					},
 					Selector:  map[string]string{"app": "my-node-port-service-ok"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},
@@ -231,12 +247,14 @@ func TestCreateServices(t *testing.T) {
 					Name:   "my-node-port-service-ok2",
 					Labels: map[string]string{"app": "my-node-port-service-ok2"},
 				},
-				Spec: v1.ServiceSpec{Type: "NodePort",
+				Spec: v1.ServiceSpec{
+					Type: "NodePort",
 					Ports: []v1.ServicePort{
 						{Name: "80-http", Protocol: "TCP", Port: 80, TargetPort: intstr.IntOrString{Type: 1, IntVal: 0, StrVal: "http"}, NodePort: 4444},
 					},
 					Selector:  map[string]string{"app": "my-node-port-service-ok2"},
-					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: "",
+				},
 			},
 			expectErr: false,
 		},

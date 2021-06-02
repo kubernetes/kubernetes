@@ -28,13 +28,15 @@ import (
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-var ParameterCodec = runtime.NewParameterCodec(Scheme)
-var localSchemeBuilder = runtime.SchemeBuilder{
-	wardlev1alpha1.AddToScheme,
-	wardlev1beta1.AddToScheme,
-}
+var (
+	Scheme             = runtime.NewScheme()
+	Codecs             = serializer.NewCodecFactory(Scheme)
+	ParameterCodec     = runtime.NewParameterCodec(Scheme)
+	localSchemeBuilder = runtime.SchemeBuilder{
+		wardlev1alpha1.AddToScheme,
+		wardlev1beta1.AddToScheme,
+	}
+)
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
 // of clientsets, like in:

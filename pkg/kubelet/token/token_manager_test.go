@@ -320,7 +320,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 					shouldFail: true,
 				},
 				{
-					//exactly the same with last one, besides it will success
+					// exactly the same with last one, besides it will success
 					name:      "fake-name-4",
 					namespace: "fake-namespace-4",
 					tr: authenticationv1.TokenRequest{
@@ -514,7 +514,7 @@ func TestKeyFunc(t *testing.T) {
 				tr: &authenticationv1.TokenRequest{
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences: []string{"foo1", "foo2"},
-						//everthing is same besides ExpirationSeconds
+						// everthing is same besides ExpirationSeconds
 						ExpirationSeconds: getInt64Point(2001),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
@@ -554,7 +554,7 @@ func TestKeyFunc(t *testing.T) {
 						ExpirationSeconds: getInt64Point(2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
-							//everthing is same besides BoundObjectRef.Name
+							// everthing is same besides BoundObjectRef.Name
 							Name: "diff-pod",
 							UID:  "foo-uid",
 						},
@@ -572,7 +572,7 @@ func TestKeyFunc(t *testing.T) {
 			for _, tru := range c.trus {
 				mgr.set(getKeyFunc(tru), &authenticationv1.TokenRequest{
 					Status: authenticationv1.TokenRequestStatus{
-						//make sure the token cache would not be cleaned by token manager clenaup func
+						// make sure the token cache would not be cleaned by token manager clenaup func
 						ExpirationTimestamp: metav1.Time{Time: mgr.clock.Now().Add(50 * time.Minute)},
 					},
 				})
@@ -584,7 +584,6 @@ func TestKeyFunc(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func getTokenRequest() *authenticationv1.TokenRequest {

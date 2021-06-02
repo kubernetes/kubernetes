@@ -125,7 +125,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				jig.WaitForIngress(true)
 			}
 		})
-
 	})
 
 	ginkgo.Describe("GCE [Slow] [Feature:NEG] [Flaky]", func() {
@@ -623,10 +622,12 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		}
 
 		ingTemplate := &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-ing",
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-ing",
 				Labels: map[string]string{
 					"special-label": f.UniqueName,
-				}},
+				},
+			},
 			Spec: networkingv1.IngressSpec{
 				DefaultBackend: &defaultBackend,
 				Rules: []networkingv1.IngressRule{

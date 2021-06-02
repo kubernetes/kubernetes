@@ -25,8 +25,10 @@ import (
 )
 
 // All registered credential providers.
-var providersMutex sync.Mutex
-var providers = make(map[string]DockerConfigProvider)
+var (
+	providersMutex sync.Mutex
+	providers      = make(map[string]DockerConfigProvider)
+)
 
 // RegisterCredentialProvider is called by provider implementations on
 // initialization to register themselves, like so:

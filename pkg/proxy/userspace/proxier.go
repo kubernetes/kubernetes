@@ -191,12 +191,10 @@ type portMapValue struct {
 	}
 }
 
-var (
-	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
-	// the loopback address. May be checked for by callers of NewProxier to know whether
-	// the caller provided invalid input.
-	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
-)
+// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
+// the loopback address. May be checked for by callers of NewProxier to know whether
+// the caller provided invalid input.
+var ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
@@ -1007,13 +1005,17 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol v1.Protocol, proxyI
 
 // See comments in the *PortalArgs() functions for some details about why we
 // use two chains for portals.
-var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
-var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
+var (
+	iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
+	iptablesHostPortalChain      iptables.Chain = "KUBE-PORTALS-HOST"
+)
 
 // Chains for NodePort services
-var iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
-var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
-var iptablesNonLocalNodePortChain iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
+var (
+	iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
+	iptablesHostNodePortChain      iptables.Chain = "KUBE-NODEPORT-HOST"
+	iptablesNonLocalNodePortChain  iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
+)
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -1109,11 +1111,15 @@ func iptablesFlush(ipt iptables.Interface) error {
 }
 
 // Used below.
-var zeroIPv4 = net.ParseIP("0.0.0.0")
-var localhostIPv4 = net.ParseIP("127.0.0.1")
+var (
+	zeroIPv4      = net.ParseIP("0.0.0.0")
+	localhostIPv4 = net.ParseIP("127.0.0.1")
+)
 
-var zeroIPv6 = net.ParseIP("::")
-var localhostIPv6 = net.ParseIP("::1")
+var (
+	zeroIPv6      = net.ParseIP("::")
+	localhostIPv6 = net.ParseIP("::1")
+)
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, service proxy.ServicePortName) []string {

@@ -50,6 +50,7 @@ func (fi *fakeFileInfo) Mode() os.FileMode {
 func (fi *fakeFileInfo) ModTime() time.Time {
 	return time.Now()
 }
+
 func (fi *fakeFileInfo) IsDir() bool {
 	return false
 }

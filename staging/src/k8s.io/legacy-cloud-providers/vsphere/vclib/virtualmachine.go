@@ -294,7 +294,8 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 		dsObjList = append(dsObjList,
 			&DatastoreInfo{
 				&datastore,
-				dsMo.Info.GetDatastoreInfo()})
+				dsMo.Info.GetDatastoreInfo(),
+			})
 	}
 	return dsObjList, nil
 }

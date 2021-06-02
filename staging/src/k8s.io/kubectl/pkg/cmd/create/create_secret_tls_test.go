@@ -83,7 +83,6 @@ rLTt0TTazzwBCgCD0Jkoqg==
 -----END PRIVATE KEY-----`
 
 func TestCreateSecretTLS(t *testing.T) {
-
 	validCertTmpDir := utiltesting.MkTmpdirOrDie("tls-valid-cert-test")
 	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
 	defer tearDown(validCertTmpDir)

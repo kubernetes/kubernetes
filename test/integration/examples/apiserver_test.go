@@ -204,7 +204,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if numMatches != 4 {
 		t.Fatal("names don't match")
 	}
-
 }
 
 func waitForWardleRunning(t *testing.T, wardleToKASKubeConfig *rest.Config, wardleCertDir string, wardlePort int) (*rest.Config, error) {

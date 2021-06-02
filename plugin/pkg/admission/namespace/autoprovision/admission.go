@@ -51,9 +51,11 @@ type Provision struct {
 	namespaceLister corev1listers.NamespaceLister
 }
 
-var _ admission.MutationInterface = &Provision{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Provision{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Provision{})
+var (
+	_ admission.MutationInterface = &Provision{}
+	_                             = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Provision{})
+	_                             = genericadmissioninitializer.WantsExternalKubeClientSet(&Provision{})
+)
 
 // Admit makes an admission decision based on the request attributes
 func (p *Provision) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {

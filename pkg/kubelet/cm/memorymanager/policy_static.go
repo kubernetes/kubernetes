@@ -281,7 +281,6 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	for _, ctr := range pod.Spec.InitContainers {
 		reqRsrcs, err := getRequestedResources(&ctr)
-
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +297,6 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	for _, ctr := range pod.Spec.Containers {
 		reqRsrcs, err := getRequestedResources(&ctr)
-
 		if err != nil {
 			return nil, err
 		}

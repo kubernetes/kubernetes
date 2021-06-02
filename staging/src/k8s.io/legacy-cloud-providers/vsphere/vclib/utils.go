@@ -146,7 +146,7 @@ func GetPathFromVMDiskPath(vmDiskPath string) string {
 	return datastorePathObj.Path
 }
 
-//GetDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
+// GetDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
 func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath, error) {
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
@@ -157,7 +157,7 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 	return datastorePathObj, nil
 }
 
-//IsValidUUID checks if the string is a valid UUID.
+// IsValidUUID checks if the string is a valid UUID.
 func IsValidUUID(uuid string) bool {
 	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 	return r.MatchString(uuid)
@@ -198,7 +198,6 @@ func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths 
 			}
 		}
 	}
-
 }
 
 // isvCenterDeprecated takes vCenter version and vCenter API version as input and return true if vCenter is deprecated

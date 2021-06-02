@@ -50,9 +50,11 @@ type azureFilePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &azureFilePlugin{}
-var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
-var _ volume.ExpandableVolumePlugin = &azureFilePlugin{}
+var (
+	_ volume.VolumePlugin           = &azureFilePlugin{}
+	_ volume.PersistentVolumePlugin = &azureFilePlugin{}
+	_ volume.ExpandableVolumePlugin = &azureFilePlugin{}
+)
 
 const (
 	azureFilePluginName     = "kubernetes.io/azure-file"
@@ -82,7 +84,7 @@ func (plugin *azureFilePlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 }
 
 func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
-	//TODO: check if mount.cifs is there
+	// TODO: check if mount.cifs is there
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureFile != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
@@ -185,7 +187,6 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 	}
 
 	requestGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
-
 	if err != nil {
 		return oldSize, err
 	}
@@ -391,7 +392,6 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		return "", "", fmt.Errorf("invalid Azure volume: nil namespace")
 	}
 	return secretName, secretNamespace, nil
-
 }
 
 func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {

@@ -58,7 +58,6 @@ func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 		if pvcSpec.DataSource.Kind == pvc &&
 			apiGroup == "" {
 			return true
-
 		}
 
 		if pvcSpec.DataSource.Kind == volumeSnapshot && apiGroup == "snapshot.storage.k8s.io" {

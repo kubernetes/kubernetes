@@ -35,10 +35,8 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var (
-	// non-root UID used in tests.
-	nonRootTestUserID = int64(1000)
-)
+// non-root UID used in tests.
+var nonRootTestUserID = int64(1000)
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")

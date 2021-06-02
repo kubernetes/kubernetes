@@ -56,7 +56,6 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
 		testStackdriverAcceleratorMonitoring(f)
 	})
-
 })
 
 func testStackdriverAcceleratorMonitoring(f *framework.Framework) {

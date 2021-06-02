@@ -97,7 +97,6 @@ func BindClusterRole(c bindingsGetter, clusterRole, ns string, subjects ...rbacv
 		},
 		Subjects: subjects,
 	}, metav1.CreateOptions{})
-
 	if err != nil {
 		return errors.Wrapf(err, "binding clusterrole/%s for %q for %v", clusterRole, ns, subjects)
 	}
@@ -134,7 +133,6 @@ func bindInNamespace(c bindingsGetter, roleType, role, ns string, subjects ...rb
 		},
 		Subjects: subjects,
 	}, metav1.CreateOptions{})
-
 	if err != nil {
 		return errors.Wrapf(err, "binding %s/%s into %q for %v", roleType, role, ns, subjects)
 	}

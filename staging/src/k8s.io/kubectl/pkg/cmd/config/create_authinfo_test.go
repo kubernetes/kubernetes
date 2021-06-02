@@ -448,11 +448,13 @@ func TestCreateAuthInfo(t *testing.T) {
 		expected: `User "cluster-admin" set.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				"cluster-admin": {Username: "admin", Password: "uXFGweU9l35qcif"}},
+				"cluster-admin": {Username: "admin", Password: "uXFGweU9l35qcif"},
+			},
 		},
 	}
 	test.run(t)
 }
+
 func (test createAuthInfoTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {

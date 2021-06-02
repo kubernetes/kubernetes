@@ -78,7 +78,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewCertAndKey(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name string
 		key  crypto.Signer
 	}{
@@ -117,7 +117,7 @@ func TestHasServerAuth(t *testing.T) {
 		NewPrivateKey = privateKeyFunc
 	}()
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		config   CertConfig
 		expected bool
@@ -270,7 +270,7 @@ func TestCertOrKeyExist(t *testing.T) {
 		)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		name     string
@@ -318,7 +318,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		name     string
@@ -372,7 +372,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 		)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc     string
 		path     string
 		name     string
@@ -424,7 +424,7 @@ func TestTryLoadCertChainFromDisk(t *testing.T) {
 		t.Fatalf("failed to write cert bundle: %v", err)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc          string
 		path          string
 		name          string
@@ -475,7 +475,7 @@ func TestTryLoadCertChainFromDisk(t *testing.T) {
 }
 
 func TestTryLoadKeyFromDisk(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc       string
 		pathSuffix string
 		name       string
@@ -570,8 +570,7 @@ func TestPathForCSR(t *testing.T) {
 }
 
 func TestGetAPIServerAltNames(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		desc                string
 		name                string
 		cfg                 *kubeadmapi.InitConfiguration
@@ -777,7 +776,7 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 }
 
 func TestAppendSANsToAltNames(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		sans     []string
 		expected int
 	}{
@@ -801,7 +800,6 @@ func TestAppendSANsToAltNames(t *testing.T) {
 			)
 		}
 	}
-
 }
 
 func TestRemoveDuplicateAltNames(t *testing.T) {
@@ -886,7 +884,7 @@ func TestVerifyCertChain(t *testing.T) {
 		t.Errorf("failed to create leaf cert and key with an error: %v", err)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		desc          string
 		leaf          *x509.Certificate
 		intermediates []*x509.Certificate

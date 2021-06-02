@@ -69,7 +69,7 @@ func TestGetControllerOf(t *testing.T) {
 		},
 	}
 	controllerRef := NewControllerRef(obj1, gvk)
-	var falseRef = false
+	falseRef := false
 	obj2 := &metaObj{
 		ObjectMeta: ObjectMeta{
 			UID:  "uid2",

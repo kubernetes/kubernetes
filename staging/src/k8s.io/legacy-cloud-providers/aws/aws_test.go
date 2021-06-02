@@ -48,8 +48,10 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
-const TestClusterID = "clusterid.test"
-const TestClusterName = "testCluster"
+const (
+	TestClusterID   = "clusterid.test"
+	TestClusterName = "testCluster"
+)
 
 type MockedFakeEC2 struct {
 	*FakeEC2Impl
@@ -343,8 +345,10 @@ func TestOverridesActiveConfig(t *testing.T) {
                   SigningMethod = v4`),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name: "s3", region: "sregion1", signingRegion: "sregion1", signingMethod: "v4"},
-				{name: "ec2", region: "sregion2", signingRegion: "sregion2", signingMethod: "v4"}},
+			[]ServiceDescriptor{
+				{name: "s3", region: "sregion1", signingRegion: "sregion1", signingMethod: "v4"},
+				{name: "ec2", region: "sregion2", signingRegion: "sregion2", signingMethod: "v4"},
+			},
 		},
 		{
 			"Duplicate Services",
@@ -389,8 +393,10 @@ func TestOverridesActiveConfig(t *testing.T) {
                  `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: ""},
-				{name: "ec2", region: "region2", signingRegion: "sregion", signingMethod: "v4"}},
+			[]ServiceDescriptor{
+				{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: ""},
+				{name: "ec2", region: "region2", signingRegion: "sregion", signingMethod: "v4"},
+			},
 		},
 		{
 			"Multiple regions, Same Service",
@@ -414,8 +420,10 @@ func TestOverridesActiveConfig(t *testing.T) {
                  `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
-				{name: "s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4", signingName: "name"}},
+			[]ServiceDescriptor{
+				{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
+				{name: "s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4", signingName: "name"},
+			},
 		},
 	}
 
@@ -1582,7 +1590,8 @@ func TestGetVolumeLabels(t *testing.T) {
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
 		v1.LabelTopologyZone:   "us-east-1a",
-		v1.LabelTopologyRegion: "us-east-1"}, labels)
+		v1.LabelTopologyRegion: "us-east-1",
+	}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1674,7 +1683,6 @@ func TestGetLabelsForVolume(t *testing.T) {
 			assert.Equal(t, test.expectedLabels, l)
 			assert.Equal(t, test.expectedError, err)
 		})
-
 	}
 }
 

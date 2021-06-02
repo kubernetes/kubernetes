@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -187,8 +188,10 @@ func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fld
 	return allErrs
 }
 
-var validSelectPolicyTypes = sets.NewString(string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
-var validSelectPolicyTypesList = validSelectPolicyTypes.List()
+var (
+	validSelectPolicyTypes     = sets.NewString(string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
+	validSelectPolicyTypesList = validSelectPolicyTypes.List()
+)
 
 func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -217,8 +220,10 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 	return allErrs
 }
 
-var validPolicyTypes = sets.NewString(string(autoscaling.PodsScalingPolicy), string(autoscaling.PercentScalingPolicy))
-var validPolicyTypesList = validPolicyTypes.List()
+var (
+	validPolicyTypes     = sets.NewString(string(autoscaling.PodsScalingPolicy), string(autoscaling.PercentScalingPolicy))
+	validPolicyTypesList = validPolicyTypes.List()
+)
 
 func validateScalingPolicy(policy autoscaling.HPAScalingPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

@@ -223,6 +223,7 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Do(context.TODO()).
 		Get()
 }
+
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
 	if options == nil {
 		options = &metav1.PatchOptions{}
@@ -245,7 +246,7 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
 	c := m.RESTClient
-	var options = &metav1.UpdateOptions{}
+	options := &metav1.UpdateOptions{}
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}

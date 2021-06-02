@@ -39,9 +39,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -54,9 +56,11 @@ func (*Event) ProtoMessage() {}
 func (*Event) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{0}
 }
+
 func (m *Event) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Event) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -65,12 +69,15 @@ func (m *Event) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Event) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Event.Merge(m, src)
 }
+
 func (m *Event) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Event) XXX_DiscardUnknown() {
 	xxx_messageInfo_Event.DiscardUnknown(m)
 }
@@ -82,9 +89,11 @@ func (*EventList) ProtoMessage() {}
 func (*EventList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{1}
 }
+
 func (m *EventList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *EventList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -93,12 +102,15 @@ func (m *EventList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *EventList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EventList.Merge(m, src)
 }
+
 func (m *EventList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *EventList) XXX_DiscardUnknown() {
 	xxx_messageInfo_EventList.DiscardUnknown(m)
 }
@@ -110,9 +122,11 @@ func (*GroupResources) ProtoMessage() {}
 func (*GroupResources) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{2}
 }
+
 func (m *GroupResources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *GroupResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -121,12 +135,15 @@ func (m *GroupResources) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *GroupResources) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GroupResources.Merge(m, src)
 }
+
 func (m *GroupResources) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *GroupResources) XXX_DiscardUnknown() {
 	xxx_messageInfo_GroupResources.DiscardUnknown(m)
 }
@@ -138,9 +155,11 @@ func (*ObjectReference) ProtoMessage() {}
 func (*ObjectReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{3}
 }
+
 func (m *ObjectReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ObjectReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -149,12 +168,15 @@ func (m *ObjectReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *ObjectReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ObjectReference.Merge(m, src)
 }
+
 func (m *ObjectReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ObjectReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_ObjectReference.DiscardUnknown(m)
 }
@@ -166,9 +188,11 @@ func (*Policy) ProtoMessage() {}
 func (*Policy) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{4}
 }
+
 func (m *Policy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Policy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -177,12 +201,15 @@ func (m *Policy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Policy) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Policy.Merge(m, src)
 }
+
 func (m *Policy) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Policy) XXX_DiscardUnknown() {
 	xxx_messageInfo_Policy.DiscardUnknown(m)
 }
@@ -194,9 +221,11 @@ func (*PolicyList) ProtoMessage() {}
 func (*PolicyList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{5}
 }
+
 func (m *PolicyList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PolicyList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -205,12 +234,15 @@ func (m *PolicyList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PolicyList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PolicyList.Merge(m, src)
 }
+
 func (m *PolicyList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PolicyList) XXX_DiscardUnknown() {
 	xxx_messageInfo_PolicyList.DiscardUnknown(m)
 }
@@ -222,9 +254,11 @@ func (*PolicyRule) ProtoMessage() {}
 func (*PolicyRule) Descriptor() ([]byte, []int) {
 	return fileDescriptor_46c0b2c8ea67b187, []int{6}
 }
+
 func (m *PolicyRule) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PolicyRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -233,12 +267,15 @@ func (m *PolicyRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *PolicyRule) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PolicyRule.Merge(m, src)
 }
+
 func (m *PolicyRule) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PolicyRule) XXX_DiscardUnknown() {
 	xxx_messageInfo_PolicyRule.DiscardUnknown(m)
 }
@@ -906,6 +943,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *Event) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1130,9 +1168,11 @@ func (m *PolicyRule) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *Event) String() string {
 	if this == nil {
 		return "nil"
@@ -1147,7 +1187,8 @@ func (this *Event) String() string {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
 	}
 	mapStringForAnnotations += "}"
-	s := strings.Join([]string{`&Event{`,
+	s := strings.Join([]string{
+		`&Event{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Level:` + fmt.Sprintf("%v", this.Level) + `,`,
 		`Timestamp:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Timestamp), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -1170,6 +1211,7 @@ func (this *Event) String() string {
 	}, "")
 	return s
 }
+
 func (this *EventList) String() string {
 	if this == nil {
 		return "nil"
@@ -1179,18 +1221,21 @@ func (this *EventList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Event", "Event", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&EventList{`,
+	s := strings.Join([]string{
+		`&EventList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *GroupResources) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&GroupResources{`,
+	s := strings.Join([]string{
+		`&GroupResources{`,
 		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
 		`Resources:` + fmt.Sprintf("%v", this.Resources) + `,`,
 		`ResourceNames:` + fmt.Sprintf("%v", this.ResourceNames) + `,`,
@@ -1198,11 +1243,13 @@ func (this *GroupResources) String() string {
 	}, "")
 	return s
 }
+
 func (this *ObjectReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ObjectReference{`,
+	s := strings.Join([]string{
+		`&ObjectReference{`,
 		`Resource:` + fmt.Sprintf("%v", this.Resource) + `,`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
@@ -1214,6 +1261,7 @@ func (this *ObjectReference) String() string {
 	}, "")
 	return s
 }
+
 func (this *Policy) String() string {
 	if this == nil {
 		return "nil"
@@ -1223,7 +1271,8 @@ func (this *Policy) String() string {
 		repeatedStringForRules += strings.Replace(strings.Replace(f.String(), "PolicyRule", "PolicyRule", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForRules += "}"
-	s := strings.Join([]string{`&Policy{`,
+	s := strings.Join([]string{
+		`&Policy{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Rules:` + repeatedStringForRules + `,`,
 		`OmitStages:` + fmt.Sprintf("%v", this.OmitStages) + `,`,
@@ -1231,6 +1280,7 @@ func (this *Policy) String() string {
 	}, "")
 	return s
 }
+
 func (this *PolicyList) String() string {
 	if this == nil {
 		return "nil"
@@ -1240,13 +1290,15 @@ func (this *PolicyList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Policy", "Policy", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&PolicyList{`,
+	s := strings.Join([]string{
+		`&PolicyList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *PolicyRule) String() string {
 	if this == nil {
 		return "nil"
@@ -1256,7 +1308,8 @@ func (this *PolicyRule) String() string {
 		repeatedStringForResources += strings.Replace(strings.Replace(f.String(), "GroupResources", "GroupResources", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForResources += "}"
-	s := strings.Join([]string{`&PolicyRule{`,
+	s := strings.Join([]string{
+		`&PolicyRule{`,
 		`Level:` + fmt.Sprintf("%v", this.Level) + `,`,
 		`Users:` + fmt.Sprintf("%v", this.Users) + `,`,
 		`UserGroups:` + fmt.Sprintf("%v", this.UserGroups) + `,`,
@@ -1269,6 +1322,7 @@ func (this *PolicyRule) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -1277,6 +1331,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *Event) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2023,6 +2078,7 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *EventList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2140,6 +2196,7 @@ func (m *EventList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *GroupResources) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2286,6 +2343,7 @@ func (m *GroupResources) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ObjectReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2560,6 +2618,7 @@ func (m *ObjectReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Policy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2709,6 +2768,7 @@ func (m *Policy) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PolicyList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2826,6 +2886,7 @@ func (m *PolicyList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PolicyRule) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3134,6 +3195,7 @@ func (m *PolicyRule) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

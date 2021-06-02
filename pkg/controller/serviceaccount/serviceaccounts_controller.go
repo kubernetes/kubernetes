@@ -182,6 +182,7 @@ func (c *ServiceAccountsController) processNextWorkItem() bool {
 
 	return true
 }
+
 func (c *ServiceAccountsController) syncNamespace(key string) error {
 	startTime := time.Now()
 	defer func() {

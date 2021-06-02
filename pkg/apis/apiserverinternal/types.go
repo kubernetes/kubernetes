@@ -76,7 +76,7 @@ type ServerStorageVersion struct {
 type StorageVersionConditionType string
 
 const (
-	//AllEncodingVersionsEqual Indicates that encoding storage versions reported by all servers are equal.
+	// AllEncodingVersionsEqual Indicates that encoding storage versions reported by all servers are equal.
 	AllEncodingVersionsEqual StorageVersionConditionType = "AllEncodingVersionsEqual"
 )
 

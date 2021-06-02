@@ -30,8 +30,7 @@ func New(utilexec.Interface) Interface {
 	return &runner{}
 }
 
-type runner struct {
-}
+type runner struct{}
 
 func (runner *runner) Flush() error {
 	return fmt.Errorf("IPVS not supported for this platform")

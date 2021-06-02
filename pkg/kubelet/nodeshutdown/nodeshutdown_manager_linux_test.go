@@ -103,7 +103,7 @@ func TestManager(t *testing.T) {
 	longGracePeriod := int64(1000)
 	normalPodLongGracePeriod := makePod("normal-pod-long-grace-period", false /* criticalPod */, &longGracePeriod /* terminationGracePeriod */)
 
-	var tests = []struct {
+	tests := []struct {
 		desc                             string
 		activePods                       []*v1.Pod
 		shutdownGracePeriodRequested     time.Duration
@@ -263,7 +263,7 @@ func TestManager(t *testing.T) {
 }
 
 func TestFeatureEnabled(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc                         string
 		shutdownGracePeriodRequested time.Duration
 		featureGateEnabled           bool

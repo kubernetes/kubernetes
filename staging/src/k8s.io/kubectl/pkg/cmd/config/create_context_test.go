@@ -29,11 +29,11 @@ import (
 type createContextTest struct {
 	description    string
 	testContext    string              // name of the context being modified
-	config         clientcmdapi.Config //initiate kubectl config
-	args           []string            //kubectl set-context args
-	flags          []string            //kubectl set-context flags
-	expected       string              //expectd out
-	expectedConfig clientcmdapi.Config //expect kubectl config
+	config         clientcmdapi.Config // initiate kubectl config
+	args           []string            // kubectl set-context args
+	flags          []string            // kubectl set-context flags
+	expected       string              // expectd out
+	expectedConfig clientcmdapi.Config // expect kubectl config
 }
 
 func TestCreateContext(t *testing.T) {
@@ -51,16 +51,20 @@ func TestCreateContext(t *testing.T) {
 		expected: `Context "shaker-context" created.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
-				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
+				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
+			},
 		},
 	}
 	test.run(t)
 }
+
 func TestModifyContext(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
-			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := createContextTest{
 		testContext: "shaker-context",
 		description: "Testing for modify a already exist context",
@@ -75,7 +79,9 @@ func TestModifyContext(t *testing.T) {
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
 				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
-				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			},
+		},
 	}
 	test.run(t)
 }
@@ -85,7 +91,9 @@ func TestModifyCurrentContext(t *testing.T) {
 		CurrentContext: "shaker-context",
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
-			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := createContextTest{
 		testContext: "shaker-context",
 		description: "Testing for modify a current context",
@@ -101,7 +109,9 @@ func TestModifyCurrentContext(t *testing.T) {
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
 				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
-				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			},
+		},
 	}
 	test.run(t)
 }

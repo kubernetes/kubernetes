@@ -28,8 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-const preScoreStateKey = "PreScore" + Name
-const invalidScore = -1
+const (
+	preScoreStateKey = "PreScore" + Name
+	invalidScore     = -1
+)
 
 // preScoreState computed at PreScore and used at Score.
 // Fields are exported for comparison during testing.

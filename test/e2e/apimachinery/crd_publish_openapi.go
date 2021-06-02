@@ -46,9 +46,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 )
 
-var (
-	metaPattern = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
-)
+var metaPattern = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 
 var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")

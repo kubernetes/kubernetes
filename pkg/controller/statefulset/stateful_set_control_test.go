@@ -1609,7 +1609,8 @@ func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInforme
 		revisionInformer.Informer().GetIndexer(),
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0}}
+		requestTracker{0, nil, 0},
+	}
 }
 
 func (spc *fakeStatefulPodControl) SetCreateStatefulPodError(err error, after int) {

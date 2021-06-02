@@ -58,7 +58,6 @@ type legacyReplicaCalcTestCase struct {
 }
 
 func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
-
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
@@ -599,7 +598,6 @@ func TestLegacyReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
 func TestLegacyReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
-
 	startPods := int32(10)
 	// 150 mCPU per pod.
 	totalUsedCPUOfAllPods := int64(startPods * 150)

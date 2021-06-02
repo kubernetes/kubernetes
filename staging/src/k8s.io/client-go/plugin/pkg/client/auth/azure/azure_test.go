@@ -168,6 +168,7 @@ func TestTokenSourceDeviceCode(t *testing.T) {
 		}
 	})
 }
+
 func TestAzureTokenSource(t *testing.T) {
 	configModes := []configMode{configModeOmitSPNPrefix, configModeDefault}
 	expectedConfigModes := []string{"1", "0"}

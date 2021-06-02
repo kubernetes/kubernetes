@@ -192,7 +192,8 @@ func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccount
 					NetworkRuleSet:         networkRuleSet,
 				},
 				Tags:     tags,
-				Location: &location}
+				Location: &location,
+			}
 
 			ctx, cancel := getContextWithCancel()
 			defer cancel()

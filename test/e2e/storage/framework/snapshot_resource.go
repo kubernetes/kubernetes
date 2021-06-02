@@ -280,6 +280,7 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 
 	return snapshot
 }
+
 func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstructured.Unstructured {
 	snapshot := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -299,6 +300,7 @@ func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstru
 
 	return snapshot
 }
+
 func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
 	snapshotContent := &unstructured.Unstructured{
 		Object: map[string]interface{}{

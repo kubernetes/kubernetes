@@ -465,7 +465,6 @@ var _ = SIGDescribe("CronJob", func() {
 			expectFinalizer(&cj, "deleting cronjob collection")
 		}
 	})
-
 })
 
 func ensureHistoryLimits(c clientset.Interface, ns string, cronJob *batchv1.CronJob) {

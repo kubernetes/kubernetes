@@ -777,8 +777,10 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 	return nil
 }
 
-var _ volume.VolumeHost = &attachDetachController{}
-var _ volume.AttachDetachVolumeHost = &attachDetachController{}
+var (
+	_ volume.VolumeHost             = &attachDetachController{}
+	_ volume.AttachDetachVolumeHost = &attachDetachController{}
+)
 
 func (adc *attachDetachController) CSINodeLister() storagelistersv1.CSINodeLister {
 	return adc.csiNodeLister

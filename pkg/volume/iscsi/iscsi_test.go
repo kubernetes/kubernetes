@@ -398,7 +398,6 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 				err, resultNs, resultName)
 		}
 	}
-
 }
 
 func TestGetISCSIInitiatorInfo(t *testing.T) {

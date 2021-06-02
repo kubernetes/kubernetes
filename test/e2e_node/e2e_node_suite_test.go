@@ -94,7 +94,6 @@ func init() {
 		Asset:      generated.Asset,
 		AssetNames: generated.AssetNames,
 	})
-
 }
 
 func TestMain(m *testing.M) {

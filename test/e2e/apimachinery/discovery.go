@@ -30,98 +30,99 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
-var _ = SIGDescribe("Discovery", func() {
-	f := framework.NewDefaultFramework("discovery")
+var (
+	storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
+	_                           = SIGDescribe("Discovery", func() {
+		f := framework.NewDefaultFramework("discovery")
 
-	var namespaceName string
+		var namespaceName string
 
-	ginkgo.BeforeEach(func() {
-		namespaceName = f.Namespace.Name
+		ginkgo.BeforeEach(func() {
+			namespaceName = f.Namespace.Name
 
-		e2eskipper.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
+			e2eskipper.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
-		ginkgo.By("Setting up server cert")
-		setupServerCert(namespaceName, serviceName)
-	})
+			ginkgo.By("Setting up server cert")
+			setupServerCert(namespaceName, serviceName)
+		})
 
-	ginkgo.It("Custom resource should have storage version hash", func() {
-		testcrd, err := crd.CreateTestCRD(f)
-		if err != nil {
-			return
-		}
-		defer testcrd.CleanUp()
-		spec := testcrd.Crd.Spec
-		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
-		if err != nil {
-			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
-		}
-		found := false
-		var storageVersion string
-		for _, v := range spec.Versions {
-			if v.Storage {
-				storageVersion = v.Name
+		ginkgo.It("Custom resource should have storage version hash", func() {
+			testcrd, err := crd.CreateTestCRD(f)
+			if err != nil {
+				return
 			}
-		}
-		// DISCLAIMER: the algorithm of deriving the storageVersionHash
-		// is an implementation detail, which shouldn't be relied on by
-		// the clients. The following calculation is for test purpose
-		// only.
-		expected := discovery.StorageVersionHash(spec.Group, storageVersion, spec.Names.Kind)
-
-		for _, r := range resources.APIResources {
-			if r.Name == spec.Names.Plural {
-				found = true
-				if r.StorageVersionHash != expected {
-					framework.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
+			defer testcrd.CleanUp()
+			spec := testcrd.Crd.Spec
+			resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
+			if err != nil {
+				framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
+			}
+			found := false
+			var storageVersion string
+			for _, v := range spec.Versions {
+				if v.Storage {
+					storageVersion = v.Name
 				}
 			}
-		}
-		if !found {
-			framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
-		}
-	})
+			// DISCLAIMER: the algorithm of deriving the storageVersionHash
+			// is an implementation detail, which shouldn't be relied on by
+			// the clients. The following calculation is for test purpose
+			// only.
+			expected := discovery.StorageVersionHash(spec.Group, storageVersion, spec.Names.Kind)
 
-	/*
-	   Release : v1.19
-	   Testname: Discovery, confirm the PreferredVersion for each api group
-	   Description: Ensure that a list of apis is retrieved.
-	   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
-	*/
-	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
-
-		// get list of APIGroup endpoints
-		list := &metav1.APIGroupList{}
-		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
-		framework.ExpectNoError(err, "Failed to find /apis/")
-		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
-
-		for _, group := range list.Groups {
-			if strings.HasSuffix(group.Name, ".example.com") {
-				// ignore known example dynamic API groups that are added/removed during the e2e test run
-				continue
-			}
-			framework.Logf("Checking APIGroup: %v", group.Name)
-
-			// locate APIGroup endpoint
-			checkGroup := &metav1.APIGroup{}
-			apiPath := "/apis/" + group.Name + "/"
-			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
-			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
-			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
-			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
-			framework.Logf("Versions found %v", checkGroup.Versions)
-
-			// confirm that the PreferredVersion is a valid version
-			match := false
-			for _, version := range checkGroup.Versions {
-				if version.GroupVersion == checkGroup.PreferredVersion.GroupVersion {
-					framework.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
-					match = true
-					break
+			for _, r := range resources.APIResources {
+				if r.Name == spec.Names.Plural {
+					found = true
+					if r.StorageVersionHash != expected {
+						framework.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
+					}
 				}
 			}
-			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
-		}
+			if !found {
+				framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
+			}
+		})
+
+		/*
+		   Release : v1.19
+		   Testname: Discovery, confirm the PreferredVersion for each api group
+		   Description: Ensure that a list of apis is retrieved.
+		   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
+		*/
+		framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
+			// get list of APIGroup endpoints
+			list := &metav1.APIGroupList{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
+			framework.ExpectNoError(err, "Failed to find /apis/")
+			framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
+
+			for _, group := range list.Groups {
+				if strings.HasSuffix(group.Name, ".example.com") {
+					// ignore known example dynamic API groups that are added/removed during the e2e test run
+					continue
+				}
+				framework.Logf("Checking APIGroup: %v", group.Name)
+
+				// locate APIGroup endpoint
+				checkGroup := &metav1.APIGroup{}
+				apiPath := "/apis/" + group.Name + "/"
+				err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
+				framework.ExpectNoError(err, "Fail to access: %s", apiPath)
+				framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
+				framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
+				framework.Logf("Versions found %v", checkGroup.Versions)
+
+				// confirm that the PreferredVersion is a valid version
+				match := false
+				for _, version := range checkGroup.Versions {
+					if version.GroupVersion == checkGroup.PreferredVersion.GroupVersion {
+						framework.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
+						match = true
+						break
+					}
+				}
+				framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
+			}
+		})
 	})
-})
+)

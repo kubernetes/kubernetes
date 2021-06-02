@@ -18,7 +18,6 @@ package app
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/controller/bootstrap"

@@ -121,6 +121,7 @@ func BenchmarkZapLoggerError(b *testing.B) {
 		}
 	})
 }
+
 func BenchmarkZapLoggerErrorStandardJSON(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {

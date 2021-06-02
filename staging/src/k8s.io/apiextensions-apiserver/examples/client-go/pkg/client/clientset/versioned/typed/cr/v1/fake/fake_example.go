@@ -77,7 +77,6 @@ func (c *FakeExamples) List(ctx context.Context, opts v1.ListOptions) (result *c
 func (c *FakeExamples) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(examplesResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.

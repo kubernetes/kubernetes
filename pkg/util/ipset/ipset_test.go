@@ -550,7 +550,6 @@ func TestTestEntryIPv6(t *testing.T) {
 }
 
 func TestListEntries(t *testing.T) {
-
 	output := `Name: foobar
 Type: hash:ip,port
 Revision: 2

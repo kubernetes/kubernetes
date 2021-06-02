@@ -210,8 +210,8 @@ func testDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 			},
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
+	volumeMounts := make([]v1.VolumeMount, len(pvclaims))
+	volumes := make([]v1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
 		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}

@@ -32,6 +32,7 @@ import (
 func resource(resource string) schema.GroupResource {
 	return schema.GroupResource{Group: "", Resource: resource}
 }
+
 func kind(kind string) schema.GroupKind {
 	return schema.GroupKind{Group: "", Kind: kind}
 }
@@ -303,6 +304,7 @@ func TestIsTooManyRequestsSupportsWrappedErrors(t *testing.T) {
 		}
 	}
 }
+
 func TestIsRequestEntityTooLargeErrorSupportsWrappedErrors(t *testing.T) {
 	testCases := []struct {
 		name        string

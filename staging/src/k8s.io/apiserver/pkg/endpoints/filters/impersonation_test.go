@@ -410,7 +410,6 @@ func TestImpersonationFilter(t *testing.T) {
 				t.Fatalf("extra header still present: %v", key)
 			}
 		}
-
 	})
 	handler := func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

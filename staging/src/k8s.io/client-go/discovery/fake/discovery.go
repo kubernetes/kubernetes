@@ -130,7 +130,6 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	}
 
 	return list, nil
-
 }
 
 // ServerVersion retrieves and parses the server's version.

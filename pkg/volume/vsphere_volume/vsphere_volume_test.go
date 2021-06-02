@@ -62,8 +62,7 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-type fakePDManager struct {
-}
+type fakePDManager struct{}
 
 func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error) {
 	volSpec = &VolumeSpec{

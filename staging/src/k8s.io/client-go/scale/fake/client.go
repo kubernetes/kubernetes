@@ -50,7 +50,6 @@ type fakeNamespacedScaleClient struct {
 func (f *fakeNamespacedScaleClient) Get(ctx context.Context, resource schema.GroupResource, name string, opts metav1.GetOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewGetSubresourceAction(resource.WithVersion(""), f.namespace, "scale", name), &autoscalingapi.Scale{})
-
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +60,6 @@ func (f *fakeNamespacedScaleClient) Get(ctx context.Context, resource schema.Gro
 func (f *fakeNamespacedScaleClient) Update(ctx context.Context, resource schema.GroupResource, scale *autoscalingapi.Scale, opts metav1.UpdateOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewUpdateSubresourceAction(resource.WithVersion(""), "scale", f.namespace, scale), &autoscalingapi.Scale{})
-
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +70,6 @@ func (f *fakeNamespacedScaleClient) Update(ctx context.Context, resource schema.
 func (f *fakeNamespacedScaleClient) Patch(ctx context.Context, gvr schema.GroupVersionResource, name string, pt types.PatchType, patch []byte, opts metav1.PatchOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewPatchSubresourceAction(gvr, f.namespace, name, pt, patch, "scale"), &autoscalingapi.Scale{})
-
 	if err != nil {
 		return nil, err
 	}

@@ -64,8 +64,10 @@ type Plugin struct {
 	clusterNodeSelectors map[string]string
 }
 
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var (
+	_ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+	_ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+)
 
 type pluginConfig struct {
 	PodNodeSelectorPluginConfig map[string]string

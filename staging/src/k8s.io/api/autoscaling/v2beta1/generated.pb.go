@@ -37,9 +37,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -52,9 +54,11 @@ func (*ContainerResourceMetricSource) ProtoMessage() {}
 func (*ContainerResourceMetricSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{0}
 }
+
 func (m *ContainerResourceMetricSource) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerResourceMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -63,12 +67,15 @@ func (m *ContainerResourceMetricSource) XXX_Marshal(b []byte, deterministic bool
 	}
 	return b[:n], nil
 }
+
 func (m *ContainerResourceMetricSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerResourceMetricSource.Merge(m, src)
 }
+
 func (m *ContainerResourceMetricSource) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerResourceMetricSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerResourceMetricSource.DiscardUnknown(m)
 }
@@ -80,9 +87,11 @@ func (*ContainerResourceMetricStatus) ProtoMessage() {}
 func (*ContainerResourceMetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{1}
 }
+
 func (m *ContainerResourceMetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ContainerResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -91,12 +100,15 @@ func (m *ContainerResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool
 	}
 	return b[:n], nil
 }
+
 func (m *ContainerResourceMetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ContainerResourceMetricStatus.Merge(m, src)
 }
+
 func (m *ContainerResourceMetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ContainerResourceMetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ContainerResourceMetricStatus.DiscardUnknown(m)
 }
@@ -108,9 +120,11 @@ func (*CrossVersionObjectReference) ProtoMessage() {}
 func (*CrossVersionObjectReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{2}
 }
+
 func (m *CrossVersionObjectReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CrossVersionObjectReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -119,12 +133,15 @@ func (m *CrossVersionObjectReference) XXX_Marshal(b []byte, deterministic bool) 
 	}
 	return b[:n], nil
 }
+
 func (m *CrossVersionObjectReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CrossVersionObjectReference.Merge(m, src)
 }
+
 func (m *CrossVersionObjectReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CrossVersionObjectReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_CrossVersionObjectReference.DiscardUnknown(m)
 }
@@ -136,9 +153,11 @@ func (*ExternalMetricSource) ProtoMessage() {}
 func (*ExternalMetricSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{3}
 }
+
 func (m *ExternalMetricSource) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExternalMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -147,12 +166,15 @@ func (m *ExternalMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *ExternalMetricSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExternalMetricSource.Merge(m, src)
 }
+
 func (m *ExternalMetricSource) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExternalMetricSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExternalMetricSource.DiscardUnknown(m)
 }
@@ -164,9 +186,11 @@ func (*ExternalMetricStatus) ProtoMessage() {}
 func (*ExternalMetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{4}
 }
+
 func (m *ExternalMetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExternalMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -175,12 +199,15 @@ func (m *ExternalMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *ExternalMetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExternalMetricStatus.Merge(m, src)
 }
+
 func (m *ExternalMetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExternalMetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExternalMetricStatus.DiscardUnknown(m)
 }
@@ -192,9 +219,11 @@ func (*HorizontalPodAutoscaler) ProtoMessage() {}
 func (*HorizontalPodAutoscaler) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{5}
 }
+
 func (m *HorizontalPodAutoscaler) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HorizontalPodAutoscaler) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -203,12 +232,15 @@ func (m *HorizontalPodAutoscaler) XXX_Marshal(b []byte, deterministic bool) ([]b
 	}
 	return b[:n], nil
 }
+
 func (m *HorizontalPodAutoscaler) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HorizontalPodAutoscaler.Merge(m, src)
 }
+
 func (m *HorizontalPodAutoscaler) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HorizontalPodAutoscaler) XXX_DiscardUnknown() {
 	xxx_messageInfo_HorizontalPodAutoscaler.DiscardUnknown(m)
 }
@@ -220,9 +252,11 @@ func (*HorizontalPodAutoscalerCondition) ProtoMessage() {}
 func (*HorizontalPodAutoscalerCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{6}
 }
+
 func (m *HorizontalPodAutoscalerCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HorizontalPodAutoscalerCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -231,12 +265,15 @@ func (m *HorizontalPodAutoscalerCondition) XXX_Marshal(b []byte, deterministic b
 	}
 	return b[:n], nil
 }
+
 func (m *HorizontalPodAutoscalerCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HorizontalPodAutoscalerCondition.Merge(m, src)
 }
+
 func (m *HorizontalPodAutoscalerCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HorizontalPodAutoscalerCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_HorizontalPodAutoscalerCondition.DiscardUnknown(m)
 }
@@ -248,9 +285,11 @@ func (*HorizontalPodAutoscalerList) ProtoMessage() {}
 func (*HorizontalPodAutoscalerList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{7}
 }
+
 func (m *HorizontalPodAutoscalerList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HorizontalPodAutoscalerList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -259,12 +298,15 @@ func (m *HorizontalPodAutoscalerList) XXX_Marshal(b []byte, deterministic bool) 
 	}
 	return b[:n], nil
 }
+
 func (m *HorizontalPodAutoscalerList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HorizontalPodAutoscalerList.Merge(m, src)
 }
+
 func (m *HorizontalPodAutoscalerList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HorizontalPodAutoscalerList) XXX_DiscardUnknown() {
 	xxx_messageInfo_HorizontalPodAutoscalerList.DiscardUnknown(m)
 }
@@ -276,9 +318,11 @@ func (*HorizontalPodAutoscalerSpec) ProtoMessage() {}
 func (*HorizontalPodAutoscalerSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{8}
 }
+
 func (m *HorizontalPodAutoscalerSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HorizontalPodAutoscalerSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -287,12 +331,15 @@ func (m *HorizontalPodAutoscalerSpec) XXX_Marshal(b []byte, deterministic bool) 
 	}
 	return b[:n], nil
 }
+
 func (m *HorizontalPodAutoscalerSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HorizontalPodAutoscalerSpec.Merge(m, src)
 }
+
 func (m *HorizontalPodAutoscalerSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HorizontalPodAutoscalerSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_HorizontalPodAutoscalerSpec.DiscardUnknown(m)
 }
@@ -304,9 +351,11 @@ func (*HorizontalPodAutoscalerStatus) ProtoMessage() {}
 func (*HorizontalPodAutoscalerStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{9}
 }
+
 func (m *HorizontalPodAutoscalerStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HorizontalPodAutoscalerStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -315,12 +364,15 @@ func (m *HorizontalPodAutoscalerStatus) XXX_Marshal(b []byte, deterministic bool
 	}
 	return b[:n], nil
 }
+
 func (m *HorizontalPodAutoscalerStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HorizontalPodAutoscalerStatus.Merge(m, src)
 }
+
 func (m *HorizontalPodAutoscalerStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HorizontalPodAutoscalerStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_HorizontalPodAutoscalerStatus.DiscardUnknown(m)
 }
@@ -332,9 +384,11 @@ func (*MetricSpec) ProtoMessage() {}
 func (*MetricSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{10}
 }
+
 func (m *MetricSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -343,12 +397,15 @@ func (m *MetricSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *MetricSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricSpec.Merge(m, src)
 }
+
 func (m *MetricSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricSpec.DiscardUnknown(m)
 }
@@ -360,9 +417,11 @@ func (*MetricStatus) ProtoMessage() {}
 func (*MetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{11}
 }
+
 func (m *MetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *MetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -371,12 +430,15 @@ func (m *MetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	}
 	return b[:n], nil
 }
+
 func (m *MetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricStatus.Merge(m, src)
 }
+
 func (m *MetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *MetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_MetricStatus.DiscardUnknown(m)
 }
@@ -388,9 +450,11 @@ func (*ObjectMetricSource) ProtoMessage() {}
 func (*ObjectMetricSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{12}
 }
+
 func (m *ObjectMetricSource) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ObjectMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -399,12 +463,15 @@ func (m *ObjectMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *ObjectMetricSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ObjectMetricSource.Merge(m, src)
 }
+
 func (m *ObjectMetricSource) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ObjectMetricSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_ObjectMetricSource.DiscardUnknown(m)
 }
@@ -416,9 +483,11 @@ func (*ObjectMetricStatus) ProtoMessage() {}
 func (*ObjectMetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{13}
 }
+
 func (m *ObjectMetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ObjectMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -427,12 +496,15 @@ func (m *ObjectMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *ObjectMetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ObjectMetricStatus.Merge(m, src)
 }
+
 func (m *ObjectMetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ObjectMetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ObjectMetricStatus.DiscardUnknown(m)
 }
@@ -444,9 +516,11 @@ func (*PodsMetricSource) ProtoMessage() {}
 func (*PodsMetricSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{14}
 }
+
 func (m *PodsMetricSource) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodsMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -455,12 +529,15 @@ func (m *PodsMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *PodsMetricSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodsMetricSource.Merge(m, src)
 }
+
 func (m *PodsMetricSource) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodsMetricSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodsMetricSource.DiscardUnknown(m)
 }
@@ -472,9 +549,11 @@ func (*PodsMetricStatus) ProtoMessage() {}
 func (*PodsMetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{15}
 }
+
 func (m *PodsMetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *PodsMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -483,12 +562,15 @@ func (m *PodsMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *PodsMetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PodsMetricStatus.Merge(m, src)
 }
+
 func (m *PodsMetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *PodsMetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_PodsMetricStatus.DiscardUnknown(m)
 }
@@ -500,9 +582,11 @@ func (*ResourceMetricSource) ProtoMessage() {}
 func (*ResourceMetricSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{16}
 }
+
 func (m *ResourceMetricSource) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ResourceMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -511,12 +595,15 @@ func (m *ResourceMetricSource) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *ResourceMetricSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ResourceMetricSource.Merge(m, src)
 }
+
 func (m *ResourceMetricSource) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ResourceMetricSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_ResourceMetricSource.DiscardUnknown(m)
 }
@@ -528,9 +615,11 @@ func (*ResourceMetricStatus) ProtoMessage() {}
 func (*ResourceMetricStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_26c1bfc7a52d0478, []int{17}
 }
+
 func (m *ResourceMetricStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -539,12 +628,15 @@ func (m *ResourceMetricStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *ResourceMetricStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ResourceMetricStatus.Merge(m, src)
 }
+
 func (m *ResourceMetricStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ResourceMetricStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ResourceMetricStatus.DiscardUnknown(m)
 }
@@ -1741,6 +1833,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ContainerResourceMetricSource) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2119,14 +2212,17 @@ func (m *ResourceMetricStatus) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ContainerResourceMetricSource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerResourceMetricSource{`,
+	s := strings.Join([]string{
+		`&ContainerResourceMetricSource{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`TargetAverageUtilization:` + valueToStringGenerated(this.TargetAverageUtilization) + `,`,
 		`TargetAverageValue:` + strings.Replace(fmt.Sprintf("%v", this.TargetAverageValue), "Quantity", "resource.Quantity", 1) + `,`,
@@ -2135,11 +2231,13 @@ func (this *ContainerResourceMetricSource) String() string {
 	}, "")
 	return s
 }
+
 func (this *ContainerResourceMetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ContainerResourceMetricStatus{`,
+	s := strings.Join([]string{
+		`&ContainerResourceMetricStatus{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`CurrentAverageUtilization:` + valueToStringGenerated(this.CurrentAverageUtilization) + `,`,
 		`CurrentAverageValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentAverageValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
@@ -2148,11 +2246,13 @@ func (this *ContainerResourceMetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *CrossVersionObjectReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CrossVersionObjectReference{`,
+	s := strings.Join([]string{
+		`&CrossVersionObjectReference{`,
 		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`APIVersion:` + fmt.Sprintf("%v", this.APIVersion) + `,`,
@@ -2160,11 +2260,13 @@ func (this *CrossVersionObjectReference) String() string {
 	}, "")
 	return s
 }
+
 func (this *ExternalMetricSource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExternalMetricSource{`,
+	s := strings.Join([]string{
+		`&ExternalMetricSource{`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`MetricSelector:` + strings.Replace(fmt.Sprintf("%v", this.MetricSelector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`TargetValue:` + strings.Replace(fmt.Sprintf("%v", this.TargetValue), "Quantity", "resource.Quantity", 1) + `,`,
@@ -2173,11 +2275,13 @@ func (this *ExternalMetricSource) String() string {
 	}, "")
 	return s
 }
+
 func (this *ExternalMetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExternalMetricStatus{`,
+	s := strings.Join([]string{
+		`&ExternalMetricStatus{`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`MetricSelector:` + strings.Replace(fmt.Sprintf("%v", this.MetricSelector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
 		`CurrentValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
@@ -2186,11 +2290,13 @@ func (this *ExternalMetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *HorizontalPodAutoscaler) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&HorizontalPodAutoscaler{`,
+	s := strings.Join([]string{
+		`&HorizontalPodAutoscaler{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "HorizontalPodAutoscalerSpec", "HorizontalPodAutoscalerSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "HorizontalPodAutoscalerStatus", "HorizontalPodAutoscalerStatus", 1), `&`, ``, 1) + `,`,
@@ -2198,11 +2304,13 @@ func (this *HorizontalPodAutoscaler) String() string {
 	}, "")
 	return s
 }
+
 func (this *HorizontalPodAutoscalerCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&HorizontalPodAutoscalerCondition{`,
+	s := strings.Join([]string{
+		`&HorizontalPodAutoscalerCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -2212,6 +2320,7 @@ func (this *HorizontalPodAutoscalerCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *HorizontalPodAutoscalerList) String() string {
 	if this == nil {
 		return "nil"
@@ -2221,13 +2330,15 @@ func (this *HorizontalPodAutoscalerList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "HorizontalPodAutoscaler", "HorizontalPodAutoscaler", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&HorizontalPodAutoscalerList{`,
+	s := strings.Join([]string{
+		`&HorizontalPodAutoscalerList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *HorizontalPodAutoscalerSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -2237,7 +2348,8 @@ func (this *HorizontalPodAutoscalerSpec) String() string {
 		repeatedStringForMetrics += strings.Replace(strings.Replace(f.String(), "MetricSpec", "MetricSpec", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForMetrics += "}"
-	s := strings.Join([]string{`&HorizontalPodAutoscalerSpec{`,
+	s := strings.Join([]string{
+		`&HorizontalPodAutoscalerSpec{`,
 		`ScaleTargetRef:` + strings.Replace(strings.Replace(this.ScaleTargetRef.String(), "CrossVersionObjectReference", "CrossVersionObjectReference", 1), `&`, ``, 1) + `,`,
 		`MinReplicas:` + valueToStringGenerated(this.MinReplicas) + `,`,
 		`MaxReplicas:` + fmt.Sprintf("%v", this.MaxReplicas) + `,`,
@@ -2246,6 +2358,7 @@ func (this *HorizontalPodAutoscalerSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *HorizontalPodAutoscalerStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -2260,7 +2373,8 @@ func (this *HorizontalPodAutoscalerStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "HorizontalPodAutoscalerCondition", "HorizontalPodAutoscalerCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&HorizontalPodAutoscalerStatus{`,
+	s := strings.Join([]string{
+		`&HorizontalPodAutoscalerStatus{`,
 		`ObservedGeneration:` + valueToStringGenerated(this.ObservedGeneration) + `,`,
 		`LastScaleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScaleTime), "Time", "v1.Time", 1) + `,`,
 		`CurrentReplicas:` + fmt.Sprintf("%v", this.CurrentReplicas) + `,`,
@@ -2271,11 +2385,13 @@ func (this *HorizontalPodAutoscalerStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *MetricSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MetricSpec{`,
+	s := strings.Join([]string{
+		`&MetricSpec{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Object:` + strings.Replace(this.Object.String(), "ObjectMetricSource", "ObjectMetricSource", 1) + `,`,
 		`Pods:` + strings.Replace(this.Pods.String(), "PodsMetricSource", "PodsMetricSource", 1) + `,`,
@@ -2286,11 +2402,13 @@ func (this *MetricSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *MetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&MetricStatus{`,
+	s := strings.Join([]string{
+		`&MetricStatus{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Object:` + strings.Replace(this.Object.String(), "ObjectMetricStatus", "ObjectMetricStatus", 1) + `,`,
 		`Pods:` + strings.Replace(this.Pods.String(), "PodsMetricStatus", "PodsMetricStatus", 1) + `,`,
@@ -2301,11 +2419,13 @@ func (this *MetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *ObjectMetricSource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ObjectMetricSource{`,
+	s := strings.Join([]string{
+		`&ObjectMetricSource{`,
 		`Target:` + strings.Replace(strings.Replace(this.Target.String(), "CrossVersionObjectReference", "CrossVersionObjectReference", 1), `&`, ``, 1) + `,`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`TargetValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.TargetValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
@@ -2315,11 +2435,13 @@ func (this *ObjectMetricSource) String() string {
 	}, "")
 	return s
 }
+
 func (this *ObjectMetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ObjectMetricStatus{`,
+	s := strings.Join([]string{
+		`&ObjectMetricStatus{`,
 		`Target:` + strings.Replace(strings.Replace(this.Target.String(), "CrossVersionObjectReference", "CrossVersionObjectReference", 1), `&`, ``, 1) + `,`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`CurrentValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
@@ -2329,11 +2451,13 @@ func (this *ObjectMetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodsMetricSource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PodsMetricSource{`,
+	s := strings.Join([]string{
+		`&PodsMetricSource{`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`TargetAverageValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.TargetAverageValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
@@ -2341,11 +2465,13 @@ func (this *PodsMetricSource) String() string {
 	}, "")
 	return s
 }
+
 func (this *PodsMetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&PodsMetricStatus{`,
+	s := strings.Join([]string{
+		`&PodsMetricStatus{`,
 		`MetricName:` + fmt.Sprintf("%v", this.MetricName) + `,`,
 		`CurrentAverageValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentAverageValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
 		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "v1.LabelSelector", 1) + `,`,
@@ -2353,11 +2479,13 @@ func (this *PodsMetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *ResourceMetricSource) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ResourceMetricSource{`,
+	s := strings.Join([]string{
+		`&ResourceMetricSource{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`TargetAverageUtilization:` + valueToStringGenerated(this.TargetAverageUtilization) + `,`,
 		`TargetAverageValue:` + strings.Replace(fmt.Sprintf("%v", this.TargetAverageValue), "Quantity", "resource.Quantity", 1) + `,`,
@@ -2365,11 +2493,13 @@ func (this *ResourceMetricSource) String() string {
 	}, "")
 	return s
 }
+
 func (this *ResourceMetricStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ResourceMetricStatus{`,
+	s := strings.Join([]string{
+		`&ResourceMetricStatus{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`CurrentAverageUtilization:` + valueToStringGenerated(this.CurrentAverageUtilization) + `,`,
 		`CurrentAverageValue:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CurrentAverageValue), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
@@ -2377,6 +2507,7 @@ func (this *ResourceMetricStatus) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -2385,6 +2516,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ContainerResourceMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2555,6 +2687,7 @@ func (m *ContainerResourceMetricSource) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ContainerResourceMetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2722,6 +2855,7 @@ func (m *ContainerResourceMetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CrossVersionObjectReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2868,6 +3002,7 @@ func (m *CrossVersionObjectReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ExternalMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3058,6 +3193,7 @@ func (m *ExternalMetricSource) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ExternalMetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3245,6 +3381,7 @@ func (m *ExternalMetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HorizontalPodAutoscaler) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3394,6 +3531,7 @@ func (m *HorizontalPodAutoscaler) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HorizontalPodAutoscalerCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3605,6 +3743,7 @@ func (m *HorizontalPodAutoscalerCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HorizontalPodAutoscalerList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3722,6 +3861,7 @@ func (m *HorizontalPodAutoscalerList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HorizontalPodAutoscalerSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3878,6 +4018,7 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HorizontalPodAutoscalerStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4090,6 +4231,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MetricSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4352,6 +4494,7 @@ func (m *MetricSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *MetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4614,6 +4757,7 @@ func (m *MetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ObjectMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4834,6 +4978,7 @@ func (m *ObjectMetricSource) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ObjectMetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5054,6 +5199,7 @@ func (m *ObjectMetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodsMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5205,6 +5351,7 @@ func (m *PodsMetricSource) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *PodsMetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5356,6 +5503,7 @@ func (m *PodsMetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ResourceMetricSource) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5494,6 +5642,7 @@ func (m *ResourceMetricSource) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ResourceMetricStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5629,6 +5778,7 @@ func (m *ResourceMetricStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

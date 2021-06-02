@@ -312,7 +312,6 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
@@ -1014,7 +1013,8 @@ func (cont *NginxIngressController) Init() {
 		svc.Spec.Ports = []v1.ServicePort{
 			{Name: "http", Port: 80},
 			{Name: "https", Port: 443},
-			{Name: "stats", Port: 18080}}
+			{Name: "stats", Port: 18080},
+		}
 	})
 	framework.ExpectNoError(err)
 	cont.lbSvc, err = serviceJig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cont.Client))

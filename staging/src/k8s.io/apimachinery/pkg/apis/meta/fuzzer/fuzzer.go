@@ -59,7 +59,7 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *runtime.Object, c fuzz.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
-			if true { //c.RandBool() {
+			if true { // c.RandBool() {
 				*j = &runtime.Unknown{
 					// We do not set TypeMeta here because it is not carried through a round trip
 					Raw:         []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
@@ -80,7 +80,7 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			// Find a codec for converting the object to raw bytes.  This is necessary for the
 			// api version and kind to be correctly set be serialization.
-			var codec = apitesting.TestCodec(codecs, metav1.SchemeGroupVersion)
+			codec := apitesting.TestCodec(codecs, metav1.SchemeGroupVersion)
 
 			// Convert the object to raw bytes
 			bytes, err := runtime.Encode(codec, obj)
@@ -115,8 +115,14 @@ func (c *charRange) choose(r *rand.Rand) rune {
 // of a label key.
 func randomLabelPart(c fuzz.Continue, canBeEmpty bool) string {
 	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'}}
-	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'},
-		{'.', '.'}, {'-', '-'}, {'_', '_'}}
+	validMiddle := []charRange{
+		{'0', '9'},
+		{'a', 'z'},
+		{'A', 'Z'},
+		{'.', '.'},
+		{'-', '-'},
+		{'_', '_'},
+	}
 
 	partLen := c.Rand.Intn(64) // len is [0, 63]
 	if !canBeEmpty {
@@ -172,7 +178,6 @@ func randomLabelKey(c fuzz.Continue) string {
 }
 
 func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
-
 	return []interface{}{
 		func(j *metav1.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their

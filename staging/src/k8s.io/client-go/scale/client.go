@@ -30,10 +30,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-var scaleConverter = NewScaleConverter()
-var codecs = serializer.NewCodecFactory(scaleConverter.Scheme())
-var parameterScheme = runtime.NewScheme()
-var dynamicParameterCodec = runtime.NewParameterCodec(parameterScheme)
+var (
+	scaleConverter        = NewScaleConverter()
+	codecs                = serializer.NewCodecFactory(scaleConverter.Scheme())
+	parameterScheme       = runtime.NewScheme()
+	dynamicParameterCodec = runtime.NewParameterCodec(parameterScheme)
+)
 
 var versionV1 = schema.GroupVersion{Version: "v1"}
 

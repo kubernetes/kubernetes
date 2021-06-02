@@ -187,7 +187,8 @@ func (c *Client) PreparePutRequest(ctx context.Context, decorators ...autorest.P
 		[]autorest.PrepareDecorator{
 			autorest.AsContentType("application/json; charset=utf-8"),
 			autorest.AsPut(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }
@@ -198,7 +199,8 @@ func (c *Client) PreparePatchRequest(ctx context.Context, decorators ...autorest
 		[]autorest.PrepareDecorator{
 			autorest.AsContentType("application/json; charset=utf-8"),
 			autorest.AsPatch(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }
@@ -209,7 +211,8 @@ func (c *Client) PreparePostRequest(ctx context.Context, decorators ...autorest.
 		[]autorest.PrepareDecorator{
 			autorest.AsContentType("application/json; charset=utf-8"),
 			autorest.AsPost(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }
@@ -219,7 +222,8 @@ func (c *Client) PrepareGetRequest(ctx context.Context, decorators ...autorest.P
 	decorators = append(
 		[]autorest.PrepareDecorator{
 			autorest.AsGet(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }
@@ -229,7 +233,8 @@ func (c *Client) PrepareDeleteRequest(ctx context.Context, decorators ...autores
 	decorators = append(
 		[]autorest.PrepareDecorator{
 			autorest.AsDelete(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }
@@ -239,7 +244,8 @@ func (c *Client) PrepareHeadRequest(ctx context.Context, decorators ...autorest.
 	decorators = append(
 		[]autorest.PrepareDecorator{
 			autorest.AsHead(),
-			autorest.WithBaseURL(c.baseURI)},
+			autorest.WithBaseURL(c.baseURI),
+		},
 		decorators...)
 	return c.prepareRequest(ctx, decorators...)
 }

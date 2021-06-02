@@ -69,10 +69,12 @@ type QuotaAdmission struct {
 	evaluator          Evaluator
 }
 
-var _ admission.ValidationInterface = &QuotaAdmission{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
-var _ = genericadmissioninitializer.WantsQuotaConfiguration(&QuotaAdmission{})
+var (
+	_ admission.ValidationInterface = &QuotaAdmission{}
+	_                               = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
+	_                               = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
+	_                               = genericadmissioninitializer.WantsQuotaConfiguration(&QuotaAdmission{})
+)
 
 type liveLookupEntry struct {
 	expiry time.Time

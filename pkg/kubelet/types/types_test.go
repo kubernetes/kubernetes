@@ -31,7 +31,7 @@ func TestConvertToTimestamp(t *testing.T) {
 }
 
 func TestLen(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		statuses SortedContainerStatuses
 		expected int
 	}{
@@ -50,7 +50,7 @@ func TestLen(t *testing.T) {
 }
 
 func TestSwap(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		statuses SortedContainerStatuses
 		expected SortedContainerStatuses
 	}{
@@ -72,7 +72,7 @@ func TestSwap(t *testing.T) {
 }
 
 func TestLess(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		statuses SortedContainerStatuses
 		expected bool
 	}{
@@ -101,7 +101,7 @@ func TestSortInitContainerStatuses(t *testing.T) {
 	pod := v1.Pod{
 		Spec: v1.PodSpec{},
 	}
-	var cases = []struct {
+	cases := []struct {
 		containers     []v1.Container
 		statuses       []v1.ContainerStatus
 		sortedStatuses []v1.ContainerStatus

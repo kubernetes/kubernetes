@@ -30,19 +30,25 @@ limitations under the License.
 */
 package v1
 
-import proto "github.com/gogo/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	proto "github.com/gogo/protobuf/proto"
+	fmt "fmt"
+	math "math"
+)
 
-import strings "strings"
-import reflect "reflect"
+import (
+	strings "strings"
+	reflect "reflect"
+)
 
 import io "io"
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -67,6 +73,7 @@ func init() {
 	proto.RegisterType((*ReplicaSetSpec)(nil), "k8s.io.apiserver.pkg.apis.example2.v1.ReplicaSetSpec")
 	proto.RegisterType((*ReplicaSetStatus)(nil), "k8s.io.apiserver.pkg.apis.example2.v1.ReplicaSetStatus")
 }
+
 func (m *ReplicaSet) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -162,6 +169,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+
 func (m *ReplicaSet) Size() (n int) {
 	var l int
 	_ = l
@@ -200,14 +208,17 @@ func sovGenerated(x uint64) (n int) {
 	}
 	return n
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ReplicaSet) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ReplicaSet{`,
+	s := strings.Join([]string{
+		`&ReplicaSet{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ReplicaSetSpec", "ReplicaSetSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ReplicaSetStatus", "ReplicaSetStatus", 1), `&`, ``, 1) + `,`,
@@ -215,26 +226,31 @@ func (this *ReplicaSet) String() string {
 	}, "")
 	return s
 }
+
 func (this *ReplicaSetSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ReplicaSetSpec{`,
+	s := strings.Join([]string{
+		`&ReplicaSetSpec{`,
 		`Replicas:` + valueToStringGenerated(this.Replicas) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ReplicaSetStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ReplicaSetStatus{`,
+	s := strings.Join([]string{
+		`&ReplicaSetStatus{`,
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -243,6 +259,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ReplicaSet) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -383,6 +400,7 @@ func (m *ReplicaSet) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ReplicaSetSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -453,6 +471,7 @@ func (m *ReplicaSetSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ReplicaSetStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -522,6 +541,7 @@ func (m *ReplicaSetStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

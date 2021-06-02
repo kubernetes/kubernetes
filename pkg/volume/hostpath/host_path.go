@@ -52,11 +52,13 @@ type hostPathPlugin struct {
 	config volume.VolumeConfig
 }
 
-var _ volume.VolumePlugin = &hostPathPlugin{}
-var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
-var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
-var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
-var _ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
+var (
+	_ volume.VolumePlugin              = &hostPathPlugin{}
+	_ volume.PersistentVolumePlugin    = &hostPathPlugin{}
+	_ volume.RecyclableVolumePlugin    = &hostPathPlugin{}
+	_ volume.DeletableVolumePlugin     = &hostPathPlugin{}
+	_ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
+)
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"

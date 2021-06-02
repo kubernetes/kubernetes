@@ -43,6 +43,7 @@ type FakeV2DifferentObj struct {
 func (*FakeV2DifferentObj) DeepCopyObject() runtime.Object {
 	panic("not supported")
 }
+
 func TestSparse(t *testing.T) {
 	v1 := schema.GroupVersion{Group: "mygroup", Version: "v1"}
 	v2 := schema.GroupVersion{Group: "mygroup", Version: "v2"}

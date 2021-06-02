@@ -33,15 +33,19 @@ func NewObjectInterfacesFromScheme(scheme *runtime.Scheme) ObjectInterfaces {
 func (r *RuntimeObjectInterfaces) GetObjectCreater() runtime.ObjectCreater {
 	return r.ObjectCreater
 }
+
 func (r *RuntimeObjectInterfaces) GetObjectTyper() runtime.ObjectTyper {
 	return r.ObjectTyper
 }
+
 func (r *RuntimeObjectInterfaces) GetObjectDefaulter() runtime.ObjectDefaulter {
 	return r.ObjectDefaulter
 }
+
 func (r *RuntimeObjectInterfaces) GetObjectConvertor() runtime.ObjectConvertor {
 	return r.ObjectConvertor
 }
+
 func (r *RuntimeObjectInterfaces) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
 	return r.EquivalentResourceMapper
 }

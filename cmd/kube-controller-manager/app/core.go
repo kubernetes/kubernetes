@@ -487,7 +487,6 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 }
 
 func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
-
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
 		return nil, true, err

@@ -213,7 +213,6 @@ type stringPair struct {
 }
 
 var _ = SIGDescribe("Addon update", func() {
-
 	var dir string
 	var sshClient *ssh.Client
 	f := framework.NewDefaultFramework("addon-update-test")
@@ -247,7 +246,7 @@ var _ = SIGDescribe("Addon update", func() {
 		// providers that provide those capabilities.
 		e2eskipper.SkipUnlessProviderIs("gce")
 
-		//these tests are long, so I squeezed several cases in one scenario
+		// these tests are long, so I squeezed several cases in one scenario
 		framework.ExpectNotEqual(sshClient, nil)
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 

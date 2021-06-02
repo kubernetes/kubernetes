@@ -65,9 +65,11 @@ var (
 	namespaceToken = "{namespace}"
 )
 
-var definitions map[string]common.OpenAPIDefinition
-var buildDefinitions sync.Once
-var namer *openapi.DefinitionNamer
+var (
+	definitions      map[string]common.OpenAPIDefinition
+	buildDefinitions sync.Once
+	namer            *openapi.DefinitionNamer
+)
 
 // Options contains builder options.
 type Options struct {

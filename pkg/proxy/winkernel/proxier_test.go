@@ -20,6 +20,11 @@ package winkernel
 
 import (
 	"fmt"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
 	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,10 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilpointer "k8s.io/utils/pointer"
-	"net"
-	"strings"
-	"testing"
-	"time"
 )
 
 const (
@@ -83,7 +84,6 @@ func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpo
 		}, nil
 	}
 	return nil, nil
-
 }
 
 func (hns fakeHNS) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
@@ -185,7 +185,6 @@ func TestCreateServiceVip(t *testing.T) {
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
-
 	} else {
 		if svcInfo.remoteEndpoint == nil {
 			t.Error()
@@ -245,7 +244,6 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	epInfo, ok := ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -309,7 +307,6 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	epInfo, ok := ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -324,6 +321,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 }
+
 func TestSharedRemoteEndpointDelete(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "L2Bridge", false)
@@ -403,7 +401,6 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	epInfo, ok := ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -454,7 +451,6 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	epInfo, ok = ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -469,6 +465,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 }
+
 func TestSharedRemoteEndpointUpdate(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "L2Bridge", false)
@@ -549,7 +546,6 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 	epInfo, ok := ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -616,7 +612,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 						Name:     "p443",
 						Port:     int32(443),
 						Protocol: v1.ProtocolTCP,
-					}},
+					},
+				},
 			}}
 		}))
 
@@ -632,7 +629,6 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName1.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
@@ -647,6 +643,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 }
+
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
@@ -697,13 +694,11 @@ func TestCreateLoadBalancer(t *testing.T) {
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
-
 	} else {
 		if svcInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
 		}
 	}
-
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
@@ -757,7 +752,6 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
-
 	} else {
 		if svcInfo.hnsID != guid {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
@@ -822,7 +816,6 @@ func TestEndpointSlice(t *testing.T) {
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
-
 	} else {
 		if svcInfo.hnsID != guid {
 			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, guid, svcPortName.String())
@@ -833,7 +826,6 @@ func TestEndpointSlice(t *testing.T) {
 	epInfo, ok := ep.(*endpointsInfo)
 	if !ok {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
-
 	} else {
 		if epInfo.hnsID != guid {
 			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
@@ -883,6 +875,7 @@ func makeServiceMap(proxier *Proxier, allServices ...*v1.Service) {
 	defer proxier.mu.Unlock()
 	proxier.servicesSynced = true
 }
+
 func deleteServices(proxier *Proxier, allServices ...*v1.Service) {
 	for i := range allServices {
 		proxier.OnServiceDelete(allServices[i])

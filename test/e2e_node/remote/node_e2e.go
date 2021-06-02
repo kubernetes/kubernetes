@@ -144,7 +144,7 @@ func getOSDistribution(host string) (string, error) {
 		return "", fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 
-	var re = regexp.MustCompile(`(?m)^ID="?(\w+)"?`)
+	re := regexp.MustCompile(`(?m)^ID="?(\w+)"?`)
 	subMatch := re.FindStringSubmatch(output)
 	if len(subMatch) > 0 {
 		return subMatch[1], nil

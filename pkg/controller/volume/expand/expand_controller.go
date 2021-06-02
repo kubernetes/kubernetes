@@ -346,7 +346,6 @@ func (expc *expandController) runWorker() {
 func (expc *expandController) getPersistentVolume(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
 	pv, err := expc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volumeName, metav1.GetOptions{})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PV %q: %v", volumeName, err)
 	}

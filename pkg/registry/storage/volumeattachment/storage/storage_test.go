@@ -106,7 +106,7 @@ func TestUpdate(t *testing.T) {
 			object.Status.Attached = true
 			return object
 		},
-		//invalid update
+		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.VolumeAttachment)
 			object.Spec.Attacher = "invalid-attacher-!@#$%^&*()"

@@ -45,37 +45,39 @@ import (
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
-var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
-var k8sVersion = version.MustParseGeneric(k8sVersionString)
-var nodeName = "mynode"
-var cfgFiles = map[string][]byte{
-	"InitConfiguration_v1beta2": []byte(fmt.Sprintf(`
+var (
+	k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
+	k8sVersion       = version.MustParseGeneric(k8sVersionString)
+	nodeName         = "mynode"
+	cfgFiles         = map[string][]byte{
+		"InitConfiguration_v1beta2": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
 `, kubeadmapiv1old.SchemeGroupVersion.String())),
-	"ClusterConfiguration_v1beta2": []byte(fmt.Sprintf(`
+		"ClusterConfiguration_v1beta2": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: ClusterConfiguration
 kubernetesVersion: %s
 `, kubeadmapiv1old.SchemeGroupVersion.String(), k8sVersionString)),
-	"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
+		"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
 `, kubeadmapiv1.SchemeGroupVersion.String())),
-	"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
+		"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: ClusterConfiguration
 kubernetesVersion: %s
 `, kubeadmapiv1.SchemeGroupVersion.String(), k8sVersionString)),
-	"Kube-proxy_componentconfig": []byte(`
+		"Kube-proxy_componentconfig": []byte(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 `),
-	"Kubelet_componentconfig": []byte(`
+		"Kubelet_componentconfig": []byte(`
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 `),
-}
+	}
+)
 
 var kubeletConfFiles = map[string][]byte{
 	"withoutX509Cert": []byte(`
@@ -204,7 +206,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		kubeconfigContent []byte
 		pemContent        []byte
@@ -283,7 +285,7 @@ func TestGetNodeRegistration(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		fileContents  []byte
 		node          *v1.Node
@@ -360,7 +362,7 @@ func TestGetNodeRegistration(t *testing.T) {
 }
 
 func TestGetAPIEndpointWithBackoff(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		nodeName         string
 		staticPod        *testresources.FakeStaticPod
@@ -496,7 +498,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
+	tests := []struct {
 		name            string
 		fileContents    []byte
 		node            *v1.Node
@@ -743,7 +745,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 }
 
 func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		nodeName         string
 		pods             []testresources.FakeStaticPod
@@ -816,7 +818,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 }
 
 func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		nodeName         string
 		pods             []testresources.FakeStaticPod

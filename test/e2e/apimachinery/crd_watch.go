@@ -36,7 +36,6 @@ import (
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
-
 	f := framework.NewDefaultFramework("crd-watch")
 
 	ginkgo.Context("CustomResourceDefinition Watch", func() {
@@ -47,7 +46,6 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			modify and delete events.
 		*/
 		framework.ConformanceIt("watch on custom resource definition objects", func() {
-
 			const (
 				watchCRNameA = "name1"
 				watchCRNameB = "name2"
@@ -191,5 +189,4 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 		return client.Resource(gvr).Namespace(ns), nil
 	}
 	return client.Resource(gvr), nil
-
 }

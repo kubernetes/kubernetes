@@ -153,7 +153,6 @@ func (c *Repair) runOnce() error {
 		}
 		return true, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}

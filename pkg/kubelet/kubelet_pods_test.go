@@ -386,8 +386,9 @@ func TestRunInContainer(t *testing.T) {
 				Name:      "podFoo",
 				Namespace: "nsFoo",
 				Containers: []*kubecontainer.Container{
-					{Name: "containerFoo",
-						ID: containerID,
+					{
+						Name: "containerFoo",
+						ID:   containerID,
 					},
 				},
 			}},
@@ -792,7 +793,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1", //legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1", // legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1294,7 +1295,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{
 						Optional:             &trueVal,
-						LocalObjectReference: v1.LocalObjectReference{Name: "missing-config-map"}}},
+						LocalObjectReference: v1.LocalObjectReference{Name: "missing-config-map"},
+					}},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -1542,7 +1544,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{Name: "missing-secret"},
-						Optional:             &trueVal}},
+						Optional:             &trueVal,
+					}},
 				},
 			},
 			masterServiceNs: "nothing",
@@ -1708,7 +1711,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
 			}
 		})
-
 	}
 }
 
@@ -1720,6 +1722,7 @@ func waitingState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+
 func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -1733,6 +1736,7 @@ func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 		},
 	}
 }
+
 func runningState(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -1741,6 +1745,7 @@ func runningState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+
 func stoppedState(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -1749,6 +1754,7 @@ func stoppedState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+
 func succeededState(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -1759,6 +1765,7 @@ func succeededState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+
 func failedState(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -2127,8 +2134,9 @@ func TestGetExec(t *testing.T) {
 				Name:      podName,
 				Namespace: podNamespace,
 				Containers: []*kubecontainer.Container{
-					{Name: containerID,
-						ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+					{
+						Name: containerID,
+						ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 					},
 				},
 			}},
@@ -2180,8 +2188,9 @@ func TestGetPortForward(t *testing.T) {
 				Name:      podName,
 				Namespace: podNamespace,
 				Containers: []*kubecontainer.Container{
-					{Name: "foo",
-						ID: kubecontainer.ContainerID{Type: "test", ID: "foo"},
+					{
+						Name: "foo",
+						ID:   kubecontainer.ContainerID{Type: "test", ID: "foo"},
 					},
 				},
 			}},
@@ -2353,7 +2362,8 @@ func TestHasHostNamespace(t *testing.T) {
 	}{
 		"nil psc": {
 			ps:       v1.PodSpec{},
-			expected: false},
+			expected: false,
+		},
 
 		"host pid true": {
 			ps: v1.PodSpec{
@@ -2406,15 +2416,15 @@ func TestTruncatePodHostname(t *testing.T) {
 		},
 		"too long hostname": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567.", // 8*9=72 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567",          //8*8-1=63 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.1234567",          // 8*8-1=63 chars
 		},
 		"hostname end with .": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456.1234567.", // 8*9-1=71 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          // 8*8-2=62 chars
 		},
 		"hostname end with -": {
 			input:  "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456-1234567.", // 8*9-1=71 chars
-			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          //8*8-2=62 chars
+			output: "1234567.1234567.1234567.1234567.1234567.1234567.1234567.123456",          // 8*8-2=62 chars
 		},
 	} {
 		t.Logf("TestCase: %q", c)

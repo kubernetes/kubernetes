@@ -102,8 +102,10 @@ func objectTypeToString(obj runtime.Object) string {
 // only from the test harness, so Register/Cleanup will be
 // no-op at runtime.
 
-var cleanupLock sync.Mutex
-var cleanup []func() = nil
+var (
+	cleanupLock sync.Mutex
+	cleanup     []func() = nil
+)
 
 func TrackStorageCleanup() {
 	cleanupLock.Lock()

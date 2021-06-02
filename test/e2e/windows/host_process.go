@@ -39,7 +39,6 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 	f := framework.NewDefaultFramework("host-process-test-windows")
 
 	ginkgo.It("should run as a process on the host/node", func() {
-
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
 		framework.ExpectNoError(err, "Error finding Windows node")

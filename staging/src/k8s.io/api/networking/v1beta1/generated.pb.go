@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*HTTPIngressPath) ProtoMessage() {}
 func (*HTTPIngressPath) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{0}
 }
+
 func (m *HTTPIngressPath) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HTTPIngressPath) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *HTTPIngressPath) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *HTTPIngressPath) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HTTPIngressPath.Merge(m, src)
 }
+
 func (m *HTTPIngressPath) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HTTPIngressPath) XXX_DiscardUnknown() {
 	xxx_messageInfo_HTTPIngressPath.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*HTTPIngressRuleValue) ProtoMessage() {}
 func (*HTTPIngressRuleValue) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{1}
 }
+
 func (m *HTTPIngressRuleValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *HTTPIngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *HTTPIngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte
 	}
 	return b[:n], nil
 }
+
 func (m *HTTPIngressRuleValue) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HTTPIngressRuleValue.Merge(m, src)
 }
+
 func (m *HTTPIngressRuleValue) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *HTTPIngressRuleValue) XXX_DiscardUnknown() {
 	xxx_messageInfo_HTTPIngressRuleValue.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*Ingress) ProtoMessage() {}
 func (*Ingress) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{2}
 }
+
 func (m *Ingress) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Ingress) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *Ingress) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Ingress) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Ingress.Merge(m, src)
 }
+
 func (m *Ingress) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Ingress) XXX_DiscardUnknown() {
 	xxx_messageInfo_Ingress.DiscardUnknown(m)
 }
@@ -133,9 +150,11 @@ func (*IngressBackend) ProtoMessage() {}
 func (*IngressBackend) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{3}
 }
+
 func (m *IngressBackend) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressBackend) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -144,12 +163,15 @@ func (m *IngressBackend) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 	}
 	return b[:n], nil
 }
+
 func (m *IngressBackend) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressBackend.Merge(m, src)
 }
+
 func (m *IngressBackend) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressBackend) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressBackend.DiscardUnknown(m)
 }
@@ -161,9 +183,11 @@ func (*IngressClass) ProtoMessage() {}
 func (*IngressClass) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{4}
 }
+
 func (m *IngressClass) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressClass) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -172,12 +196,15 @@ func (m *IngressClass) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	}
 	return b[:n], nil
 }
+
 func (m *IngressClass) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressClass.Merge(m, src)
 }
+
 func (m *IngressClass) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressClass) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressClass.DiscardUnknown(m)
 }
@@ -189,9 +216,11 @@ func (*IngressClassList) ProtoMessage() {}
 func (*IngressClassList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{5}
 }
+
 func (m *IngressClassList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressClassList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -200,12 +229,15 @@ func (m *IngressClassList) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *IngressClassList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressClassList.Merge(m, src)
 }
+
 func (m *IngressClassList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressClassList) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressClassList.DiscardUnknown(m)
 }
@@ -217,9 +249,11 @@ func (*IngressClassParametersReference) ProtoMessage() {}
 func (*IngressClassParametersReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{6}
 }
+
 func (m *IngressClassParametersReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressClassParametersReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -228,12 +262,15 @@ func (m *IngressClassParametersReference) XXX_Marshal(b []byte, deterministic bo
 	}
 	return b[:n], nil
 }
+
 func (m *IngressClassParametersReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressClassParametersReference.Merge(m, src)
 }
+
 func (m *IngressClassParametersReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressClassParametersReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressClassParametersReference.DiscardUnknown(m)
 }
@@ -245,9 +282,11 @@ func (*IngressClassSpec) ProtoMessage() {}
 func (*IngressClassSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{7}
 }
+
 func (m *IngressClassSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressClassSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -256,12 +295,15 @@ func (m *IngressClassSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *IngressClassSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressClassSpec.Merge(m, src)
 }
+
 func (m *IngressClassSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressClassSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressClassSpec.DiscardUnknown(m)
 }
@@ -273,9 +315,11 @@ func (*IngressList) ProtoMessage() {}
 func (*IngressList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{8}
 }
+
 func (m *IngressList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -284,12 +328,15 @@ func (m *IngressList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *IngressList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressList.Merge(m, src)
 }
+
 func (m *IngressList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressList) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressList.DiscardUnknown(m)
 }
@@ -301,9 +348,11 @@ func (*IngressRule) ProtoMessage() {}
 func (*IngressRule) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{9}
 }
+
 func (m *IngressRule) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -312,12 +361,15 @@ func (m *IngressRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *IngressRule) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressRule.Merge(m, src)
 }
+
 func (m *IngressRule) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressRule) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressRule.DiscardUnknown(m)
 }
@@ -329,9 +381,11 @@ func (*IngressRuleValue) ProtoMessage() {}
 func (*IngressRuleValue) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{10}
 }
+
 func (m *IngressRuleValue) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -340,12 +394,15 @@ func (m *IngressRuleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *IngressRuleValue) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressRuleValue.Merge(m, src)
 }
+
 func (m *IngressRuleValue) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressRuleValue) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressRuleValue.DiscardUnknown(m)
 }
@@ -357,9 +414,11 @@ func (*IngressSpec) ProtoMessage() {}
 func (*IngressSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{11}
 }
+
 func (m *IngressSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -368,12 +427,15 @@ func (m *IngressSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *IngressSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressSpec.Merge(m, src)
 }
+
 func (m *IngressSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressSpec.DiscardUnknown(m)
 }
@@ -385,9 +447,11 @@ func (*IngressStatus) ProtoMessage() {}
 func (*IngressStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{12}
 }
+
 func (m *IngressStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -396,12 +460,15 @@ func (m *IngressStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error
 	}
 	return b[:n], nil
 }
+
 func (m *IngressStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressStatus.Merge(m, src)
 }
+
 func (m *IngressStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressStatus.DiscardUnknown(m)
 }
@@ -413,9 +480,11 @@ func (*IngressTLS) ProtoMessage() {}
 func (*IngressTLS) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5bea11de0ceb8f53, []int{13}
 }
+
 func (m *IngressTLS) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *IngressTLS) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -424,12 +493,15 @@ func (m *IngressTLS) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *IngressTLS) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IngressTLS.Merge(m, src)
 }
+
 func (m *IngressTLS) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *IngressTLS) XXX_DiscardUnknown() {
 	xxx_messageInfo_IngressTLS.DiscardUnknown(m)
 }
@@ -1169,6 +1241,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *HTTPIngressPath) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1406,14 +1479,17 @@ func (m *IngressTLS) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *HTTPIngressPath) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&HTTPIngressPath{`,
+	s := strings.Join([]string{
+		`&HTTPIngressPath{`,
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
 		`Backend:` + strings.Replace(strings.Replace(this.Backend.String(), "IngressBackend", "IngressBackend", 1), `&`, ``, 1) + `,`,
 		`PathType:` + valueToStringGenerated(this.PathType) + `,`,
@@ -1421,6 +1497,7 @@ func (this *HTTPIngressPath) String() string {
 	}, "")
 	return s
 }
+
 func (this *HTTPIngressRuleValue) String() string {
 	if this == nil {
 		return "nil"
@@ -1430,17 +1507,20 @@ func (this *HTTPIngressRuleValue) String() string {
 		repeatedStringForPaths += strings.Replace(strings.Replace(f.String(), "HTTPIngressPath", "HTTPIngressPath", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForPaths += "}"
-	s := strings.Join([]string{`&HTTPIngressRuleValue{`,
+	s := strings.Join([]string{
+		`&HTTPIngressRuleValue{`,
 		`Paths:` + repeatedStringForPaths + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *Ingress) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Ingress{`,
+	s := strings.Join([]string{
+		`&Ingress{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "IngressSpec", "IngressSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "IngressStatus", "IngressStatus", 1), `&`, ``, 1) + `,`,
@@ -1448,11 +1528,13 @@ func (this *Ingress) String() string {
 	}, "")
 	return s
 }
+
 func (this *IngressBackend) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressBackend{`,
+	s := strings.Join([]string{
+		`&IngressBackend{`,
 		`ServiceName:` + fmt.Sprintf("%v", this.ServiceName) + `,`,
 		`ServicePort:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ServicePort), "IntOrString", "intstr.IntOrString", 1), `&`, ``, 1) + `,`,
 		`Resource:` + strings.Replace(fmt.Sprintf("%v", this.Resource), "TypedLocalObjectReference", "v11.TypedLocalObjectReference", 1) + `,`,
@@ -1460,17 +1542,20 @@ func (this *IngressBackend) String() string {
 	}, "")
 	return s
 }
+
 func (this *IngressClass) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressClass{`,
+	s := strings.Join([]string{
+		`&IngressClass{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "IngressClassSpec", "IngressClassSpec", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressClassList) String() string {
 	if this == nil {
 		return "nil"
@@ -1480,18 +1565,21 @@ func (this *IngressClassList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "IngressClass", "IngressClass", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&IngressClassList{`,
+	s := strings.Join([]string{
+		`&IngressClassList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressClassParametersReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressClassParametersReference{`,
+	s := strings.Join([]string{
+		`&IngressClassParametersReference{`,
 		`APIGroup:` + valueToStringGenerated(this.APIGroup) + `,`,
 		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
@@ -1501,17 +1589,20 @@ func (this *IngressClassParametersReference) String() string {
 	}, "")
 	return s
 }
+
 func (this *IngressClassSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressClassSpec{`,
+	s := strings.Join([]string{
+		`&IngressClassSpec{`,
 		`Controller:` + fmt.Sprintf("%v", this.Controller) + `,`,
 		`Parameters:` + strings.Replace(this.Parameters.String(), "IngressClassParametersReference", "IngressClassParametersReference", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressList) String() string {
 	if this == nil {
 		return "nil"
@@ -1521,34 +1612,40 @@ func (this *IngressList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Ingress", "Ingress", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&IngressList{`,
+	s := strings.Join([]string{
+		`&IngressList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressRule) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressRule{`,
+	s := strings.Join([]string{
+		`&IngressRule{`,
 		`Host:` + fmt.Sprintf("%v", this.Host) + `,`,
 		`IngressRuleValue:` + strings.Replace(strings.Replace(this.IngressRuleValue.String(), "IngressRuleValue", "IngressRuleValue", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressRuleValue) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressRuleValue{`,
+	s := strings.Join([]string{
+		`&IngressRuleValue{`,
 		`HTTP:` + strings.Replace(this.HTTP.String(), "HTTPIngressRuleValue", "HTTPIngressRuleValue", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -1563,7 +1660,8 @@ func (this *IngressSpec) String() string {
 		repeatedStringForRules += strings.Replace(strings.Replace(f.String(), "IngressRule", "IngressRule", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForRules += "}"
-	s := strings.Join([]string{`&IngressSpec{`,
+	s := strings.Join([]string{
+		`&IngressSpec{`,
 		`Backend:` + strings.Replace(this.Backend.String(), "IngressBackend", "IngressBackend", 1) + `,`,
 		`TLS:` + repeatedStringForTLS + `,`,
 		`Rules:` + repeatedStringForRules + `,`,
@@ -1572,27 +1670,32 @@ func (this *IngressSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *IngressStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressStatus{`,
+	s := strings.Join([]string{
+		`&IngressStatus{`,
 		`LoadBalancer:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LoadBalancer), "LoadBalancerStatus", "v11.LoadBalancerStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *IngressTLS) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IngressTLS{`,
+	s := strings.Join([]string{
+		`&IngressTLS{`,
 		`Hosts:` + fmt.Sprintf("%v", this.Hosts) + `,`,
 		`SecretName:` + fmt.Sprintf("%v", this.SecretName) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -1601,6 +1704,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *HTTPIngressPath) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1749,6 +1853,7 @@ func (m *HTTPIngressPath) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *HTTPIngressRuleValue) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1833,6 +1938,7 @@ func (m *HTTPIngressRuleValue) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *Ingress) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1982,6 +2088,7 @@ func (m *Ingress) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressBackend) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2133,6 +2240,7 @@ func (m *IngressBackend) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressClass) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2249,6 +2357,7 @@ func (m *IngressClass) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressClassList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2366,6 +2475,7 @@ func (m *IngressClassList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressClassParametersReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2579,6 +2689,7 @@ func (m *IngressClassParametersReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressClassSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2697,6 +2808,7 @@ func (m *IngressClassSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2814,6 +2926,7 @@ func (m *IngressList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressRule) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2929,6 +3042,7 @@ func (m *IngressRule) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressRuleValue) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3015,6 +3129,7 @@ func (m *IngressRuleValue) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3202,6 +3317,7 @@ func (m *IngressSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3285,6 +3401,7 @@ func (m *IngressStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *IngressTLS) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3399,6 +3516,7 @@ func (m *IngressTLS) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

@@ -18,7 +18,6 @@ package topologymanager
 
 import (
 	"fmt"
-
 	"sync"
 
 	"k8s.io/api/core/v1"

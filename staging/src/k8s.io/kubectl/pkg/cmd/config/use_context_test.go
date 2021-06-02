@@ -28,10 +28,10 @@ import (
 
 type useContextTest struct {
 	description    string
-	config         clientcmdapi.Config //initiate kubectl config
-	args           []string            //kubectl config use-context args
-	expected       string              //expect out
-	expectedConfig clientcmdapi.Config //expect kubectl config
+	config         clientcmdapi.Config // initiate kubectl config
+	args           []string            // kubectl config use-context args
+	expected       string              // expect out
+	expectedConfig clientcmdapi.Config // expect kubectl config
 }
 
 func TestUseContext(t *testing.T) {

@@ -393,7 +393,6 @@ func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 				t.Errorf("PV name %s not sufficiently unique for different volumes", pv1.Name)
 			}
 		})
-
 	}
 }
 

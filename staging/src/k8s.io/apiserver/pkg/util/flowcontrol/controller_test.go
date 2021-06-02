@@ -244,7 +244,8 @@ func TestConfigConsumer(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 			flowcontrolClient := clientset.FlowcontrolV1beta1()
-			cts := &ctlrTestState{t: t,
+			cts := &ctlrTestState{
+				t:               t,
 				fcIfc:           flowcontrolClient,
 				existingFSs:     map[string]*flowcontrol.FlowSchema{},
 				existingPLs:     map[string]*flowcontrol.PriorityLevelConfiguration{},
@@ -375,7 +376,8 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 	clientset := clientsetfake.NewSimpleClientset(fs, pl)
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
 	flowcontrolClient := clientset.FlowcontrolV1beta1()
-	cts := &ctlrTestState{t: t,
+	cts := &ctlrTestState{
+		t:               t,
 		fcIfc:           flowcontrolClient,
 		existingFSs:     map[string]*flowcontrol.FlowSchema{},
 		existingPLs:     map[string]*flowcontrol.PriorityLevelConfiguration{},
@@ -528,7 +530,8 @@ func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames 
 	newFTRs = map[string]*fsTestingRecord{}
 	catchAlls = map[bool]*flowcontrol.FlowSchema{
 		false: fcboot.MandatoryFlowSchemaCatchAll,
-		true:  fcboot.MandatoryFlowSchemaCatchAll}
+		true:  fcboot.MandatoryFlowSchemaCatchAll,
+	}
 	newFSMap = map[string]*flowcontrol.FlowSchema{}
 	add := func(ftr *fsTestingRecord) {
 		newFSs = append(newFSs, ftr.fs)

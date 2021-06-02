@@ -53,8 +53,10 @@ func TestScaledValueInternal(t *testing.T) {
 		{big.NewInt(1), 0, 3, 1000},
 		{big.NewInt(1), -3, 0, 1000},
 		{big.NewInt(1000), -3, 2, 100000000},
-		{big.NewInt(0).Div(big.NewInt(math.MaxInt64), bigThousand), 0, 3,
-			(math.MaxInt64 / 1000) * 1000},
+		{
+			big.NewInt(0).Div(big.NewInt(math.MaxInt64), bigThousand), 0, 3,
+			(math.MaxInt64 / 1000) * 1000,
+		},
 	}
 
 	for i, tt := range tests {

@@ -26,7 +26,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_HTTPIngressPath(obj *networkingv1beta1.HTTPIngressPath) {
-	var defaultPathType = networkingv1beta1.PathTypeImplementationSpecific
+	defaultPathType := networkingv1beta1.PathTypeImplementationSpecific
 	if obj.PathType == nil {
 		obj.PathType = &defaultPathType
 	}

@@ -140,7 +140,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
-		//modify labels
+		// modify labels
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
@@ -171,7 +171,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
-		//modify annotations
+		// modify annotations
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
@@ -347,7 +347,6 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
@@ -364,7 +363,6 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *v1.Pod {

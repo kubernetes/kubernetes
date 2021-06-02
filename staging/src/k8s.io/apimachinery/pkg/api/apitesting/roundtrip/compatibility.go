@@ -269,7 +269,6 @@ func CompatibilityTestFuzzer(scheme *runtime.Scheme, fuzzFuncs []interface{}) *f
 func (c *CompatibilityTestOptions) Run(t *testing.T) {
 	for _, gvk := range c.Kinds {
 		t.Run(makeName(gvk), func(t *testing.T) {
-
 			t.Run("HEAD", func(t *testing.T) {
 				c.runCurrentVersionTest(t, gvk)
 			})
@@ -279,7 +278,6 @@ func (c *CompatibilityTestOptions) Run(t *testing.T) {
 					c.runPreviousVersionTest(t, gvk, previousVersionDir)
 				})
 			}
-
 		})
 	}
 }

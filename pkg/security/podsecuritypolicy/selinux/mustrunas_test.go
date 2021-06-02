@@ -17,13 +17,14 @@ limitations under the License.
 package selinux
 
 import (
+	"reflect"
+	"strings"
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1"
-	"reflect"
-	"strings"
-	"testing"
 )
 
 func TestMustRunAsOptions(t *testing.T) {
@@ -161,19 +162,19 @@ func TestMustRunAsValidate(t *testing.T) {
 		internalSELinuxOptions := api.SELinuxOptions{}
 		v1.Convert_v1_SELinuxOptions_To_core_SELinuxOptions(tc.podSeLinux, &internalSELinuxOptions, nil)
 		errs := mustRunAs.Validate(nil, nil, nil, &internalSELinuxOptions)
-		//should've passed but didn't
+		// should've passed but didn't
 		if len(tc.expectedMsg) == 0 && len(errs) > 0 {
 			t.Errorf("%s expected no errors but received %v", name, errs)
 		}
-		//should've failed but didn't
+		// should've failed but didn't
 		if len(tc.expectedMsg) != 0 && len(errs) == 0 {
 			t.Errorf("%s expected error %s but received no errors", name, tc.expectedMsg)
 		}
-		//failed with additional messages
+		// failed with additional messages
 		if len(tc.expectedMsg) != 0 && len(errs) > 1 {
 			t.Errorf("%s expected error %s but received multiple errors: %v", name, tc.expectedMsg, errs)
 		}
-		//check that we got the right message
+		// check that we got the right message
 		if len(tc.expectedMsg) != 0 && len(errs) == 1 {
 			if !strings.Contains(errs[0].Error(), tc.expectedMsg) {
 				t.Errorf("%s expected error to contain %s but it did not: %v", name, tc.expectedMsg, errs)

@@ -868,12 +868,14 @@ func TestHandleMemExceeded(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
 				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-			}}},
+			}},
+		},
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
@@ -887,7 +889,8 @@ func TestHandleMemExceeded(t *testing.T) {
 	testClusterDNSDomain := "TEST"
 	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
 
-	spec := v1.PodSpec{NodeName: string(kl.nodeName),
+	spec := v1.PodSpec{
+		NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("90"),
@@ -929,12 +932,14 @@ func TestHandlePluginResources(t *testing.T) {
 	resourceQuantityInvalid := *resource.NewQuantity(int64(-1), resource.DecimalSI)
 	allowedPodQuantity := *resource.NewQuantity(int64(10), resource.DecimalSI)
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				adjustedResource: resourceQuantity1,
 				emptyResource:    resourceQuantity0,
 				v1.ResourcePods:  allowedPodQuantity,
-			}}},
+			}},
+		},
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
@@ -983,7 +988,8 @@ func TestHandlePluginResources(t *testing.T) {
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.
-	fittingPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+	fittingPodSpec := v1.PodSpec{
+		NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				adjustedResource: resourceQuantity2,
@@ -995,7 +1001,8 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 	// pod requiring emptyResource (extended resources with 0 allocatable) will
 	// not pass PredicateAdmit.
-	emptyPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+	emptyPodSpec := v1.PodSpec{
+		NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				emptyResource: resourceQuantity2,
@@ -1010,7 +1017,8 @@ func TestHandlePluginResources(t *testing.T) {
 	// Extended resources missing in node status are ignored in PredicateAdmit.
 	// This is required to support extended resources that are not managed by
 	// device plugin, such as cluster-level resources.
-	missingPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+	missingPodSpec := v1.PodSpec{
+		NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				missingResource: resourceQuantity2,
@@ -1021,7 +1029,8 @@ func TestHandlePluginResources(t *testing.T) {
 		}}},
 	}
 	// pod requiring failedResource will fail with the resource failed to be allocated.
-	failedPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+	failedPodSpec := v1.PodSpec{
+		NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				failedResource: resourceQuantity1,
@@ -2293,7 +2302,6 @@ func waitForVolumeUnmount(
 			return true, nil
 		},
 	)
-
 	if err != nil {
 		return fmt.Errorf(
 			"Expected volumes to be unmounted. But some volumes are still mounted: %#v", podVolumes)
@@ -2314,7 +2322,6 @@ func waitForVolumeDetach(
 			return !volumeAttached, nil
 		},
 	)
-
 	if err != nil {
 		return fmt.Errorf(
 			"Expected volumes to be detached. But some volumes are still attached: %#v", attachedVolumes)

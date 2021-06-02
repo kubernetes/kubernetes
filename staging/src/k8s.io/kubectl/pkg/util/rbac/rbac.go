@@ -17,10 +17,11 @@ limitations under the License.
 package rbac
 
 import (
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"reflect"
 	"strings"
+
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type simpleResource struct {
@@ -106,11 +107,9 @@ func BreakdownRule(rule rbacv1.PolicyRule) []rbacv1.PolicyRule {
 					for _, resourceName := range rule.ResourceNames {
 						subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}, ResourceNames: []string{resourceName}})
 					}
-
 				} else {
 					subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}})
 				}
-
 			}
 		}
 	}

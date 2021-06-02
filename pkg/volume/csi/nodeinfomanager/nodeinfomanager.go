@@ -26,7 +26,6 @@ import (
 	"math"
 	"strings"
 	"sync"
-
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -427,11 +426,9 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 	return nil
-
 }
 
 func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
-
 	kubeClient := nim.volumeHost.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("error getting kube client")
@@ -629,7 +626,6 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 
 	return err // do not wrap error
-
 }
 
 func removeMaxAttachLimit(driverName string) nodeUpdateFunc {

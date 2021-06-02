@@ -24,8 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type emptyHandle struct {
-}
+type emptyHandle struct{}
 
 // NewNetLinkHandle will create an EmptyHandle
 func NewNetLinkHandle(ipv6 bool) NetLinkHandle {

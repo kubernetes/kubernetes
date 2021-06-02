@@ -56,8 +56,7 @@ func TestSpecSourceConverters(t *testing.T) {
 	}
 }
 
-type testPlugins struct {
-}
+type testPlugins struct{}
 
 func (plugin *testPlugins) Init(host VolumeHost) error {
 	return nil

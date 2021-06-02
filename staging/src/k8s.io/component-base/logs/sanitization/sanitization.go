@@ -50,7 +50,6 @@ func (sf *SanitizingFilter) FilterF(fmt string, args []interface{}) (string, []i
 		}
 	}
 	return fmt, args
-
 }
 
 // FilterS is the filter for the structured logging functions of klog.

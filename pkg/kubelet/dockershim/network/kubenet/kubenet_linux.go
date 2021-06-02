@@ -95,7 +95,7 @@ type kubenetNetworkPlugin struct {
 	loConfig          *libcni.NetworkConfig
 	cniConfig         libcni.CNI
 	bandwidthShaper   bandwidth.Shaper
-	mu                sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
+	mu                sync.Mutex // Mutex for protecting podIPs map, netConfig, and shaper initialization
 	podIPs            map[kubecontainer.ContainerID]utilsets.String
 	mtu               int
 	execer            utilexec.Interface
@@ -268,7 +268,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 		plugin.podCIDRs = append(plugin.podCIDRs, cidr)
 	}
 
-	//setup hairpinMode
+	// setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
 	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
@@ -348,7 +348,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	if err != nil {
 		return fmt.Errorf("unable to understand network config: %v", err)
 	}
-	//TODO: v1.16 (khenidak) update NET_CONFIG_TEMPLATE to CNI version 0.3.0 or later so
+	// TODO: v1.16 (khenidak) update NET_CONFIG_TEMPLATE to CNI version 0.3.0 or later so
 	// that we get multiple IP addresses in the returned Result structure
 	if res.IP4 != nil {
 		ipv4 = res.IP4.IP.IP.To4()
@@ -751,7 +751,7 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.Shaper {
 	return plugin.bandwidthShaper
 }
 
-//TODO: make this into a goroutine and rectify the dedup rules periodically
+// TODO: make this into a goroutine and rectify the dedup rules periodically
 func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareAddr, podCIDRs []net.IPNet, podGateways []net.IP) {
 	if plugin.ebtables == nil {
 		plugin.ebtables = utilebtables.New(plugin.execer)

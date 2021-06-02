@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

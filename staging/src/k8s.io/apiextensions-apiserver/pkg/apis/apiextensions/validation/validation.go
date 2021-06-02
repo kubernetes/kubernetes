@@ -1140,6 +1140,7 @@ func requireOpenAPISchema(requestGV schema.GroupVersion, oldCRDSpec *apiextensio
 	}
 	return true
 }
+
 func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitionSpec) bool {
 	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil {
 		return true
@@ -1300,6 +1301,7 @@ func specHasNonStructuralSchema(spec *apiextensions.CustomResourceDefinitionSpec
 	}
 	return false
 }
+
 func schemaIsNonStructural(schema *apiextensions.JSONSchemaProps) bool {
 	if schema == nil {
 		return false
@@ -1328,6 +1330,7 @@ func requirePrunedDefaults(oldCRDSpec *apiextensions.CustomResourceDefinitionSpe
 	}
 	return true
 }
+
 func schemaHasUnprunedDefaults(schema *apiextensions.JSONSchemaProps) (bool, error) {
 	if schema == nil || !schemaHasDefaults(schema) {
 		return false, nil

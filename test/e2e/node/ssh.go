@@ -30,7 +30,6 @@ import (
 const maxNodes = 100
 
 var _ = SIGDescribe("SSH", func() {
-
 	f := framework.NewDefaultFramework("ssh")
 
 	ginkgo.BeforeEach(func() {

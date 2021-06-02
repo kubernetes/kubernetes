@@ -238,9 +238,11 @@ func TestValidateReservedMemory(t *testing.T) {
 		},
 		{
 			"Reserved total equal to Node Allocatable",
-			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
-				hugepages2M: *resource.NewQuantity(77, resource.DecimalSI),
-				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
+			v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
+				hugepages2M:       *resource.NewQuantity(77, resource.DecimalSI),
+				hugepages1G:       *resource.NewQuantity(13, resource.DecimalSI),
+			},
 			machineInfo,
 			[]kubeletconfig.MemoryReservation{
 				{
@@ -263,9 +265,11 @@ func TestValidateReservedMemory(t *testing.T) {
 		},
 		{
 			"Reserved total hugapages-2M not equal to Node Allocatable",
-			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
-				hugepages2M: *resource.NewQuantity(14, resource.DecimalSI),
-				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
+			v1.ResourceList{
+				v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
+				hugepages2M:       *resource.NewQuantity(14, resource.DecimalSI),
+				hugepages1G:       *resource.NewQuantity(13, resource.DecimalSI),
+			},
 			machineInfo,
 			[]kubeletconfig.MemoryReservation{
 				{
@@ -460,7 +464,6 @@ func TestGetSystemReservedMemory(t *testing.T) {
 				t.Errorf("Memory Manager getReservedMemory() error, expected error %v, but got: %v",
 					testCase.expectedError, err)
 			}
-
 		})
 	}
 }
@@ -900,7 +903,6 @@ func TestRemoveStaleState(t *testing.T) {
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", mgr.state.GetMachineState(), testCase.expectedMachineState)
 			}
 		})
-
 	}
 }
 
@@ -1402,7 +1404,6 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("[test] %+v", mgr.state.GetMemoryAssignments())
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", mgr.state.GetMachineState(), testCase.expectedMachineState)
 			}
-
 		})
 	}
 }
@@ -2141,7 +2142,6 @@ func TestNewManager(t *testing.T) {
 				} else {
 					t.Errorf("Could not create the Memory Manager - manager is nil, but it should not be.")
 				}
-
 			}
 		})
 	}
@@ -2290,7 +2290,6 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {

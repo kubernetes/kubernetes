@@ -17,10 +17,9 @@ limitations under the License.
 package populator
 
 import (
+	"fmt"
 	"testing"
 	"time"
-
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -222,7 +221,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -282,7 +281,6 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 				expectedVolumeName)
 		}
 	}
-
 }
 
 func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
@@ -352,7 +350,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -546,7 +544,7 @@ func TestEphemeralVolumeEnablement(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -663,14 +661,14 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
 	fakePodManager.DeletePod(pod)
-	//pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	// pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 
 	if dswp.pods.processedPods[podName] {
@@ -1323,7 +1321,8 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		desiredStateOfWorld:       fakesDSW,
 		actualStateOfWorld:        fakeASW,
 		pods: processedPods{
-			processedPods: make(map[types.UniquePodName]bool)},
+			processedPods: make(map[types.UniquePodName]bool),
+		},
 		kubeContainerRuntime:     fakeRuntime,
 		keepTerminatedPodVolumes: false,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),

@@ -80,7 +80,6 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		volumeAttachment.Spec.Source.InlineVolumeSpec = nil
 	}
-
 }
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

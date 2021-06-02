@@ -1055,7 +1055,8 @@ func TestUnstructuredApply(t *testing.T) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
 							Header:     cmdtesting.DefaultHeader(),
-							Body:       body}, nil
+							Body:       body,
+						}, nil
 					case p == path && m == "PATCH":
 						contentType := req.Header.Get("Content-Type")
 						if contentType != "application/merge-patch+json" {
@@ -1068,7 +1069,8 @@ func TestUnstructuredApply(t *testing.T) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
 							Header:     cmdtesting.DefaultHeader(),
-							Body:       body}, nil
+							Body:       body,
+						}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -1124,7 +1126,8 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
 							Header:     cmdtesting.DefaultHeader(),
-							Body:       body}, nil
+							Body:       body,
+						}, nil
 					case p == path && m == "PATCH":
 						// In idempotent updates, kubectl will resolve to an empty patch and not send anything to the server
 						// Thus, if we reach this branch, kubectl is unnecessarily sending a patch.

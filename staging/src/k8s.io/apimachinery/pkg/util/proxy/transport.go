@@ -100,7 +100,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		rt = http.DefaultTransport
 	}
 	resp, err := rt.RoundTrip(req)
-
 	if err != nil {
 		return nil, errors.NewServiceUnavailable(fmt.Sprintf("error trying to reach service: %v", err))
 	}

@@ -139,7 +139,6 @@ func TestAllocate(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // TestReallocate test that we can not allocate a port already allocated until it is released
@@ -180,5 +179,4 @@ func TestReallocate(t *testing.T) {
 	if err := storage.Allocate(30100); err != nil {
 		t.Fatal(err)
 	}
-
 }

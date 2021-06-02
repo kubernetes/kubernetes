@@ -18,14 +18,17 @@ package vsphere
 
 import (
 	"context"
+	"sync"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"sync"
 )
 
-var once sync.Once
-var waiting = make(chan bool)
-var f *framework.Framework
+var (
+	once    sync.Once
+	waiting = make(chan bool)
+	f       *framework.Framework
+)
 
 // Bootstrap takes care of initializing necessary test context for vSphere tests
 func Bootstrap(fw *framework.Framework) {

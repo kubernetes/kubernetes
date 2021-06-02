@@ -68,7 +68,6 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 				state := status.ContainerStatuses[0].State.Terminated
 				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
 				gomega.Expect(state.ExitCode).To(gomega.Not(gomega.BeZero()), "ContainerStateTerminated: %+v", state)
-
 			})
 			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
@@ -93,8 +92,9 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	}
 })
 
-const apparmorProfilePrefix = "e2e-node-apparmor-test-"
-const testProfiles = `
+const (
+	apparmorProfilePrefix = "e2e-node-apparmor-test-"
+	testProfiles          = `
 #include <tunables/global>
 
 profile e2e-node-apparmor-test-deny-write flags=(attach_disconnected) {
@@ -115,6 +115,7 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
   audit /** w,
 }
 `
+)
 
 func loadTestProfiles() error {
 	f, err := ioutil.TempFile("/tmp", "apparmor")

@@ -207,7 +207,8 @@ func versionTests() []versionTest {
 			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
 			requested: []string{"v1.raw", "v1.base64"},
 			error:     true,
-		}, {
+		},
+		{
 			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
 			requested: []string{"v1.raw", "raw"},
 			expected:  "raw",

@@ -30,7 +30,7 @@ import (
 
 func TestMakeTransportInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
-		//Invalid certificate and key path
+		// Invalid certificate and key path
 		TLSClientConfig: restclient.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertinvalid.cer",
 			KeyFile:  "../../client/testdata/mycertinvalid.key",

@@ -82,7 +82,6 @@ func (c *FakeReplicaSets) List(ctx context.Context, opts v1.ListOptions) (result
 func (c *FakeReplicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.

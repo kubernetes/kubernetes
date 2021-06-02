@@ -227,7 +227,6 @@ func TestToKubeContainerStatus(t *testing.T) {
 }
 
 func TestLifeCycleHook(t *testing.T) {
-
 	// Setup
 	fakeRuntime, _, m, _ := createTestRuntimeManager()
 
@@ -325,7 +324,6 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Post Start script
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
-
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)

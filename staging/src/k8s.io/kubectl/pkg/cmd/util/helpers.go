@@ -546,7 +546,7 @@ const (
 )
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
-	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	dryRunFlag := GetFlagString(cmd, "dry-run")
 	b, err := strconv.ParseBool(dryRunFlag)
 	// The flag is not a boolean
 	if err != nil {

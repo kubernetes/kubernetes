@@ -225,6 +225,7 @@ var aPod string = `
     }
 }
 `
+
 var aPodBadAnnotations string = `
 {
     "kind": "Pod",
@@ -823,7 +824,6 @@ func TestURLBuilder(t *testing.T) {
 	if info.Name != "test1" || info.Namespace != "foo" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
-
 }
 
 func TestURLBuilderRequireNamespace(t *testing.T) {
@@ -1228,6 +1228,7 @@ func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 }
+
 func TestNoSelectorUnknowResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		NamespaceParam("test").
@@ -1240,6 +1241,7 @@ func TestNoSelectorUnknowResourceType(t *testing.T) {
 		}
 	}
 }
+
 func TestSingleResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
@@ -1380,7 +1382,6 @@ func TestMultipleObject(t *testing.T) {
 	obj, err := newDefaultBuilder().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
 		Do().Object()
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1433,7 +1434,6 @@ func TestSingleItemImpliedObject(t *testing.T) {
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-master-controller.yaml"}}).
 		Flatten().
 		Do().Object()
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1453,7 +1453,6 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/pod.yaml"}}).
 		Flatten().
 		Do().Object()
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1537,7 +1536,6 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 		ResourceTypeOrNameArgs(true, "pods,services").
 		Flatten().
 		Do().Object()
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1563,7 +1561,6 @@ func TestWatch(t *testing.T) {
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-master-service.yaml"}}).Flatten().
 		Do().Watch("12")
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1789,7 +1786,6 @@ func TestUnstructured(t *testing.T) {
 					t.Errorf("expected error with '%s', got: %v", tc.expectedError, err)
 				}
 			}
-
 		})
 	}
 }

@@ -390,7 +390,8 @@ func TestEnoughRequests(t *testing.T) {
 					ScalarResources: map[v1.ResourceName]int64{
 						extendedResourceB:     1,
 						kubernetesIOResourceA: 1,
-					}}),
+					},
+				}),
 			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com"},
@@ -508,7 +509,6 @@ func TestNotEnoughRequests(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestStorageRequests(t *testing.T) {
@@ -580,5 +580,4 @@ func TestStorageRequests(t *testing.T) {
 			}
 		})
 	}
-
 }

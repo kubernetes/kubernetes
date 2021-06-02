@@ -1351,8 +1351,10 @@ type PhotonPersistentDiskVolumeSource struct {
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 
-type AzureDataDiskCachingMode string
-type AzureDataDiskKind string
+type (
+	AzureDataDiskCachingMode string
+	AzureDataDiskKind        string
+)
 
 const (
 	AzureDataDiskCachingNone      AzureDataDiskCachingMode = "None"
@@ -2625,7 +2627,7 @@ const (
 // by the node selector terms.
 // +structType=atomic
 type NodeSelector struct {
-	//Required. A list of node selector terms. The terms are ORed.
+	// Required. A list of node selector terms. The terms are ORed.
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 

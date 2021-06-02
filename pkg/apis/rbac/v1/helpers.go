@@ -18,10 +18,9 @@ package v1
 
 import (
 	"fmt"
+	"sort"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-
-	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

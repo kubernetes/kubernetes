@@ -153,8 +153,10 @@ type ScaleREST struct {
 }
 
 // ScaleREST implements Patcher
-var _ = rest.Patcher(&ScaleREST{})
-var _ = rest.GroupVersionKindProvider(&ScaleREST{})
+var (
+	_ = rest.Patcher(&ScaleREST{})
+	_ = rest.GroupVersionKindProvider(&ScaleREST{})
+)
 
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {

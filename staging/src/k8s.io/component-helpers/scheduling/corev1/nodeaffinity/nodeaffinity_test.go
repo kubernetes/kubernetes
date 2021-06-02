@@ -28,9 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-var (
-	ignoreBadValue = cmpopts.IgnoreFields(field.Error{}, "BadValue")
-)
+var ignoreBadValue = cmpopts.IgnoreFields(field.Error{}, "BadValue")
 
 func TestNodeSelectorMatch(t *testing.T) {
 	tests := []struct {

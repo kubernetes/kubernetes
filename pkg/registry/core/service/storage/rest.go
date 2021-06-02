@@ -447,7 +447,6 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// release the allocated, this is expected to be cleared if the entire function ran to success
 		if allocated_released, err := rs.releaseClusterIPs(allocated); err != nil {
 			klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v", service.Namespace, service.Name, err, allocated, allocated_released)
-
 		}
 		// performRelease is set when the enture function ran to success
 		if performRelease {

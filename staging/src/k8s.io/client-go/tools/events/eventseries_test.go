@@ -17,12 +17,11 @@ limitations under the License.
 package events
 
 import (
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
-
-	"os"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -193,7 +192,6 @@ func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *event
 	if expectedUpdate {
 		if recvEvent.Series == nil {
 			t.Errorf("%v - Series was nil but expected: %#v", messagePrefix, recvEvent.Series)
-
 		} else {
 			if recvEvent.Series.Count != expectedEvent.Series.Count {
 				t.Errorf("%v - Series mismatch actual was: %#v but expected: %#v", messagePrefix, recvEvent.Series, expectedEvent.Series)
@@ -209,7 +207,6 @@ func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *event
 			t.Errorf("%v - series was expected to be nil but was: %#v", messagePrefix, recvEvent.Series)
 		}
 	}
-
 }
 
 func TestFinishSeries(t *testing.T) {
@@ -313,7 +310,7 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		{
 			patchFunc: func(event *eventsv1.Event, patch []byte) (*eventsv1.Event, error) {
 				// event we receive is already patched, usually the sink uses it
-				//only to retrieve the name and namespace, here we'll use it directly.
+				// only to retrieve the name and namespace, here we'll use it directly.
 				patchEvent <- event
 				return event, nil
 			},

@@ -356,7 +356,7 @@ func createEvent(eventType eventType, selfUID string, owners []string) event {
 }
 
 func TestProcessEvent(t *testing.T) {
-	var testScenarios = []struct {
+	testScenarios := []struct {
 		name string
 		// a series of events that will be supplied to the
 		// GraphBuilder.graphChanges.
@@ -1005,7 +1005,7 @@ func TestConflictingData(t *testing.T) {
 	badChildPod := makeID("v1", "Pod", "ns1", "badpod", "badpoduid")
 	goodChildPod := makeID("v1", "Pod", "ns1", "goodpod", "goodpoduid")
 
-	var testScenarios = []struct {
+	testScenarios := []struct {
 		name           string
 		initialObjects []runtime.Object
 		steps          []step
@@ -1455,9 +1455,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
-						makeNode(deployment1apps, virtual)},
+						makeNode(deployment1apps, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(deployment1apps, virtual)}, // virtual parent enqueued for delete attempt
+						makeNode(deployment1apps, virtual),
+					}, // virtual parent enqueued for delete attempt
 				}),
 				// 4,5: observe child pointing at no-longer-served apiVersion
 				processEvent(makeAddEvent(pod1ns1, deployment1extensions)),
@@ -1465,10 +1467,12 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))}, // mismatched child enqueued for delete attempt
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					}, // mismatched child enqueued for delete attempt
 				}),
 				// 6,7: handle attempt to delete virtual parent for accessible apiVersion
 				processAttemptToDelete(1),
@@ -1480,7 +1484,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					pendingAttemptToDelete: []*node{makeNode(pod1ns1, withOwners(deployment1extensions))},
 				}),
 				// 8,9: handle attempt to delete mismatched child
@@ -1493,7 +1498,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					pendingAttemptToDelete: []*node{makeNode(pod1ns1, withOwners(deployment1extensions))}, // restmapper on inaccessible parent, requeued
 				}),
 				// 10,11: handle queued virtual delete event
@@ -1521,7 +1527,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1extensions, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					absentOwnerCache: []objectReference{deployment1apps},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),       // children of absent apps/v1 parent queued for delete attempt
@@ -1540,7 +1547,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1extensions, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					absentOwnerCache: []objectReference{deployment1apps},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1extensions, virtual),             // new virtual parent queued for delete attempt
@@ -1554,7 +1562,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(deployment1apps)),
 						makeNode(deployment1extensions, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					absentOwnerCache: []objectReference{deployment1apps},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1ns1, withOwners(deployment1extensions)), // child referencing inaccessible apiVersion
@@ -1568,7 +1577,8 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(deployment1extensions, virtual),
-						makeNode(pod1ns1, withOwners(deployment1extensions))},
+						makeNode(pod1ns1, withOwners(deployment1extensions)),
+					},
 					absentOwnerCache: []objectReference{deployment1apps},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1ns1, withOwners(deployment1extensions)), // child referencing inaccessible apiVersion
@@ -1592,9 +1602,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)}, // virtual parent enqueued for delete attempt
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					}, // virtual parent enqueued for delete attempt
 				}),
 
 				// 5,6: observe good child
@@ -1603,7 +1615,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child added
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(badSecretReferenceWithDeploymentUID, virtual), // virtual parent enqueued for delete attempt
 						makeNode(goodChildPod, withOwners(deployment1apps)),    // good child enqueued for delete attempt
@@ -1620,7 +1633,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child enqueued for delete attempt
 					},
@@ -1637,7 +1651,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 				}),
 
 				// 11,12: process virtual delete event of bad parent reference
@@ -1646,7 +1661,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps, virtual)}, // parent node switched to alternate identity, still virtual
+						makeNode(deployment1apps, virtual),
+					}, // parent node switched to alternate identity, still virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID}, // remember absence of bad parent coordinates
 					pendingAttemptToDelete: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // child of bad parent coordinates enqueued for delete attempt
@@ -1664,7 +1680,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps, virtual)}, // parent node switched to alternate identity, still virtual
+						makeNode(deployment1apps, virtual),
+					}, // parent node switched to alternate identity, still virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // new alternate virtual parent identity queued for delete attempt
@@ -1680,7 +1697,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps, virtual)}, // parent node switched to alternate identity, still virtual
+						makeNode(deployment1apps, virtual),
+					}, // parent node switched to alternate identity, still virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // requeued, not yet observed
@@ -1693,7 +1711,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps)}, // parent node made non-virtual
+						makeNode(deployment1apps),
+					}, // parent node made non-virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps), // still queued, no longer virtual
@@ -1706,7 +1725,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						// bad child node removed
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps), // still queued, no longer virtual
@@ -1722,7 +1742,8 @@ func TestConflictingData(t *testing.T) {
 					},
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 				}),
 			},
@@ -1739,9 +1760,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)}, // virtual parent enqueued for delete attempt
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					}, // virtual parent enqueued for delete attempt
 				}),
 
 				// 5,6: observe good child
@@ -1750,7 +1773,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child added
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(badSecretReferenceWithDeploymentUID, virtual), // virtual parent enqueued for delete attempt
 						makeNode(goodChildPod, withOwners(deployment1apps)),    // good child enqueued for delete attempt
@@ -1767,7 +1791,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child enqueued for delete attempt
 					},
@@ -1784,32 +1809,38 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 				}),
 
 				// 11,12: good parent add event
 				insertEvent(makeAddEvent(deployment1apps)),
 				assertState(state{
 					pendingGraphChanges: []*event{
-						makeAddEvent(deployment1apps),                                // good parent observation sneaked in
-						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID)}, // bad virtual parent not found, queued virtual delete event
+						makeAddEvent(deployment1apps), // good parent observation sneaked in
+						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID),
+					}, // bad virtual parent not found, queued virtual delete event
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(badSecretReferenceWithDeploymentUID, virtual)},
+						makeNode(badSecretReferenceWithDeploymentUID, virtual),
+					},
 				}),
 
 				// 13,14: process good parent add
 				processPendingGraphChanges(1),
 				assertState(state{
 					pendingGraphChanges: []*event{
-						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID)}, // bad virtual parent still queued virtual delete event
+						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID),
+					}, // bad virtual parent still queued virtual delete event
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps)}, // parent node gets fixed, no longer virtual
+						makeNode(deployment1apps),
+					}, // parent node gets fixed, no longer virtual
 					pendingAttemptToDelete: []*node{
-						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID))}, // child of bad parent coordinates enqueued for delete attempt
+						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
+					}, // child of bad parent coordinates enqueued for delete attempt
 				}),
 
 				// 15,16: process virtual delete event of bad parent reference
@@ -1818,7 +1849,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID}, // remember absence of bad parent coordinates
 					pendingAttemptToDelete: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // child of bad parent coordinates enqueued for delete attempt
@@ -1835,7 +1867,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 				}),
 
@@ -1846,7 +1879,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						// bad child node removed
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 				}),
 			},
@@ -1863,7 +1897,8 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child added
-						makeNode(deployment1apps, virtual)},                 // virtual parent added
+						makeNode(deployment1apps, virtual),
+					}, // virtual parent added
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // virtual parent enqueued for delete attempt
 					},
@@ -1875,7 +1910,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID))}, // bad child added
+						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
+					}, // bad child added
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual),                                     // virtual parent enqueued for delete attempt
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // bad child enqueued for delete attempt
@@ -1891,7 +1927,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID))},
+						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // bad child enqueued for delete attempt
 						makeNode(deployment1apps, virtual),                                     // virtual parent requeued to end, still virtual
@@ -1909,7 +1946,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(deployment1apps, virtual),
-						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID))},
+						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID}, // remember absence of bad parent
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // virtual parent requeued to end, still virtual
@@ -1922,7 +1960,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(deployment1apps), // good parent no longer virtual
-						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID))},
+						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps), // parent requeued to end, no longer virtual
@@ -1935,7 +1974,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						// bad child node removed
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps), // parent requeued to end, no longer virtual
@@ -1951,7 +1991,8 @@ func TestConflictingData(t *testing.T) {
 					},
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
-						makeNode(deployment1apps)},
+						makeNode(deployment1apps),
+					},
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID},
 				}),
 			},
@@ -1969,9 +2010,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual)}, // virtual parent queued for deletion
+						makeNode(pod1nonamespace, virtual),
+					}, // virtual parent queued for deletion
 				}),
 
 				// 4,5: observe good child
@@ -1980,7 +2023,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1nonamespace, virtual),     // virtual parent queued for deletion
 						makeNode(pod2ns1, withOwners(pod1ns1)), // mismatched child queued for deletion
@@ -1993,9 +2037,11 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					}, // mismatched child queued for deletion
 				}),
 
 				// 8,9: process attemptToDelete of good child
@@ -2009,7 +2055,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					absentOwnerCache: []objectReference{pod1ns1}, // missing parent cached
 				}),
 
@@ -2019,7 +2066,8 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					absentOwnerCache: []objectReference{pod1ns1},
 				}),
 			},
@@ -2038,9 +2086,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual)}, // virtual parent queued for deletion
+						makeNode(pod1nonamespace, virtual),
+					}, // virtual parent queued for deletion
 				}),
 
 				// 5,6: observe good child
@@ -2049,10 +2099,12 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual),      // virtual parent queued for deletion
-						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
+						makeNode(pod1nonamespace, virtual), // virtual parent queued for deletion
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					}, // mismatched child queued for deletion
 				}),
 
 				// 7,8: process attemptToDelete of bad virtual parent coordinates
@@ -2061,9 +2113,11 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					}, // mismatched child queued for deletion
 				}),
 
 				// 9,10: process attemptToDelete of good child
@@ -2076,7 +2130,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 				}),
 
 				// 11,12: late observe good parent
@@ -2085,11 +2140,13 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1ns1)},
+						makeNode(pod1ns1),
+					},
 					// warn about bad node reference
 					events: []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace "" involvedObject{kind=Node,apiVersion=v1}`},
 					pendingAttemptToDelete: []*node{
-						makeNode(node1, withOwners(pod1nonamespace))}, // queue bad cluster-scoped child for delete attempt
+						makeNode(node1, withOwners(pod1nonamespace)),
+					}, // queue bad cluster-scoped child for delete attempt
 				}),
 
 				// 13,14: process attemptToDelete of bad child
@@ -2102,7 +2159,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1ns1)},
+						makeNode(pod1ns1),
+					},
 				}),
 			},
 		},
@@ -2119,9 +2177,11 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1ns1, virtual)},
+						makeNode(pod1ns1, virtual),
+					},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1ns1, virtual)}, // virtual parent queued for deletion
+						makeNode(pod1ns1, virtual),
+					}, // virtual parent queued for deletion
 				}),
 
 				// 4,5: observe bad child
@@ -2130,7 +2190,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1ns1, virtual)},
+						makeNode(pod1ns1, virtual),
+					},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1ns1, virtual),                   // virtual parent queued for deletion
 						makeNode(node1, withOwners(pod1nonamespace)), // mismatched child queued for deletion
@@ -2146,7 +2207,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1ns1, virtual)},
+						makeNode(pod1ns1, virtual),
+					},
 					pendingGraphChanges: []*event{makeVirtualDeleteEvent(pod1ns1)}, // virtual parent not found, queued virtual delete event
 					pendingAttemptToDelete: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)), // mismatched child still queued for deletion
@@ -2162,7 +2224,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1ns1, virtual)},
+						makeNode(pod1ns1, virtual),
+					},
 					pendingGraphChanges: []*event{makeVirtualDeleteEvent(pod1ns1)}, // virtual parent virtual delete event still enqueued
 				}),
 
@@ -2172,7 +2235,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)}, // missing virtual parent replaced with alternate coordinates, still virtual
+						makeNode(pod1nonamespace, virtual),
+					}, // missing virtual parent replaced with alternate coordinates, still virtual
 					absentOwnerCache: []objectReference{pod1ns1}, // cached absence of missing parent
 					pendingAttemptToDelete: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1)), // good child of missing parent enqueued for deletion
@@ -2190,7 +2254,8 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					absentOwnerCache: []objectReference{pod1ns1},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1nonamespace, virtual), // new virtual parent coordinates enqueued for deletion
@@ -2202,7 +2267,8 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					absentOwnerCache: []objectReference{pod1ns1},
 					pendingAttemptToDelete: []*node{
 						makeNode(pod1nonamespace, virtual), // new virtual parent coordinates enqueued for deletion
@@ -2215,7 +2281,8 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
-						makeNode(pod1nonamespace, virtual)},
+						makeNode(pod1nonamespace, virtual),
+					},
 					absentOwnerCache: []objectReference{pod1ns1},
 				}),
 			},
@@ -2226,7 +2293,6 @@ func TestConflictingData(t *testing.T) {
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-
 			absentOwnerCache := NewReferenceCache(100)
 
 			eventRecorder := record.NewFakeRecorder(100)
@@ -2317,6 +2383,7 @@ func virtual(n *node) *node {
 	n.virtual = true
 	return n
 }
+
 func withOwners(ownerReferences ...objectReference) nodeTweak {
 	return func(n *node) *node {
 		var owners []metav1.OwnerReference
@@ -2709,7 +2776,6 @@ func assertState(s state) step {
 			}
 		},
 	}
-
 }
 
 // trackingWorkqueue implements RateLimitingInterface,
@@ -2735,26 +2801,33 @@ func (t *trackingWorkqueue) Add(item interface{}) {
 	t.queue(item)
 	t.limiter.Add(item)
 }
+
 func (t *trackingWorkqueue) AddAfter(item interface{}, duration time.Duration) {
 	t.Add(item)
 }
+
 func (t *trackingWorkqueue) AddRateLimited(item interface{}) {
 	t.Add(item)
 }
+
 func (t *trackingWorkqueue) Get() (interface{}, bool) {
 	item, shutdown := t.limiter.Get()
 	t.dequeue(item)
 	return item, shutdown
 }
+
 func (t *trackingWorkqueue) Done(item interface{}) {
 	t.limiter.Done(item)
 }
+
 func (t *trackingWorkqueue) Forget(item interface{}) {
 	t.limiter.Forget(item)
 }
+
 func (t *trackingWorkqueue) NumRequeues(item interface{}) int {
 	return 0
 }
+
 func (t *trackingWorkqueue) Len() int {
 	if e, a := len(t.pendingList), len(t.pendingMap); e != a {
 		panic(fmt.Errorf("pendingList != pendingMap: %d / %d", e, a))
@@ -2764,9 +2837,11 @@ func (t *trackingWorkqueue) Len() int {
 	}
 	return len(t.pendingList)
 }
+
 func (t *trackingWorkqueue) ShutDown() {
 	t.limiter.ShutDown()
 }
+
 func (t *trackingWorkqueue) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
 }
@@ -2779,6 +2854,7 @@ func (t *trackingWorkqueue) queue(item interface{}) {
 	t.pendingMap[item] = struct{}{}
 	t.pendingList = append(t.pendingList, item)
 }
+
 func (t *trackingWorkqueue) dequeue(item interface{}) {
 	if _, queued := t.pendingMap[item]; !queued {
 		// fmt.Printf("not queued: %#v\n", item)

@@ -136,7 +136,8 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			PVSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver: "k8s/" + driver,
-				}},
+				},
+			},
 			NamePrefix:       "pv-",
 			StorageClassName: resizableSc.Name,
 			VolumeMode:       pvc.Spec.VolumeMode,

@@ -161,7 +161,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
 	}
 
-	var knownTargets = []string{
+	knownTargets := []string{
 		kubeadmconstants.Etcd,
 		kubeadmconstants.KubeAPIServer,
 		kubeadmconstants.KubeControllerManager,
@@ -197,7 +197,6 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 
 // WriteStaticPodToDisk writes a static pod file to disk
 func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
-
 	// creates target folder if not already exists
 	if err := os.MkdirAll(manifestDir, 0700); err != nil {
 		return errors.Wrapf(err, "failed to create directory %q", manifestDir)

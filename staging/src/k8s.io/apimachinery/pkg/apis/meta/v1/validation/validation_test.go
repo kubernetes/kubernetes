@@ -125,7 +125,6 @@ func TestInvalidDryRun(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func boolPtr(b bool) *bool {
@@ -361,9 +360,10 @@ func TestValidateConditions(t *testing.T) {
 		},
 		{
 			name: "duplicates",
-			conditions: []metav1.Condition{{
-				Type: "First",
-			},
+			conditions: []metav1.Condition{
+				{
+					Type: "First",
+				},
 				{
 					Type: "Second",
 				},

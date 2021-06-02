@@ -48,6 +48,7 @@ func SetDefaultWarningHandler(l WarningHandler) {
 	defer defaultWarningHandlerLock.Unlock()
 	defaultWarningHandler = l
 }
+
 func getDefaultWarningHandler() WarningHandler {
 	defaultWarningHandlerLock.RLock()
 	defer defaultWarningHandlerLock.RUnlock()

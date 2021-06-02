@@ -1383,7 +1383,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				make(chan struct{}),
 				scheduler.WithAlgorithmSource(algorithmSrc),
 			)
-
 			if err != nil {
 				t.Fatalf("Error constructing: %v", err)
 			}
@@ -1502,7 +1501,6 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 				make(chan struct{}),
 				opts...,
 			)
-
 			if err != nil {
 				t.Fatalf("Error constructing: %v", err)
 			}
@@ -2055,7 +2053,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
@@ -2079,7 +2076,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					}
 				}),
 			)
-
 			if err != nil {
 				t.Fatalf("Error constructing: %v", err)
 			}

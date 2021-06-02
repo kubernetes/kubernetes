@@ -101,7 +101,6 @@ func (v mergeStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
 
 // do merges a recorded, local and remote map into a new object
 func (v mergeStrategy) doMergeMap(e map[string]apply.Element) (apply.Result, error) {
-
 	// Merge each item in the list
 	merged := map[string]interface{}{}
 	for key, value := range e {

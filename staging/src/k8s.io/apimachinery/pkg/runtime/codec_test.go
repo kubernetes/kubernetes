@@ -28,9 +28,11 @@ import (
 func gv(group, version string) schema.GroupVersion {
 	return schema.GroupVersion{Group: group, Version: version}
 }
+
 func gvk(group, version, kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
 }
+
 func gk(group, kind string) schema.GroupKind {
 	return schema.GroupKind{Group: group, Kind: kind}
 }

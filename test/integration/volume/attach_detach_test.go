@@ -192,7 +192,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	}
 
 	podInformerObj, _, err := podInformer.GetStore().GetByKey(podKey)
-
 	if err != nil {
 		t.Fatalf("Pod not found in Pod Informer cache : %v", err)
 	}
@@ -440,7 +439,6 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		timers,
 		nil, /* filteredDialOptions */
 	)
-
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
 	}

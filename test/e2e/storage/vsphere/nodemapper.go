@@ -34,8 +34,7 @@ import (
 )
 
 // NodeMapper contains information to generate nameToNodeInfo and vcToZoneDatastore maps
-type NodeMapper struct {
-}
+type NodeMapper struct{}
 
 // NodeInfo contains information about vcenter nodes
 type NodeInfo struct {
@@ -213,9 +212,9 @@ func retrieveZoneInformationForNode(nodeName string, connection *VSphere, hostSy
 // GenerateZoneToDatastoreMap generates a mapping of zone to datastore for easily verifying volume placement
 func (nm *NodeMapper) GenerateZoneToDatastoreMap() error {
 	// 1. Create zone to hosts map for each VC
-	var vcToZoneHostsMap = make(map[string](map[string][]string))
+	vcToZoneHostsMap := make(map[string](map[string][]string))
 	// 2. Create host to datastores map for each VC
-	var vcToHostDatastoresMap = make(map[string](map[string][]string))
+	vcToHostDatastoresMap := make(map[string](map[string][]string))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// 3. Populate vcToZoneHostsMap and vcToHostDatastoresMap
@@ -258,7 +257,7 @@ func (nm *NodeMapper) GenerateZoneToDatastoreMap() error {
 
 // retrieveCommonDatastoresAmongHosts retrieves the common datastores from the specified hosts
 func retrieveCommonDatastoresAmongHosts(hosts []string, hostToDatastoresMap map[string][]string) []string {
-	var datastoreCountMap = make(map[string]int)
+	datastoreCountMap := make(map[string]int)
 	for _, host := range hosts {
 		for _, datastore := range hostToDatastoresMap[host] {
 			datastoreCountMap[datastore] = datastoreCountMap[datastore] + 1

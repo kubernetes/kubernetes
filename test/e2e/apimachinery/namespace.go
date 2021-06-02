@@ -53,7 +53,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	}
 	wg.Wait()
 
-	//Wait 10 seconds, then SEND delete requests for all the namespaces.
+	// Wait 10 seconds, then SEND delete requests for all the namespaces.
 	ginkgo.By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
 	deleteFilter := []string{"nslifetest"}
@@ -62,10 +62,10 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	framework.ExpectEqual(len(deleted), totalNS)
 
 	ginkgo.By("Waiting for namespaces to vanish")
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
-			var cnt = 0
+			cnt := 0
 			nsList, err := f.ClientSet.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, err
@@ -224,7 +224,6 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
 var _ = SIGDescribe("Namespaces [Serial]", func() {
-
 	f := framework.NewDefaultFramework("namespaces")
 
 	/*
@@ -279,5 +278,4 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.ExpectNoError(err, "failed to get Namespace")
 		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
 	})
-
 })

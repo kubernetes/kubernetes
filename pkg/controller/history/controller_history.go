@@ -336,7 +336,6 @@ func (rh *realHistory) ReleaseControllerRevision(parent metav1.Object, revision 
 	released, err := rh.client.AppsV1().ControllerRevisions(revision.GetNamespace()).Patch(context.TODO(), revision.GetName(),
 		types.StrategicMergePatchType,
 		[]byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, parent.GetUID(), revision.UID)), metav1.PatchOptions{})
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// We ignore deleted revisions

@@ -24,13 +24,14 @@ limitations under the License.
 package testing
 
 import (
+	reflect "reflect"
+	time "time"
+
 	types "github.com/docker/docker/api/types"
 	container "github.com/docker/docker/api/types/container"
 	image "github.com/docker/docker/api/types/image"
 	gomock "github.com/golang/mock/gomock"
 	libdocker "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	reflect "reflect"
-	time "time"
 )
 
 // MockInterface is a mock of Interface interface

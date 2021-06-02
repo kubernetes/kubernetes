@@ -80,7 +80,6 @@ func (c *FakeRoleBindings) List(ctx context.Context, opts v1.ListOptions) (resul
 func (c *FakeRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rolebindingsResource, c.ns, opts))
-
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.

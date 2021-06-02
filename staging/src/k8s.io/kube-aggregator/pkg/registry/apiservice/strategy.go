@@ -40,8 +40,10 @@ type apiServerStrategy struct {
 }
 
 // apiServerStrategy must implement rest.RESTCreateUpdateStrategy
-var _ rest.RESTCreateUpdateStrategy = apiServerStrategy{}
-var Strategy = apiServerStrategy{}
+var (
+	_        rest.RESTCreateUpdateStrategy = apiServerStrategy{}
+	Strategy                               = apiServerStrategy{}
+)
 
 // NewStrategy creates a new apiServerStrategy.
 func NewStrategy(typer runtime.ObjectTyper) rest.CreateUpdateResetFieldsStrategy {

@@ -205,7 +205,6 @@ func TestForwardPorts(t *testing.T) {
 		}
 		server.Close()
 	}
-
 }
 
 func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {

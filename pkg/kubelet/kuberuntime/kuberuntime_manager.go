@@ -69,10 +69,8 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 )
 
-var (
-	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
-	ErrVersionNotSupported = errors.New("runtime api version is not supported")
-)
+// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
+var ErrVersionNotSupported = errors.New("runtime api version is not supported")
 
 // podStateProvider can determine if a pod is deleted ir terminated
 type podStateProvider interface {

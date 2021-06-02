@@ -97,8 +97,10 @@ func NewInitializedVolumePluginMgr(
 }
 
 // Compile-time check to ensure kubeletVolumeHost implements the VolumeHost interface
-var _ volume.VolumeHost = &kubeletVolumeHost{}
-var _ volume.KubeletVolumeHost = &kubeletVolumeHost{}
+var (
+	_ volume.VolumeHost        = &kubeletVolumeHost{}
+	_ volume.KubeletVolumeHost = &kubeletVolumeHost{}
+)
 
 func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 	return kvh.kubelet.getPluginDir(pluginName)

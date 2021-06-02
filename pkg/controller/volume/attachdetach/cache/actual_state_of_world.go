@@ -475,7 +475,6 @@ func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
 		volumeName,
 		nodeName)
-
 }
 
 // Add the volumeName to the node's volumesToReportAsAttached list
@@ -693,5 +692,6 @@ func getAttachedVolume(
 			PluginIsAttachable: true,
 		},
 		MountedByNode:       nodeAttachedTo.mountedByNode,
-		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
+		DetachRequestedTime: nodeAttachedTo.detachRequestedTime,
+	}
 }

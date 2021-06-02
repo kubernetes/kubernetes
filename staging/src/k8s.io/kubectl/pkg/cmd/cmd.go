@@ -325,14 +325,12 @@ __kubectl_custom_func() {
 
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
-var (
-	bashCompletionFlags = map[string]string{
-		"namespace": "__kubectl_get_resource_namespace",
-		"context":   "__kubectl_config_get_contexts",
-		"cluster":   "__kubectl_config_get_clusters",
-		"user":      "__kubectl_config_get_users",
-	}
-)
+var bashCompletionFlags = map[string]string{
+	"namespace": "__kubectl_get_resource_namespace",
+	"context":   "__kubectl_config_get_contexts",
+	"cluster":   "__kubectl_config_get_clusters",
+	"user":      "__kubectl_config_get_users",
+}
 
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
@@ -406,7 +404,6 @@ func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 
 // Execute implements PluginHandler
 func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
-
 	// Windows does not support exec syscall.
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command(executablePath, cmdArgs...)

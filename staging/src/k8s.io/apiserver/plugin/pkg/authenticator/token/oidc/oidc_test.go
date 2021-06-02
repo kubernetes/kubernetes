@@ -296,7 +296,6 @@ func (c *claimsTest) run(t *testing.T) {
 	}
 
 	got, ok, err := a.AuthenticateToken(context.Background(), token)
-
 	if err != nil {
 		if !c.wantErr {
 			t.Fatalf("authenticate token: %v", err)
@@ -1460,7 +1459,6 @@ func TestUnmarshalClaim(t *testing.T) {
 				var n int
 				err := c.unmarshalClaim("aud", &n)
 				return n, err
-
 			},
 			wantErr: true,
 		},

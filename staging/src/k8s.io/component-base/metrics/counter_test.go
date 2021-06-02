@@ -28,7 +28,7 @@ import (
 )
 
 func TestCounter(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		*CounterOpts
 		expectedMetricCount int
@@ -114,7 +114,7 @@ func TestCounter(t *testing.T) {
 }
 
 func TestCounterVec(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		*CounterOpts
 		labels                    []string
@@ -219,7 +219,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 		Name:      "metric_allowlist_test",
 		Subsystem: "subsystem",
 	}
-	var tests = []struct {
+	tests := []struct {
 		desc               string
 		labelValues        [][]string
 		expectMetricValues map[string]int

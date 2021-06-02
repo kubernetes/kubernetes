@@ -797,7 +797,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 			}
 		}
 
-		//Remove from nodeZones cache if using depreciated LabelFailureDomainBetaZone
+		// Remove from nodeZones cache if using depreciated LabelFailureDomainBetaZone
 		prevZoneFailureDomain, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok && az.isAvailabilityZone(prevZoneFailureDomain) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)

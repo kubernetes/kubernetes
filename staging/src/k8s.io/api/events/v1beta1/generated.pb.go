@@ -34,9 +34,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -49,9 +51,11 @@ func (*Event) ProtoMessage() {}
 func (*Event) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4f97f691c32a5ac8, []int{0}
 }
+
 func (m *Event) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *Event) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -60,12 +64,15 @@ func (m *Event) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *Event) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Event.Merge(m, src)
 }
+
 func (m *Event) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *Event) XXX_DiscardUnknown() {
 	xxx_messageInfo_Event.DiscardUnknown(m)
 }
@@ -77,9 +84,11 @@ func (*EventList) ProtoMessage() {}
 func (*EventList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4f97f691c32a5ac8, []int{1}
 }
+
 func (m *EventList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *EventList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -88,12 +97,15 @@ func (m *EventList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *EventList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EventList.Merge(m, src)
 }
+
 func (m *EventList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *EventList) XXX_DiscardUnknown() {
 	xxx_messageInfo_EventList.DiscardUnknown(m)
 }
@@ -105,9 +117,11 @@ func (*EventSeries) ProtoMessage() {}
 func (*EventSeries) Descriptor() ([]byte, []int) {
 	return fileDescriptor_4f97f691c32a5ac8, []int{2}
 }
+
 func (m *EventSeries) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *EventSeries) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -116,12 +130,15 @@ func (m *EventSeries) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 	}
 	return b[:n], nil
 }
+
 func (m *EventSeries) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EventSeries.Merge(m, src)
 }
+
 func (m *EventSeries) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *EventSeries) XXX_DiscardUnknown() {
 	xxx_messageInfo_EventSeries.DiscardUnknown(m)
 }
@@ -425,6 +442,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *Event) Size() (n int) {
 	if m == nil {
 		return 0
@@ -499,14 +517,17 @@ func (m *EventSeries) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *Event) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&Event{`,
+	s := strings.Join([]string{
+		`&Event{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`EventTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.EventTime), "MicroTime", "v1.MicroTime", 1), `&`, ``, 1) + `,`,
 		`Series:` + strings.Replace(this.Series.String(), "EventSeries", "EventSeries", 1) + `,`,
@@ -526,6 +547,7 @@ func (this *Event) String() string {
 	}, "")
 	return s
 }
+
 func (this *EventList) String() string {
 	if this == nil {
 		return "nil"
@@ -535,24 +557,28 @@ func (this *EventList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "Event", "Event", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&EventList{`,
+	s := strings.Join([]string{
+		`&EventList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *EventSeries) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&EventSeries{`,
+	s := strings.Join([]string{
+		`&EventSeries{`,
 		`Count:` + fmt.Sprintf("%v", this.Count) + `,`,
 		`LastObservedTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastObservedTime), "MicroTime", "v1.MicroTime", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -561,6 +587,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *Event) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1092,6 +1119,7 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *EventList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1209,6 +1237,7 @@ func (m *EventList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *EventSeries) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1311,6 +1340,7 @@ func (m *EventSeries) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

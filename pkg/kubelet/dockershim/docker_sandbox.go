@@ -56,10 +56,8 @@ const (
 	runtimeName = "docker"
 )
 
-var (
-	// Termination grace period
-	defaultSandboxGracePeriod = time.Duration(10) * time.Second
-)
+// Termination grace period
+var defaultSandboxGracePeriod = time.Duration(10) * time.Second
 
 // Returns whether the sandbox network is ready, and whether the sandbox is known
 func (ds *dockerService) getNetworkReady(podSandboxID string) (bool, bool) {
@@ -241,7 +239,8 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 			} else {
 				return nil, utilerrors.NewAggregate([]error{
 					fmt.Errorf("failed to get checkpoint for sandbox %q: %v", podSandboxID, checkpointErr),
-					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
+					fmt.Errorf("failed to get sandbox status: %v", statusErr),
+				})
 			}
 		} else {
 			_, name, namespace, _, hostNetwork = checkpoint.GetData()

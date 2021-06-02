@@ -49,8 +49,7 @@ type FlunderSpec struct {
 }
 
 // FlunderStatus is the status of a Flunder.
-type FlunderStatus struct {
-}
+type FlunderStatus struct{}
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

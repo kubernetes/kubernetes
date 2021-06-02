@@ -25,7 +25,7 @@ import (
 
 func BenchmarkEnsureRBACPolicy(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		var policy = &PolicyData{
+		policy := &PolicyData{
 			ClusterRoles:               append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
 			ClusterRoleBindings:        append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
 			Roles:                      bootstrappolicy.NamespaceRoles(),

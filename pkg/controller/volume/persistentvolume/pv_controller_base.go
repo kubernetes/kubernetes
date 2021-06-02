@@ -361,7 +361,6 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
 	}
 	return newVol, nil
-
 }
 
 // updateMigrationAnnotations takes an Annotations map and checks for a

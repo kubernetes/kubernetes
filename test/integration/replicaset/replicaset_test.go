@@ -828,7 +828,7 @@ func TestGeneralPodAdoption(t *testing.T) {
 		t.Fatalf("len(pods) = %d, want 1", len(pods.Items))
 	}
 	pod := &pods.Items[0]
-	var falseVar = false
+	falseVar := false
 
 	// When the only OwnerReference of the pod points to another type of API object such as statefulset
 	// with Controller=false, the RS should add a second OwnerReference (ControllerRef) pointing to itself

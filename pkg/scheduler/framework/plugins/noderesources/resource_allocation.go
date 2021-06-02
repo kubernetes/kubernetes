@@ -81,7 +81,6 @@ func (r *resourceAllocationScorer) score(
 				pod.Name, node.Name, r.Name,
 				allocatable, requested, score,
 			)
-
 		}
 	}
 

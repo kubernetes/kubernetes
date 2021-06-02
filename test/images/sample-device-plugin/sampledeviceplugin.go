@@ -89,7 +89,6 @@ func main() {
 	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
 	if err := dp1.Start(); err != nil {
 		panic(err)
-
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
 	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {

@@ -38,9 +38,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -53,9 +55,11 @@ func (*ConversionRequest) ProtoMessage() {}
 func (*ConversionRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{0}
 }
+
 func (m *ConversionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ConversionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -64,12 +68,15 @@ func (m *ConversionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
+
 func (m *ConversionRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ConversionRequest.Merge(m, src)
 }
+
 func (m *ConversionRequest) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ConversionRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ConversionRequest.DiscardUnknown(m)
 }
@@ -81,9 +88,11 @@ func (*ConversionResponse) ProtoMessage() {}
 func (*ConversionResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{1}
 }
+
 func (m *ConversionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ConversionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -92,12 +101,15 @@ func (m *ConversionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, 
 	}
 	return b[:n], nil
 }
+
 func (m *ConversionResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ConversionResponse.Merge(m, src)
 }
+
 func (m *ConversionResponse) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ConversionResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ConversionResponse.DiscardUnknown(m)
 }
@@ -109,9 +121,11 @@ func (*ConversionReview) ProtoMessage() {}
 func (*ConversionReview) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{2}
 }
+
 func (m *ConversionReview) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ConversionReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -120,12 +134,15 @@ func (m *ConversionReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *ConversionReview) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ConversionReview.Merge(m, src)
 }
+
 func (m *ConversionReview) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ConversionReview) XXX_DiscardUnknown() {
 	xxx_messageInfo_ConversionReview.DiscardUnknown(m)
 }
@@ -137,9 +154,11 @@ func (*CustomResourceColumnDefinition) ProtoMessage() {}
 func (*CustomResourceColumnDefinition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{3}
 }
+
 func (m *CustomResourceColumnDefinition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceColumnDefinition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -148,12 +167,15 @@ func (m *CustomResourceColumnDefinition) XXX_Marshal(b []byte, deterministic boo
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceColumnDefinition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceColumnDefinition.Merge(m, src)
 }
+
 func (m *CustomResourceColumnDefinition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceColumnDefinition) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceColumnDefinition.DiscardUnknown(m)
 }
@@ -165,9 +187,11 @@ func (*CustomResourceConversion) ProtoMessage() {}
 func (*CustomResourceConversion) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{4}
 }
+
 func (m *CustomResourceConversion) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceConversion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -176,12 +200,15 @@ func (m *CustomResourceConversion) XXX_Marshal(b []byte, deterministic bool) ([]
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceConversion) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceConversion.Merge(m, src)
 }
+
 func (m *CustomResourceConversion) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceConversion) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceConversion.DiscardUnknown(m)
 }
@@ -193,9 +220,11 @@ func (*CustomResourceDefinition) ProtoMessage() {}
 func (*CustomResourceDefinition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{5}
 }
+
 func (m *CustomResourceDefinition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -204,12 +233,15 @@ func (m *CustomResourceDefinition) XXX_Marshal(b []byte, deterministic bool) ([]
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinition.Merge(m, src)
 }
+
 func (m *CustomResourceDefinition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinition) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinition.DiscardUnknown(m)
 }
@@ -221,9 +253,11 @@ func (*CustomResourceDefinitionCondition) ProtoMessage() {}
 func (*CustomResourceDefinitionCondition) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{6}
 }
+
 func (m *CustomResourceDefinitionCondition) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -232,12 +266,15 @@ func (m *CustomResourceDefinitionCondition) XXX_Marshal(b []byte, deterministic 
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionCondition) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionCondition.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionCondition) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionCondition) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionCondition.DiscardUnknown(m)
 }
@@ -249,9 +286,11 @@ func (*CustomResourceDefinitionList) ProtoMessage() {}
 func (*CustomResourceDefinitionList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{7}
 }
+
 func (m *CustomResourceDefinitionList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -260,12 +299,15 @@ func (m *CustomResourceDefinitionList) XXX_Marshal(b []byte, deterministic bool)
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionList) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionList.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionList) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionList) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionList.DiscardUnknown(m)
 }
@@ -277,9 +319,11 @@ func (*CustomResourceDefinitionNames) ProtoMessage() {}
 func (*CustomResourceDefinitionNames) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{8}
 }
+
 func (m *CustomResourceDefinitionNames) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionNames) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -288,12 +332,15 @@ func (m *CustomResourceDefinitionNames) XXX_Marshal(b []byte, deterministic bool
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionNames) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionNames.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionNames) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionNames) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionNames.DiscardUnknown(m)
 }
@@ -305,9 +352,11 @@ func (*CustomResourceDefinitionSpec) ProtoMessage() {}
 func (*CustomResourceDefinitionSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{9}
 }
+
 func (m *CustomResourceDefinitionSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -316,12 +365,15 @@ func (m *CustomResourceDefinitionSpec) XXX_Marshal(b []byte, deterministic bool)
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionSpec.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionSpec) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionSpec.DiscardUnknown(m)
 }
@@ -333,9 +385,11 @@ func (*CustomResourceDefinitionStatus) ProtoMessage() {}
 func (*CustomResourceDefinitionStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{10}
 }
+
 func (m *CustomResourceDefinitionStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -344,12 +398,15 @@ func (m *CustomResourceDefinitionStatus) XXX_Marshal(b []byte, deterministic boo
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionStatus.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionStatus.DiscardUnknown(m)
 }
@@ -361,9 +418,11 @@ func (*CustomResourceDefinitionVersion) ProtoMessage() {}
 func (*CustomResourceDefinitionVersion) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{11}
 }
+
 func (m *CustomResourceDefinitionVersion) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceDefinitionVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -372,12 +431,15 @@ func (m *CustomResourceDefinitionVersion) XXX_Marshal(b []byte, deterministic bo
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceDefinitionVersion) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceDefinitionVersion.Merge(m, src)
 }
+
 func (m *CustomResourceDefinitionVersion) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceDefinitionVersion) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceDefinitionVersion.DiscardUnknown(m)
 }
@@ -389,9 +451,11 @@ func (*CustomResourceSubresourceScale) ProtoMessage() {}
 func (*CustomResourceSubresourceScale) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{12}
 }
+
 func (m *CustomResourceSubresourceScale) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceSubresourceScale) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -400,12 +464,15 @@ func (m *CustomResourceSubresourceScale) XXX_Marshal(b []byte, deterministic boo
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceSubresourceScale) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceSubresourceScale.Merge(m, src)
 }
+
 func (m *CustomResourceSubresourceScale) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceSubresourceScale) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceSubresourceScale.DiscardUnknown(m)
 }
@@ -417,9 +484,11 @@ func (*CustomResourceSubresourceStatus) ProtoMessage() {}
 func (*CustomResourceSubresourceStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{13}
 }
+
 func (m *CustomResourceSubresourceStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceSubresourceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -428,12 +497,15 @@ func (m *CustomResourceSubresourceStatus) XXX_Marshal(b []byte, deterministic bo
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceSubresourceStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceSubresourceStatus.Merge(m, src)
 }
+
 func (m *CustomResourceSubresourceStatus) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceSubresourceStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceSubresourceStatus.DiscardUnknown(m)
 }
@@ -445,9 +517,11 @@ func (*CustomResourceSubresources) ProtoMessage() {}
 func (*CustomResourceSubresources) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{14}
 }
+
 func (m *CustomResourceSubresources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceSubresources) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -456,12 +530,15 @@ func (m *CustomResourceSubresources) XXX_Marshal(b []byte, deterministic bool) (
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceSubresources) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceSubresources.Merge(m, src)
 }
+
 func (m *CustomResourceSubresources) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceSubresources) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceSubresources.DiscardUnknown(m)
 }
@@ -473,9 +550,11 @@ func (*CustomResourceValidation) ProtoMessage() {}
 func (*CustomResourceValidation) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{15}
 }
+
 func (m *CustomResourceValidation) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *CustomResourceValidation) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -484,12 +563,15 @@ func (m *CustomResourceValidation) XXX_Marshal(b []byte, deterministic bool) ([]
 	}
 	return b[:n], nil
 }
+
 func (m *CustomResourceValidation) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CustomResourceValidation.Merge(m, src)
 }
+
 func (m *CustomResourceValidation) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *CustomResourceValidation) XXX_DiscardUnknown() {
 	xxx_messageInfo_CustomResourceValidation.DiscardUnknown(m)
 }
@@ -501,9 +583,11 @@ func (*ExternalDocumentation) ProtoMessage() {}
 func (*ExternalDocumentation) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{16}
 }
+
 func (m *ExternalDocumentation) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ExternalDocumentation) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -512,12 +596,15 @@ func (m *ExternalDocumentation) XXX_Marshal(b []byte, deterministic bool) ([]byt
 	}
 	return b[:n], nil
 }
+
 func (m *ExternalDocumentation) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ExternalDocumentation.Merge(m, src)
 }
+
 func (m *ExternalDocumentation) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ExternalDocumentation) XXX_DiscardUnknown() {
 	xxx_messageInfo_ExternalDocumentation.DiscardUnknown(m)
 }
@@ -529,9 +616,11 @@ func (*JSON) ProtoMessage() {}
 func (*JSON) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{17}
 }
+
 func (m *JSON) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *JSON) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -540,12 +629,15 @@ func (m *JSON) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	}
 	return b[:n], nil
 }
+
 func (m *JSON) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JSON.Merge(m, src)
 }
+
 func (m *JSON) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *JSON) XXX_DiscardUnknown() {
 	xxx_messageInfo_JSON.DiscardUnknown(m)
 }
@@ -557,9 +649,11 @@ func (*JSONSchemaProps) ProtoMessage() {}
 func (*JSONSchemaProps) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{18}
 }
+
 func (m *JSONSchemaProps) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *JSONSchemaProps) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -568,12 +662,15 @@ func (m *JSONSchemaProps) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 	}
 	return b[:n], nil
 }
+
 func (m *JSONSchemaProps) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JSONSchemaProps.Merge(m, src)
 }
+
 func (m *JSONSchemaProps) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *JSONSchemaProps) XXX_DiscardUnknown() {
 	xxx_messageInfo_JSONSchemaProps.DiscardUnknown(m)
 }
@@ -585,9 +682,11 @@ func (*JSONSchemaPropsOrArray) ProtoMessage() {}
 func (*JSONSchemaPropsOrArray) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{19}
 }
+
 func (m *JSONSchemaPropsOrArray) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *JSONSchemaPropsOrArray) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -596,12 +695,15 @@ func (m *JSONSchemaPropsOrArray) XXX_Marshal(b []byte, deterministic bool) ([]by
 	}
 	return b[:n], nil
 }
+
 func (m *JSONSchemaPropsOrArray) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JSONSchemaPropsOrArray.Merge(m, src)
 }
+
 func (m *JSONSchemaPropsOrArray) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *JSONSchemaPropsOrArray) XXX_DiscardUnknown() {
 	xxx_messageInfo_JSONSchemaPropsOrArray.DiscardUnknown(m)
 }
@@ -613,9 +715,11 @@ func (*JSONSchemaPropsOrBool) ProtoMessage() {}
 func (*JSONSchemaPropsOrBool) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{20}
 }
+
 func (m *JSONSchemaPropsOrBool) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *JSONSchemaPropsOrBool) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -624,12 +728,15 @@ func (m *JSONSchemaPropsOrBool) XXX_Marshal(b []byte, deterministic bool) ([]byt
 	}
 	return b[:n], nil
 }
+
 func (m *JSONSchemaPropsOrBool) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JSONSchemaPropsOrBool.Merge(m, src)
 }
+
 func (m *JSONSchemaPropsOrBool) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *JSONSchemaPropsOrBool) XXX_DiscardUnknown() {
 	xxx_messageInfo_JSONSchemaPropsOrBool.DiscardUnknown(m)
 }
@@ -641,9 +748,11 @@ func (*JSONSchemaPropsOrStringArray) ProtoMessage() {}
 func (*JSONSchemaPropsOrStringArray) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{21}
 }
+
 func (m *JSONSchemaPropsOrStringArray) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *JSONSchemaPropsOrStringArray) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -652,12 +761,15 @@ func (m *JSONSchemaPropsOrStringArray) XXX_Marshal(b []byte, deterministic bool)
 	}
 	return b[:n], nil
 }
+
 func (m *JSONSchemaPropsOrStringArray) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_JSONSchemaPropsOrStringArray.Merge(m, src)
 }
+
 func (m *JSONSchemaPropsOrStringArray) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *JSONSchemaPropsOrStringArray) XXX_DiscardUnknown() {
 	xxx_messageInfo_JSONSchemaPropsOrStringArray.DiscardUnknown(m)
 }
@@ -669,9 +781,11 @@ func (*ServiceReference) ProtoMessage() {}
 func (*ServiceReference) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{22}
 }
+
 func (m *ServiceReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -680,12 +794,15 @@ func (m *ServiceReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, er
 	}
 	return b[:n], nil
 }
+
 func (m *ServiceReference) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ServiceReference.Merge(m, src)
 }
+
 func (m *ServiceReference) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *ServiceReference) XXX_DiscardUnknown() {
 	xxx_messageInfo_ServiceReference.DiscardUnknown(m)
 }
@@ -697,9 +814,11 @@ func (*WebhookClientConfig) ProtoMessage() {}
 func (*WebhookClientConfig) Descriptor() ([]byte, []int) {
 	return fileDescriptor_98a4cc6918394e53, []int{23}
 }
+
 func (m *WebhookClientConfig) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
+
 func (m *WebhookClientConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
@@ -708,12 +827,15 @@ func (m *WebhookClientConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte,
 	}
 	return b[:n], nil
 }
+
 func (m *WebhookClientConfig) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WebhookClientConfig.Merge(m, src)
 }
+
 func (m *WebhookClientConfig) XXX_Size() int {
 	return m.Size()
 }
+
 func (m *WebhookClientConfig) XXX_DiscardUnknown() {
 	xxx_messageInfo_WebhookClientConfig.DiscardUnknown(m)
 }
@@ -2647,6 +2769,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+
 func (m *ConversionRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -3271,9 +3394,11 @@ func (m *WebhookClientConfig) Size() (n int) {
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
+
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+
 func (this *ConversionRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -3283,7 +3408,8 @@ func (this *ConversionRequest) String() string {
 		repeatedStringForObjects += fmt.Sprintf("%v", f) + ","
 	}
 	repeatedStringForObjects += "}"
-	s := strings.Join([]string{`&ConversionRequest{`,
+	s := strings.Join([]string{
+		`&ConversionRequest{`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`DesiredAPIVersion:` + fmt.Sprintf("%v", this.DesiredAPIVersion) + `,`,
 		`Objects:` + repeatedStringForObjects + `,`,
@@ -3291,6 +3417,7 @@ func (this *ConversionRequest) String() string {
 	}, "")
 	return s
 }
+
 func (this *ConversionResponse) String() string {
 	if this == nil {
 		return "nil"
@@ -3300,7 +3427,8 @@ func (this *ConversionResponse) String() string {
 		repeatedStringForConvertedObjects += fmt.Sprintf("%v", f) + ","
 	}
 	repeatedStringForConvertedObjects += "}"
-	s := strings.Join([]string{`&ConversionResponse{`,
+	s := strings.Join([]string{
+		`&ConversionResponse{`,
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`ConvertedObjects:` + repeatedStringForConvertedObjects + `,`,
 		`Result:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Result), "Status", "v1.Status", 1), `&`, ``, 1) + `,`,
@@ -3308,22 +3436,26 @@ func (this *ConversionResponse) String() string {
 	}, "")
 	return s
 }
+
 func (this *ConversionReview) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ConversionReview{`,
+	s := strings.Join([]string{
+		`&ConversionReview{`,
 		`Request:` + strings.Replace(this.Request.String(), "ConversionRequest", "ConversionRequest", 1) + `,`,
 		`Response:` + strings.Replace(this.Response.String(), "ConversionResponse", "ConversionResponse", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *CustomResourceColumnDefinition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceColumnDefinition{`,
+	s := strings.Join([]string{
+		`&CustomResourceColumnDefinition{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Format:` + fmt.Sprintf("%v", this.Format) + `,`,
@@ -3334,11 +3466,13 @@ func (this *CustomResourceColumnDefinition) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceConversion) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceConversion{`,
+	s := strings.Join([]string{
+		`&CustomResourceConversion{`,
 		`Strategy:` + fmt.Sprintf("%v", this.Strategy) + `,`,
 		`WebhookClientConfig:` + strings.Replace(this.WebhookClientConfig.String(), "WebhookClientConfig", "WebhookClientConfig", 1) + `,`,
 		`ConversionReviewVersions:` + fmt.Sprintf("%v", this.ConversionReviewVersions) + `,`,
@@ -3346,11 +3480,13 @@ func (this *CustomResourceConversion) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceDefinition{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinition{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
 		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "CustomResourceDefinitionSpec", "CustomResourceDefinitionSpec", 1), `&`, ``, 1) + `,`,
 		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "CustomResourceDefinitionStatus", "CustomResourceDefinitionStatus", 1), `&`, ``, 1) + `,`,
@@ -3358,11 +3494,13 @@ func (this *CustomResourceDefinition) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceDefinitionCondition{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
@@ -3372,6 +3510,7 @@ func (this *CustomResourceDefinitionCondition) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionList) String() string {
 	if this == nil {
 		return "nil"
@@ -3381,18 +3520,21 @@ func (this *CustomResourceDefinitionList) String() string {
 		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "CustomResourceDefinition", "CustomResourceDefinition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&CustomResourceDefinitionList{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionNames) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceDefinitionNames{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionNames{`,
 		`Plural:` + fmt.Sprintf("%v", this.Plural) + `,`,
 		`Singular:` + fmt.Sprintf("%v", this.Singular) + `,`,
 		`ShortNames:` + fmt.Sprintf("%v", this.ShortNames) + `,`,
@@ -3403,6 +3545,7 @@ func (this *CustomResourceDefinitionNames) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -3417,7 +3560,8 @@ func (this *CustomResourceDefinitionSpec) String() string {
 		repeatedStringForAdditionalPrinterColumns += strings.Replace(strings.Replace(f.String(), "CustomResourceColumnDefinition", "CustomResourceColumnDefinition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForAdditionalPrinterColumns += "}"
-	s := strings.Join([]string{`&CustomResourceDefinitionSpec{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionSpec{`,
 		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Names:` + strings.Replace(strings.Replace(this.Names.String(), "CustomResourceDefinitionNames", "CustomResourceDefinitionNames", 1), `&`, ``, 1) + `,`,
@@ -3432,6 +3576,7 @@ func (this *CustomResourceDefinitionSpec) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -3441,7 +3586,8 @@ func (this *CustomResourceDefinitionStatus) String() string {
 		repeatedStringForConditions += strings.Replace(strings.Replace(f.String(), "CustomResourceDefinitionCondition", "CustomResourceDefinitionCondition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForConditions += "}"
-	s := strings.Join([]string{`&CustomResourceDefinitionStatus{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionStatus{`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`AcceptedNames:` + strings.Replace(strings.Replace(this.AcceptedNames.String(), "CustomResourceDefinitionNames", "CustomResourceDefinitionNames", 1), `&`, ``, 1) + `,`,
 		`StoredVersions:` + fmt.Sprintf("%v", this.StoredVersions) + `,`,
@@ -3449,6 +3595,7 @@ func (this *CustomResourceDefinitionStatus) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceDefinitionVersion) String() string {
 	if this == nil {
 		return "nil"
@@ -3458,7 +3605,8 @@ func (this *CustomResourceDefinitionVersion) String() string {
 		repeatedStringForAdditionalPrinterColumns += strings.Replace(strings.Replace(f.String(), "CustomResourceColumnDefinition", "CustomResourceColumnDefinition", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForAdditionalPrinterColumns += "}"
-	s := strings.Join([]string{`&CustomResourceDefinitionVersion{`,
+	s := strings.Join([]string{
+		`&CustomResourceDefinitionVersion{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Served:` + fmt.Sprintf("%v", this.Served) + `,`,
 		`Storage:` + fmt.Sprintf("%v", this.Storage) + `,`,
@@ -3471,11 +3619,13 @@ func (this *CustomResourceDefinitionVersion) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceSubresourceScale) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceSubresourceScale{`,
+	s := strings.Join([]string{
+		`&CustomResourceSubresourceScale{`,
 		`SpecReplicasPath:` + fmt.Sprintf("%v", this.SpecReplicasPath) + `,`,
 		`StatusReplicasPath:` + fmt.Sprintf("%v", this.StatusReplicasPath) + `,`,
 		`LabelSelectorPath:` + valueToStringGenerated(this.LabelSelectorPath) + `,`,
@@ -3483,57 +3633,68 @@ func (this *CustomResourceSubresourceScale) String() string {
 	}, "")
 	return s
 }
+
 func (this *CustomResourceSubresourceStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceSubresourceStatus{`,
+	s := strings.Join([]string{
+		`&CustomResourceSubresourceStatus{`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *CustomResourceSubresources) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceSubresources{`,
+	s := strings.Join([]string{
+		`&CustomResourceSubresources{`,
 		`Status:` + strings.Replace(this.Status.String(), "CustomResourceSubresourceStatus", "CustomResourceSubresourceStatus", 1) + `,`,
 		`Scale:` + strings.Replace(this.Scale.String(), "CustomResourceSubresourceScale", "CustomResourceSubresourceScale", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *CustomResourceValidation) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&CustomResourceValidation{`,
+	s := strings.Join([]string{
+		`&CustomResourceValidation{`,
 		`OpenAPIV3Schema:` + strings.Replace(this.OpenAPIV3Schema.String(), "JSONSchemaProps", "JSONSchemaProps", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ExternalDocumentation) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ExternalDocumentation{`,
+	s := strings.Join([]string{
+		`&ExternalDocumentation{`,
 		`Description:` + fmt.Sprintf("%v", this.Description) + `,`,
 		`URL:` + fmt.Sprintf("%v", this.URL) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *JSON) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&JSON{`,
+	s := strings.Join([]string{
+		`&JSON{`,
 		`Raw:` + valueToStringGenerated(this.Raw) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *JSONSchemaProps) String() string {
 	if this == nil {
 		return "nil"
@@ -3598,7 +3759,8 @@ func (this *JSONSchemaProps) String() string {
 		mapStringForDefinitions += fmt.Sprintf("%v: %v,", k, this.Definitions[k])
 	}
 	mapStringForDefinitions += "}"
-	s := strings.Join([]string{`&JSONSchemaProps{`,
+	s := strings.Join([]string{
+		`&JSONSchemaProps{`,
 		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`Schema:` + fmt.Sprintf("%v", this.Schema) + `,`,
 		`Ref:` + valueToStringGenerated(this.Ref) + `,`,
@@ -3646,6 +3808,7 @@ func (this *JSONSchemaProps) String() string {
 	}, "")
 	return s
 }
+
 func (this *JSONSchemaPropsOrArray) String() string {
 	if this == nil {
 		return "nil"
@@ -3655,40 +3818,47 @@ func (this *JSONSchemaPropsOrArray) String() string {
 		repeatedStringForJSONSchemas += strings.Replace(strings.Replace(f.String(), "JSONSchemaProps", "JSONSchemaProps", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForJSONSchemas += "}"
-	s := strings.Join([]string{`&JSONSchemaPropsOrArray{`,
+	s := strings.Join([]string{
+		`&JSONSchemaPropsOrArray{`,
 		`Schema:` + strings.Replace(this.Schema.String(), "JSONSchemaProps", "JSONSchemaProps", 1) + `,`,
 		`JSONSchemas:` + repeatedStringForJSONSchemas + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *JSONSchemaPropsOrBool) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&JSONSchemaPropsOrBool{`,
+	s := strings.Join([]string{
+		`&JSONSchemaPropsOrBool{`,
 		`Allows:` + fmt.Sprintf("%v", this.Allows) + `,`,
 		`Schema:` + strings.Replace(this.Schema.String(), "JSONSchemaProps", "JSONSchemaProps", 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *JSONSchemaPropsOrStringArray) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&JSONSchemaPropsOrStringArray{`,
+	s := strings.Join([]string{
+		`&JSONSchemaPropsOrStringArray{`,
 		`Schema:` + strings.Replace(this.Schema.String(), "JSONSchemaProps", "JSONSchemaProps", 1) + `,`,
 		`Property:` + fmt.Sprintf("%v", this.Property) + `,`,
 		`}`,
 	}, "")
 	return s
 }
+
 func (this *ServiceReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ServiceReference{`,
+	s := strings.Join([]string{
+		`&ServiceReference{`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Path:` + valueToStringGenerated(this.Path) + `,`,
@@ -3697,11 +3867,13 @@ func (this *ServiceReference) String() string {
 	}, "")
 	return s
 }
+
 func (this *WebhookClientConfig) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&WebhookClientConfig{`,
+	s := strings.Join([]string{
+		`&WebhookClientConfig{`,
 		`Service:` + strings.Replace(this.Service.String(), "ServiceReference", "ServiceReference", 1) + `,`,
 		`CABundle:` + valueToStringGenerated(this.CABundle) + `,`,
 		`URL:` + valueToStringGenerated(this.URL) + `,`,
@@ -3709,6 +3881,7 @@ func (this *WebhookClientConfig) String() string {
 	}, "")
 	return s
 }
+
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -3717,6 +3890,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+
 func (m *ConversionRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3865,6 +4039,7 @@ func (m *ConversionRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ConversionResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4014,6 +4189,7 @@ func (m *ConversionResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ConversionReview) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4136,6 +4312,7 @@ func (m *ConversionReview) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceColumnDefinition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4365,6 +4542,7 @@ func (m *CustomResourceColumnDefinition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceConversion) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4515,6 +4693,7 @@ func (m *CustomResourceConversion) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4664,6 +4843,7 @@ func (m *CustomResourceDefinition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4875,6 +5055,7 @@ func (m *CustomResourceDefinitionCondition) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4992,6 +5173,7 @@ func (m *CustomResourceDefinitionList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionNames) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5234,6 +5416,7 @@ func (m *CustomResourceDefinitionNames) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5610,6 +5793,7 @@ func (m *CustomResourceDefinitionSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -5759,6 +5943,7 @@ func (m *CustomResourceDefinitionStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceDefinitionVersion) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6040,6 +6225,7 @@ func (m *CustomResourceDefinitionVersion) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceSubresourceScale) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6187,6 +6373,7 @@ func (m *CustomResourceSubresourceScale) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceSubresourceStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6237,6 +6424,7 @@ func (m *CustomResourceSubresourceStatus) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceSubresources) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6359,6 +6547,7 @@ func (m *CustomResourceSubresources) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *CustomResourceValidation) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6445,6 +6634,7 @@ func (m *CustomResourceValidation) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ExternalDocumentation) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6559,6 +6749,7 @@ func (m *ExternalDocumentation) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *JSON) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -6643,6 +6834,7 @@ func (m *JSON) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *JSONSchemaProps) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8281,6 +8473,7 @@ func (m *JSONSchemaProps) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *JSONSchemaPropsOrArray) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8401,6 +8594,7 @@ func (m *JSONSchemaPropsOrArray) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *JSONSchemaPropsOrBool) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8507,6 +8701,7 @@ func (m *JSONSchemaPropsOrBool) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *JSONSchemaPropsOrStringArray) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8625,6 +8820,7 @@ func (m *JSONSchemaPropsOrStringArray) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8792,6 +8988,7 @@ func (m *ServiceReference) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func (m *WebhookClientConfig) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8945,6 +9142,7 @@ func (m *WebhookClientConfig) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

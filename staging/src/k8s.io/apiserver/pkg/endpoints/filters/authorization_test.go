@@ -183,5 +183,4 @@ func TestAuditAnnotation(t *testing.T) {
 		assert.Equal(t, tc.decisionAnnotation, audit.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
 		assert.Equal(t, tc.reasonAnnotation, audit.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
 	}
-
 }

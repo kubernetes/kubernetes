@@ -62,7 +62,6 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd, args))
 			cmdutil.CheckErr(options.run(out))
-
 		},
 	}
 

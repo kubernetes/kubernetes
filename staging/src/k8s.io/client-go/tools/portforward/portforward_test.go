@@ -342,7 +342,6 @@ func TestGetListener(t *testing.T) {
 		}
 		if port != expectedListenerPort {
 			t.Errorf("Test case #%d failed: Listener does not listen on expected port: asked %v got %v", i, expectedListenerPort, port)
-
 		}
 		listener.Close()
 	}
@@ -367,7 +366,6 @@ func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
 	}()
 
 	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
-
 	if err != nil {
 		t.Fatalf("error while calling New: %s", err)
 	}

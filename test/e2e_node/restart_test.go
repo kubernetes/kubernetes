@@ -80,7 +80,6 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:Container
 	ginkgo.Context("Container Runtime", func() {
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
-
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)

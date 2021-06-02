@@ -100,7 +100,6 @@ func TestCreatePdbValidation(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			o := &PodDisruptionBudgetOpts{
 				Name:           tc.options.Name,
 				Selector:       tc.options.Selector,
@@ -223,7 +222,6 @@ func TestCreatePdb(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			podDisruptionBudget, err := tc.options.createPodDisruptionBudgets()
 			if err != nil {
 				t.Errorf("unexpected error:\n%#v\n", err)

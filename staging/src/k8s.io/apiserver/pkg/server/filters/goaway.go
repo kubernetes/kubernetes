@@ -27,15 +27,13 @@ type GoawayDecider interface {
 	Goaway(r *http.Request) bool
 }
 
-var (
-	// randPool used to get a rand.Rand and generate a random number thread-safely,
-	// which improve the performance of using rand.Rand with a locker
-	randPool = &sync.Pool{
-		New: func() interface{} {
-			return rand.New(rand.NewSource(rand.Int63()))
-		},
-	}
-)
+// randPool used to get a rand.Rand and generate a random number thread-safely,
+// which improve the performance of using rand.Rand with a locker
+var randPool = &sync.Pool{
+	New: func() interface{} {
+		return rand.New(rand.NewSource(rand.Int63()))
+	},
+}
 
 // WithProbabilisticGoaway returns an http.Handler that send GOAWAY probabilistically
 // according to the given chance for HTTP2 requests. After client receive GOAWAY,

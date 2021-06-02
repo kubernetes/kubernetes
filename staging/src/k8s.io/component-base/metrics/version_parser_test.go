@@ -25,7 +25,7 @@ import (
 )
 
 func TestVersionParsing(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc            string
 		versionString   string
 		expectedVersion string

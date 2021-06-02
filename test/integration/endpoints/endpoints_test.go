@@ -153,7 +153,6 @@ func TestEndpointUpdates(t *testing.T) {
 	if resVersion != endpoints.ObjectMeta.ResourceVersion {
 		t.Fatalf("endpoints resource version does not match, expected %s received %s", resVersion, endpoints.ObjectMeta.ResourceVersion)
 	}
-
 }
 
 func labelMap() map[string]string {
@@ -176,5 +175,4 @@ func newService(namespace, name string) *v1.Service {
 			},
 		},
 	}
-
 }

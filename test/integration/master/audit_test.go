@@ -234,7 +234,8 @@ func runTestWithVersion(t *testing.T, version string) {
 			"--audit-policy-file", policyFile.Name(),
 			"--audit-log-version", version,
 			"--audit-log-mode", "blocking",
-			"--audit-log-path", logFile.Name()},
+			"--audit-log-path", logFile.Name(),
+		},
 		framework.SharedEtcd())
 	defer result.TearDownFn()
 

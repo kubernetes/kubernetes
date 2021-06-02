@@ -71,7 +71,6 @@ func main() {
 	var currentStep *EditStep
 
 	fmt.Println(http.ListenAndServe(":8081", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-
 		// Record non-discovery things
 		record := false
 		switch segments := strings.Split(strings.Trim(req.URL.Path, "/"), "/"); segments[0] {

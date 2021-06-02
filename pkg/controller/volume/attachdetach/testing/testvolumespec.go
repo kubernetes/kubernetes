@@ -59,10 +59,12 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 	}
 }
 
-var extraPods *v1.PodList
-var volumeAttachments *storagev1.VolumeAttachmentList
-var pvs *v1.PersistentVolumeList
-var nodes *v1.NodeList
+var (
+	extraPods         *v1.PodList
+	volumeAttachments *storagev1.VolumeAttachmentList
+	pvs               *v1.PersistentVolumeList
+	nodes             *v1.NodeList
+)
 
 func CreateTestClient() *fake.Clientset {
 	fakeClient := &fake.Clientset{}

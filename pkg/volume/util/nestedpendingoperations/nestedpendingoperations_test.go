@@ -52,7 +52,6 @@ func Test_NestedPendingOperations_Positive_SingleOp(t *testing.T) {
 
 	// Act
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: noopFunc})
-
 	// Assert
 	if err != nil {
 		t.Fatalf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err)
@@ -107,7 +106,6 @@ func Test_NestedPendingOperations_Positive_SingleOpWithExpBackoff(t *testing.T) 
 
 	// Act
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: noopFunc})
-
 	// Assert
 	if err != nil {
 		t.Fatalf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err)
@@ -672,7 +670,6 @@ func Test_NestedPendingOperations_SecondOpBeforeFirstCompletes(t *testing.T) {
 		})
 
 	}
-
 }
 
 func Test_NestedPendingOperations_Positive_Issue_88355(t *testing.T) {

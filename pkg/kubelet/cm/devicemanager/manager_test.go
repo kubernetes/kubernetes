@@ -827,11 +827,14 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		makePod(v1.ResourceList{
 			v1.ResourceName(res1.resourceName): res1.resourceQuantity,
 			v1.ResourceName("cpu"):             res1.resourceQuantity,
-			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+		}),
 		makePod(v1.ResourceList{
-			v1.ResourceName(res1.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+		}),
 		makePod(v1.ResourceList{
-			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+		}),
 	}
 	testCases := []struct {
 		description               string
@@ -890,7 +893,6 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
-
 }
 
 func TestInitContainerDeviceAllocation(t *testing.T) {
@@ -1077,7 +1079,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 		opts: &pluginapi.DevicePluginOptions{PreStartRequired: true},
 	}
 	pod := makePod(v1.ResourceList{
-		v1.ResourceName(res1.resourceName): res1.resourceQuantity})
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+	})
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
@@ -1106,7 +1109,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
 
 	pod2 := makePod(v1.ResourceList{
-		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
+		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI),
+	})
 	activePods = append(activePods, pod2)
 	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
