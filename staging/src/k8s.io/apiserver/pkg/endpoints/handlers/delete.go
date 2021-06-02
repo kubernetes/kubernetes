@@ -251,7 +251,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				}
 
 				ae := request.AuditEventFrom(ctx)
-				objGV := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+				objGV := gvk.GroupVersion()
 				audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
