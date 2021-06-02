@@ -160,7 +160,10 @@ type watchCache struct {
 	// you should always apply modulo capacity to get an index in cache array.
 	cache      []*watchCacheEvent
 	startIndex int
-	endIndex   int
+	watchSize  int
+
+	// removed is marked when the cache is full.
+	removed bool
 
 	// store will effectively support LIST operation from the "end of cache
 	// history" i.e. from the moment just after the newest cached watched event.
@@ -207,7 +210,7 @@ func newWatchCache(
 		lowerBoundCapacity:  defaultLowerBoundCapacity,
 		upperBoundCapacity:  defaultUpperBoundCapacity,
 		startIndex:          0,
-		endIndex:            0,
+		watchSize:           0,
 		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
 		resourceVersion:     0,
 		listResourceVersion: 0,
@@ -336,24 +339,29 @@ func (w *watchCache) updateCache(event *watchCacheEvent) {
 	w.resizeCacheLocked(event.RecordTime)
 	if w.isCacheFullLocked() {
 		// Cache is full - remove the oldest element.
-		w.startIndex++
+		w.startIndex = (w.startIndex + 1) % (w.capacity)
+		w.watchSize--
+		w.removed = true
 	}
-	w.cache[w.endIndex%w.capacity] = event
-	w.endIndex++
+	w.cache[(w.startIndex+w.watchSize)%w.capacity] = event
+	w.watchSize++
 }
 
 // resizeCacheLocked resizes the cache if necessary:
 // - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
 // - decreases capacity by 2x when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
 func (w *watchCache) resizeCacheLocked(eventTime time.Time) {
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < eventFreshDuration {
+	if !w.isCacheFullLocked() {
+		return
+	}
+	if eventTime.Sub(w.cache[w.startIndex].RecordTime) < eventFreshDuration {
 		capacity := min(w.capacity*2, w.upperBoundCapacity)
 		if capacity > w.capacity {
 			w.doCacheResizeLocked(capacity)
 		}
 		return
 	}
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > eventFreshDuration {
+	if eventTime.Sub(w.cache[(w.startIndex+w.watchSize-w.capacity/4)%w.capacity].RecordTime) > eventFreshDuration {
 		capacity := max(w.capacity/2, w.lowerBoundCapacity)
 		if capacity < w.capacity {
 			w.doCacheResizeLocked(capacity)
@@ -365,7 +373,10 @@ func (w *watchCache) resizeCacheLocked(eventTime time.Time) {
 // isCacheFullLocked used to judge whether watchCacheEvent is full.
 // Assumes that lock is already held for write.
 func (w *watchCache) isCacheFullLocked() bool {
-	return w.endIndex == w.startIndex+w.capacity
+	if w.watchSize == w.capacity {
+		return true
+	}
+	return false
 }
 
 // doCacheResizeLocked resize watchCache's event array with different capacity.
@@ -374,11 +385,13 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 	newCache := make([]*watchCacheEvent, capacity)
 	if capacity < w.capacity {
 		// adjust startIndex if cache capacity shrink.
-		w.startIndex = w.endIndex - capacity
+		w.startIndex = w.startIndex + w.watchSize - capacity
+		w.watchSize = capacity
 	}
-	for i := w.startIndex; i < w.endIndex; i++ {
-		newCache[i%capacity] = w.cache[i%w.capacity]
+	for i := 0; i < w.watchSize; i++ {
+		newCache[i] = w.cache[(i+w.startIndex)%w.capacity]
 	}
+	w.startIndex = 0
 	w.cache = newCache
 	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
@@ -537,7 +550,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	defer w.Unlock()
 
 	w.startIndex = 0
-	w.endIndex = 0
+	w.watchSize = 0
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
 	}
@@ -558,20 +571,19 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 }
 
 func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	size := w.endIndex - w.startIndex
 	var oldest uint64
 	switch {
-	case w.listResourceVersion > 0 && w.startIndex == 0:
+	case w.listResourceVersion > 0 && !w.removed:
 		// If no event was removed from the buffer since last relist, the oldest watch
 		// event we can deliver is one greater than the resource version of the list.
 		oldest = w.listResourceVersion + 1
-	case size > 0:
+	case w.watchSize > 0:
 		// If the previous condition is not satisfied: either some event was already
 		// removed from the buffer or we've never completed a list (the latter can
 		// only happen in unit tests that populate the buffer without performing
 		// list/replace operations), the oldest watch event we can deliver is the first
 		// one in the buffer.
-		oldest = w.cache[w.startIndex%w.capacity].ResourceVersion
+		oldest = w.cache[w.startIndex].ResourceVersion
 	default:
 		return nil, fmt.Errorf("watch cache isn't correctly initialized")
 	}
@@ -613,9 +625,9 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].ResourceVersion > resourceVersion
 	}
-	first := sort.Search(size, f)
-	result := make([]*watchCacheEvent, size-first)
-	for i := 0; i < size-first; i++ {
+	first := sort.Search(w.watchSize, f)
+	result := make([]*watchCacheEvent, w.watchSize-first)
+	for i := 0; i < w.watchSize-first; i++ {
 		result[i] = w.cache[(w.startIndex+first+i)%w.capacity]
 	}
 	return result, nil
