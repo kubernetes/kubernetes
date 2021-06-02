@@ -141,7 +141,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
-		objGV := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+		objGV := gvk.GroupVersion()
 		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
