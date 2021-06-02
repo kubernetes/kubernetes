@@ -837,14 +837,22 @@ func prepareSnapshotDataSourceForProvisioning(
 ) (*v1.TypedLocalObjectReference, func()) {
 	_, clearComputedStorageClass := SetupStorageClass(client, class)
 
-	ginkgo.By("[Initialize dataSource]creating a initClaim")
-	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(context.TODO(), initClaim, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	if initClaim.ResourceVersion != "" {
+		ginkgo.By("Skipping creation of PVC, it already exists")
+	} else {
+		ginkgo.By("[Initialize dataSource]creating a initClaim")
+		updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(context.TODO(), initClaim, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			err = nil
+		}
+		framework.ExpectNoError(err)
+		initClaim = updatedClaim
+	}
 
 	// write namespace to the /mnt/test (= the volume).
 	tests := []e2evolume.Test{
 		{
-			Volume:          *storageutils.CreateVolumeSource(updatedClaim.Name, false /* readOnly */),
+			Volume:          *storageutils.CreateVolumeSource(initClaim.Name, false /* readOnly */),
 			Mode:            mode,
 			File:            "index.html",
 			ExpectedContent: injectContent,
@@ -853,8 +861,7 @@ func prepareSnapshotDataSourceForProvisioning(
 	e2evolume.InjectContent(f, config, nil, "", tests)
 
 	parameters := map[string]string{}
-	snapshotResource := storageframework.CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace(), f.Timeouts, parameters)
-
+	snapshotResource := storageframework.CreateSnapshotResource(sDriver, perTestConfig, pattern, initClaim.GetName(), initClaim.GetNamespace(), f.Timeouts, parameters)
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
 		APIGroup: &group,
@@ -863,10 +870,10 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 
 	cleanupFunc := func() {
-		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
-		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, metav1.DeleteOptions{})
+		framework.Logf("deleting initClaim %q/%q", initClaim.Namespace, initClaim.Name)
+		err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Delete(context.TODO(), initClaim.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
+			framework.Failf("Error deleting initClaim %q. Error: %v", initClaim.Name, err)
 		}
 
 		err = snapshotResource.CleanupResource(f.Timeouts)
@@ -890,13 +897,18 @@ func preparePVCDataSourceForProvisioning(
 ) (*v1.TypedLocalObjectReference, func()) {
 	_, clearComputedStorageClass := SetupStorageClass(client, class)
 
-	ginkgo.By("[Initialize dataSource]creating a source PVC")
-	sourcePVC, err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(context.TODO(), source, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	if source.ResourceVersion != "" {
+		ginkgo.By("Skipping creation of PVC, it already exists")
+	} else {
+		ginkgo.By("[Initialize dataSource]creating a source PVC")
+		var err error
+		source, err = client.CoreV1().PersistentVolumeClaims(source.Namespace).Create(context.TODO(), source, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+	}
 
 	tests := []e2evolume.Test{
 		{
-			Volume:          *storageutils.CreateVolumeSource(sourcePVC.Name, false /* readOnly */),
+			Volume:          *storageutils.CreateVolumeSource(source.Name, false /* readOnly */),
 			Mode:            mode,
 			File:            "index.html",
 			ExpectedContent: injectContent,
@@ -906,14 +918,14 @@ func preparePVCDataSourceForProvisioning(
 
 	dataSourceRef := &v1.TypedLocalObjectReference{
 		Kind: "PersistentVolumeClaim",
-		Name: sourcePVC.GetName(),
+		Name: source.GetName(),
 	}
 
 	cleanupFunc := func() {
-		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
-		err := client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(context.TODO(), sourcePVC.Name, metav1.DeleteOptions{})
+		framework.Logf("deleting source PVC %q/%q", source.Namespace, source.Name)
+		err := client.CoreV1().PersistentVolumeClaims(source.Namespace).Delete(context.TODO(), source.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
+			framework.Failf("Error deleting source PVC %q. Error: %v", source.Name, err)
 		}
 
 		clearComputedStorageClass()
