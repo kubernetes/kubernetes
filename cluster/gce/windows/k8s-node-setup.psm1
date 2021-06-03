@@ -1719,7 +1719,7 @@ function DownloadAndInstall-NodeProblemDetector {
 }
 
 # Creates the node-problem-detector user kubeconfig file at
-# $env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE.
+# $env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE (if defined).
 #
 # Create-NodePki() must be called first.
 #
@@ -1727,9 +1727,11 @@ function DownloadAndInstall-NodeProblemDetector {
 #   CA_CERT
 #   NODE_PROBLEM_DETECTOR_TOKEN
 function Create-NodeProblemDetectorKubeConfig {
-  Create-Kubeconfig -Name 'node-problem-detector' `
-    -Path ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE} `
-    -Token ${kube_env}['NODE_PROBLEM_DETECTOR_TOKEN']
+  if (-not [string]::IsNullOrEmpty(${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE})) {
+    Create-Kubeconfig -Name 'node-problem-detector' `
+      -Path ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE} `
+      -Token ${kube_env}['NODE_PROBLEM_DETECTOR_TOKEN']
+  }
 }
 
 # Configures NPD to run with the bundled monitor configs and report against the Kubernetes api server.
