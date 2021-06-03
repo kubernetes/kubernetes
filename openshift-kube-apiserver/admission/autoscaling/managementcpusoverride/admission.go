@@ -239,6 +239,13 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return nil
 	}
 
+	// we should skip mutation of the pod that has container with both CPU limit and request because once we will remove
+	// the request, the defaulter will set the request back with the CPU limit value
+	if podHasBothCPULimitAndRequest(allContainers) {
+		pod.Annotations[workloadAdmissionWarning] = "skip pod CPUs requests modifications because pod container has both CPU limit and request"
+		return nil
+	}
+
 	// before we update the pod available under admission attributes, we need to verify that deletion of the CPU request
 	// will not change the pod QoS class, otherwise skip pod mutation
 	// 1. Copy the pod
@@ -406,6 +413,19 @@ func getPodQoSClass(containers []coreapi.Container) coreapi.PodQOSClass {
 	}
 
 	return coreapi.PodQOSBurstable
+}
+
+func podHasBothCPULimitAndRequest(containers []coreapi.Container) bool {
+	for _, c := range containers {
+		_, cpuRequestExists := c.Resources.Requests[coreapi.ResourceCPU]
+		_, cpuLimitExists := c.Resources.Limits[coreapi.ResourceCPU]
+
+		if cpuRequestExists && cpuLimitExists {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isManagementResourceAvailableForAllNodes(nodes []*corev1.Node, workloadType string) error {
