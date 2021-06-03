@@ -16,7 +16,10 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# This script builds and runs a local kubernetes cluster. You may need to run
+#get the default gateway
+DEFAULT_GATEWAY=$(ip route get 1.1.1.1 | grep -Po '(?<=(src )).*(?= uid)')
+DEFAULT_HOSTNAME=${DEFAULT_GATEWAY:-"127.0.0.1"}
+
 # this as root to allow kubelet to open docker's socket, and to write the test
 # CA in /var/run/kubernetes.
 # Usage: `hack/local-up-cluster.sh`.
@@ -76,7 +79,7 @@ KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
 MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
-HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
+HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-$DEFAULT_HOSTNAME}
 EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
 EXTERNAL_CLOUD_PROVIDER_BINARY=${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}
 EXTERNAL_CLOUD_VOLUME_PLUGIN=${EXTERNAL_CLOUD_VOLUME_PLUGIN:-""}
@@ -220,7 +223,7 @@ NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
-KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
+KUBELET_HOST=${KUBELET_HOST:-$DEFAULT_HOSTNAME}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
