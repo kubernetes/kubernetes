@@ -696,7 +696,7 @@ github.com/prometheus/client_golang/prometheus/testutil/promlint
 # github.com/prometheus/client_model v0.2.0 => github.com/prometheus/client_model v0.2.0
 ## explicit
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.10.0 => github.com/prometheus/common v0.10.0
+# github.com/prometheus/common v0.26.0 => github.com/prometheus/common v0.26.0
 ## explicit
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
@@ -2355,8 +2355,7 @@ sigs.k8s.io/yaml
 # github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
 # github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 # github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
-# github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
-# github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
+# github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 # github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 # github.com/armon/go-metrics => github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
 # github.com/armon/go-radix => github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
@@ -2433,13 +2432,14 @@ sigs.k8s.io/yaml
 # github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 # github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
-# github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
-# github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
+# github.com/go-kit/log => github.com/go-kit/log v0.1.0
+# github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
 # github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
 # github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
+# github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
 # github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
@@ -2496,17 +2496,17 @@ sigs.k8s.io/yaml
 # github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0
 # github.com/jmespath/go-jmespath/internal/testify => github.com/jmespath/go-jmespath/internal/testify v1.5.1
 # github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
+# github.com/jpillora/backoff => github.com/jpillora/backoff v1.0.0
 # github.com/json-iterator/go => github.com/json-iterator/go v1.1.10
 # github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.9.1
 # github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
-# github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.2.0
+# github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.3.0
 # github.com/jung-kurt/gofpdf => github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5
 # github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0
 # github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 # github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
 # github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.2
-# github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 # github.com/kr/pretty => github.com/kr/pretty v0.2.1
 # github.com/kr/text => github.com/kr/text v0.2.0
 # github.com/kylelemons/godebug => github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
@@ -2548,7 +2548,7 @@ sigs.k8s.io/yaml
 # github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.5.0
 # github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 # github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
-# github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223
+# github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
 # github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 # github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 # github.com/naoina/toml => github.com/naoina/toml v0.1.1
@@ -2571,7 +2571,7 @@ sigs.k8s.io/yaml
 # github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 # github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.7.1
 # github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
-# github.com/prometheus/common => github.com/prometheus/common v0.10.0
+# github.com/prometheus/common => github.com/prometheus/common v0.26.0
 # github.com/prometheus/procfs => github.com/prometheus/procfs v0.2.0
 # github.com/quobyte/api => github.com/quobyte/api v0.1.8
 # github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
