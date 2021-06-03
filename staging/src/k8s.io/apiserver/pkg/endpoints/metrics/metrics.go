@@ -35,7 +35,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -82,7 +81,7 @@ var (
 			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
-		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "code"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "code", "system_client"},
 	)
 	longRunningRequestsGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -474,9 +473,9 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 
 	if requestInfo.IsResourceRequest {
-		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests), "").Inc()
 	} else {
-		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests), "").Inc()
 	}
 }
 
@@ -555,12 +554,19 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode)).Inc()
-	// MonitorRequest happens after authentication, so we can trust the username given by the request
-	info, ok := request.UserFrom(req.Context())
-	if ok && info.GetName() == user.APIServerUser {
-		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
+
+	systemClient := ""
+	if uas := strings.SplitN(req.UserAgent(), "/", 2); len(uas) > 1 {
+		switch uas[0] {
+		case "kube-apiserver":
+			apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
+			fallthrough
+		case "kube-controller-manager", "kube-scheduler", "cluster-policy-controller":
+			systemClient = uas[0]
+		}
 	}
+	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode), systemClient).Inc()
+
 	if deprecated {
 		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
