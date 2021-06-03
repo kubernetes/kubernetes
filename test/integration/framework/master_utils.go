@@ -89,7 +89,7 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 
 // APIServerReceiver can be used to provide the API server to a custom incoming server function
 type APIServerReceiver interface {
-	SetMaster(m *controlplane.Instance)
+	SetAPIServer(m *controlplane.Instance)
 }
 
 // APIServerHolder implements
@@ -98,8 +98,8 @@ type APIServerHolder struct {
 	M           *controlplane.Instance
 }
 
-// SetMaster assigns the current master.
-func (h *APIServerHolder) SetMaster(m *controlplane.Instance) {
+// SetAPIServer assigns the current API server.
+func (h *APIServerHolder) SetAPIServer(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -123,8 +123,8 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
-// startApiserverOrDie starts a kubernetes master and an httpserver to handle api requests
-func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// startAPIServerOrDie starts a kubernetes master and an httpserver to handle api requests
+func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
@@ -215,7 +215,7 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
 	if apiServerReceiver != nil {
-		apiServerReceiver.SetMaster(m)
+		apiServerReceiver.SetAPIServer(m)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
@@ -347,12 +347,12 @@ func RunAnAPIServer(masterConfig *controlplane.Config) (*controlplane.Instance, 
 		masterConfig = NewControlPlaneConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 	}
-	return startApiserverOrDie(masterConfig, nil, nil)
+	return startAPIServerOrDie(masterConfig, nil, nil)
 }
 
 // RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.
 func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	return startApiserverOrDie(controlPlaneConfig, s, apiServerReceiver)
+	return startAPIServerOrDie(controlPlaneConfig, s, apiServerReceiver)
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
