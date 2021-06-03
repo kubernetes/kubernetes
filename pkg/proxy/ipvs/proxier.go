@@ -633,6 +633,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read file /proc/modules with error %v", err)
 	}
+	defer modulesFile.Close()
 
 	mods, err := getFirstColumn(modulesFile)
 	if err != nil {
