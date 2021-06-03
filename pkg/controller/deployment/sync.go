@@ -300,6 +300,12 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 	// deployment. If there is no active replica set, then we should scale up the newest replica set.
 	if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
+			annotationsNeedUpdate := deploymentutil.ReplicasAnnotationsNeedUpdate(activeOrLatest, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
+			if annotationsNeedUpdate {
+				// update the replicaset annotation, the scalingOperation is trivial as it will not emit events
+				_, _, err := dc.scaleReplicaSet(activeOrLatest, *(deployment.Spec.Replicas), deployment, "")
+				return err
+			}
 			return nil
 		}
 		_, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)
