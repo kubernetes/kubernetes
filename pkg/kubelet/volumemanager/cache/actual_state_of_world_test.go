@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -653,7 +653,18 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		}
 	}
 	if volumeFound {
-		t.Fatalf("expected volume %s to be not found in asw", volumeSpec1.Name())
+		t.Fatalf("expected volume %s to be not found in asw.GetMountedVolumesForPod", volumeSpec1.Name())
+	}
+
+	possiblyMountedVolumes := asw.GetPossiblyMountedVolumesForPod(podName1)
+	volumeFound = false
+	for _, volume := range possiblyMountedVolumes {
+		if volume.InnerVolumeSpecName == volumeSpec1.Name() {
+			volumeFound = true
+		}
+	}
+	if !volumeFound {
+		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
 	}
 
 	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1)

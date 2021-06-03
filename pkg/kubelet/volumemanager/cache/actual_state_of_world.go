@@ -136,6 +136,11 @@ type ActualStateOfWorld interface {
 	// current actual state of the world.
 	GetMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
 
+	// GetPossiblyMountedVolumesForPod generates and returns a list of volumes for
+	// the specified pod that either are attached and mounted or are "uncertain",
+	// i.e. a volume plugin may be mounting the volume right now.
+	GetPossiblyMountedVolumesForPod(podName volumetypes.UniquePodName) []MountedVolume
+
 	// GetGloballyMountedVolumes generates and returns a list of all attached
 	// volumes that are globally mounted. This list can be used to determine
 	// which volumes should be reported as "in use" in the node's VolumesInUse
@@ -752,6 +757,26 @@ func (asw *actualStateOfWorld) GetMountedVolumesForPod(
 	for _, volumeObj := range asw.attachedVolumes {
 		for mountedPodName, podObj := range volumeObj.mountedPods {
 			if mountedPodName == podName && podObj.volumeMountStateForPod == operationexecutor.VolumeMounted {
+				mountedVolume = append(
+					mountedVolume,
+					getMountedVolume(&podObj, &volumeObj))
+			}
+		}
+	}
+
+	return mountedVolume
+}
+
+func (asw *actualStateOfWorld) GetPossiblyMountedVolumesForPod(
+	podName volumetypes.UniquePodName) []MountedVolume {
+	asw.RLock()
+	defer asw.RUnlock()
+	mountedVolume := make([]MountedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		for mountedPodName, podObj := range volumeObj.mountedPods {
+			if mountedPodName == podName &&
+				(podObj.volumeMountStateForPod == operationexecutor.VolumeMounted ||
+					podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain) {
 				mountedVolume = append(
 					mountedVolume,
 					getMountedVolume(&podObj, &volumeObj))
