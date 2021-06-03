@@ -37,7 +37,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+	_, server, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	config := restclient.Config{Host: server.URL}
@@ -81,7 +81,7 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+	_, server, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	config := restclient.Config{Host: server.URL}

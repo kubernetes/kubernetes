@@ -92,7 +92,7 @@ func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOpt
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
@@ -226,7 +226,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 func TestCacheControl(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.MasterConfigOptions{})
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	master, _, closeFn := framework.RunAMaster(masterConfig)
+	master, _, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)

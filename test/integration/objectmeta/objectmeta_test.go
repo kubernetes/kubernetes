@@ -32,7 +32,7 @@ import (
 
 func TestIgnoreClusterName(t *testing.T) {
 	config := framework.NewControlPlaneConfig()
-	_, s, closeFn := framework.RunAMaster(config)
+	_, s, closeFn := framework.RunAnAPIServer(config)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

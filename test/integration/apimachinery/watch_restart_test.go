@@ -70,7 +70,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	// Timeout is set random between MinRequestTimeout and 2x
 	masterConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	config := &restclient.Config{

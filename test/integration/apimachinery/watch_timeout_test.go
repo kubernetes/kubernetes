@@ -44,7 +44,7 @@ import (
 func TestWebsocketWatchClientTimeout(t *testing.T) {
 	// server setup
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	instance, s, closeFn := framework.RunAMaster(masterConfig)
+	instance, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	// object setup
@@ -144,7 +144,7 @@ func TestWebsocketWatchClientTimeout(t *testing.T) {
 
 func TestWatchClientTimeout(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	t.Run("direct", func(t *testing.T) {

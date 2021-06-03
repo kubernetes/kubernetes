@@ -59,7 +59,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -276,7 +276,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -503,7 +503,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -730,7 +730,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -960,7 +960,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1075,7 +1075,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1159,7 +1159,7 @@ func TestExistingServiceDefaulting(t *testing.T) {
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1248,7 +1248,7 @@ func TestPreferDualStack(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1326,7 +1326,7 @@ func TestServiceUpdate(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

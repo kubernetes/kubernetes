@@ -58,7 +58,7 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	// Switch off endpoints reconciler to avoid unnecessary operations.
 	masterConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
-	_, s, stopMaster := framework.RunAMaster(masterConfig)
+	_, s, stopMaster := framework.RunAnAPIServer(masterConfig)
 
 	closeFn := func() {
 		stopMaster()
@@ -72,7 +72,7 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	}
 
 	// Wait for apiserver to be stabilized.
-	// Everything but default service creation is checked in RunAMaster above by
+	// Everything but default service creation is checked in RunAnAPIServer above by
 	// waiting for post start hooks, so we just wait for default service to exist.
 	// TODO(wojtek-t): Figure out less fragile way.
 	ctx := context.Background()
