@@ -450,7 +450,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) error {
 	found := make([]interface{}, 0, len(items))
 	for _, item := range items {
-		found = append(found, item)
+		copyItem := item.DeepCopyObject()
+		found = append(found, copyItem)
 	}
 	return r.store.Replace(found, resourceVersion)
 }
