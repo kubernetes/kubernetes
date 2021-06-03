@@ -243,6 +243,7 @@
   - resource
   - scope
   - subresource
+  - system_client
   - verb
   - version
 - name: apiserver_requested_deprecated_apis
