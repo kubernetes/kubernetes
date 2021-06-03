@@ -70,8 +70,8 @@ type AutoscaleOptions struct {
 
 	createAnnotation bool
 	args             []string
-	enforceNamespace bool
-	namespace        string
+	EnforceNamespace bool
+	Namespace        string
 	dryRunStrategy   cmdutil.DryRunStrategy
 	dryRunVerifier   *resource.DryRunVerifier
 	builder          *resource.Builder
@@ -163,7 +163,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	o.HPAClient = kubeClient.AutoscalingV1()
 
-	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -195,8 +195,8 @@ func (o *AutoscaleOptions) Run() error {
 	r := o.builder.
 		Unstructured().
 		ContinueOnError().
-		NamespaceParam(o.namespace).DefaultNamespace().
-		FilenameParam(o.enforceNamespace, o.FilenameOptions).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, o.args...).
 		Flatten().
 		Do()
@@ -246,7 +246,7 @@ func (o *AutoscaleOptions) Run() error {
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(context.TODO(), hpa, createOptions)
+		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.Namespace).Create(context.TODO(), hpa, createOptions)
 		if err != nil {
 			return err
 		}
@@ -285,6 +285,10 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping
 			},
 			MaxReplicas: o.Max,
 		},
+	}
+
+	if o.EnforceNamespace {
+		scaler.Namespace = o.Namespace
 	}
 
 	if o.Min > 0 {
