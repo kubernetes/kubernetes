@@ -426,8 +426,8 @@ func TestMetrics(t *testing.T) {
 	expected := strings.NewReader(`
         # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
         # TYPE apiserver_request_total counter
-        apiserver_request_total{code="200",component="test-server",dry_run="",group="",resource="flagz",scope="",subresource="",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="test-server",dry_run="",group="config.k8s.io",resource="flagz",scope="",subresource="",verb="GET",version="v1alpha1"} 1
+        apiserver_request_total{code="200",component="test-server",dry_run="",group="",resource="flagz",scope="",subresource="",system_client="",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="test-server",dry_run="",group="config.k8s.io",resource="flagz",scope="",subresource="",system_client="",verb="GET",version="v1alpha1"} 1
 `)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
 		t.Error(err)
