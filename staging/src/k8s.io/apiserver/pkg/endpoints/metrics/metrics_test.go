@@ -305,7 +305,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			            apiserver_dropped_requests_total{request_kind="readOnly"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
-			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="LIST",version="v1"} 1
+			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",system_client="",verb="LIST",version="v1"} 1
 				`,
 		},
 		{
@@ -329,7 +329,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
-			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="POST",version="v1"} 1
+			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",system_client="",verb="POST",version="v1"} 1
 				`,
 		},
 		{
@@ -355,7 +355,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
-			            apiserver_request_total{code="429",component="apiserver",dry_run="All",group="batch",resource="jobs",scope="cluster",subresource="status",verb="PATCH",version="v1"} 1
+			            apiserver_request_total{code="429",component="apiserver",dry_run="All",group="batch",resource="jobs",scope="cluster",subresource="status",system_client="",verb="PATCH",version="v1"} 1
 				`,
 		},
 	}
