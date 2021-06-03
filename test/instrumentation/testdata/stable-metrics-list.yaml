@@ -63,6 +63,7 @@
   - resource
   - scope
   - subresource
+  - system_client
   - verb
   - version
 - name: apiserver_storage_objects
