@@ -641,7 +641,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 						},
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
