@@ -87,19 +87,19 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 	}, true, nil
 }
 
-// MasterReceiver can be used to provide the master to a custom incoming server function
-type MasterReceiver interface {
+// APIServerReceiver can be used to provide the API server to a custom incoming server function
+type APIServerReceiver interface {
 	SetMaster(m *controlplane.Instance)
 }
 
-// MasterHolder implements
-type MasterHolder struct {
+// APIServerHolder implements
+type APIServerHolder struct {
 	Initialized chan struct{}
 	M           *controlplane.Instance
 }
 
 // SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *controlplane.Instance) {
+func (h *APIServerHolder) SetMaster(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -124,7 +124,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 }
 
 // startApiserverOrDie starts a kubernetes master and an httpserver to handle api requests
-func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
@@ -214,8 +214,8 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
-	if masterReceiver != nil {
-		masterReceiver.SetMaster(m)
+	if apiServerReceiver != nil {
+		apiServerReceiver.SetMaster(m)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
@@ -351,8 +351,8 @@ func RunAnAPIServer(masterConfig *controlplane.Config) (*controlplane.Instance, 
 }
 
 // RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.
-func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	return startApiserverOrDie(controlPlaneConfig, s, masterReceiver)
+func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	return startApiserverOrDie(controlPlaneConfig, s, apiServerReceiver)
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
