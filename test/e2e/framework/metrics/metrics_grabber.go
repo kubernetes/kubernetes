@@ -45,6 +45,12 @@ const (
 	snapshotControllerPort = 9102
 )
 
+// MetricsGrabbingDisabledError is an error that is wrapped by the
+// different MetricsGrabber.Wrap functions when metrics grabbing is
+// not supported. Tests that check metrics data should then skip
+// the check.
+var MetricsGrabbingDisabledError = errors.New("metrics grabbing disabled")
+
 // Collection is metrics collection of components
 type Collection struct {
 	APIServerMetrics          APIServerMetrics
@@ -74,7 +80,14 @@ type Grabber struct {
 	waitForSnapshotControllerReadyOnce sync.Once
 }
 
-// NewMetricsGrabber returns new metrics which are initialized.
+// NewMetricsGrabber prepares for grabbing metrics data from several different
+// components. It should be called when those components are running because
+// it needs to communicate with them to determine for which components
+// metrics data can be retrieved.
+//
+// Collecting metrics data is an optional debug feature. Not all clusters will
+// support it. If disabled for a component, the corresponding Grab function
+// will immediately return an error derived from MetricsGrabbingDisabledError.
 func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
 
 	kubeScheduler := ""
@@ -183,8 +196,8 @@ func (g *Grabber) grabFromKubeletInternal(nodeName string, kubeletPort int) (Kub
 
 // GrabFromScheduler returns metrics from scheduler
 func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
-	if g.kubeScheduler == "" {
-		return SchedulerMetrics{}, fmt.Errorf("kube-scheduler pod is not registered. Skipping Scheduler's metrics gathering")
+	if !g.grabFromScheduler {
+		return SchedulerMetrics{}, fmt.Errorf("kube-scheduler: %w", MetricsGrabbingDisabledError)
 	}
 
 	var err error
@@ -208,7 +221,7 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 // GrabFromClusterAutoscaler returns metrics from cluster autoscaler
 func (g *Grabber) GrabFromClusterAutoscaler() (ClusterAutoscalerMetrics, error) {
 	if !g.HasControlPlanePods() && g.externalClient == nil {
-		return ClusterAutoscalerMetrics{}, fmt.Errorf("Did not find control-plane pods. Skipping ClusterAutoscaler's metrics gathering")
+		return ClusterAutoscalerMetrics{}, fmt.Errorf("ClusterAutoscaler: %w", MetricsGrabbingDisabledError)
 	}
 	var client clientset.Interface
 	var namespace string
@@ -228,8 +241,8 @@ func (g *Grabber) GrabFromClusterAutoscaler() (ClusterAutoscalerMetrics, error) 
 
 // GrabFromControllerManager returns metrics from controller manager
 func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) {
-	if g.kubeControllerManager == "" {
-		return ControllerManagerMetrics{}, fmt.Errorf("kube-controller-manager pod is not registered. Skipping ControllerManager's metrics gathering")
+	if !g.grabFromControllerManager {
+		return ControllerManagerMetrics{}, fmt.Errorf("kube-controller-manager: %w", MetricsGrabbingDisabledError)
 	}
 
 	var err error
@@ -258,8 +271,8 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 
 // GrabFromSnapshotController returns metrics from controller manager
 func (g *Grabber) GrabFromSnapshotController(podName string, port int) (SnapshotControllerMetrics, error) {
-	if g.snapshotController == "" {
-		return SnapshotControllerMetrics{}, fmt.Errorf("SnapshotController pod is not registered. Skipping SnapshotController's metrics gathering")
+	if !g.grabFromSnapshotController {
+		return SnapshotControllerMetrics{}, fmt.Errorf("snapshot controller: %w", MetricsGrabbingDisabledError)
 	}
 
 	// Use overrides if provided via test config flags.

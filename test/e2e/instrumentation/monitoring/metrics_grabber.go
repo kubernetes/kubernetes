@@ -18,6 +18,7 @@ package monitoring
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
@@ -65,6 +67,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from API server.", func() {
 		ginkgo.By("Connecting to /metrics endpoint")
 		response, err := grabber.GrabFromAPIServer()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
@@ -72,6 +77,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from a Kubelet.", func() {
 		ginkgo.By("Proxying to Node through the API server")
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		response, err := grabber.GrabFromKubelet(node.Name)
 		framework.ExpectNoError(err)
@@ -81,10 +89,13 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from a Scheduler.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
+			e2eskipper.Skipf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 			return
 		}
 		response, err := grabber.GrabFromScheduler()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
@@ -92,10 +103,13 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from a ControllerManager.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
+			e2eskipper.Skipf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 			return
 		}
 		response, err := grabber.GrabFromControllerManager()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
