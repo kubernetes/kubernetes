@@ -22,11 +22,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
+// This plugin has been deprecated and is only configurable through the scheduler policy
+// API and the v1beta1 component config API. It is recommended to use the TaintToleration
+// plugin instead.
 type NodeUnschedulable struct {
 }
 
@@ -75,5 +79,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState
 
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	klog.Warning("NodeUnschedulable plugin is deprecated and will removed in future versions")
 	return &NodeUnschedulable{}, nil
 }
