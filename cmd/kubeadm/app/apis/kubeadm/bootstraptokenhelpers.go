@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
@@ -61,13 +61,13 @@ func encodeTokenSecretData(token *BootstrapToken, now time.Time) map[string][]by
 	if token.Expires != nil {
 		// Format the expiration date accordingly
 		// TODO: This maybe should be a helper function in bootstraputil?
-		expirationString := token.Expires.Time.Format(time.RFC3339)
+		expirationString := token.Expires.Time.UTC().Format(time.RFC3339)
 		data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expirationString)
 
 	} else if token.TTL != nil && token.TTL.Duration > 0 {
 		// Only if .Expires is unset, TTL might have an effect
 		// Get the current time, add the specified duration, and format it accordingly
-		expirationString := now.Add(token.TTL.Duration).Format(time.RFC3339)
+		expirationString := now.Add(token.TTL.Duration).UTC().Format(time.RFC3339)
 		data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expirationString)
 	}
 

@@ -390,7 +390,7 @@ func TestReconcile1Pod(t *testing.T) {
 
 			client := newClientset()
 			setupMetrics()
-			triggerTime := time.Now()
+			triggerTime := time.Now().UTC()
 			r := newReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
 			reconcileHelper(t, r, &testCase.service, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
 
