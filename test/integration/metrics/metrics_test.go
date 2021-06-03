@@ -306,42 +306,42 @@ func TestAPIServerMetricsPods(t *testing.T) {
 			executor: func() {
 				callOrDie(c.Create(context.TODO(), makePod("foo"), metav1.CreateOptions{}))
 			},
-			want: `apiserver_request_total{code="201", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="POST", version="v1"}`,
+			want: `apiserver_request_total{code="201", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", system_client="", verb="POST", version="v1"}`,
 		},
 		{
 			name: "update pod",
 			executor: func() {
 				callOrDie(c.Update(context.TODO(), makePod("bar"), metav1.UpdateOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="PUT", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", system_client="", verb="PUT", version="v1"}`,
 		},
 		{
 			name: "update pod status",
 			executor: func() {
 				callOrDie(c.UpdateStatus(context.TODO(), makePod("bar"), metav1.UpdateOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="status", verb="PUT", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="status", system_client="", verb="PUT", version="v1"}`,
 		},
 		{
 			name: "get pod",
 			executor: func() {
 				callOrDie(c.Get(context.TODO(), "foo", metav1.GetOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="GET", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", system_client="", verb="GET", version="v1"}`,
 		},
 		{
 			name: "list pod",
 			executor: func() {
 				callOrDie(c.List(context.TODO(), metav1.ListOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="namespace", subresource="", verb="LIST", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="namespace", subresource="", system_client="", verb="LIST", version="v1"}`,
 		},
 		{
 			name: "delete pod",
 			executor: func() {
 				callOrDie(nil, c.Delete(context.TODO(), "foo", metav1.DeleteOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="DELETE", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="pods", scope="resource", subresource="", system_client="", verb="DELETE", version="v1"}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -414,42 +414,42 @@ func TestAPIServerMetricsNamespaces(t *testing.T) {
 			executor: func() {
 				callOrDie(c.Create(context.TODO(), makeNamespace("foo"), metav1.CreateOptions{}))
 			},
-			want: `apiserver_request_total{code="201", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="POST", version="v1"}`,
+			want: `apiserver_request_total{code="201", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", system_client="", verb="POST", version="v1"}`,
 		},
 		{
 			name: "update namespace",
 			executor: func() {
 				callOrDie(c.Update(context.TODO(), makeNamespace("bar"), metav1.UpdateOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="PUT", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", system_client="", verb="PUT", version="v1"}`,
 		},
 		{
 			name: "update namespace status",
 			executor: func() {
 				callOrDie(c.UpdateStatus(context.TODO(), makeNamespace("bar"), metav1.UpdateOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="status", verb="PUT", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="status", system_client="", verb="PUT", version="v1"}`,
 		},
 		{
 			name: "get namespace",
 			executor: func() {
 				callOrDie(c.Get(context.TODO(), "foo", metav1.GetOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="GET", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", system_client="", verb="GET", version="v1"}`,
 		},
 		{
 			name: "list namespace",
 			executor: func() {
 				callOrDie(c.List(context.TODO(), metav1.ListOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="cluster", subresource="", verb="LIST", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="cluster", subresource="", system_client="", verb="LIST", version="v1"}`,
 		},
 		{
 			name: "delete namespace",
 			executor: func() {
 				callOrDie(nil, c.Delete(context.TODO(), "foo", metav1.DeleteOptions{}))
 			},
-			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="DELETE", version="v1"}`,
+			want: `apiserver_request_total{code="200", component="apiserver", dry_run="", group="", resource="namespaces", scope="resource", subresource="", system_client="", verb="DELETE", version="v1"}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

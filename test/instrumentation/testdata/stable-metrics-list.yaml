@@ -266,6 +266,7 @@
   - resource
   - scope
   - subresource
+  - system_client
   - verb
   - version
 - name: requested_deprecated_apis
