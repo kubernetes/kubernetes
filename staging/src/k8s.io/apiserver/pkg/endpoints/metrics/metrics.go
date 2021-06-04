@@ -128,15 +128,6 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
-	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
-	RegisteredWatchers = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_registered_watchers",
-			Help:           "Number of currently registered watchers for a given resources",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "version", "kind"},
-	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_watch_events_total",
@@ -239,7 +230,6 @@ var (
 		responseSizes,
 		DroppedRequests,
 		TLSHandshakeErrors,
-		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
