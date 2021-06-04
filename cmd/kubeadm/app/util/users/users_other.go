@@ -43,3 +43,8 @@ func AddUsersAndGroups() (*UsersAndGroups, error) {
 func RemoveUsersAndGroups() error {
 	return nil
 }
+
+// UpdatePathOwnerAndPermissions is a NO-OP on non-Linux.
+func UpdatePathOwnerAndPermissions(path string, uid, gid int64, perms uint32) error {
+	return nil
+}
