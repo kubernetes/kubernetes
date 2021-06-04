@@ -93,7 +93,7 @@ dependencies:
       match: const etcdImage
 
   - name: "etcd-image"
-    version: 3.5.0-beta.3
+    version: 3.5.0-rc.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
