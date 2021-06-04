@@ -29,6 +29,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -240,6 +243,17 @@ func TestRunHandlerHttps(t *testing.T) {
 	}
 	if fakeHTTPDoer.url != "https://foo:443/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPDoer.url)
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LifecycleHandlerHTTPS, false)()
+
+	_, err = handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHTTPDoer.url != "http://foo:80/bar" {
+		t.Errorf("unexpected url: %q", fakeHTTPDoer.url)
 	}
 }
 

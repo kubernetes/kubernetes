@@ -499,12 +499,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
+
 	// A TLS transport is needed to make HTTPS-based container lifecycle requests,
 	// but we do not have the information necessary to do TLS verification.
-	insecureTLSTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	insecureContainerLifecycleHTTPClient := &http.Client{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.LifecycleHandlerHTTPS) {
+		insecureTLSTransport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		insecureContainerLifecycleHTTPClient.Transport = insecureTLSTransport
 	}
-	insecureContainerLifecycleHTTPClient := &http.Client{Transport: insecureTLSTransport}
 
 	klet := &Kubelet{
 		hostname:                                hostname,

@@ -27,7 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -149,7 +151,7 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
 		port = 80
-		if handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
+		if utilfeature.DefaultFeatureGate.Enabled(features.LifecycleHandlerHTTPS) && handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
 			port = 443
 		}
 	} else {
@@ -161,7 +163,7 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	}
 	path := handler.HTTPGet.Path
 	scheme := "http"
-	if handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
+	if utilfeature.DefaultFeatureGate.Enabled(features.LifecycleHandlerHTTPS) && handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
 		scheme = "https"
 	}
 
