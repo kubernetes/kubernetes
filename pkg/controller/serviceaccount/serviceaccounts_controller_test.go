@@ -176,7 +176,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		saStore := saInformer.Informer().GetStore()
 		nsStore := nsInformer.Informer().GetStore()
 
-		syncCalls := make(chan struct{})
+		syncCalls := make(chan struct{}, 1)
 		controller.syncHandler = func(ctx context.Context, key string) error {
 			err := controller.syncNamespace(ctx, key)
 			if err != nil {
