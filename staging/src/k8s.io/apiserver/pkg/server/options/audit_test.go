@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -33,6 +34,9 @@ import (
 )
 
 func TestAuditValidOptions(t *testing.T) {
+	tmpDir := t.TempDir()
+	auditPath := filepath.Join(tmpDir, "audit")
+
 	webhookConfig := makeTmpWebhookConfig(t)
 	defer os.Remove(webhookConfig)
 
@@ -50,7 +54,7 @@ func TestAuditValidOptions(t *testing.T) {
 		name: "default log",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.PolicyFile = policy
 			return o
 		},
@@ -59,7 +63,7 @@ func TestAuditValidOptions(t *testing.T) {
 		name: "default log no policy",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			return o
 		},
 		expected: "",
@@ -94,7 +98,7 @@ func TestAuditValidOptions(t *testing.T) {
 		name: "default union",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.WebhookOptions.ConfigFile = webhookConfig
 			o.PolicyFile = policy
 			return o
@@ -105,7 +109,7 @@ func TestAuditValidOptions(t *testing.T) {
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
 			o.LogOptions.BatchOptions.Mode = ModeBatch
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.WebhookOptions.BatchOptions.Mode = ModeBlocking
 			o.WebhookOptions.ConfigFile = webhookConfig
 			o.PolicyFile = policy
@@ -148,6 +152,9 @@ func TestAuditValidOptions(t *testing.T) {
 }
 
 func TestAuditInvalidOptions(t *testing.T) {
+	tmpDir := t.TempDir()
+	auditPath := filepath.Join(tmpDir, "audit")
+
 	testCases := []struct {
 		name    string
 		options func() *AuditOptions
@@ -155,7 +162,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid log format",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.LogOptions.Format = "foo"
 			return o
 		},
@@ -163,7 +170,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid log mode",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.LogOptions.BatchOptions.Mode = "foo"
 			return o
 		},
@@ -171,7 +178,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid log buffer size",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.LogOptions.Path = "/audit"
+			o.LogOptions.Path = auditPath
 			o.LogOptions.BatchOptions.Mode = "batch"
 			o.LogOptions.BatchOptions.BatchConfig.BufferSize = -3
 			return o
@@ -180,7 +187,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid webhook mode",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.ConfigFile = auditPath
 			o.WebhookOptions.BatchOptions.Mode = "foo"
 			return o
 		},
@@ -188,7 +195,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid webhook buffer throttle qps",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.ConfigFile = auditPath
 			o.WebhookOptions.BatchOptions.Mode = "batch"
 			o.WebhookOptions.BatchOptions.BatchConfig.ThrottleQPS = -1
 			return o
@@ -197,7 +204,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid webhook truncate max event size",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.ConfigFile = auditPath
 			o.WebhookOptions.TruncateOptions.Enabled = true
 			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = -1
 			return o
@@ -206,7 +213,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		name: "invalid webhook truncate max batch size",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.ConfigFile = auditPath
 			o.WebhookOptions.TruncateOptions.Enabled = true
 			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = 2
 			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxBatchSize = 1
