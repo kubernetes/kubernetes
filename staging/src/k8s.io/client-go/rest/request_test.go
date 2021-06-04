@@ -2773,7 +2773,16 @@ func TestRequestStreamWithRetry(t *testing.T) {
 
 func TestRequestWatchWithRetry(t *testing.T) {
 	testRequestWithRetry(t, "Watch", func(ctx context.Context, r *Request) {
-		r.Watch(ctx)
+		w, err := r.Watch(ctx)
+		if err == nil {
+			// in this test the the response body returned by the server is always empty,
+			// this will cause StreamWatcher.receive() to:
+			// - return an io.EOF to indicate that the watch closed normally and
+			// - then close the io.Reader
+			// since we assert on the number of times 'Close' has been called on the
+			// body of the response object, we need to wait here to avoid race condition.
+			<-w.ResultChan()
+		}
 	})
 }
 
@@ -2870,8 +2879,9 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 				"Watch": {
 					attempts: 3,
 					reqCount: &count{closes: 0, seeks: make([]seek, 2)},
-					// we don't close the the Body of the final successful response
-					respCount: &count{closes: 1, seeks: []seek{}},
+					// the Body of the successful response object will get closed by
+					// StreamWatcher, so we need to take that into account.
+					respCount: &count{closes: 2, seeks: []seek{}},
 				},
 				"Stream": {
 					attempts:  2,
