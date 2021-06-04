@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -721,6 +722,8 @@ func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *Unschedulab
 // may be different than what scheduler has here. We should be able to find pods
 // by their UID and update/delete them.
 type nominatedPodMap struct {
+	// podLister is used to verify if the given pod is alive.
+	podLister listersv1.PodLister
 	// nominatedPods is a map keyed by a node name and the value is a list of
 	// pods which are nominated to run on the node. These are pods which can be in
 	// the activeQ or unschedulableQ.
@@ -744,6 +747,15 @@ func (npm *nominatedPodMap) add(p *v1.Pod, nodeName string) {
 			return
 		}
 	}
+
+	if npm.podLister != nil {
+		// If the pod is not alive, don't contain it.
+		if _, err := npm.podLister.Pods(p.Namespace).Get(p.Name); err != nil {
+			klog.V(4).InfoS("Pod %v/%v doesn't exist in podLister, aborting adding it to the nominated map", p.Namespace, p.Name)
+			return
+		}
+	}
+
 	npm.nominatedPodToNode[p.UID] = nnn
 	for _, np := range npm.nominatedPods[nnn] {
 		if np.UID == p.UID {
@@ -796,8 +808,17 @@ func (npm *nominatedPodMap) UpdateNominatedPod(oldPod, newPod *v1.Pod) {
 }
 
 // NewPodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
+// DEPRECATED: use NewSafePodNominator() instead.
 func NewPodNominator() framework.PodNominator {
+	return NewSafePodNominator(nil)
+}
+
+// NewSafePodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
+// Unlike NewPodNominator, it passes in a podLister so as to check if the pod is alive
+// before adding its nominatedNode info.
+func NewSafePodNominator(podLister listersv1.PodLister) framework.PodNominator {
 	return &nominatedPodMap{
+		podLister:          podLister,
 		nominatedPods:      make(map[string][]*v1.Pod),
 		nominatedPodToNode: make(map[ktypes.UID]string),
 	}
