@@ -149,6 +149,9 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
 		port = 80
+		if handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
+			port = 443
+		}
 	} else {
 		var err error
 		port, err = resolvePort(handler.HTTPGet.Port, container)
@@ -157,15 +160,12 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		}
 	}
 	path := handler.HTTPGet.Path
-	var scheme string
-	switch handler.HTTPGet.Scheme {
-	case v1.URISchemeHTTPS:
+	scheme := "http"
+	if handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
 		scheme = "https"
-	default:
-		scheme = "http"
 	}
-	url := formatURL(scheme, host, port, path)
 
+	url := formatURL(scheme, host, port, path)
 	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
 		return "", err
