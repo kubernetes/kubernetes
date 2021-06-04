@@ -19,6 +19,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"strconv"
 	"time"
 
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
@@ -55,6 +57,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
+	memoryRequest := container.Resources.Requests.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
@@ -88,6 +91,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	}
 
 	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+		unified := map[string]string{}
+		if memoryRequest != 0 {
+			unified[cm.MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+		}
+		lc.Resources.Unified = unified
+	}
 
 	return lc
 }

@@ -53,6 +53,8 @@ const (
 	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
+	// MemoryMin is memory.min for cgroup v2
+	MemoryMin string = "memory.min"
 )
 
 var RootCgroupName = CgroupName([]string{})
@@ -433,6 +435,13 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 			Pagesize: pageSize,
 			Limit:    uint64(0),
 		})
+	}
+	// only for cgroup v2
+	if resourceConfig.Unified != nil {
+		resources.Unified = make(map[string]string)
+		for k, v := range resources.Unified {
+			resources.Unified[k] = v
+		}
 	}
 	return resources
 }
