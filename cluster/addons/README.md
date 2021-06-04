@@ -9,6 +9,7 @@ shipped with the Kubernetes binaries and are considered an inherent part of the
 Kubernetes clusters.
 
 There are currently two classes of add-ons:
+
 - Add-ons that will be reconciled.
 - Add-ons that will be created if they don't exist.
 
@@ -32,3 +33,11 @@ It would be hard to update `Pod` because many fields in `Pod` are immutable. For
 `ReplicationController` and `DaemonSet`, in-place update may not trigger the underlying
 pods to be re-created. You probably need to change their names during update to trigger
 a complete deletion and creation.
+
+## Add-on migration
+
+List of add-ons that have migrated out of this directory and where they have gone too.
+
+| add-on | New Location |
+| ------ | ------------ |
+| fluentd-gcp | [k8s-sigs/instrumentation-addons/fluentd-gcp](https://github.com/kubernetes-sigs/instrumentation-addons/fluentd-gcp) |
