@@ -243,3 +243,7 @@ func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
+
+func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
+	return nil
+}

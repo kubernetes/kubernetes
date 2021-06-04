@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,8 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -191,10 +193,9 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	return nil
 }
 
-// setMemoryReserve sums the memory limits of all pods in a QOS class,
-// calculates QOS class memory limits, and set those limits in the
-// CgroupConfig for each QOS class.
-func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
+// getQoSMemoryRequests sums and returns the memory request of all pods for
+// guaranteed and burstable qos classes.
+func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int64 {
 	qosMemoryRequests := map[v1.PodQOSClass]int64{
 		v1.PodQOSGuaranteed: 0,
 		v1.PodQOSBurstable:  0,
@@ -215,6 +216,15 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 		}
 		qosMemoryRequests[qosClass] += podMemoryRequest
 	}
+
+	return qosMemoryRequests
+}
+
+// setMemoryReserve sums the memory limits of all pods in a QOS class,
+// calculates QOS class memory limits, and set those limits in the
+// CgroupConfig for each QOS class.
+func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
+	qosMemoryRequests := m.getQoSMemoryRequests()
 
 	resources := m.getNodeAllocatable()
 	allocatableResource, ok := resources[v1.ResourceMemory]
@@ -265,6 +275,27 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSCla
 	}
 }
 
+// setMemoryQoS sums the memory requests of all pods in the Burstable class,
+// and set the sum memory as the memory.min in the Unified field of CgroupConfig.
+func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*CgroupConfig) {
+	qosMemoryRequests := m.getQoSMemoryRequests()
+
+	// Calculate the memory.min:
+	// for burstable(/kubepods/burstable): sum of all burstable pods
+	burstableMin := qosMemoryRequests[v1.PodQOSBurstable]
+
+	if burstableMin > 0 {
+		if configs[v1.PodQOSBurstable].ResourceParameters.Unified == nil {
+			configs[v1.PodQOSBurstable].ResourceParameters.Unified = map[string]string{
+				MemoryMin: strconv.FormatInt(burstableMin, 10),
+			}
+		} else {
+			configs[v1.PodQOSBurstable].ResourceParameters.Unified[MemoryMin] = strconv.FormatInt(burstableMin, 10)
+		}
+		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSBurstable, "memory.min", burstableMin)
+	}
+}
+
 func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	m.Lock()
 	defer m.Unlock()
@@ -288,6 +319,12 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
 	if err := m.setHugePagesConfig(qosConfigs); err != nil {
 		return err
+	}
+
+	// update the qos level cgrougs v2 settings of memory qos if feature enabled
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
+		m.setMemoryQoS(qosConfigs)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {

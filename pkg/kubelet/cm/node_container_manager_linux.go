@@ -188,10 +188,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	return &rc
 }
 
-// getNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 // Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
-func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
+func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return cm.getNodeAllocatableAbsoluteImpl(cm.capacity)
 }
 

@@ -55,6 +55,8 @@ const (
 	systemdSuffix string = ".slice"
 	// MemoryMin is memory.min for cgroup v2
 	MemoryMin string = "memory.min"
+	// MemoryHigh is memory.high for cgroup v2
+	MemoryHigh string = "memory.high"
 )
 
 var RootCgroupName = CgroupName([]string{})
@@ -439,7 +441,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	// only for cgroup v2
 	if resourceConfig.Unified != nil {
 		resources.Unified = make(map[string]string)
-		for k, v := range resources.Unified {
+		for k, v := range resourceConfig.Unified {
 			resources.Unified[k] = v
 		}
 	}

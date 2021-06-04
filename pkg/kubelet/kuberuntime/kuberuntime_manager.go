@@ -141,6 +141,9 @@ type kubeGenericRuntimeManager struct {
 
 	// PodState provider instance
 	podStateProvider podStateProvider
+
+	//Function to get node allocatable resources
+	getNodeAllocatable func() v1.ResourceList
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -182,6 +185,7 @@ func NewKubeGenericRuntimeManager(
 	legacyLogProvider LegacyLogProvider,
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
+	getNodeAllocatable func() v1.ResourceList,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -201,6 +205,7 @@ func NewKubeGenericRuntimeManager(
 		logManager:          logManager,
 		runtimeClassManager: runtimeClassManager,
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		getNodeAllocatable:  getNodeAllocatable,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()

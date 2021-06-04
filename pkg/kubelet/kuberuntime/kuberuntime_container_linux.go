@@ -22,8 +22,9 @@ import (
 	"strconv"
 	"time"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
@@ -32,6 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+)
+
+const (
+	// The Default memory throttling factor for MemroyQoS
+	memoryThrottlingFactor = 0.8
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -92,12 +98,38 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 
 	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
 		unified := map[string]string{}
+
 		if memoryRequest != 0 {
 			unified[cm.MemoryMin] = strconv.FormatInt(memoryRequest, 10)
 		}
-		lc.Resources.Unified = unified
+
+		memoryHigh := int64(0)
+		if memoryLimit != 0 {
+			memoryHigh = int64(float64(memoryLimit) * memoryThrottlingFactor)
+		} else {
+			allocatable := m.getNodeAllocatable()
+			allocatableMemory, ok := allocatable[v1.ResourceMemory]
+			if ok && allocatableMemory.Value() > 0 {
+				memoryHigh = int64(float64(allocatableMemory.Value()) * memoryThrottlingFactor)
+			}
+		}
+		if memoryHigh > memoryRequest {
+			unified[cm.MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+		}
+		if len(unified) > 0 {
+			if lc.Resources.Unified == nil {
+				lc.Resources.Unified = unified
+			} else {
+				for k, v := range unified {
+					lc.Resources.Unified[k] = v
+				}
+			}
+			klog.V(4).InfoS("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
+		}
 	}
 
 	return lc

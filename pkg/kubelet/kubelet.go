@@ -649,6 +649,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.dockerLegacyService,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
+		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 	)
 	if err != nil {
 		return nil, err
