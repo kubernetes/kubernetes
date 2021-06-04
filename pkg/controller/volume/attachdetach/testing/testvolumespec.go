@@ -59,12 +59,12 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 	}
 }
 
-var extraPods *v1.PodList
-var volumeAttachments *storagev1.VolumeAttachmentList
-var pvs *v1.PersistentVolumeList
-var nodes *v1.NodeList
-
 func CreateTestClient() *fake.Clientset {
+	var extraPods *v1.PodList
+	var volumeAttachments *storagev1.VolumeAttachmentList
+	var pvs *v1.PersistentVolumeList
+	var nodes *v1.NodeList
+
 	fakeClient := &fake.Clientset{}
 
 	extraPods = &v1.PodList{}
@@ -156,7 +156,7 @@ func CreateTestClient() *fake.Clientset {
 			// We want also the "mynode" node since all the testing pods live there
 			nodeName = nodeNamePrefix
 		}
-		attachVolumeToNode("lostVolumeName", nodeName)
+		attachVolumeToNode(nodes, "lostVolumeName", nodeName)
 	}
 	fakeClient.AddReactor("update", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		updateAction := action.(core.UpdateAction)
@@ -173,38 +173,29 @@ func CreateTestClient() *fake.Clientset {
 		obj.Items = append(obj.Items, nodes.Items...)
 		return true, obj, nil
 	})
-	var mu sync.Mutex
 	volumeAttachments = &storagev1.VolumeAttachmentList{}
 	fakeClient.AddReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &storagev1.VolumeAttachmentList{}
-		mu.Lock()
 		obj.Items = append(obj.Items, volumeAttachments.Items...)
-		mu.Unlock()
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		va := createAction.GetObject().(*storagev1.VolumeAttachment)
-		mu.Lock()
 		volumeAttachments.Items = append(volumeAttachments.Items, *va)
-		mu.Unlock()
 		return true, createAction.GetObject(), nil
 	})
 
 	pvs = &v1.PersistentVolumeList{}
 	fakeClient.AddReactor("list", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PersistentVolumeList{}
-		mu.Lock()
 		obj.Items = append(obj.Items, pvs.Items...)
-		mu.Unlock()
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		pv := createAction.GetObject().(*v1.PersistentVolume)
-		mu.Lock()
 		pvs.Items = append(pvs.Items, *pv)
-		mu.Unlock()
 		return true, createAction.GetObject(), nil
 	})
 
@@ -305,7 +296,7 @@ func NewPV(pvName, volumeName string) *v1.PersistentVolume {
 	}
 }
 
-func attachVolumeToNode(volumeName, nodeName string) {
+func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string) {
 	// if nodeName exists, get the object.. if not create node object
 	var node *v1.Node
 	found := false
