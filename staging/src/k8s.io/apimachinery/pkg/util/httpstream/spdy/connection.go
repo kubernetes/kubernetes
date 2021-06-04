@@ -31,7 +31,7 @@ import (
 // streams.
 type connection struct {
 	conn             *spdystream.Connection
-	streams          map[uint32]httpstream.Stream
+	streams          []httpstream.Stream
 	streamLock       sync.Mutex
 	newStreamHandler httpstream.NewStreamHandler
 	ping             func() (time.Duration, error)
@@ -85,12 +85,7 @@ func NewServerConnectionWithPings(conn net.Conn, newStreamHandler httpstream.New
 // will be invoked when the server receives a newly created stream from the
 // client.
 func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewStreamHandler, pingPeriod time.Duration, pingFn func() (time.Duration, error)) httpstream.Connection {
-	c := &connection{
-		conn:             conn,
-		newStreamHandler: newStreamHandler,
-		ping:             pingFn,
-		streams:          make(map[uint32]httpstream.Stream),
-	}
+	c := &connection{conn: conn, newStreamHandler: newStreamHandler, ping: pingFn}
 	go conn.Serve(c.newSpdyStream)
 	if pingPeriod > 0 && pingFn != nil {
 		go c.sendPings(pingPeriod)
@@ -110,22 +105,13 @@ func (c *connection) Close() error {
 		// calling Reset instead of Close ensures that all streams are fully torn down
 		s.Reset()
 	}
-	c.streams = make(map[uint32]httpstream.Stream, 0)
+	c.streams = make([]httpstream.Stream, 0)
 	c.streamLock.Unlock()
 
 	// now that all streams are fully torn down, it's safe to call close on the underlying connection,
 	// which should be able to terminate immediately at this point, instead of waiting for any
 	// remaining graceful stream termination.
 	return c.conn.Close()
-}
-
-// RemoveStreams can be used to removes a set of streams from the Connection.
-func (c *connection) RemoveStreams(streams ...httpstream.Stream) {
-	c.streamLock.Lock()
-	for _, stream := range streams {
-		delete(c.streams, stream.Identifier())
-	}
-	c.streamLock.Unlock()
 }
 
 // CreateStream creates a new stream with the specified headers and registers
@@ -147,7 +133,7 @@ func (c *connection) CreateStream(headers http.Header) (httpstream.Stream, error
 // it owns.
 func (c *connection) registerStream(s httpstream.Stream) {
 	c.streamLock.Lock()
-	c.streams[s.Identifier()] = s
+	c.streams = append(c.streams, s)
 	c.streamLock.Unlock()
 }
 
