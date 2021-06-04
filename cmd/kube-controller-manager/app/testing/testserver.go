@@ -106,7 +106,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func(stopCh <-chan struct{}) {
 		if err := app.Run(config.Complete(), stopCh); err != nil {
 			errCh <- err
