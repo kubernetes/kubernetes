@@ -17,13 +17,23 @@ limitations under the License.
 package testing
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
+	grpclogsettable "github.com/grpc-ecosystem/go-grpc-middleware/logging/settable"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/tests/v3/integration"
+	"google.golang.org/grpc/grpclog"
 )
+
+var grpc_logger grpclogsettable.SettableLoggerV2
+
+func init() {
+	// override logger set up by etcd integration test package
+	grpc_logger = grpclogsettable.ReplaceGrpcLoggerV2()
+}
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
@@ -45,8 +55,9 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
 	integration.BeforeTestExternal(t)
+	grpc_logger.Set(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, &testErrorWriter{t}))
 	server := &EtcdTestServer{
-		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
+		v3Cluster: integration.NewClusterV3(&noLogT{t}, &integration.ClusterConfig{Size: 1}),
 	}
 	server.V3Client = server.v3Cluster.RandClient()
 	config := &storagebackend.Config{
@@ -58,4 +69,22 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 		Paging: true,
 	}
 	return server, config
+}
+
+type noLogT struct {
+	testing.TB
+}
+
+func (q *noLogT) Log(s ...interface{}) {
+}
+func (q *noLogT) Logf(s string, params ...interface{}) {
+}
+
+type testErrorWriter struct {
+	testing.TB
+}
+
+func (t *testErrorWriter) Write(b []byte) (int, error) {
+	t.TB.Error(string(b))
+	return len(b), nil
 }
