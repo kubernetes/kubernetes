@@ -585,6 +585,8 @@ message LinuxContainerResources {
     string cpuset_mems = 7;
     // List of HugepageLimits to limit the HugeTLB usage of container per page size. Default: nil (not specified).
     repeated HugepageLimit hugepage_limits = 8;
+    // Unified resources for cgroup v2. Default: nil (not specified).
+    map<string, string> unified = 9;
 }
 
 // HugepageLimit corresponds to the file`hugetlb.<hugepagesize>.limit_in_byte` in container level cgroup.
