@@ -38,8 +38,8 @@ import (
 )
 
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Controller, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: server.URL}
 	clientSet, err := clientset.NewForConfig(&config)

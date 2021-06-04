@@ -400,12 +400,12 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
 	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
 
-	masterConfig := framework.NewControlPlaneConfig()
-	masterConfig.GenericConfig.EnableIndex = true
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
-	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(masterConfig, apiServer, h)
+	controlPlaneConfig := framework.NewControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.EnableIndex = true
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizer
+	controlPlaneConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
+	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
