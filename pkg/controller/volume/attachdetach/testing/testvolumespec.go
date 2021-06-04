@@ -173,29 +173,38 @@ func CreateTestClient() *fake.Clientset {
 		obj.Items = append(obj.Items, nodes.Items...)
 		return true, obj, nil
 	})
+	var mu sync.Mutex
 	volumeAttachments = &storagev1.VolumeAttachmentList{}
 	fakeClient.AddReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &storagev1.VolumeAttachmentList{}
+		mu.Lock()
 		obj.Items = append(obj.Items, volumeAttachments.Items...)
+		mu.Unlock()
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		va := createAction.GetObject().(*storagev1.VolumeAttachment)
+		mu.Lock()
 		volumeAttachments.Items = append(volumeAttachments.Items, *va)
+		mu.Unlock()
 		return true, createAction.GetObject(), nil
 	})
 
 	pvs = &v1.PersistentVolumeList{}
 	fakeClient.AddReactor("list", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PersistentVolumeList{}
+		mu.Lock()
 		obj.Items = append(obj.Items, pvs.Items...)
+		mu.Unlock()
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		pv := createAction.GetObject().(*v1.PersistentVolume)
+		mu.Lock()
 		pvs.Items = append(pvs.Items, *pv)
+		mu.Unlock()
 		return true, createAction.GetObject(), nil
 	})
 
