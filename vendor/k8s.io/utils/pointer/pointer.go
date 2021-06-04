@@ -46,86 +46,182 @@ func AllPtrFieldsNil(obj interface{}) bool {
 	return true
 }
 
-// Int32Ptr returns a pointer to an int32
-func Int32Ptr(i int32) *int32 {
+// Int32 returns a pointer to an int32.
+func Int32(i int32) *int32 {
 	return &i
 }
 
-// Int32PtrDerefOr dereference the int32 ptr and returns it if not nil,
-// else returns def.
-func Int32PtrDerefOr(ptr *int32, def int32) int32 {
+var Int32Ptr = Int32 // for back-compat
+
+// Int32Deref dereferences the int32 ptr and returns it if not nil, or else
+// returns def.
+func Int32Deref(ptr *int32, def int32) int32 {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
 }
 
-// Int64Ptr returns a pointer to an int64
-func Int64Ptr(i int64) *int64 {
+var Int32PtrDerefOr = Int32Deref // for back-compat
+
+// Int32Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Int32Equal(a, b *int32) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Int64 returns a pointer to an int64.
+func Int64(i int64) *int64 {
 	return &i
 }
 
-// Int64PtrDerefOr dereference the int64 ptr and returns it if not nil,
-// else returns def.
-func Int64PtrDerefOr(ptr *int64, def int64) int64 {
+var Int64Ptr = Int64 // for back-compat
+
+// Int64Deref dereferences the int64 ptr and returns it if not nil, or else
+// returns def.
+func Int64Deref(ptr *int64, def int64) int64 {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
 }
 
-// BoolPtr returns a pointer to a bool
-func BoolPtr(b bool) *bool {
+var Int64PtrDerefOr = Int64Deref // for back-compat
+
+// Int64Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Int64Equal(a, b *int64) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Bool returns a pointer to a bool.
+func Bool(b bool) *bool {
 	return &b
 }
 
-// BoolPtrDerefOr dereference the bool ptr and returns it if not nil,
-// else returns def.
-func BoolPtrDerefOr(ptr *bool, def bool) bool {
+var BoolPtr = Bool // for back-compat
+
+// BoolDeref dereferences the bool ptr and returns it if not nil, or else
+// returns def.
+func BoolDeref(ptr *bool, def bool) bool {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
 }
 
-// StringPtr returns a pointer to the passed string.
-func StringPtr(s string) *string {
+var BoolPtrDerefOr = BoolDeref // for back-compat
+
+// BoolEqual returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func BoolEqual(a, b *bool) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// String returns a pointer to a string.
+func String(s string) *string {
 	return &s
 }
 
-// StringPtrDerefOr dereference the string ptr and returns it if not nil,
-// else returns def.
-func StringPtrDerefOr(ptr *string, def string) string {
+var StringPtr = String // for back-compat
+
+// StringDeref dereferences the string ptr and returns it if not nil, or else
+// returns def.
+func StringDeref(ptr *string, def string) string {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
 }
 
-// Float32Ptr returns a pointer to the passed float32.
-func Float32Ptr(i float32) *float32 {
+var StringPtrDerefOr = StringDeref // for back-compat
+
+// StringEqual returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func StringEqual(a, b *string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Float32 returns a pointer to the a float32.
+func Float32(i float32) *float32 {
 	return &i
 }
 
-// Float32PtrDerefOr dereference the float32 ptr and returns it if not nil,
-// else returns def.
-func Float32PtrDerefOr(ptr *float32, def float32) float32 {
+var Float32Ptr = Float32
+
+// Float32Deref dereferences the float32 ptr and returns it if not nil, or else
+// returns def.
+func Float32Deref(ptr *float32, def float32) float32 {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
 }
 
-// Float64Ptr returns a pointer to the passed float64.
-func Float64Ptr(i float64) *float64 {
+var Float32PtrDerefOr = Float32Deref // for back-compat
+
+// Float32Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Float32Equal(a, b *float32) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Float64 returns a pointer to the a float64.
+func Float64(i float64) *float64 {
 	return &i
 }
 
-// Float64PtrDerefOr dereference the float64 ptr and returns it if not nil,
-// else returns def.
-func Float64PtrDerefOr(ptr *float64, def float64) float64 {
+var Float64Ptr = Float64
+
+// Float64Deref dereferences the float64 ptr and returns it if not nil, or else
+// returns def.
+func Float64Deref(ptr *float64, def float64) float64 {
 	if ptr != nil {
 		return *ptr
 	}
 	return def
+}
+
+var Float64PtrDerefOr = Float64Deref // for back-compat
+
+// Float64Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Float64Equal(a, b *float64) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
 }

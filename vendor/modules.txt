@@ -2218,7 +2218,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.4.0 => k8s.io/system-validators v1.4.0
 ## explicit
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20201110183641-67b214c5f920 => k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+# k8s.io/utils v0.0.0-20210521133846-da695404a2bc => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -2693,7 +2693,7 @@ sigs.k8s.io/yaml
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 # k8s.io/system-validators => k8s.io/system-validators v1.4.0
-# k8s.io/utils => k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+# k8s.io/utils => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
 # modernc.org/mathutil => modernc.org/mathutil v1.0.0
