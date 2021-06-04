@@ -22,7 +22,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -625,6 +627,32 @@ func writeFile(f *os.File, str string) error {
 		return err
 	}
 	if err := f.Truncate(int64(len(str))); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateFileOwnerAndPermissions(path string, uid, gid int64, perms uint32) error {
+	if err := os.Chown(path, int(uid), int(gid)); err != nil {
+		return err
+	}
+	if err := os.Chmod(path, fs.FileMode(perms)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateDirOwnerAndPermissions(dirPath string, uid, gid int64, perms uint32) error {
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err := os.Chown(path, int(uid), int(gid)); err != nil {
+			return err
+		}
+		if err := os.Chmod(path, fs.FileMode(perms)); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 	return nil

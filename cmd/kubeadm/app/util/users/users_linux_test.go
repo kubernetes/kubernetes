@@ -19,9 +19,12 @@ limitations under the License.
 package users
 
 import (
+	"io/fs"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
+	"syscall"
 	"testing"
 )
 
@@ -570,6 +573,49 @@ func TestRemoveUsersAndGroups(t *testing.T) {
 	}
 }
 
+func TestUpdateFileOwnerAndPermissions(t *testing.T) {
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+	var uid int64 = 1000
+	var gid int64 = 1100
+	var perms uint32 = 0700
+	if err := UpdateFileOwnerAndPermissions(file.Name(), uid, gid, perms); err != nil {
+		t.Fatal(err)
+	}
+	checkPermissions(t, file.Name(), uid, gid, perms)
+}
+
+func TestUpdateDirOwnerAndPermissions(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	innerDir := dir + "/inner"
+	if err := os.Mkdir(innerDir, 0777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ioutil.TempFile(innerDir, ""); err != nil {
+		t.Fatal(err)
+	}
+	var uid int64 = 1000
+	var gid int64 = 1100
+	var perms uint32 = 0700
+	if err := UpdateDirOwnerAndPermissions(dir, uid, gid, perms); err != nil {
+		t.Fatalf("UpdateDirectoryOwnership(%s, 1000, 1100, 0700) failed: %v", dir, err)
+	}
+	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		checkPermissions(t, path, uid, gid, perms)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func writeTempFile(t *testing.T, contents string) (string, func()) {
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -590,4 +636,25 @@ func readTempFile(t *testing.T, path string) string {
 		t.Fatalf("could not read file: %v", err)
 	}
 	return string(b)
+}
+
+func checkPermissions(t *testing.T, path string, uid, gid int64, permissions uint32) {
+	t.Helper()
+	fInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fInfo.Mode().Perm() != fs.FileMode(permissions) {
+		t.Errorf("want file mode %s, got file mode %s", fs.FileMode(permissions).String(), fInfo.Mode().Perm().String())
+	}
+	statInfo, ok := fInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		t.Fatalf("could not cast fInfo.Sys to *syscall.Stat_t")
+	}
+	if statInfo.Uid != uint32(uid) {
+		t.Errorf("want uid %d, got uid %d", uid, statInfo.Uid)
+	}
+	if statInfo.Gid != uint32(gid) {
+		t.Errorf("want uid %d, got uid %d", gid, statInfo.Gid)
+	}
 }
