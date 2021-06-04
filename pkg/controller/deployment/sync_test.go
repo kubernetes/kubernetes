@@ -60,8 +60,30 @@ func TestScale(t *testing.T) {
 		expectedOld  []*apps.ReplicaSet
 		wasntUpdated map[string]bool
 
-		desiredReplicasAnnotations map[string]int32
+		desiredReplicasAnnotations       map[string]int32
+		expectedOldReplicasetAnnotations map[string]map[string]string
 	}{
+		// Scenario: deployment.spec.replicas == 5 ( foo-v2.spec.replicas = 4 and foo-v3.spec.replicas = 0 )
+		// Deployment is scaled to 4. foo-v2.spec.replicas and foo-v3.spec.replicas should not be updated, however desired-replicas
+		// annotation on foo-v2.spec.replicas should be updated.
+		{
+			name:          "update rs replicas annotation",
+			deployment:    newDeployment("foo", 4, nil, nil, intOrStrP(1), nil),
+			oldDeployment: newDeployment("foo", 5, nil, nil, intOrStrP(1), nil),
+
+			newRS:  rs("foo-v3", 0, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp)},
+
+			expectedNew: rs("foo-v3", 0, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp)},
+
+			desiredReplicasAnnotations: map[string]int32{"foo-v2": int32(5)},
+			expectedOldReplicasetAnnotations: map[string]map[string]string{
+				"foo-v2": {
+					"deployment.kubernetes.io/desired-replicas": "4",
+				},
+			},
+		},
 		{
 			name:          "normal scaling event: 10 -> 12",
 			deployment:    newDeployment("foo", 12, nil, nil, nil, nil),
@@ -315,6 +337,16 @@ func TestScale(t *testing.T) {
 			// Get all the UPDATE actions and update nameToSize with all the updated sizes.
 			for _, action := range fake.Actions() {
 				rs := action.(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
+				if annotations, ok := test.expectedOldReplicasetAnnotations[rs.Name]; ok {
+					for annotation, expectedValue := range annotations {
+						updatedValue, ok := rs.Annotations[annotation]
+						if !ok || updatedValue != expectedValue {
+							t.Errorf("%s: expected newRS annotation %s, got %s", test.name, expectedValue, updatedValue)
+							return
+						}
+					}
+				}
+
 				if !test.wasntUpdated[rs.Name] {
 					nameToSize[rs.Name] = *(rs.Spec.Replicas)
 				}
