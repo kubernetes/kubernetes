@@ -222,7 +222,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func(stopCh <-chan struct{}) {
 		prepared, err := server.PrepareRun()
 		if err != nil {
