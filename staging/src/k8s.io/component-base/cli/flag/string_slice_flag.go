@@ -46,8 +46,7 @@ func (s *StringSlice) String() string {
 
 func (s *StringSlice) Set(val string) error {
 	if s.value == nil || !s.changed {
-		v := make([]string, 0)
-		s.value = &v
+		*s.value = make([]string, 0)
 	}
 	*s.value = append(*s.value, val)
 	s.changed = true
