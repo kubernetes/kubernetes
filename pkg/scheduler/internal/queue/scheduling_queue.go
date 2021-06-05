@@ -247,7 +247,7 @@ func NewPriorityQueue(
 	}
 
 	if options.podNominator == nil {
-		options.podNominator = NewPodNominator()
+		options.podNominator = NewPodNominator(informerFactory.Core().V1().Pods().Lister())
 	}
 
 	pq := &PriorityQueue{
@@ -628,7 +628,7 @@ func (p *PriorityQueue) Close() {
 }
 
 // DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
-func (npm *nominatedPodMap) DeleteNominatedPodIfExists(pod *v1.Pod) {
+func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.Lock()
 	npm.delete(pod)
 	npm.Unlock()
@@ -638,7 +638,7 @@ func (npm *nominatedPodMap) DeleteNominatedPodIfExists(pod *v1.Pod) {
 // This is called during the preemption process after a node is nominated to run
 // the pod. We update the structure before sending a request to update the pod
 // object to avoid races with the following scheduling cycles.
-func (npm *nominatedPodMap) AddNominatedPod(pi *framework.PodInfo, nodeName string) {
+func (npm *nominator) AddNominatedPod(pi *framework.PodInfo, nodeName string) {
 	npm.Lock()
 	npm.add(pi, nodeName)
 	npm.Unlock()
@@ -646,7 +646,7 @@ func (npm *nominatedPodMap) AddNominatedPod(pi *framework.PodInfo, nodeName stri
 
 // NominatedPodsForNode returns pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
-func (npm *nominatedPodMap) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+func (npm *nominator) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
 	npm.RLock()
 	defer npm.RUnlock()
 	// TODO: we may need to return a copy of []*Pods to avoid modification
@@ -762,11 +762,11 @@ func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *Unschedulab
 	}
 }
 
-// nominatedPodMap is a structure that stores pods nominated to run on nodes.
+// nominator is a structure that stores pods nominated to run on nodes.
 // It exists because nominatedNodeName of pod objects stored in the structure
 // may be different than what scheduler has here. We should be able to find pods
 // by their UID and update/delete them.
-type nominatedPodMap struct {
+type nominator struct {
 	// podLister is used to verify if the given pod is alive.
 	podLister listersv1.PodLister
 	// nominatedPods is a map keyed by a node name and the value is a list of
@@ -780,7 +780,7 @@ type nominatedPodMap struct {
 	sync.RWMutex
 }
 
-func (npm *nominatedPodMap) add(pi *framework.PodInfo, nodeName string) {
+func (npm *nominator) add(pi *framework.PodInfo, nodeName string) {
 	// always delete the pod if it already exist, to ensure we never store more than
 	// one instance of the pod.
 	npm.delete(pi.Pod)
@@ -796,7 +796,7 @@ func (npm *nominatedPodMap) add(pi *framework.PodInfo, nodeName string) {
 	if npm.podLister != nil {
 		// If the pod is not alive, don't contain it.
 		if _, err := npm.podLister.Pods(pi.Pod.Namespace).Get(pi.Pod.Name); err != nil {
-			klog.V(4).InfoS("Pod doesn't exist in podLister, aborting adding it to the nominated map", "pod", klog.KObj(pi.Pod))
+			klog.V(4).InfoS("Pod doesn't exist in podLister, aborting adding it to the nominator", "pod", klog.KObj(pi.Pod))
 			return
 		}
 	}
@@ -804,14 +804,14 @@ func (npm *nominatedPodMap) add(pi *framework.PodInfo, nodeName string) {
 	npm.nominatedPodToNode[pi.Pod.UID] = nnn
 	for _, npi := range npm.nominatedPods[nnn] {
 		if npi.Pod.UID == pi.Pod.UID {
-			klog.V(4).InfoS("Pod already exists in the nominated map", "pod", klog.KObj(npi.Pod))
+			klog.V(4).InfoS("Pod already exists in the nominator", "pod", klog.KObj(npi.Pod))
 			return
 		}
 	}
 	npm.nominatedPods[nnn] = append(npm.nominatedPods[nnn], pi)
 }
 
-func (npm *nominatedPodMap) delete(p *v1.Pod) {
+func (npm *nominator) delete(p *v1.Pod) {
 	nnn, ok := npm.nominatedPodToNode[p.UID]
 	if !ok {
 		return
@@ -829,7 +829,7 @@ func (npm *nominatedPodMap) delete(p *v1.Pod) {
 }
 
 // UpdateNominatedPod updates the <oldPod> with <newPod>.
-func (npm *nominatedPodMap) UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *framework.PodInfo) {
+func (npm *nominator) UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *framework.PodInfo) {
 	npm.Lock()
 	defer npm.Unlock()
 	// In some cases, an Update event with no "NominatedNode" present is received right
@@ -852,17 +852,11 @@ func (npm *nominatedPodMap) UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *frame
 	npm.add(newPodInfo, nodeName)
 }
 
-// NewPodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
-// DEPRECATED: use NewSafePodNominator() instead.
-func NewPodNominator() framework.PodNominator {
-	return NewSafePodNominator(nil)
-}
-
-// NewSafePodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
-// Unlike NewPodNominator, it passes in a podLister so as to check if the pod is alive
+// NewPodNominator creates a nominator as a backing of framework.PodNominator.
+// A podLister is passed in so as to check if the pod exists
 // before adding its nominatedNode info.
-func NewSafePodNominator(podLister listersv1.PodLister) framework.PodNominator {
-	return &nominatedPodMap{
+func NewPodNominator(podLister listersv1.PodLister) framework.PodNominator {
+	return &nominator{
 		podLister:          podLister,
 		nominatedPods:      make(map[string][]*framework.PodInfo),
 		nominatedPodToNode: make(map[types.UID]string),
