@@ -4910,8 +4910,9 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	// externalIP should route to local ready + non-terminating endpoints if they exist
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 1, "Expected 1 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.3:80")
+	assert.Len(t, realServers2, 2, "Expected 2 real servers")
+	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
+	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
