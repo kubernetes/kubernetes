@@ -336,13 +336,13 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 
 	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
+		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServerUsingServer(masterConfig, s, h)
+	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)

@@ -259,14 +259,14 @@ func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
 // NewIntegrationTestControlPlaneConfigWithOptions returns the control plane config appropriate for most integration tests
 // configured with the provided options.
 func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
-	masterConfig := NewControlPlaneConfigWithOptions(opts)
-	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
+	controlPlaneConfig := NewControlPlaneConfigWithOptions(opts)
+	controlPlaneConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving
-	masterConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
+	controlPlaneConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
-	return masterConfig
+	return controlPlaneConfig
 }
 
 // MasterConfigOptions are the configurable options for a new integration test master config.
@@ -342,12 +342,12 @@ func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.C
 type CloseFunc func()
 
 // RunAnAPIServer starts a API server with the provided config.
-func RunAnAPIServer(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	if masterConfig == nil {
-		masterConfig = NewControlPlaneConfig()
-		masterConfig.GenericConfig.EnableProfiling = true
+func RunAnAPIServer(controlPlaneConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	if controlPlaneConfig == nil {
+		controlPlaneConfig = NewControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.EnableProfiling = true
 	}
-	return startAPIServerOrDie(masterConfig, nil, nil)
+	return startAPIServerOrDie(controlPlaneConfig, nil, nil)
 }
 
 // RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.

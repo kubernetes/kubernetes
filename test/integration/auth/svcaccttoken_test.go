@@ -83,10 +83,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	gcs := &clientset.Clientset{}
 
 	// Start the server
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	masterConfig.GenericConfig.Authentication.APIAudiences = aud
-	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	controlPlaneConfig.GenericConfig.Authentication.APIAudiences = aud
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
 		serviceaccount.JWTTokenAuthenticator(
 			[]string{iss},
 			[]interface{}{&pk},
@@ -110,16 +110,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
-	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
-	masterConfig.GenericConfig.Authentication.APIAudiences = aud
-	masterConfig.ExtraConfig.ExtendExpiration = true
+	controlPlaneConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
+	controlPlaneConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
+	controlPlaneConfig.GenericConfig.Authentication.APIAudiences = aud
+	controlPlaneConfig.ExtraConfig.ExtendExpiration = true
 
-	masterConfig.ExtraConfig.ServiceAccountIssuerURL = iss
-	masterConfig.ExtraConfig.ServiceAccountJWKSURI = ""
-	masterConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
+	controlPlaneConfig.ExtraConfig.ServiceAccountIssuerURL = iss
+	controlPlaneConfig.ExtraConfig.ServiceAccountJWKSURI = ""
+	controlPlaneConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
 
-	master, _, closeFn := framework.RunAnAPIServer(masterConfig)
+	master, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	cs, err := clientset.NewForConfig(master.GenericAPIServer.LoopbackClientConfig)
@@ -372,7 +372,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			ObjectMeta: sa.ObjectMeta,
 		}
 		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, 0, nil)
-		tok, err := masterConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
+		tok, err := controlPlaneConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
 		}

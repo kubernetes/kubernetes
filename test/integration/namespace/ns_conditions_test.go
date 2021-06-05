@@ -165,8 +165,8 @@ func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured,
 }
 
 func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.NamespaceController, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	config.QPS = 10000

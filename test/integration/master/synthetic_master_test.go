@@ -140,58 +140,58 @@ func TestEmptyList(t *testing.T) {
 }
 
 func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	return masterConfig
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+	return controlPlaneConfig
 }
 
 func initUnauthorizedControlPlaneConfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	masterConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	return masterConfig
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	return controlPlaneConfig
 }
 
 func TestStatus(t *testing.T) {
 	testCases := []struct {
-		name         string
-		masterConfig *controlplane.Config
-		statusCode   int
-		reqPath      string
-		reason       string
-		message      string
+		name               string
+		controlPlaneConfig *controlplane.Config
+		statusCode         int
+		reqPath            string
+		reason             string
+		message            string
 	}{
 		{
-			name:         "404",
-			masterConfig: nil,
-			statusCode:   http.StatusNotFound,
-			reqPath:      "/apis/batch/v1/namespaces/default/jobs/foo",
-			reason:       "NotFound",
-			message:      `jobs.batch "foo" not found`,
+			name:               "404",
+			controlPlaneConfig: nil,
+			statusCode:         http.StatusNotFound,
+			reqPath:            "/apis/batch/v1/namespaces/default/jobs/foo",
+			reason:             "NotFound",
+			message:            `jobs.batch "foo" not found`,
 		},
 		{
-			name:         "403",
-			masterConfig: initStatusForbiddenControlPlaneConfig(),
-			statusCode:   http.StatusForbidden,
-			reqPath:      "/apis",
-			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			name:               "403",
+			controlPlaneConfig: initStatusForbiddenControlPlaneConfig(),
+			statusCode:         http.StatusForbidden,
+			reqPath:            "/apis",
+			reason:             "Forbidden",
+			message:            `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
-			name:         "401",
-			masterConfig: initUnauthorizedControlPlaneConfig(),
-			statusCode:   http.StatusUnauthorized,
-			reqPath:      "/apis",
-			reason:       "Unauthorized",
-			message:      `Unauthorized`,
+			name:               "401",
+			controlPlaneConfig: initUnauthorizedControlPlaneConfig(),
+			statusCode:         http.StatusUnauthorized,
+			reqPath:            "/apis",
+			reason:             "Unauthorized",
+			message:            `Unauthorized`,
 		},
 	}
 
 	for _, tc := range testCases {
-		_, s, closeFn := framework.RunAnAPIServer(tc.masterConfig)
+		_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
 		defer closeFn()
 
 		u := s.URL + tc.reqPath

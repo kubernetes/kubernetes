@@ -421,8 +421,8 @@ func newV1Eviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *
 }
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)

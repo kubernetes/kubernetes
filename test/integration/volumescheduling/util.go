@@ -71,7 +71,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		resourceConfig.EnableVersions(schema.GroupVersion{
@@ -79,13 +79,13 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 			Version: "v1alpha1",
 		})
 	}
-	masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 
 	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
+		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServerUsingServer(masterConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)

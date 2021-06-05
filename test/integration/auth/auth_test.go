@@ -439,9 +439,9 @@ func getTestRequests(namespace string) []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-always-allow", s, t)
@@ -536,10 +536,10 @@ func getPreviousResourceVersionKey(url, id string) string {
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
@@ -585,11 +585,11 @@ func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", s, t)
@@ -655,10 +655,10 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 // should receive "Forbidden".
 func TestBobIsForbidden(t *testing.T) {
 	// This file has alice and bob in it.
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-bob-forbidden", s, t)
@@ -698,11 +698,11 @@ func TestBobIsForbidden(t *testing.T) {
 func TestUnknownUserIsUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", s, t)
@@ -760,11 +760,11 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 }
 
 func TestImpersonateIsForbidden(t *testing.T) {
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = impersonateAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = impersonateAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", s, t)
@@ -907,11 +907,11 @@ func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorize
 func TestAuthorizationAttributeDetermination(t *testing.T) {
 	trackingAuthorizer := &trackingAuthorizer{}
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = trackingAuthorizer
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = trackingAuthorizer
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-attribute-determination", s, t)
@@ -973,11 +973,11 @@ func TestNamespaceAuthorization(t *testing.T) {
 	a := newAuthorizerWithContents(t, `{"namespace": "auth-namespace"}
 `)
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-namespace", s, t)
@@ -1071,11 +1071,11 @@ func TestKindAuthorization(t *testing.T) {
 	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-kind", s, t)
@@ -1155,11 +1155,11 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 	a := newAuthorizerWithContents(t, `{"readonly": true}`)
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	masterConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-read-only", s, t)
@@ -1232,11 +1232,11 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 		t.Fatalf("error starting webhook token authenticator server: %v", err)
 	}
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
+	// Set up an API server
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-webhook-token", s, t)
