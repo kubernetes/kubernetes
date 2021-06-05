@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -362,6 +363,75 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target)
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
+				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
+			}
+		})
+	}
+}
+
+func TestGenerateLinuxContainerConfigCpuShares(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	_, _, m, err := createTestRuntimeManager()
+	if err != nil {
+		t.Fatalf("error creating test RuntimeManager: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		pod  *v1.Pod
+		want int64
+	}{
+		{
+			"MinShares",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("0"),
+									v1.ResourceMemory: resource.MustParse("0"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1G"),
+								},
+							},
+						},
+					},
+				},
+			},
+			minShares,
+		},
+		{
+			"NormalShares",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1G"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1G"),
+								},
+							},
+						},
+					},
+					ShareProcessNamespace: &[]bool{true}[0],
+				},
+			},
+			1024,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil)
+			if diff := cmp.Diff(tc.want, got.Resources.CpuShares); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
 			}
 		})

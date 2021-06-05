@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -51,23 +52,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	}
 
 	// set linux container resources
-	var cpuShares int64
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
-	// API server does this for new containers, but we repeat this logic in Kubelet
-	// for containers running on existing Kubernetes clusters.
-	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
-	} else {
-		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
-		// of CPU shares.
-		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
-	}
-	lc.Resources.CpuShares = cpuShares
+	// API server does this for new containers.
+	lc.Resources.CpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	if memoryLimit != 0 {
 		lc.Resources.MemoryLimitInBytes = memoryLimit
 	}
