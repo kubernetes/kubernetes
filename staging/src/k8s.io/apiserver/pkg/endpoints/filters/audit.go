@@ -173,6 +173,7 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	_, cn := responseWriter.(http.CloseNotifier)
 	_, fl := responseWriter.(http.Flusher)
 	_, hj := responseWriter.(http.Hijacker)
