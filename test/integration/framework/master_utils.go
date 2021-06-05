@@ -87,19 +87,19 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 	}, true, nil
 }
 
-// MasterReceiver can be used to provide the master to a custom incoming server function
-type MasterReceiver interface {
-	SetMaster(m *controlplane.Instance)
+// APIServerReceiver can be used to provide the API server to a custom incoming server function
+type APIServerReceiver interface {
+	SetAPIServer(m *controlplane.Instance)
 }
 
-// MasterHolder implements
-type MasterHolder struct {
+// APIServerHolder implements
+type APIServerHolder struct {
 	Initialized chan struct{}
 	M           *controlplane.Instance
 }
 
-// SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *controlplane.Instance) {
+// SetAPIServer assigns the current API server.
+func (h *APIServerHolder) SetAPIServer(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -123,8 +123,8 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
-// startApiserverOrDie starts a kubernetes master and an httpserver to handle api requests
-func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// startAPIServerOrDie starts a kubernetes master and an httpserver to handle api requests
+func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
@@ -214,8 +214,8 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
-	if masterReceiver != nil {
-		masterReceiver.SetMaster(m)
+	if apiServerReceiver != nil {
+		apiServerReceiver.SetAPIServer(m)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
@@ -341,18 +341,18 @@ func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.C
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
-// RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// RunAnAPIServer starts a API server with the provided config.
+func RunAnAPIServer(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewControlPlaneConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 	}
-	return startApiserverOrDie(masterConfig, nil, nil)
+	return startAPIServerOrDie(masterConfig, nil, nil)
 }
 
-// RunAnApiserverUsingServer starts up an instance using the provided config on the specified server.
-func RunAnApiserverUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	return startApiserverOrDie(controlPlaneConfig, s, masterReceiver)
+// RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.
+func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	return startAPIServerOrDie(controlPlaneConfig, s, apiServerReceiver)
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.

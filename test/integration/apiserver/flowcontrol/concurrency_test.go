@@ -62,7 +62,7 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFligh
 	masterConfig.GenericConfig.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 
 	return s, masterConfig.GenericConfig.LoopbackClientConfig, closeFn
 }

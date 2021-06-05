@@ -64,8 +64,8 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		cancelFn: cancelFunc,
 	}
 
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// 1. Create API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -85,7 +85,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		masterConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnApiserverUsingServer(masterConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServerUsingServer(masterConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)

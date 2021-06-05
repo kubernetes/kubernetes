@@ -322,7 +322,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
 	// Listener
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -405,7 +405,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAnApiserverUsingServer(masterConfig, apiServer, h)
+	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

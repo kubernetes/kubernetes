@@ -398,11 +398,14 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
 	*/
 	ginkgo.It("should be ready immediately after startupProbe succeeds", func() {
-		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; echo ok >/tmp/startup; sleep 600"}
+		// Probe workers sleep at Kubelet start for a random time which is at most PeriodSeconds
+		// this test requires both readiness and startup workers running before updating statuses
+		// to avoid flakes, ensure sleep before startup (22s) > readinessProbe.PeriodSeconds
+		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 22; echo ok >/tmp/startup; sleep 600"}
 		readinessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/health"}),
 			InitialDelaySeconds: 0,
-			PeriodSeconds:       60,
+			PeriodSeconds:       20,
 		}
 		startupProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/startup"}),

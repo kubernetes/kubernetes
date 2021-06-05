@@ -69,7 +69,7 @@ func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 }
 
 func testPrefix(t *testing.T, prefix string) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + prefix)
@@ -95,7 +95,7 @@ func TestAppsPrefix(t *testing.T) {
 
 func TestKubernetesService(t *testing.T) {
 	config := framework.NewControlPlaneConfig()
-	_, _, closeFn := framework.RunAMaster(config)
+	_, _, closeFn := framework.RunAnAPIServer(config)
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
@@ -112,7 +112,7 @@ func TestKubernetesService(t *testing.T) {
 }
 
 func TestEmptyList(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	u := s.URL + "/api/v1/namespaces/default/pods"
@@ -191,7 +191,7 @@ func TestStatus(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, s, closeFn := framework.RunAMaster(tc.masterConfig)
+		_, s, closeFn := framework.RunAnAPIServer(tc.masterConfig)
 		defer closeFn()
 
 		u := s.URL + tc.reqPath
@@ -298,7 +298,7 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 }
 
 func TestObjectSizeResponses(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -349,7 +349,7 @@ func TestObjectSizeResponses(t *testing.T) {
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
@@ -430,7 +430,7 @@ func appsPath(resource, namespace, name string) string {
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 	transport := http.DefaultTransport
 
@@ -475,7 +475,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAppsGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 	transport := http.DefaultTransport
 
@@ -523,7 +523,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/")
@@ -601,7 +601,7 @@ func countEndpoints(eps *corev1.Endpoints) int {
 }
 
 func TestMasterService(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
+	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -643,7 +643,7 @@ func TestServiceAlloc(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

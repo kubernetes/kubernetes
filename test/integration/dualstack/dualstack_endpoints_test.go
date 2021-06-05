@@ -64,7 +64,7 @@ func TestDualStackEndpoints(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
 var (
@@ -699,6 +700,26 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 		}
 		t.Errorf("unexpected bookmark watchers %v", numWatchers)
 	}
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	initSignal := utilflowcontrol.NewInitializationSignal()
+	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
+
+	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	initSignal.Wait()
 }
 
 func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBookmarks bool) {

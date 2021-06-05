@@ -501,11 +501,10 @@ const (
 	// owner: @alaypatel07, @soltysh
 	// alpha: v1.20
 	// beta: v1.21
+	// GA: v1.22
 	//
 	// CronJobControllerV2 controls whether the controller manager starts old cronjob
 	// controller or new one which is implemented with informers and delaying queue
-	//
-	// This feature is deprecated, and will be removed in v1.22.
 	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
 
 	// owner: @smarterclayton
@@ -513,12 +512,6 @@ const (
 	// beta: v1.22
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
-
-	// owner: @m1093782566
-	// alpha: v1.17
-	//
-	// Enables topology aware service routing
-	ServiceTopology featuregate.Feature = "ServiceTopology"
 
 	// owner: @robscott
 	// kep: http://kep.k8s.io/1507
@@ -840,9 +833,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.Beta},
-	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
-	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
+	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},

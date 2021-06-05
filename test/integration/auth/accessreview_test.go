@@ -58,7 +58,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -153,7 +153,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 		}, true, nil
 	})
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -232,7 +232,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

@@ -6,7 +6,7 @@ go 1.16
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
