@@ -19,7 +19,6 @@ package logs
 import (
 	"bufio"
 	"bytes"
-	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -28,8 +27,6 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"k8s.io/klog/v2"
 )
 
 // TestZapLoggerInfo test ZapLogger json info format
@@ -144,38 +141,6 @@ func TestZapLoggerError(t *testing.T) {
 	expect := fmt.Sprintf(expectFormat, ts)
 	if !assert.JSONEq(t, expect, logStr) {
 		t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logStr)
-	}
-}
-
-// TestKlogV test klog -v(--verbose) func available with json logger
-func TestKlogV(t *testing.T) {
-	var buffer testBuff
-	logger := NewJSONLogger(&buffer)
-	klog.SetLogger(logger)
-	defer klog.SetLogger(nil)
-	fs := flag.FlagSet{}
-	klog.InitFlags(&fs)
-	totalLogsWritten := 0
-
-	defer fs.Set("v", "0")
-
-	for i := 0; i < 11; i++ {
-		err := fs.Set("v", fmt.Sprintf("%d", i))
-		if err != nil {
-			t.Fatalf("Failed to set verbosity")
-		}
-		for j := 0; j < 11; j++ {
-			klog.V(klog.Level(j)).Info("test", "time", time.Microsecond)
-			logWritten := buffer.writeCount > 0
-			totalLogsWritten += buffer.writeCount
-			buffer.writeCount = 0
-			if logWritten == (i < j) {
-				t.Errorf("klog.V(%d).Info(...) wrote log when -v=%d", j, i)
-			}
-		}
-	}
-	if totalLogsWritten != 66 {
-		t.Fatalf("Unexpected number of logs written, got %d, expected 66", totalLogsWritten)
 	}
 }
 
