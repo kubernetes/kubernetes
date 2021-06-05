@@ -306,7 +306,6 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
-				HorizontalPodAutoscalerUseRESTClients:               true,
 			},
 		},
 		JobController: &JobControllerOptions{
@@ -561,7 +560,6 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
-				HorizontalPodAutoscalerUseRESTClients:               true,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,

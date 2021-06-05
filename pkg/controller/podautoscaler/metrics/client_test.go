@@ -42,6 +42,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var fixedTimestamp = time.Date(2015, time.November, 10, 12, 30, 0, 0, time.UTC)
+
+// timestamp is used for establishing order on metricPoints
+type metricPoint struct {
+	level     uint64
+	timestamp int
+}
+
 type restClientTestCase struct {
 	desiredMetricValues PodMetricsInfo
 	desiredError        error
@@ -423,4 +431,8 @@ func TestRESTClientContainerCPUEmptyMetricsForOnePod(t *testing.T) {
 		reportedPodMetrics: []map[string]int64{{"test-1": 100}, {"test-1": 300, "test-2": 400}, {}},
 	}
 	tc.runTest(t)
+}
+
+func offsetTimestampBy(t int) time.Time {
+	return fixedTimestamp.Add(time.Duration(t) * time.Minute)
 }
