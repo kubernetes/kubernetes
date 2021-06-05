@@ -507,14 +507,19 @@ func (r Request) finalURLTemplate() url.URL {
 		newParams[k] = v
 	}
 	r.params = newParams
-	url := r.URL()
+	u := r.URL()
 
-	segments := strings.Split(url.Path, "/")
+	if u == nil {
+		klog.V(4).Infof("unexpected nil URL in Request: %v", r)
+		return url.URL{}
+	}
+
+	segments := strings.Split(u.Path, "/")
 	groupIndex := 0
 	index := 0
 	trimmedBasePath := ""
-	if url != nil && r.c.base != nil && strings.Contains(url.Path, r.c.base.Path) {
-		p := strings.TrimPrefix(url.Path, r.c.base.Path)
+	if r.c.base != nil && strings.Contains(u.Path, r.c.base.Path) {
+		p := strings.TrimPrefix(u.Path, r.c.base.Path)
 		if !strings.HasPrefix(p, "/") {
 			p = "/" + p
 		}
@@ -525,7 +530,7 @@ func (r Request) finalURLTemplate() url.URL {
 		groupIndex = 1
 	}
 	if len(segments) <= 2 {
-		return *url
+		return *u
 	}
 
 	const CoreGroupPrefix = "api"
@@ -542,10 +547,10 @@ func (r Request) finalURLTemplate() url.URL {
 		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
 		// outlet here in case more API groups are added in future if ever possible:
 		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups
-		// if a wrong API groups name is encountered, return the {prefix} for url.Path
-		url.Path = "/{prefix}"
-		url.RawQuery = ""
-		return *url
+		// if a wrong API groups name is encountered, return the {prefix} for u.Path
+		u.Path = "/{prefix}"
+		u.RawQuery = ""
+		return *u
 	}
 	//switch segLength := len(segments) - index; segLength {
 	switch {
@@ -570,8 +575,8 @@ func (r Request) finalURLTemplate() url.URL {
 			segments[index+3] = "{name}"
 		}
 	}
-	url.Path = path.Join(trimmedBasePath, path.Join(segments...))
-	return *url
+	u.Path = path.Join(trimmedBasePath, path.Join(segments...))
+	return *u
 }
 
 func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) error {

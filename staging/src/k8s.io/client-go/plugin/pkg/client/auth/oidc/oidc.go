@@ -111,12 +111,12 @@ func (c *clientCache) setClient(clusterAddress, issuer, clientID string, client 
 func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	issuer := cfg[cfgIssuerURL]
 	if issuer == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgIssuerURL)
+		return nil, fmt.Errorf("must provide %s", cfgIssuerURL)
 	}
 
 	clientID := cfg[cfgClientID]
 	if clientID == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgClientID)
+		return nil, fmt.Errorf("must provide %s", cfgClientID)
 	}
 
 	// Check cache for existing provider.
@@ -236,7 +236,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	// Try to request a new token using the refresh token.
 	rt, ok := p.cfg[cfgRefreshToken]
 	if !ok || len(rt) == 0 {
-		return "", errors.New("No valid id-token, and cannot refresh without refresh-token")
+		return "", errors.New("no valid id-token, and cannot refresh without refresh-token")
 	}
 
 	// Determine provider's OAuth2 token endpoint.
