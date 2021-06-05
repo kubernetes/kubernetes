@@ -480,7 +480,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		},
 		{
 			levels:              []DebugLevel{DebugCurlCommand},
-			expectedOutputLines: []string{fmt.Sprintf("curl -v -X")},
+			expectedOutputLines: []string{"curl -k -v -X"},
 		},
 	}
 
