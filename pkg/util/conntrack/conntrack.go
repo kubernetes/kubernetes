@@ -43,10 +43,19 @@ func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
 	return parameters
 }
 
+// for TCP only match SYN_SENT connections so we don't break connections that are/were already established
+func parametersWithProtocol(isTCP bool, parameters ...string) []string {
+	if isTCP {
+		parameters = append(parameters, "--state", "SYN_SENT")
+	}
+	return parameters
+}
+
 // ClearEntriesForIP uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the given service IP
 func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
+	parameters = parametersWithProtocol(protocol == v1.ProtocolTCP, parameters...)
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
@@ -89,6 +98,7 @@ func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol 
 		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
 	}
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
+	parameters = parametersWithProtocol(protocol == v1.ProtocolTCP, parameters...)
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
@@ -101,6 +111,7 @@ func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol 
 func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
 		"-p", protoStr(protocol))
+	parameters = parametersWithProtocol(protocol == v1.ProtocolTCP, parameters...)
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
@@ -120,6 +131,7 @@ func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protoc
 		return fmt.Errorf("Wrong port number. The port number must be greater then zero")
 	}
 	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
+	parameters = parametersWithProtocol(protocol == v1.ProtocolTCP, parameters...)
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for %s port: %d, error: %v", protoStr(protocol), port, err)
