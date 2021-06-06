@@ -201,6 +201,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -516,6 +522,7 @@ func NewNodeLifecycleController(
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
 			nc.nodesToRetry.Delete(node.Name)
 			nc.nodeEvictionMap.unregisterNode(node.Name)
+			nc.nodeHealthMap.delete(node.Name)
 			return nil
 		}),
 	})
@@ -594,6 +601,7 @@ func (nc *Controller) doNodeProcessingPassWorker() {
 			return
 		}
 		nodeName := obj.(string)
+
 		if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
 			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
 			// TODO(k82cn): Add nodeName back to the queue
@@ -798,6 +806,11 @@ func (nc *Controller) monitorNodeHealth() error {
 			name := node.Name
 			node, err = nc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
+				// If the node no longer exists, delete the corresponding health data from nodeHealthMap.
+				if apierrors.IsNotFound(err) {
+					nc.nodeHealthMap.delete(name)
+					return true, nil
+				}
 				klog.Errorf("Failed while getting a Node to retry updating node health. Probably Node %s was deleted.", name)
 				return false, err
 			}
