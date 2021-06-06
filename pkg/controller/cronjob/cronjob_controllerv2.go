@@ -425,6 +425,14 @@ func (jm *ControllerV2) syncCronJob(
 			_, status := getFinishedStatus(j)
 			deleteFromActiveList(cj, j.ObjectMeta.UID)
 			jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
+		} else if IsJobFinished(j) {
+			// a job does not have to be in active list, as long as it is finished, we will process the timestamp
+			if cj.Status.LastSuccessfulTime == nil {
+				cj.Status.LastSuccessfulTime = j.Status.CompletionTime
+			}
+			if j.Status.CompletionTime != nil && j.Status.CompletionTime.After(cj.Status.LastSuccessfulTime.Time) {
+				cj.Status.LastSuccessfulTime = j.Status.CompletionTime
+			}
 		}
 	}
 
