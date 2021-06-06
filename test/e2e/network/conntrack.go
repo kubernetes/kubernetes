@@ -279,6 +279,158 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
+	ginkgo.It("should be able to preserve TCP traffic when server pod cycles for a NodePort service", func() {
+
+		// Create a NodePort service
+		tcpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a TCP service " + serviceName + " with type=NodePort in " + ns)
+		tcpService, err := tcpJig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "tcp", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		// Create a pod in one node to create the UDP traffic against the NodePort service every 5 seconds
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
+		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, tcpService.Spec.Ports[0].NodePort)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		fr.PodClient().CreateSync(clientPod)
+
+		// Read the client pod logs
+		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod client logs: %s", logs)
+
+		// Add a backend pod to the service in the other node
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--tcp-port=%d", 80))
+		serverPod1.Labels = tcpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
+		fr.PodClient().CreateSync(serverPod1)
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Additionally take into account that TCP SYN conntrakt entries timeout is
+		// net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 120
+		// Based on the above check if the pod receives the traffic.
+		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 1")
+		}
+
+		// Create a second pod
+		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--tcp-port=%d", 80))
+		serverPod2.Labels = tcpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
+		fr.PodClient().CreateSync(serverPod2)
+
+		// and delete the first pod
+		framework.Logf("Cleaning up %s pod", podBackend1)
+		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+
+		// Check that the second pod keeps receiving traffic
+		// UDP conntrack entries timeout is 30 sec by default
+		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 2")
+		}
+	})
+
+	ginkgo.It("should be able to preserve TCP traffic when server pod cycles for a ClusterIP service", func() {
+
+		// Create a ClusterIP service
+		tcpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in " + ns)
+		tcpService, err := tcpJig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "tcp", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		// Create a pod in one node to create the UDP traffic against the ClusterIP service every 5 seconds
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
+		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
+		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -w 5 -p %d %s %d; echo; done`, srcPort, tcpService.Spec.ClusterIP, tcpService.Spec.Ports[0].Port)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		fr.PodClient().CreateSync(clientPod)
+
+		// Read the client pod logs
+		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod client logs: %s", logs)
+
+		// Add a backend pod to the service in the other node
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--tcp-port=%d", 80))
+		serverPod1.Labels = tcpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
+		fr.PodClient().CreateSync(serverPod1)
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Additionally take into account that TCP SYN conntrakt entries timeout is
+		// net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 120
+		// Based on the above check if the pod receives the traffic.
+		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 1")
+		}
+
+		// Create a second pod
+		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--tcp-port=%d", 80))
+		serverPod2.Labels = tcpJig.Labels
+		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
+		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
+		fr.PodClient().CreateSync(serverPod2)
+
+		// and delete the first pod
+		framework.Logf("Cleaning up %s pod", podBackend1)
+		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+
+		// Check that the second pod keeps receiving traffic
+		// UDP conntrack entries timeout is 30 sec by default
+		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 2")
+		}
+	})
+
 	// Regression test for #74839, where:
 	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
 	// a problem where spurious retransmits in a long-running TCP connection to a service
