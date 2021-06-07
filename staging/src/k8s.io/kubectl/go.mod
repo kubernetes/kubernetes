@@ -27,7 +27,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.1.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 	gopkg.in/yaml.v2 v2.4.0

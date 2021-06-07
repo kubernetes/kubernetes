@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/common v0.26.0
 	github.com/prometheus/procfs v0.2.0
 	github.com/spf13/cobra v1.1.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449 // indirect
