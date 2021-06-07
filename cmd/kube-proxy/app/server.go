@@ -691,7 +691,7 @@ func (s *ProxyServer) Run() error {
 				// TODO(random-liu): Remove this when the docker bug is fixed.
 				const message = "CRI error: /sys is read-only: " +
 					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
-				s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, err.Error(), "Starting Kube-proxy", message)
+				s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, err.Error(), "Starting kube-proxy", message)
 			}
 		}
 
