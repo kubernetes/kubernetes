@@ -1255,6 +1255,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				testsuites.CapOnlineExpansion:     true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
@@ -1697,6 +1698,7 @@ func InitAwsDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				testsuites.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
