@@ -452,7 +452,7 @@ func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP
 		netTier := cloud.NetworkTierGCEValueToType(netTierStr)
 		if netTier != desiredNetTier {
 			klog.Errorf("verifyUserRequestedIP: requested static IP %q (name: %s) for LB %s has network tier %s, need %s.", requestedIP, existingAddress.Name, lbRef, netTier, desiredNetTier)
-			return false, fmt.Errorf("requrested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
+			return false, fmt.Errorf("requested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
 		}
 		klog.V(4).Infof("verifyUserRequestedIP: the requested static IP %q (name: %s, tier: %s) for LB %s exists.", requestedIP, existingAddress.Name, netTier, lbRef)
 		return true, nil
