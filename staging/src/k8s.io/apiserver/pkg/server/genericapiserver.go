@@ -351,6 +351,17 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	drainedCh := make(chan struct{})
+	go func() {
+		defer close(drainedCh)
+
+		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		<-delayedStopCh
+
+		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+		s.HandlerChainWaitGroup.Wait()
+	}()
+
 	<-stopCh
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
@@ -359,13 +370,10 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
-	<-delayedStopCh
+	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
+	<-drainedCh
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
 	<-stoppedCh
-
-	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
-	s.HandlerChainWaitGroup.Wait()
 
 	return nil
 }
