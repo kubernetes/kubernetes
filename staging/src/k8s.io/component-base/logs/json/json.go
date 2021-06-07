@@ -17,7 +17,6 @@ limitations under the License.
 package logs
 
 import (
-	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -35,6 +34,38 @@ var (
 	timeNow = time.Now
 )
 
+func init() {
+	JSONLogger = NewJSONLogger(nil)
+}
+
+// NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
+func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
+	l, _ := zapConfig.Build()
+	l = l.WithOptions(zap.AddCallerSkip(1))
+	if w != nil {
+		l = l.WithOptions(zap.WrapCore(
+			func(zapcore.Core) zapcore.Core {
+				return zapcore.NewCore(zapcore.NewJSONEncoder(zapConfig.EncoderConfig), zapcore.AddSync(w), zapcore.DebugLevel)
+			}))
+	}
+	return &zapLogger{l: l}
+}
+
+var zapConfig = zap.Config{
+	Level:       zap.NewAtomicLevelAt(zap.DebugLevel),
+	Development: false,
+	Sampling:    nil,
+	Encoding:    "json",
+	EncoderConfig: zapcore.EncoderConfig{
+		MessageKey:     "msg",
+		TimeKey:        "ts",
+		EncodeTime:     zapcore.EpochMillisTimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+	},
+	OutputPaths:      []string{"stdout"},
+	ErrorOutputPaths: []string{"stderr"},
+}
+
 // zapLogger is a logr.Logger that uses Zap to record log.
 type zapLogger struct {
 	// NB: this looks very similar to zap.SugaredLogger, but
@@ -43,7 +74,7 @@ type zapLogger struct {
 	lvl int
 }
 
-// implement logr.Logger
+// zapLogger implement logr.Logger
 var _ logr.Logger = &zapLogger{}
 
 // Enabled should always return true
@@ -124,6 +155,10 @@ func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
 	checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
 }
 
+func handleError(err error) zap.Field {
+	return zap.NamedError("err", err)
+}
+
 // V return info logr.Logger  with specified level
 func (l *zapLogger) V(level int) logr.Logger {
 	return &zapLogger{
@@ -142,37 +177,4 @@ func (l *zapLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
 func (l *zapLogger) WithName(name string) logr.Logger {
 	l.l = l.l.Named(name)
 	return l
-}
-
-// encoderConfig config zap encodetime format
-var encoderConfig = zapcore.EncoderConfig{
-	MessageKey: "msg",
-
-	TimeKey:        "ts",
-	EncodeTime:     zapcore.EpochMillisTimeEncoder,
-	EncodeDuration: zapcore.StringDurationEncoder,
-}
-
-// NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
-func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
-	l, _ := zap.NewProduction()
-	if w == nil {
-		w = os.Stdout
-	}
-	log := l.WithOptions(zap.AddCallerSkip(1),
-		zap.WrapCore(
-			func(zapcore.Core) zapcore.Core {
-				return zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), zapcore.AddSync(w), zapcore.DebugLevel)
-			}))
-	return &zapLogger{
-		l: log,
-	}
-}
-
-func handleError(err error) zap.Field {
-	return zap.NamedError("err", err)
-}
-
-func init() {
-	JSONLogger = NewJSONLogger(nil)
 }
