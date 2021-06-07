@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -180,6 +181,18 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		return "", err
 	}
 	header := buildHeader(handler.HTTPGet.HTTPHeaders)
+	if _, ok := header["User-Agent"]; !ok {
+		// explicitly set User-Agent so it's not set to default Go value
+		v := version.Get()
+		header.Set("User-Agent", fmt.Sprintf("kube-lifecycle/%s.%s", v.Major, v.Minor))
+	}
+	if _, ok := header["Accept"]; !ok {
+		// Accept header was not defined. accept all
+		header.Set("Accept", "*/*")
+	} else if header.Get("Accept") == "" {
+		// Accept header was overridden but is empty. removing
+		header.Del("Accept")
+	}
 	req.Header = header
 	resp, err := hr.httpDoer.Do(req)
 
