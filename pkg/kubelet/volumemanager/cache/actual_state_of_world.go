@@ -110,6 +110,14 @@ type ActualStateOfWorld interface {
 	// volumes that do not need to update contents should not fail.
 	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) (bool, string, error)
 
+	// PodRemovedFromVolume returns true if the given pod does not exist in the list of
+	// mountedPods for the given volume in the cache, indicating that the pod has
+	// fully unmounted it or it was never mounted the volume.
+	// If the volume is fully mounted or is in uncertain mount state for the pod, it is
+	// considered that the pod still exists in volume manager's actual state of the world
+	// and false is returned.
+	PodRemovedFromVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool
+
 	// VolumeExistsWithSpecName returns true if the given volume specified with the
 	// volume spec name (a.k.a., InnerVolumeSpecName) exists in the list of
 	// volumes that should be attached to this node.
@@ -689,6 +697,31 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 	}
 
 	return podExists, volumeObj.devicePath, nil
+}
+
+func (asw *actualStateOfWorld) PodRemovedFromVolume(
+	podName volumetypes.UniquePodName,
+	volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return true
+	}
+
+	podObj, podExists := volumeObj.mountedPods[podName]
+	if podExists {
+		// if volume mount was uncertain we should keep trying to unmount the volume
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain {
+			return false
+		}
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMounted {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (asw *actualStateOfWorld) VolumeExistsWithSpecName(podName volumetypes.UniquePodName, volumeSpecName string) bool {

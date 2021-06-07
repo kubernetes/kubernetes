@@ -671,6 +671,10 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
+	removed := asw.PodRemovedFromVolume(podName1, generatedVolumeName1)
+	if removed {
+		t.Fatalf("expected volume %s not to be removed in asw", generatedVolumeName1)
+	}
 }
 
 func verifyVolumeExistsInGloballyMountedVolumes(

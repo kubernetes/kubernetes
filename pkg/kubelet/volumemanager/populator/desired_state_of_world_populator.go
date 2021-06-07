@@ -278,12 +278,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
 			continue
 		}
-		exists, _, _ := dswp.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
 		var volumeToMountSpecName string
 		if volumeToMount.VolumeSpec != nil {
 			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
 		}
-		if !exists && podExists {
+		removed := dswp.actualStateOfWorld.PodRemovedFromVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		if removed && podExists {
 			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 			continue
 		}
