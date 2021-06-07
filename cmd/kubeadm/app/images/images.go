@@ -58,7 +58,14 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.DNS.ImageTag != "" {
 		dnsImageTag = cfg.DNS.ImageTag
 	}
-	return GetGenericImage(dnsImageRepository, constants.CoreDNSImageName, dnsImageTag)
+
+	// DNS uses default image name by default
+	dnsImageName := constants.CoreDNSImageName
+	if cfg.DNS.ImageName != "" {
+		dnsImageName = cfg.DNS.ImageName
+	}
+
+	return GetGenericImage(dnsImageRepository, dnsImageName, dnsImageTag)
 }
 
 // GetEtcdImage generates and returns the image for etcd
@@ -82,7 +89,14 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
 		etcdImageTag = cfg.Etcd.Local.ImageTag
 	}
-	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
+
+	// Etcd uses default image name by default
+	etcdImageName := constants.Etcd
+	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageName != "" {
+		etcdImageName = cfg.Etcd.Local.ImageName
+	}
+
+	return GetGenericImage(etcdImageRepository, etcdImageName, etcdImageTag)
 }
 
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node

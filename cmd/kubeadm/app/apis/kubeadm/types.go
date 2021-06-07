@@ -181,7 +181,9 @@ type ImageMeta struct {
 	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 	ImageTag string
 
-	//TODO: evaluate if we need also a ImageName based on user feedbacks
+	// ImageName allows to specify an exact name of the image.
+	// if not set, the ImageName defined in a constants.go will be used instead.
+	ImageName string
 }
 
 // APIEndpoint struct contains elements of API server instance deployed on a node.

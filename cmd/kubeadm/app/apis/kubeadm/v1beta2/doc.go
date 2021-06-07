@@ -188,6 +188,7 @@ limitations under the License.
 // 	  local:
 // 	    imageRepository: "k8s.gcr.io"
 // 	    imageTag: "3.2.24"
+//	    imageName: "etcd"
 // 	    dataDir: "/var/lib/etcd"
 // 	    extraArgs:
 // 	      listen-client-urls: "http://10.100.0.1:2379"

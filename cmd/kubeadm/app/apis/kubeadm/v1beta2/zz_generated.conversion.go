@@ -605,6 +605,7 @@ func Convert_kubeadm_HostPathMount_To_v1beta2_HostPathMount(in *kubeadm.HostPath
 func autoConvert_v1beta2_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
+	out.ImageName = in.ImageName
 	return nil
 }
 
@@ -616,6 +617,7 @@ func Convert_v1beta2_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.
 func autoConvert_kubeadm_ImageMeta_To_v1beta2_ImageMeta(in *kubeadm.ImageMeta, out *ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
+	out.ImageName = in.ImageName
 	return nil
 }
 

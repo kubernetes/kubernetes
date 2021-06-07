@@ -178,7 +178,9 @@ type ImageMeta struct {
 	// +optional
 	ImageTag string `json:"imageTag,omitempty"`
 
-	//TODO: evaluate if we need also a ImageName based on user feedbacks
+	// ImageName allows to specify an exact name of the image.
+	// if not set, the ImageName defined in a constants.go will be used instead.
+	ImageName string `json:"imageName,omitempty"`
 }
 
 // APIEndpoint struct contains elements of API server instance deployed on a node.
