@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -435,6 +436,14 @@ func summarizeData(data []byte, maxLength int) string {
 
 func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	defer req.Body.Close()
+
+	// Get Content-Length from header to avoid unnecessary I/O operation
+	if contentLength, err := strconv.Atoi(req.Header.Get("Content-Length")); err == nil {
+		if int64(contentLength) > limit {
+			return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
+		}
+	}
+
 	if limit <= 0 {
 		return ioutil.ReadAll(req.Body)
 	}
