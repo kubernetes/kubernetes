@@ -50,3 +50,19 @@ func (se *SafeELFFile) Symbols() (syms []elf.Symbol, err error) {
 	syms, err = se.File.Symbols()
 	return
 }
+
+// DynamicSymbols is the safe version of elf.File.DynamicSymbols.
+func (se *SafeELFFile) DynamicSymbols() (syms []elf.Symbol, err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+
+		syms = nil
+		err = fmt.Errorf("reading ELF dynamic symbols panicked: %s", r)
+	}()
+
+	syms, err = se.File.DynamicSymbols()
+	return
+}
