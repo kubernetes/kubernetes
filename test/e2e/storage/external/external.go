@@ -203,6 +203,14 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, driver); err != nil {
 		return nil, errors.Wrap(err, filename)
 	}
+
+	// to ensure backward compatibility if controller expansion is enabled then set online expansion to true
+	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion]; !ok &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
+		caps := driver.DriverInfo.Capabilities
+		caps[storageframework.CapOnlineExpansion] = true
+		driver.DriverInfo.Capabilities = caps
+	}
 	return driver, nil
 }
 
