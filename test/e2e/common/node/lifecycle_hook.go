@@ -158,13 +158,13 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			testPodWithHook(podWithHook)
 		})
 		/*
-			Release : v1.19
+			Release : v1.24
 			Testname: Pod Lifecycle, poststart https hook
 			Description: When a post-start handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod with a container lifecycle specifying a post-start that invokes the server pod to validate that the post-start is executed.
 		*/
-		ginkgo.It("should execute poststart https hook properly [NodeConformance]", func() {
+		ginkgo.It("should execute poststart https hook properly [MinimumKubeletVersion:1.22] [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PostStart: &v1.Handler{
+				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
@@ -199,13 +199,13 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			testPodWithHook(podWithHook)
 		})
 		/*
-			Release : v1.19
+			Release : v1.24
 			Testname: Pod Lifecycle, prestop https hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		ginkgo.It("should execute prestop https hook properly [NodeConformance]", func() {
+		ginkgo.It("should execute prestop https hook properly [MinimumKubeletVersion:1.22] [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
-				PreStop: &v1.Handler{
+				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
