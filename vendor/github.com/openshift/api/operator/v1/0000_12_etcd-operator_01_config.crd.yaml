@@ -1,0 +1,230 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: etcds.operator.openshift.io
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+spec:
+  scope: Cluster
+  group: operator.openshift.io
+  names:
+    kind: Etcd
+    plural: etcds
+    singular: etcd
+    categories:
+    - coreoperators
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        description: Etcd provides information to configure an operator to manage
+          etcd.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            properties:
+              failedRevisionLimit:
+                description: failedRevisionLimit is the number of failed static pod
+                  installer revisions to keep on disk and in the api -1 = unlimited,
+                  0 or unset = 5 (default)
+                type: integer
+                format: int32
+              forceRedeploymentReason:
+                description: forceRedeploymentReason can be used to force the redeployment
+                  of the operand by providing a unique string. This provides a mechanism
+                  to kick a previously failed deployment and provide a reason why
+                  you think it will work this time instead of failing again on the
+                  same config.
+                type: string
+              logLevel:
+                description: "logLevel is an intent based logging for an overall component.
+                  \ It does not give fine grained control, but it is a simple way
+                  to manage coarse grained logging choices that operators have to
+                  interpret for their operands. \n Valid values are: \"Normal\", \"Debug\",
+                  \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                type: string
+                default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
+              managementState:
+                description: managementState indicates whether and how the operator
+                  should manage the component
+                type: string
+                pattern: ^(Managed|Unmanaged|Force|Removed)$
+              observedConfig:
+                description: observedConfig holds a sparse config that controller
+                  has observed from the cluster state.  It exists in spec because
+                  it is an input to the level for the operator
+                type: object
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+              operatorLogLevel:
+                description: "operatorLogLevel is an intent based logging for the
+                  operator itself.  It does not give fine grained control, but it
+                  is a simple way to manage coarse grained logging choices that operators
+                  have to interpret for themselves. \n Valid values are: \"Normal\",
+                  \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                type: string
+                default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
+              succeededRevisionLimit:
+                description: succeededRevisionLimit is the number of successful static
+                  pod installer revisions to keep on disk and in the api -1 = unlimited,
+                  0 or unset = 5 (default)
+                type: integer
+                format: int32
+              unsupportedConfigOverrides:
+                description: 'unsupportedConfigOverrides holds a sparse config that
+                  will override any previously set options.  It only needs to be the
+                  fields to override it will end up overlaying in the following order:
+                  1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                type: object
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            properties:
+              conditions:
+                description: conditions is a list of conditions and their status
+                type: array
+                items:
+                  description: OperatorCondition is just the standard condition fields.
+                  type: object
+                  properties:
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+              generations:
+                description: generations are used to determine when an item needs
+                  to be reconciled or has changed in a way that needs a reaction.
+                type: array
+                items:
+                  description: GenerationStatus keeps track of the generation for
+                    a given resource so that decisions about forced updates can be
+                    made.
+                  type: object
+                  properties:
+                    group:
+                      description: group is the group of the thing you're tracking
+                      type: string
+                    hash:
+                      description: hash is an optional field set for resources without
+                        generation that are content sensitive like secrets and configmaps
+                      type: string
+                    lastGeneration:
+                      description: lastGeneration is the last generation of the workload
+                        controller involved
+                      type: integer
+                      format: int64
+                    name:
+                      description: name is the name of the thing you're tracking
+                      type: string
+                    namespace:
+                      description: namespace is where the thing you're tracking is
+                      type: string
+                    resource:
+                      description: resource is the resource type of the thing you're
+                        tracking
+                      type: string
+              latestAvailableRevision:
+                description: latestAvailableRevision is the deploymentID of the most
+                  recent deployment
+                type: integer
+                format: int32
+              latestAvailableRevisionReason:
+                description: latestAvailableRevisionReason describe the detailed reason
+                  for the most recent deployment
+                type: string
+              nodeStatuses:
+                description: nodeStatuses track the deployment values and errors across
+                  individual nodes
+                type: array
+                items:
+                  description: NodeStatus provides information about the current state
+                    of a particular node managed by this operator.
+                  type: object
+                  properties:
+                    currentRevision:
+                      description: currentRevision is the generation of the most recently
+                        successful deployment
+                      type: integer
+                      format: int32
+                    lastFailedCount:
+                      description: lastFailedCount is how often the last failed revision
+                        failed.
+                      type: integer
+                    lastFailedRevision:
+                      description: lastFailedRevision is the generation of the deployment
+                        we tried and failed to deploy.
+                      type: integer
+                      format: int32
+                    lastFailedRevisionErrors:
+                      description: lastFailedRevisionErrors is a list of the errors
+                        during the failed deployment referenced in lastFailedRevision
+                      type: array
+                      items:
+                        type: string
+                    lastFailedTime:
+                      description: lastFailedTime is the time the last failed revision
+                        failed the last time.
+                      type: string
+                      format: date-time
+                    nodeName:
+                      description: nodeName is the name of the node
+                      type: string
+                    targetRevision:
+                      description: targetRevision is the generation of the deployment
+                        we're trying to apply
+                      type: integer
+                      format: int32
+              observedGeneration:
+                description: observedGeneration is the last generation change you've
+                  dealt with
+                type: integer
+                format: int64
+              readyReplicas:
+                description: readyReplicas indicates how many replicas are ready and
+                  at the desired state
+                type: integer
+                format: int32
+              version:
+                description: version is the level this availability applies to
+                type: string
