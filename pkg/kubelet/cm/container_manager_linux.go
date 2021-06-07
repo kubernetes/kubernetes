@@ -609,6 +609,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
 
+	klog.Infof("Starting linux container manager")
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		containerMap, err := buildContainerMapFromRuntime(runtimeService)
@@ -637,11 +638,13 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// allocatable of the node
 	cm.nodeInfo = node
 
+	klog.Infof("Inside linux container manager Start(): getting storage data")
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
 		if err != nil {
 			return fmt.Errorf("failed to get rootfs info: %v", err)
 		}
+		klog.Infof("Storing rootfs.Capacity: %d:", rootfs.Capacity)
 		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
 			cm.capacity[rName] = rCap
 		}
@@ -1057,6 +1060,14 @@ func isKernelPid(pid int) bool {
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	klog.Infof("Called GetCapacity(), returning capacity")
+	if cm.capacity != nil {
+		if _, exists := cm.capacity[v1.ResourceEphemeralStorage]; !exists {
+			klog.Errorf("No ephemeral-storage data in capacity property")
+		}
+	} else {
+		klog.Errorf("No ephemeral-storage data in capacity property")
+	}
 	return cm.capacity
 }
 
