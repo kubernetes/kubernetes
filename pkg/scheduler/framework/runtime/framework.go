@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -142,22 +144,33 @@ func (f *frameworkImpl) Extenders() []framework.Extender {
 }
 
 type frameworkOptions struct {
-	clientSet            clientset.Interface
-	kubeConfig           *restclient.Config
-	eventRecorder        events.EventRecorder
-	informerFactory      informers.SharedInformerFactory
-	snapshotSharedLister framework.SharedLister
-	metricsRecorder      *metricsRecorder
-	podNominator         framework.PodNominator
-	extenders            []framework.Extender
-	runAllFilters        bool
-	captureProfile       CaptureProfile
-	clusterEventMap      map[framework.ClusterEvent]sets.String
-	parallelizer         parallelize.Parallelizer
+	componentConfigVersion string
+	clientSet              clientset.Interface
+	kubeConfig             *restclient.Config
+	eventRecorder          events.EventRecorder
+	informerFactory        informers.SharedInformerFactory
+	snapshotSharedLister   framework.SharedLister
+	metricsRecorder        *metricsRecorder
+	podNominator           framework.PodNominator
+	extenders              []framework.Extender
+	runAllFilters          bool
+	captureProfile         CaptureProfile
+	clusterEventMap        map[framework.ClusterEvent]sets.String
+	parallelizer           parallelize.Parallelizer
 }
 
 // Option for the frameworkImpl.
 type Option func(*frameworkOptions)
+
+// WithComponentConfigVersion sets the component config version to the
+// KubeSchedulerConfiguration version used. The string should be the full
+// scheme group/version of the external type we converted from (for example
+// "kubescheduler.config.k8s.io/v1beta2")
+func WithComponentConfigVersion(componentConfigVersion string) Option {
+	return func(o *frameworkOptions) {
+		o.componentConfigVersion = componentConfigVersion
+	}
+}
 
 // WithClientSet sets clientSet for the scheduling frameworkImpl.
 func WithClientSet(clientSet clientset.Interface) Option {
@@ -322,7 +335,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 			continue
 		}
 
-		args, err := getPluginArgsOrDefault(pluginConfig, name)
+		args, err := getPluginArgsOrDefault(options.componentConfigVersion, pluginConfig, name)
 		if err != nil {
 			return nil, fmt.Errorf("getting args for Plugin %q: %w", name, err)
 		}
@@ -415,13 +428,22 @@ func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEven
 // a default from the scheme. Returns `nil, nil` if the plugin does not have a
 // defined arg types, such as in-tree plugins that don't require configuration
 // or out-of-tree plugins.
-func getPluginArgsOrDefault(pluginConfig map[string]runtime.Object, name string) (runtime.Object, error) {
+func getPluginArgsOrDefault(componentConfigVersion string, pluginConfig map[string]runtime.Object, name string) (runtime.Object, error) {
 	res, ok := pluginConfig[name]
 	if ok {
 		return res, nil
 	}
 	// Use defaults from latest config API version.
-	gvk := v1beta1.SchemeGroupVersion.WithKind(name + "Args")
+	var gvk schema.GroupVersionKind
+	switch componentConfigVersion {
+	case v1beta1.SchemeGroupVersion.String():
+		gvk = v1beta1.SchemeGroupVersion.WithKind(name + "Args")
+	case v1beta2.SchemeGroupVersion.String():
+		gvk = v1beta2.SchemeGroupVersion.WithKind(name + "Args")
+	default:
+		// default to v1beta2 (latest API)
+		gvk = v1beta2.SchemeGroupVersion.WithKind(name + "Args")
+	}
 	obj, _, err := configDecoder.Decode(nil, &gvk, nil)
 	if runtime.IsNotRegisteredError(err) {
 		// This plugin is out-of-tree or doesn't require configuration.
