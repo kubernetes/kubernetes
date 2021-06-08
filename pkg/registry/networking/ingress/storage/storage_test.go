@@ -19,13 +19,18 @@ package storage
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
@@ -251,4 +256,47 @@ func TestShortNames(t *testing.T) {
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
-// TODO TestUpdateStatus
+func TestUpdateStatus(t *testing.T) {
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+	key, _ := storage.KeyFunc(ctx, name)
+	ingressStart := validIngress()
+	ingressStart.Namespace = metav1.NamespaceDefault
+	err := storage.Storage.Create(ctx, key, ingressStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ingressIn := &networking.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Status: networking.IngressStatus{
+			LoadBalancer: api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       defaultLoadBalancer,
+						Hostname: defaultHostname,
+					},
+				},
+			},
+		},
+	}
+
+	_, _, err = statusStorage.Update(ctx, ingressIn.Name, rest.DefaultUpdatedObjectInfo(ingressIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ingressOut := obj.(*networking.Ingress)
+	// only compare the relevant change b/c metadata will differ
+	if !apiequality.Semantic.DeepEqual(ingressIn.Status, ingressOut.Status) {
+		t.Fatalf("unexpected object: %s", cmp.Diff(ingressIn.Status, ingressOut.Status))
+	}
+}
