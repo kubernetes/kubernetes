@@ -111,7 +111,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						Namespace: nsn.Namespace,
 						Name:      nsn.Name,
 						UID:       types.UID(nsn.String()),
-					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Health Check", msg)
+					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
 			klog.Error(msg)
 			continue
