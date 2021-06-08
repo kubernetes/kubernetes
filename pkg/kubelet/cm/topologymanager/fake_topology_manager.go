@@ -40,9 +40,8 @@ func (m *fakeManager) AddHintProvider(h HintProvider) {
 	klog.Infof("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, containerID string) error {
-	klog.Infof("[fake topologymanager] AddContainer  pod: %v container id:  %v", format.Pod(pod), containerID)
-	return nil
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	klog.Infof("[fake topologymanager] AddContainer  pod: %v container name: %v container id: %v", format.Pod(pod), container.Name, containerID)
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
