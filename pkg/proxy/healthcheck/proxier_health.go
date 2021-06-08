@@ -99,7 +99,7 @@ func (hs *proxierHealthServer) Run() error {
 		msg := fmt.Sprintf("failed to start proxier healthz on %s: %v", hs.addr, err)
 		// TODO(thockin): move eventing back to caller
 		if hs.recorder != nil {
-			hs.recorder.Eventf(hs.nodeRef, nil, api.EventTypeWarning, "FailedToStartProxierHealthcheck", "Starting Kube-proxy", msg)
+			hs.recorder.Eventf(hs.nodeRef, nil, api.EventTypeWarning, "FailedToStartProxierHealthcheck", "StartKubeProxy", msg)
 		}
 		return fmt.Errorf("%v", msg)
 	}
