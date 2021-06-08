@@ -1585,6 +1585,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
+				m.pvcs = append(m.pvcs, pvc)
+
 				ginkgo.By("Creating Secret")
 				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
