@@ -1125,7 +1125,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, nil, v1.EventTypeWarning, err.Error(), "Sync Proxy Rules", msg)
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
