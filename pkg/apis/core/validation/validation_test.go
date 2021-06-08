@@ -415,7 +415,8 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidatePersistentVolume(scenario.volume)
+			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
+			errs := ValidatePersistentVolume(scenario.volume, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -558,7 +559,8 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"))
+		opts := PersistentVolumeSpecValidationOptions{}
+		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"), opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -655,13 +657,22 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		opts := ValidationOptionsForPersistentVolume(scenario.newVolume, scenario.oldVolume)
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
+	}
+}
+
+func TestValidationOptionsForPersistentVolume(t *testing.T) {
+	expectedValidationOpts := PersistentVolumeSpecValidationOptions{}
+	opts := ValidationOptionsForPersistentVolume(nil, nil)
+	if opts != expectedValidationOpts {
+		t.Errorf("Expected opts: %+v, received: %+v", opts, expectedValidationOpts)
 	}
 }
 
@@ -729,7 +740,8 @@ func TestValidateLocalVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
+		opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
+		errs := ValidatePersistentVolume(scenario.volume, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -808,7 +820,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
+		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -1393,8 +1406,9 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
 			// ensure we have a resource version specified for updates
-			errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+			errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -4337,7 +4351,8 @@ func TestPVVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePV(nil),
 	}
 	for k, v := range successCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) != 0 {
+		opts := ValidationOptionsForPersistentVolume(v, nil)
+		if errs := ValidatePersistentVolume(v, opts); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -4348,7 +4363,8 @@ func TestPVVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePV(&empty),
 	}
 	for k, v := range errorCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) == 0 {
+		opts := ValidationOptionsForPersistentVolume(v, nil)
+		if errs := ValidatePersistentVolume(v, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
