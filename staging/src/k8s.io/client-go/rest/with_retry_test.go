@@ -30,10 +30,6 @@ var alwaysRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool 
 	return true
 })
 
-var neverRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool {
-	return false
-})
-
 func TestNextRetry(t *testing.T) {
 	fakeError := errors.New("fake error")
 	tests := []struct {
