@@ -775,7 +775,7 @@ func (s *ProxyServer) Run() error {
 }
 
 func (s *ProxyServer) birthCry() {
-	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "Starting kube-proxy", "")
+	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
 }
 
 func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
