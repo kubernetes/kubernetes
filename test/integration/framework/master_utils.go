@@ -253,12 +253,12 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 // NewIntegrationTestControlPlaneConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
-	return NewIntegrationTestControlPlaneConfigWithOptions(&MasterConfigOptions{})
+	return NewIntegrationTestControlPlaneConfigWithOptions(&ControlPlaneConfigOptions{})
 }
 
 // NewIntegrationTestControlPlaneConfigWithOptions returns the control plane config appropriate for most integration tests
 // configured with the provided options.
-func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+func NewIntegrationTestControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlplane.Config {
 	controlPlaneConfig := NewControlPlaneConfigWithOptions(opts)
 	controlPlaneConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
@@ -269,8 +269,8 @@ func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) 
 	return controlPlaneConfig
 }
 
-// MasterConfigOptions are the configurable options for a new integration test master config.
-type MasterConfigOptions struct {
+// ControlPlaneConfigOptions are the configurable options for a new integration test master config.
+type ControlPlaneConfigOptions struct {
 	EtcdOptions *options.EtcdOptions
 }
 
@@ -286,11 +286,11 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 
 // NewControlPlaneConfig returns a basic control plane config.
 func NewControlPlaneConfig() *controlplane.Config {
-	return NewControlPlaneConfigWithOptions(&MasterConfigOptions{})
+	return NewControlPlaneConfigWithOptions(&ControlPlaneConfigOptions{})
 }
 
 // NewControlPlaneConfigWithOptions returns a basic control plane config configured with the provided options.
-func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlplane.Config {
 	etcdOptions := DefaultEtcdOptions()
 	if opts.EtcdOptions != nil {
 		etcdOptions = opts.EtcdOptions
