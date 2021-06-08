@@ -229,6 +229,67 @@ func TestReconcile(t *testing.T) {
 		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
 	}, {
+		testName: "Endpoints with 1 subset, 2 ports, and 2 not ready addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			NotReadyAddresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
+	}, {
+		testName: "Endpoints with 1 subset, 2 ports, and 2 ready and 2 not ready addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.1.1.1",
+				Hostname: "pod-11",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.1.1.2",
+				Hostname: "pod-12",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+			NotReadyAddresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 4, addedPerSync: 4, numCreated: 1},
+	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses",
 		subsets: []corev1.EndpointSubset{{
 			Ports: []corev1.EndpointPort{{
