@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -36,7 +37,7 @@ func NewContainerScope(policy Policy) Scope {
 			name:             containerTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
-			podMap:           make(map[string]string),
+			podMap:           containermap.NewContainerMap(),
 		},
 	}
 }
