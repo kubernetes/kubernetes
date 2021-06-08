@@ -123,7 +123,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
-// startAPIServerOrDie starts a kubernetes master and an httpserver to handle api requests
+// startAPIServerOrDie starts a kubernetes API server and an httpserver to handle api requests
 func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
@@ -210,9 +210,9 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	m, err = controlPlaneConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		// We log the error first so that even if closeFn crashes, the error is shown
-		klog.Errorf("error in bringing up the master: %v", err)
+		klog.Errorf("error in bringing up the apiserver: %v", err)
 		closeFn()
-		klog.Fatalf("error in bringing up the master: %v", err)
+		klog.Fatalf("error in bringing up the apiserver: %v", err)
 	}
 	if apiServerReceiver != nil {
 		apiServerReceiver.SetAPIServer(m)
@@ -251,7 +251,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	return m, s, closeFn
 }
 
-// NewIntegrationTestControlPlaneConfig returns the master config appropriate for most integration tests.
+// NewIntegrationTestControlPlaneConfig returns the control plane config appropriate for most integration tests.
 func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
 	return NewIntegrationTestControlPlaneConfigWithOptions(&ControlPlaneConfigOptions{})
 }
@@ -269,7 +269,7 @@ func NewIntegrationTestControlPlaneConfigWithOptions(opts *ControlPlaneConfigOpt
 	return controlPlaneConfig
 }
 
-// ControlPlaneConfigOptions are the configurable options for a new integration test master config.
+// ControlPlaneConfigOptions are the configurable options for a new integration test control plane config.
 type ControlPlaneConfigOptions struct {
 	EtcdOptions *options.EtcdOptions
 }
@@ -338,7 +338,7 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 	}
 }
 
-// CloseFunc can be called to cleanup the master
+// CloseFunc can be called to cleanup the API server
 type CloseFunc func()
 
 // RunAnAPIServer starts a API server with the provided config.
