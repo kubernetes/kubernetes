@@ -43,10 +43,6 @@ func (r IsRetryableErrorFunc) IsErrorRetryable(request *http.Request, err error)
 	return r(request, err)
 }
 
-var neverRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool {
-	return false
-})
-
 // WithRetry allows the client to retry a request up to a certain number of times
 // Note that WithRetry is not safe for concurrent use by multiple
 // goroutines without additional locking or coordination.
