@@ -2825,8 +2825,8 @@ func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
 	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, master, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	client, err := clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	_, instanceConfig, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	client, err := clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -2878,8 +2878,8 @@ spec:
 	// Restart server with server-side apply disabled
 	closeFn()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, master, closeFn = framework.RunAnAPIServer(controlPlaneConfig)
-	client, err = clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	_, instanceConfig, closeFn = framework.RunAnAPIServer(controlPlaneConfig)
+	client, err = clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}

@@ -226,10 +226,10 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 func TestCacheControl(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
 	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	master, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", master.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

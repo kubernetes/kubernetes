@@ -59,10 +59,10 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 )
 
-// Config is a struct of configuration directives for NewMasterComponents.
+// Config is a struct of configuration directives for NewControlPlaneComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
-	MasterConfig            *controlplane.Config
+	InstanceConfig          *controlplane.Config
 	StartReplicationManager bool
 	// Client throttling qps
 	QPS float32

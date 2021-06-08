@@ -119,16 +119,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	controlPlaneConfig.ExtraConfig.ServiceAccountJWKSURI = ""
 	controlPlaneConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
 
-	master, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	cs, err := clientset.NewForConfig(master.GenericAPIServer.LoopbackClientConfig)
+	cs, err := clientset.NewForConfig(instanceConfig.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	*gcs = *cs
 
-	rc, err := rest.UnversionedRESTClientFor(master.GenericAPIServer.LoopbackClientConfig)
+	rc, err := rest.UnversionedRESTClientFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
