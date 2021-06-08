@@ -481,17 +481,6 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 ## explicit
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v1.0.0
-github.com/hashicorp/hcl
-github.com/hashicorp/hcl/hcl/ast
-github.com/hashicorp/hcl/hcl/parser
-github.com/hashicorp/hcl/hcl/printer
-github.com/hashicorp/hcl/hcl/scanner
-github.com/hashicorp/hcl/hcl/strconv
-github.com/hashicorp/hcl/hcl/token
-github.com/hashicorp/hcl/json/parser
-github.com/hashicorp/hcl/json/scanner
-github.com/hashicorp/hcl/json/token
 # github.com/heketi/heketi v10.2.0+incompatible => github.com/heketi/heketi v10.2.0+incompatible
 ## explicit
 github.com/heketi/heketi/client/api/go-client
@@ -531,8 +520,6 @@ github.com/liggitt/tabwriter
 github.com/lithammer/dedent
 # github.com/lpabon/godbc v0.1.1 => github.com/lpabon/godbc v0.1.1
 ## explicit
-# github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
-github.com/magiconair/properties
 # github.com/mailru/easyjson v0.7.0 => github.com/mailru/easyjson v0.7.0
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
@@ -673,8 +660,6 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
-# github.com/pelletier/go-toml v1.2.0 => github.com/pelletier/go-toml v1.2.0
-github.com/pelletier/go-toml
 # github.com/peterbourgon/diskv v2.0.1+incompatible => github.com/peterbourgon/diskv v2.0.1+incompatible
 github.com/peterbourgon/diskv
 # github.com/pkg/errors v0.9.1 => github.com/pkg/errors v0.9.1
@@ -729,21 +714,13 @@ github.com/soheilhy/cmux
 ## explicit
 github.com/spf13/afero
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.3.0 => github.com/spf13/cast v1.3.0
-github.com/spf13/cast
 # github.com/spf13/cobra v1.1.1 => github.com/spf13/cobra v1.1.1
 ## explicit
 github.com/spf13/cobra
 github.com/spf13/cobra/doc
-# github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
-## explicit
-github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5 => github.com/spf13/pflag v1.0.5
 ## explicit
 github.com/spf13/pflag
-# github.com/spf13/viper v1.7.0 => github.com/spf13/viper v1.7.0
-## explicit
-github.com/spf13/viper
 # github.com/storageos/go-api v2.2.0+incompatible => github.com/storageos/go-api v2.2.0+incompatible
 ## explicit
 github.com/storageos/go-api
@@ -757,8 +734,6 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
-# github.com/subosito/gotenv v1.2.0 => github.com/subosito/gotenv v1.2.0
-github.com/subosito/gotenv
 # github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 github.com/syndtr/gocapability/capability
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5
@@ -1204,8 +1179,6 @@ gopkg.in/gcfg.v1/token
 gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1 => gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/ini.v1 v1.51.0 => gopkg.in/ini.v1 v1.51.0
-gopkg.in/ini.v1
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/square/go-jose.v2 v2.2.2 => gopkg.in/square/go-jose.v2 v2.2.2
@@ -2590,7 +2563,7 @@ sigs.k8s.io/yaml
 # github.com/spf13/afero => github.com/spf13/afero v1.2.2
 # github.com/spf13/cast => github.com/spf13/cast v1.3.0
 # github.com/spf13/cobra => github.com/spf13/cobra v1.1.1
-# github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.1.0
+# github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.0.0
 # github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
 # github.com/spf13/viper => github.com/spf13/viper v1.7.0
 # github.com/stoewer/go-strcase => github.com/stoewer/go-strcase v1.2.0
