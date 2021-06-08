@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"runtime"
 	"strings"
 	"testing"
@@ -306,6 +307,231 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestFileExistingCheck(t *testing.T) {
+	f, err := os.CreateTemp("/tmp", "exist")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	var tests = []struct {
+		name          string
+		check         FileExistingCheck
+		expectedError bool
+	}{
+		{
+			name: "File does not exist, so it's not available",
+			check: FileExistingCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: false,
+		},
+		{
+			name: "File exists and is available",
+			check: FileExistingCheck{
+				Path: f.Name(),
+			},
+			expectedError: true,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output == nil) != rt.expectedError {
+			t.Errorf(
+				"Failed FileExistingCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestFileAvailableCheck(t *testing.T) {
+	f, err := os.CreateTemp("/tmp", "exist")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	var tests = []struct {
+		name          string
+		check         FileAvailableCheck
+		expectedError bool
+	}{
+		{
+			name: "The file does not exist",
+			check: FileAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: true,
+		},
+		{
+			name: "The file exists",
+			check: FileAvailableCheck{
+				Path: f.Name(),
+			},
+			expectedError: false,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output == nil) != rt.expectedError {
+			t.Errorf(
+				"Failed FileAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestFileContentCheck(t *testing.T) {
+	f, err := os.CreateTemp("/tmp", "exist")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	var tests = []struct {
+		name          string
+		check         FileContentCheck
+		expectedError bool
+	}{
+		{
+			name: "File exists and has matching content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("Test FileContentCheck"),
+			},
+			expectedError: true,
+		},
+		{
+			name: "File exists, content is nil",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: nil,
+			},
+			expectedError: true,
+		},
+		{
+			name: "File exists but has unexpected content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("Test FileContentCheck but this content is not exist"),
+			},
+			expectedError: false,
+		},
+		{
+			name: "File does not exist, content is not nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: []byte("Test FileContentCheck but this file is not exist"),
+			},
+			expectedError: false,
+		},
+		{
+			name: "File does not exist, content is nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: nil,
+			},
+			expectedError: false,
+		},
+	}
+	if _, err = f.WriteString("Test FileContentCheck"); err != nil {
+		t.Fatalf("Failed to write to file: %v", err)
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (len(output) == 0) != rt.expectedError {
+			t.Errorf(
+				"Failed FileContentCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(len(output) == 0),
+			)
+		}
+	}
+}
+
+func TestDirAvailableCheck(t *testing.T) {
+	fileDir, err := os.MkdirTemp("/tmp", "dir-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(fileDir)
+	var tests = []struct {
+		name          string
+		check         DirAvailableCheck
+		expectedError bool
+	}{
+		{
+			name: "Directory exists but is empty",
+			check: DirAvailableCheck{
+				Path: fileDir,
+			},
+			expectedError: true,
+		},
+		{
+			name: "Directory exists and has something",
+			check: DirAvailableCheck{
+				Path: "/tmp",
+			},
+			expectedError: false,
+		},
+		{
+			name: "Directory does not exist",
+			check: DirAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: true,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output == nil) != rt.expectedError {
+			t.Errorf(
+				"Failed DirAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestPortOpenCheck(t *testing.T) {
+	ln, _ := net.Listen("tcp", fmt.Sprintf("127.0.0.1:1000"))
+	defer ln.Close()
+	var tests = []struct {
+		name          string
+		check         PortOpenCheck
+		expectedError bool
+	}{
+		{
+			name:          "Port is available",
+			check:         PortOpenCheck{port: 0},
+			expectedError: true,
+		},
+		{
+			name:          "Port is not available",
+			check:         PortOpenCheck{port: 1000},
+			expectedError: false,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output == nil) != rt.expectedError {
+			t.Errorf(
+				"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+
 }
 
 func TestRunChecks(t *testing.T) {
