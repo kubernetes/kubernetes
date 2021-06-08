@@ -95,7 +95,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 			if totalAddressesAdded >= int(r.maxEndpointsPerSubset) {
 				break
 			}
-			if ok := d.addAddress(address, multiKey, true); ok {
+			if ok := d.addAddress(address, multiKey, false); ok {
 				totalAddressesAdded++
 			} else {
 				numInvalidAddresses++
