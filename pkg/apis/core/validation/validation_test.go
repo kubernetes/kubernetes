@@ -922,12 +922,14 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 	}
 
 	for _, tc := range successTestCases {
-		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) != 0 {
+		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec"), opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	for _, tc := range failedTestCases {
-		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
+		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec"), opts); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
 	}
@@ -1323,7 +1325,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				opts := PodValidationOptions{}
 				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""), opts)
 			} else {
-				errs = ValidatePersistentVolumeClaim(scenario.claim)
+				opts := ValidationOptionsForPersistentVolumeClaim(scenario.claim, nil)
+				errs = ValidatePersistentVolumeClaim(scenario.claim, opts)
 			}
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Error("Unexpected success for scenario")
@@ -1826,7 +1829,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
-			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
+			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -1834,6 +1838,22 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 			}
 		})
+	}
+}
+
+func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
+	expectedValidationOpts := PersistentVolumeClaimSpecValidationOptions{}
+	opts := ValidationOptionsForPersistentVolumeClaim(nil, nil)
+	if opts != expectedValidationOpts {
+		t.Errorf("Expected opts: %+v, received: %+v", opts, expectedValidationOpts)
+	}
+}
+
+func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
+	expectedValidationOpts := PersistentVolumeClaimSpecValidationOptions{}
+	opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, nil)
+	if opts != expectedValidationOpts {
+		t.Errorf("Expected opts: %+v, received: %+v", opts, expectedValidationOpts)
 	}
 }
 
@@ -4321,7 +4341,8 @@ func TestPVCVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePVC(nil),
 	}
 	for k, v := range successCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) != 0 {
+		opts := ValidationOptionsForPersistentVolumeClaim(v, nil)
+		if errs := ValidatePersistentVolumeClaim(v, opts); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -4332,7 +4353,8 @@ func TestPVCVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePVC(&empty),
 	}
 	for k, v := range errorCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) == 0 {
+		opts := ValidationOptionsForPersistentVolumeClaim(v, nil)
+		if errs := ValidatePersistentVolumeClaim(v, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -16585,12 +16607,14 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		if tc.expectedFail {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) == 0 {
+			opts := PersistentVolumeClaimSpecValidationOptions{}
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
 				t.Errorf("expected failure: %v", errs)
 			}
 
 		} else {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) != 0 {
+			opts := PersistentVolumeClaimSpecValidationOptions{}
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		}
