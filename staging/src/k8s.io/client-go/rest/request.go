@@ -432,11 +432,20 @@ func (r *Request) Body(obj interface{}) *Request {
 		}
 		glogBody("Request Body", data)
 		r.body = bytes.NewReader(data)
+		if len(r.headers.Get("Content-Type")) == 0 && len(r.c.content.ContentType) > 0{
+			r.SetHeader("Content-Type", r.c.content.ContentType)
+		}
 	case []byte:
 		glogBody("Request Body", t)
 		r.body = bytes.NewReader(t)
+		if len(r.headers.Get("Content-Type")) == 0 && len(r.c.content.ContentType) > 0{
+			r.SetHeader("Content-Type", r.c.content.ContentType)
+		}
 	case io.Reader:
 		r.body = t
+		if len(r.headers.Get("Content-Type")) == 0 && len(r.c.content.ContentType) > 0{
+			r.SetHeader("Content-Type", r.c.content.ContentType)
+		}
 	case runtime.Object:
 		// callers may pass typed interface pointers, therefore we must check nil with reflection
 		if reflect.ValueOf(t).IsNil() {

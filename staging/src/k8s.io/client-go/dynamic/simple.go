@@ -110,6 +110,7 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 	result := c.client.client.
 		Post().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -145,6 +146,7 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 	result := c.client.client.
 		Put().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -181,6 +183,7 @@ func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructu
 	result := c.client.client.
 		Put().
 		AbsPath(append(c.makeURLSegments(name), "status")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -211,6 +214,7 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 	result := c.client.client.
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		Do(ctx)
 	return result.Error()
@@ -225,6 +229,7 @@ func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav
 	result := c.client.client.
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -251,7 +256,11 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 }
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do(ctx)
+	result := c.client.client.
+		Get().
+		AbsPath(c.makeURLSegments("")...).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -288,6 +297,7 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 	result := c.client.client.
 		Patch(pt).
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", string(pt)).
 		Body(data).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)

@@ -124,32 +124,24 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	if len(name) == 0 {
 		return fmt.Errorf("name is required")
 	}
-	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
-	if err != nil {
-		return err
-	}
 
 	result := c.client.client.
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
-		Body(deleteOptionsByte).
+		Body(&opts).
 		Do(ctx)
 	return result.Error()
 }
 
 // DeleteCollection triggers deletion of all resources in the specified scope (namespace or cluster).
 func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
-	if err != nil {
-		return err
-	}
-
 	result := c.client.client.
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
-		Body(deleteOptionsByte).
+		Body(&opts).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do(ctx)
+
 	return result.Error()
 }
 

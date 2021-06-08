@@ -737,7 +737,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		equivalentResourceRegistry.RegisterKindFor(resource, "", kind)
 
 		typer := newUnstructuredObjectTyper(parameterScheme)
-		creator := unstructuredCreator{}
+		creator := unstructuredCreator{
+			Delegate: parameterScheme,
+		}
 
 		validationSchema, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
 		if err != nil {
@@ -1108,12 +1110,21 @@ func (t UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return t.Delegate.Recognizes(gvk) || t.UnstructuredTyper.Recognizes(gvk)
 }
 
-type unstructuredCreator struct{}
+type unstructuredCreator struct{
+	Delegate          runtime.ObjectCreater
+}
 
 func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, error) {
-	ret := &unstructured.Unstructured{}
-	ret.SetGroupVersionKind(kind)
-	return ret, nil
+	ret, err := c.Delegate.New(kind)
+	if err == nil{
+		return ret, nil
+	}
+	if runtime.IsNotRegisteredError(err){
+		ret := &unstructured.Unstructured{}
+		ret.SetGroupVersionKind(kind)
+		return ret, nil
+	}
+	return nil, err
 }
 
 type unstructuredDefaulter struct {
