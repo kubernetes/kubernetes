@@ -1175,7 +1175,6 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 			})
 		primaryIPConfig.LoadBalancerBackendAddressPools = &loadBalancerBackendAddressPools
 		newVMSS := compute.VirtualMachineScaleSet{
-			Sku:      vmss.Sku,
 			Location: vmss.Location,
 			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
 				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
@@ -1488,7 +1487,6 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromVMSS(service *v1.Service, backen
 			// Compose a new vmss with added backendPoolID.
 			primaryIPConfig.LoadBalancerBackendAddressPools = &newBackendPools
 			newVMSS := compute.VirtualMachineScaleSet{
-				Sku:      vmss.Sku,
 				Location: vmss.Location,
 				VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
 					VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
