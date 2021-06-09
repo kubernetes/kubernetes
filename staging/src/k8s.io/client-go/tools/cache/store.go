@@ -109,6 +109,11 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
+	// When statefulset pods update, the old pod shares the same name with new one
+	// We should use UID to distinguish them.
+	if len(meta.GetUID()) > 0 {
+		return string(meta.GetUID()), nil
+	}
 	if len(meta.GetNamespace()) > 0 {
 		return meta.GetNamespace() + "/" + meta.GetName(), nil
 	}
