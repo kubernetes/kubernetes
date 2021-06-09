@@ -241,6 +241,30 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 	}
 }
 
+func TestIsWorkingClearedAfterForgetPodWorkers(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+
+	numPods := 20
+	for i := 0; i < numPods; i++ {
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        newPod(strconv.Itoa(i), "name"),
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if len(podWorkers.podUpdates) != numPods {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]sets.Empty{})
+	if len(podWorkers.podUpdates) != 0 {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	if len(podWorkers.isWorking) != 0 {
+		t.Errorf("Incorrect number of isWorking %v", len(podWorkers.isWorking))
+	}
+}
+
 type simpleFakeKubelet struct {
 	pod       *v1.Pod
 	mirrorPod *v1.Pod

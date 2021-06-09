@@ -282,7 +282,8 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 		p.podUpdates[uid] <- workUpdate
 		delete(p.lastUndeliveredWorkUpdate, uid)
 	} else {
-		p.isWorking[uid] = false
+		// put this line in removeWorker may cause dead lock, so keep reset it here
+		delete(p.isWorking, uid)
 	}
 }
 
