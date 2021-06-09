@@ -557,6 +557,15 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
+	if len(template.OwnerReferences) != 0 {
+		for _, owner := range template.OwnerReferences {
+			if *owner.Controller {
+				return nil, fmt.Errorf("ownerReference.Controller in podTemplateSpec can not be true.")
+			}
+
+			pod.OwnerReferences = append(pod.OwnerReferences, owner)
+		}
+	}
 	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
 }
