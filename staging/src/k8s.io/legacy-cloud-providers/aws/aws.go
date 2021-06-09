@@ -451,6 +451,8 @@ const (
 	VolumeTypeIO1 = "io1"
 	// General Purpose SSD
 	VolumeTypeGP2 = "gp2"
+	// General Purpose SSD
+	VolumeTypeGP3 = "gp3"
 	// Cold HDD (sc1)
 	VolumeTypeSC1 = "sc1"
 	// Throughput Optimized HDD
@@ -2532,7 +2534,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	var createType string
 	var iops int64
 	switch volumeOptions.VolumeType {
-	case VolumeTypeGP2, VolumeTypeSC1, VolumeTypeST1:
+	case VolumeTypeGP2, VolumeTypeGP3, VolumeTypeSC1, VolumeTypeST1:
 		createType = volumeOptions.VolumeType
 
 	case VolumeTypeIO1:
