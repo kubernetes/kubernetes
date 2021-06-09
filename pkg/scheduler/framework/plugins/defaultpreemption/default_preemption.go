@@ -43,13 +43,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
 	// Name of the plugin used in the plugin registry and configurations.
-	Name = "DefaultPreemption"
+	Name = names.DefaultPreemption
 )
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.

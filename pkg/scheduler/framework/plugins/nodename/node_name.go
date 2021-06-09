@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
@@ -32,7 +33,7 @@ var _ framework.EnqueueExtensions = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeName"
+	Name = names.NodeName
 
 	// ErrReason returned when node name doesn't match.
 	ErrReason = "node(s) didn't match the requested node name"

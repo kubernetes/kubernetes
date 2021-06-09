@@ -30,10 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // Name of this plugin.
-const Name = "NodeLabel"
+const Name = names.NodeLabel
 
 const (
 	// ErrReasonPresenceViolated is used for CheckNodeLabelPresence predicate error.

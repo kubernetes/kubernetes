@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // LeastAllocated is a score plugin that favors nodes with fewer allocation requested resources based on requested resources.
@@ -37,7 +38,7 @@ type LeastAllocated struct {
 var _ = framework.ScorePlugin(&LeastAllocated{})
 
 // LeastAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const LeastAllocatedName = "NodeResourcesLeastAllocated"
+const LeastAllocatedName = names.NodeResourcesLeastAllocated
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (la *LeastAllocated) Name() string {

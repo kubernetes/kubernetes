@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
@@ -34,7 +35,7 @@ var _ framework.FilterPlugin = &NodeUnschedulable{}
 var _ framework.EnqueueExtensions = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeUnschedulable"
+const Name = names.NodeUnschedulable
 
 const (
 	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.

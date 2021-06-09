@@ -31,6 +31,7 @@ import (
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -45,7 +46,7 @@ var _ framework.EnqueueExtensions = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "VolumeZone"
+	Name = names.VolumeZone
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"

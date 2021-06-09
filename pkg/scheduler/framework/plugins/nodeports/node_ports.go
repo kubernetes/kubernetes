@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodePorts is a plugin that checks if a node has free ports for the requested pod ports.
@@ -34,7 +35,7 @@ var _ framework.EnqueueExtensions = &NodePorts{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodePorts"
+	Name = names.NodePorts
 
 	// preFilterStateKey is the key in CycleState to NodePorts pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
