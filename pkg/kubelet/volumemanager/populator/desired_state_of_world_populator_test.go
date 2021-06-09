@@ -156,7 +156,7 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 }
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
-	dswp, fakeRuntime, pod, expectedVolumeName := prepareDSWPWithPodPV(t)
+	dswp, fakeRuntime, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
@@ -221,7 +221,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 }
 
 func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
-	dswp, _, pod, expectedVolumeName := prepareDSWPWithPodPV(t)
+	dswp, _, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
@@ -270,7 +270,70 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	}
 }
 
-func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *containertest.FakeRuntime, *v1.Pod, v1.UniqueVolumeName) {
+func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
+	dswp, fakeRuntime, pod, expectedVolumeName, pv := prepareDSWPWithPodPV(t)
+	podName := util.GetUniquePodName(pod)
+
+	//let the pod be terminated
+	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+	dswp.podManager.DeletePod(pod)
+	fakeRuntime.PodList = nil
+
+	// Add the volume to ASW by reconciling.
+	fakeASW := dswp.actualStateOfWorld
+	reconcileASW(fakeASW, dswp.desiredStateOfWorld, t)
+
+	// Mark the volume as uncertain
+	opts := operationexecutor.MarkVolumeOpts{
+		PodName:             util.GetUniquePodName(pod),
+		PodUID:              pod.UID,
+		VolumeName:          expectedVolumeName,
+		OuterVolumeSpecName: "dswp-test-volume-name",
+		VolumeGidVolume:     "",
+		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
+		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+	}
+	err := dswp.actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
+	if err != nil {
+		t.Fatalf("Failed to set the volume as uncertain: %s", err)
+	}
+
+	// fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	dswp.findAndRemoveDeletedPods()
+	if dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
+	}
+
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	volumesToMount := dswp.desiredStateOfWorld.GetVolumesToMount()
+	for _, volume := range volumesToMount {
+		if volume.VolumeName == expectedVolumeName {
+			t.Fatalf(
+				"Found volume %v in the list of desired state of world volumes to mount. Expected not",
+				expectedVolumeName)
+		}
+	}
+}
+
+func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *containertest.FakeRuntime, *v1.Pod, v1.UniqueVolumeName, *v1.PersistentVolume) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -336,7 +399,7 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *contain
 
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
-	return dswp, fakeRuntime, pod, expectedVolumeName
+	return dswp, fakeRuntime, pod, expectedVolumeName, pv
 }
 
 func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
