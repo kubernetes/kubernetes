@@ -444,7 +444,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		case "kube-apiserver":
 			apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
 			fallthrough
-		case "kube-controller-manager", "kube-scheduler":
+		case "kube-controller-manager", "kube-scheduler", "cluster-policy-controller":
 			systemClient = uas[0]
 		}
 	}
