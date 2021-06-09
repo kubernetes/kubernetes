@@ -67,7 +67,7 @@ require (
 	github.com/onsi/ginkgo v4.7.0-origin.0+incompatible
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v1.0.0-rc95
+	github.com/opencontainers/runc v1.0.0-rc95.0.20210608002938-1f5126fe967e
 	github.com/opencontainers/selinux v1.8.0
 	github.com/openshift/api v0.0.0-20210521075222-e273a339932a
 	github.com/openshift/apiserver-library-go v0.0.0-20210521113822-91c23a9a7ddf
@@ -393,7 +393,7 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc95
+	github.com/opencontainers/runc => github.com/openshift/opencontainers-runc v1.0.0-rc95.0.20210608002938-1f5126fe967e
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
