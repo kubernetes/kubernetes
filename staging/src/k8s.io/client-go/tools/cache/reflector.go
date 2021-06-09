@@ -129,11 +129,11 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+		klog.Errorf("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
 	case err == io.EOF:
 		// watch closed normally
 	case err == io.ErrUnexpectedEOF:
-		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedTypeName, err)
+		klog.Errorf("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedTypeName, err)
 	default:
 		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedTypeName, err))
 	}
