@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
