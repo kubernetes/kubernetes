@@ -392,12 +392,15 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 		return false
 	}
 
-	accessModes := c.spec.PersistentVolume.Spec.AccessModes
+	if c.spec.PersistentVolume == nil {
+		klog.V(4).Info(log("mounter.SetupAt Warning: skipping fsGroup permission change, no access mode available. The volume may only be accessible to root users."))
+		return false
+	}
 	if c.spec.PersistentVolume.Spec.AccessModes == nil {
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
 		return false
 	}
-	if !hasReadWriteOnce(accessModes) {
+	if !hasReadWriteOnce(c.spec.PersistentVolume.Spec.AccessModes) {
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
 		return false
 	}
