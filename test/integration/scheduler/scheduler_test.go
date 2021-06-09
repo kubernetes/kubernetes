@@ -282,12 +282,10 @@ priorities: []
 			informerFactory,
 			profile.NewRecorderFactory(eventBroadcaster),
 			nil,
-			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
-				Policy: &kubeschedulerconfig.SchedulerPolicySource{
-					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-						Namespace: policyConfigMap.Namespace,
-						Name:      policyConfigMap.Name,
-					},
+			scheduler.WithLegacyPolicySource(&kubeschedulerconfig.SchedulerPolicySource{
+				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+					Namespace: policyConfigMap.Namespace,
+					Name:      policyConfigMap.Name,
 				},
 			}),
 			scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{
@@ -335,12 +333,10 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
 		nil,
-		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-					Namespace: "non-existent-config",
-					Name:      "non-existent-config",
-				},
+		scheduler.WithLegacyPolicySource(&kubeschedulerconfig.SchedulerPolicySource{
+			ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+				Namespace: "non-existent-config",
+				Name:      "non-existent-config",
 			},
 		}),
 		scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{

@@ -96,7 +96,7 @@ type Scheduler struct {
 type schedulerOptions struct {
 	componentConfigVersion   string
 	kubeConfig               *restclient.Config
-	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
+	legacyPolicySource       *schedulerapi.SchedulerPolicySource
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
@@ -143,10 +143,10 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithAlgorithmSource sets schedulerAlgorithmSource for Scheduler, the default is a source with DefaultProvider.
-func WithAlgorithmSource(source schedulerapi.SchedulerAlgorithmSource) Option {
+// WithPolicySource sets legacy policy config file source.
+func WithLegacyPolicySource(source *schedulerapi.SchedulerPolicySource) Option {
 	return func(o *schedulerOptions) {
-		o.schedulerAlgorithmSource = source
+		o.legacyPolicySource = source
 	}
 }
 
@@ -200,9 +200,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	profiles: []schedulerapi.KubeSchedulerProfile{
 		// Profiles' default plugins are set from the algorithm provider.
 		{SchedulerName: v1.DefaultSchedulerName},
-	},
-	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
-		Provider: defaultAlgorithmSourceProviderName(),
 	},
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
@@ -260,25 +257,23 @@ func New(client clientset.Interface,
 	metrics.Register()
 
 	var sched *Scheduler
-	source := options.schedulerAlgorithmSource
-	switch {
-	case source.Provider != nil:
-		// Create the config from a named algorithm provider.
-		sc, err := configurator.createFromProvider(*source.Provider)
+	if options.legacyPolicySource == nil {
+		sc, err := configurator.createFromConfig()
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
+			return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 		}
 		sched = sc
-	case source.Policy != nil:
+
+	} else {
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
 		switch {
-		case source.Policy.File != nil:
-			if err := initPolicyFromFile(source.Policy.File.Path, policy); err != nil {
+		case options.legacyPolicySource.File != nil:
+			if err := initPolicyFromFile(options.legacyPolicySource.File.Path, policy); err != nil {
 				return nil, err
 			}
-		case source.Policy.ConfigMap != nil:
-			if err := initPolicyFromConfigMap(client, source.Policy.ConfigMap, policy); err != nil {
+		case options.legacyPolicySource.ConfigMap != nil:
+			if err := initPolicyFromConfigMap(client, options.legacyPolicySource.ConfigMap, policy); err != nil {
 				return nil, err
 			}
 		}
@@ -286,14 +281,13 @@ func New(client clientset.Interface,
 		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
 		// which would have set extenders in the above instantiation of Configurator from CC options)
 		configurator.extenders = policy.Extenders
-		sc, err := configurator.createFromConfig(*policy)
+		sc, err := configurator.createFromPolicy(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
 		sched = sc
-	default:
-		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
+
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
@@ -696,11 +690,6 @@ func (sched *Scheduler) skipPodSchedule(fwk framework.Framework, pod *v1.Pod) bo
 		return false
 	}
 	return isAssumed
-}
-
-func defaultAlgorithmSourceProviderName() *string {
-	provider := schedulerapi.SchedulerDefaultProviderName
-	return &provider
 }
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
