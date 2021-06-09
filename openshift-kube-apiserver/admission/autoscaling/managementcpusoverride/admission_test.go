@@ -170,7 +170,7 @@ func TestAdmit(t *testing.T) {
 		},
 		{
 			name:               "should delete CPU requests and update workload CPU annotations for the burstable pod with managed annotation",
-			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
+			pod:                testManagedPod("", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.Quantity{},
 			namespace:          testManagedNamespace(),
 			expectedAnnotations: map[string]string{
@@ -218,12 +218,12 @@ func TestAdmit(t *testing.T) {
 			infra: testClusterSNOInfra(),
 		},
 		{
-			name:               "should ignore pod when removing the CPU request will change the pod QoS class to guaranteed",
+			name:               "should ignore pod when one of pod containers have both CPU limit and request",
 			pod:                testManagedPod("500m", "250m", "500Mi", ""),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			expectedAnnotations: map[string]string{
-				workloadAdmissionWarning: fmt.Sprintf("skip pod CPUs requests modifications because it will change the pod QoS class from %s to %s", corev1.PodQOSBurstable, corev1.PodQOSGuaranteed),
+				workloadAdmissionWarning: fmt.Sprintf("skip pod CPUs requests modifications because pod container has both CPU limit and request"),
 			},
 			nodes: []*corev1.Node{testNodeWithManagementResource()},
 			infra: testClusterSNOInfra(),
