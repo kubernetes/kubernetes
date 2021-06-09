@@ -103,13 +103,14 @@ type fakeResource struct {
 
 type testCase struct {
 	sync.Mutex
-	minReplicas     int32
-	maxReplicas     int32
-	specReplicas    int32
-	statusReplicas  int32
-	initialReplicas int32
-	scaleUpRules    *autoscalingv2.HPAScalingRules
-	scaleDownRules  *autoscalingv2.HPAScalingRules
+	minReplicas           int32
+	maxReplicas           int32
+	specReplicas          int32
+	statusReplicas        int32
+	initialReplicas       int32
+	initialStatusReplicas int32
+	scaleUpRules          *autoscalingv2.HPAScalingRules
+	scaleDownRules        *autoscalingv2.HPAScalingRules
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget                    int32
@@ -169,13 +170,27 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
+type testCaseOption interface {
+	Apply(*testCase)
+}
+
+type initialStatusReplicasOption int32
+
+// WithInitialStatusReplicas sets the initialStatusReplicas configuration option of a testCase.
+func WithInitialStatusReplicas(initialStatusReplicas int32) testCaseOption {
+	return initialStatusReplicasOption(initialStatusReplicas)
+}
+
+func (o initialStatusReplicasOption) Apply(tc *testCase) {
+	tc.initialStatusReplicas = int32(o)
+}
+
 func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
 	labelSet := map[string]string{"name": podNamePrefix}
 	selector := labels.SelectorFromSet(labelSet).String()
-
 	tc.Lock()
 
 	tc.scaleUpdated = false
@@ -224,7 +239,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			},
 			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
 				CurrentReplicas: tc.specReplicas,
-				DesiredReplicas: tc.specReplicas,
+				DesiredReplicas: tc.initialStatusReplicas,
 				LastScaleTime:   tc.lastScaleTime,
 			},
 		}
@@ -1419,6 +1434,7 @@ func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 	}
+	tc.initialStatusReplicas = tc.specReplicas
 	tc.runTest(t)
 }
 
@@ -2116,6 +2132,7 @@ func TestEmptyMetrics(t *testing.T) {
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
 		},
 	}
+	tc.initialStatusReplicas = tc.specReplicas
 	tc.runTest(t)
 }
 
@@ -2135,6 +2152,7 @@ func TestEmptyCPURequest(t *testing.T) {
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
 		},
 	}
+	tc.initialStatusReplicas = tc.specReplicas
 	tc.runTest(t)
 }
 
@@ -2286,7 +2304,7 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 			},
 		},
 	}
-
+	tc.initialStatusReplicas = tc.specReplicas
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
@@ -2332,7 +2350,7 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 			},
 		},
 	}
-
+	tc.initialStatusReplicas = tc.specReplicas
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
@@ -2419,6 +2437,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 			useMetricsAPI:           true,
 		}
+		tc.initialStatusReplicas = tc.specReplicas
 		_, testMetricsClient, testCMClient, testEMClient, _ := tc.prepareTestClient(t)
 		tc.testMetricsClient = testMetricsClient
 		tc.testCMClient = testCMClient
@@ -2475,6 +2494,7 @@ func TestConditionInvalidSourceType(t *testing.T) {
 			},
 		},
 	}
+	tc.initialStatusReplicas = tc.specReplicas
 	tc.runTest(t)
 }
 
@@ -2497,7 +2517,7 @@ func TestConditionFailedGetScale(t *testing.T) {
 			},
 		},
 	}
-
+	tc.initialStatusReplicas = tc.specReplicas
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
@@ -2525,7 +2545,7 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 			Reason: "FailedUpdateScale",
 		}),
 	}
-
+	tc.initialStatusReplicas = tc.specReplicas
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
@@ -4061,7 +4081,7 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 	}
-
+	tc.initialStatusReplicas = tc.specReplicas
 	tc.runTest(t)
 }
 
@@ -4096,10 +4116,36 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
 		},
 	}
+	tc.initialStatusReplicas = tc.specReplicas
 	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
 	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 	})
 	tc.testEMClient = testEMClient
+	tc.runTest(t)
+}
+
+func TestConditionZeroDesiredReplicasWithInvalidMetric(t *testing.T) {
+	tc := testCase{
+		minReplicas:             1,
+		maxReplicas:             4,
+		specReplicas:            1,
+		statusReplicas:          1,
+		expectedDesiredReplicas: 1,
+		CPUTarget:               100,
+		reportedLevels:          []uint64{},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
+		},
+	}
+	tc.initialStatusReplicas = tc.specReplicas
+
+	opts := []testCaseOption{WithInitialStatusReplicas(0)}
+	for _, opt := range opts {
+		opt.Apply(&tc)
+	}
 	tc.runTest(t)
 }

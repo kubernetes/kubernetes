@@ -652,7 +652,9 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		var metricTimestamp time.Time
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
 		if err != nil {
-			a.setCurrentReplicasInStatus(hpa, currentReplicas)
+			// set desiredReplicas to scale.Spec.Replicas when can't compute metrics
+			desiredReplicas = scale.Spec.Replicas
+			a.setStatus(hpa, currentReplicas, desiredReplicas, hpa.Status.CurrentMetrics, false)
 			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
 				utilruntime.HandleError(err)
 			}
