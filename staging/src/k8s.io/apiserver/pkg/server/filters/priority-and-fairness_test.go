@@ -50,6 +50,8 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestMain(m *testing.M) {
@@ -66,6 +68,8 @@ const (
 	decisionReject
 	decisionSkipFilter
 )
+
+var defaultRequestWidthEstimator = func(*http.Request) uint { return 1 }
 
 type fakeApfFilter struct {
 	mockDecision mockDecision
@@ -157,7 +161,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWidthEstimator)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -560,6 +564,50 @@ func TestApfCancelWaitRequest(t *testing.T) {
 		"apiserver_request_terminations_total",
 		"apiserver_dropped_requests_total",
 	})
+}
+
+type fakeFilterRequestDigest struct {
+	*fakeApfFilter
+	requestDigestGot *utilflowcontrol.RequestDigest
+}
+
+func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
+	requestDigest utilflowcontrol.RequestDigest,
+	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	_ fq.QueueNoteFn, _ func(),
+) {
+	f.requestDigestGot = &requestDigest
+}
+
+func TestApfWithRequestDigest(t *testing.T) {
+	longRunningFunc := func(_ *http.Request, _ *apirequest.RequestInfo) bool { return false }
+	fakeFilter := &fakeFilterRequestDigest{}
+
+	reqDigestExpected := &utilflowcontrol.RequestDigest{
+		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
+		User:        &user.DefaultInfo{Name: "foo"},
+		Width:       5,
+	}
+
+	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
+		longRunningFunc,
+		fakeFilter,
+		func(_ *http.Request) uint { return reqDigestExpected.Width },
+	)
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/bar", nil)
+	if err != nil {
+		t.Fatalf("Failed to create new http request - %v", err)
+	}
+	req = req.WithContext(apirequest.WithRequestInfo(req.Context(), reqDigestExpected.RequestInfo))
+	req = req.WithContext(apirequest.WithUser(req.Context(), reqDigestExpected.User))
+
+	handler.ServeHTTP(w, req)
+
+	if !reflect.DeepEqual(reqDigestExpected, fakeFilter.requestDigestGot) {
+		t.Errorf("Expected RequestDigest to match, diff: %s", cmp.Diff(reqDigestExpected, fakeFilter.requestDigestGot))
+	}
 }
 
 func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
@@ -1058,7 +1106,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWidthEstimator)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -44,7 +44,7 @@ type request struct {
 	startTime time.Time
 
 	// width of the request
-	width float64
+	width uint
 
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
