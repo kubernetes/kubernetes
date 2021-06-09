@@ -2,6 +2,7 @@ package deprecatedapirequest
 
 import (
 	"context"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -93,7 +94,7 @@ func (c *controller) Start(stop <-chan struct{}) {
 	}()
 
 	// write out logs every c.updatePeriod
-	go wait.UntilWithContext(ctx, c.persistRequestCountForAllResources, c.updatePeriod)
+	go wait.NonSlidingUntilWithContext(ctx, c.persistRequestCountForAllResources, c.updatePeriod)
 }
 
 func (c *controller) persistRequestCountForAllResources(ctx context.Context) {
@@ -115,7 +116,10 @@ func (c *controller) persistRequestCountForAllResources(ctx context.Context) {
 	for gvr := range countsToPersist.resourceToRequestCount {
 		resourceCount := countsToPersist.Resource(gvr)
 		wg.Add(1)
-		go c.persistRequestCountForResource(ctx, &wg, currentHour, expiredHour, resourceCount)
+		go func() {
+			time.Sleep(time.Duration(rand.Int63n(int64(c.updatePeriod / 5 * 4)))) // smear out over the interval to avoid resource spikes
+			c.persistRequestCountForResource(ctx, &wg, currentHour, expiredHour, resourceCount)
+		}()
 	}
 	wg.Wait()
 }
