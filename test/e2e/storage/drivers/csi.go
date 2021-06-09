@@ -242,16 +242,19 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 			return err
 		}
 
-		// Remove csi-external-health-monitor-agent because it is
-		// obsolete and shouldn't have been deployed by csi-driver-host-path v1.7.2.
-		// This can be removed when updating to a newer driver that
-		// doesn't deploy the agent.
+		// Remove csi-external-health-monitor-agent and
+		// csi-external-health-monitor-controller
+		// containers. The agent is obsolete.
+		// The controller is not needed for any of the
+		// tests and is causing too much overhead when
+		// running in a large cluster (see
+		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-856991009).
 		switch item := item.(type) {
 		case *appsv1.StatefulSet:
 			var containers []v1.Container
 			for _, container := range item.Spec.Template.Spec.Containers {
 				switch container.Name {
-				case "csi-external-health-monitor-agent":
+				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
 					// Remove these containers.
 				default:
 					// Keep the others.
