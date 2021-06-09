@@ -19,6 +19,8 @@ package devicemanager
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
+
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -326,7 +328,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 }
 
 // getContainerDevices returns the devices assigned to the provided container for all ResourceNames
-func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDeviceInstances {
+func (pdev *podDevices) getContainerDevices(podUID, contName string) device.ResourceDeviceInstances {
 	pdev.RLock()
 	defer pdev.RUnlock()
 
@@ -336,7 +338,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 	if _, contExists := pdev.devs[podUID][contName]; !contExists {
 		return nil
 	}
-	resDev := NewResourceDeviceInstances()
+	resDev := device.NewResourceDeviceInstances()
 	for resource, allocateInfo := range pdev.devs[podUID][contName] {
 		if len(allocateInfo.deviceIds) == 0 {
 			continue
@@ -362,25 +364,4 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		resDev[resource] = devicePluginMap
 	}
 	return resDev
-}
-
-// DeviceInstances is a mapping device name -> plugin device data
-type DeviceInstances map[string]pluginapi.Device
-
-// ResourceDeviceInstances is a mapping resource name -> DeviceInstances
-type ResourceDeviceInstances map[string]DeviceInstances
-
-func NewResourceDeviceInstances() ResourceDeviceInstances {
-	return make(ResourceDeviceInstances)
-}
-
-func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
-	clone := NewResourceDeviceInstances()
-	for resourceName, resourceDevs := range rdev {
-		clone[resourceName] = make(map[string]pluginapi.Device)
-		for devID, dev := range resourceDevs {
-			clone[resourceName][devID] = dev
-		}
-	}
-	return clone
 }

@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -84,7 +86,7 @@ type ManagerImpl struct {
 	callback monitorCallback
 
 	// allDevices holds all the devices currently registered to the device manager
-	allDevices ResourceDeviceInstances
+	allDevices device.ResourceDeviceInstances
 
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
@@ -150,7 +152,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 
 		socketname:            file,
 		socketdir:             dir,
-		allDevices:            NewResourceDeviceInstances(),
+		allDevices:            device.NewResourceDeviceInstances(),
 		healthyDevices:        make(map[string]sets.String),
 		unhealthyDevices:      make(map[string]sets.String),
 		allocatedDevices:      make(map[string]sets.String),
@@ -577,7 +579,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 		registeredDevs[resource] = devices.UnsortedList()
 	}
 	data := checkpoint.New(m.podDevices.toCheckpointData(),
-		registeredDevs)
+		registeredDevs, m.allDevices)
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
@@ -593,7 +595,8 @@ func (m *ManagerImpl) writeCheckpoint() error {
 func (m *ManagerImpl) readCheckpoint() error {
 	registeredDevs := make(map[string][]string)
 	devEntries := make([]checkpoint.PodDevicesEntry, 0)
-	cp := checkpoint.New(devEntries, registeredDevs)
+	allDevice := device.NewResourceDeviceInstances()
+	cp := checkpoint.New(devEntries, registeredDevs, allDevice)
 	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
@@ -604,9 +607,10 @@ func (m *ManagerImpl) readCheckpoint() error {
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	podDevices, registeredDevs := cp.GetData()
+	podDevices, registeredDevs, allDevices := cp.GetData()
 	m.podDevices.fromCheckpointData(podDevices)
 	m.allocatedDevices = m.podDevices.devices()
+	m.allDevices = allDevices
 	for resource := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
 		// will stay zero till the corresponding device plugin re-registers.
@@ -1091,7 +1095,7 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 }
 
 // GetAllocatableDevices returns information about all the devices known to the manager
-func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
+func (m *ManagerImpl) GetAllocatableDevices() device.ResourceDeviceInstances {
 	m.mutex.Lock()
 	resp := m.allDevices.Clone()
 	m.mutex.Unlock()
@@ -1100,7 +1104,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 }
 
 // GetDevices returns the devices used by the specified container
-func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceInstances {
+func (m *ManagerImpl) GetDevices(podUID, containerName string) device.ResourceDeviceInstances {
 	return m.podDevices.getContainerDevices(podUID, containerName)
 }
 

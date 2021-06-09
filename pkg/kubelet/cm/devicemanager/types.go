@@ -19,6 +19,8 @@ package devicemanager
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -59,10 +61,10 @@ type Manager interface {
 	GetWatcherHandler() cache.PluginHandler
 
 	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) ResourceDeviceInstances
+	GetDevices(podUID, containerName string) device.ResourceDeviceInstances
 
 	// GetAllocatableDevices returns information about all the devices known to the manager
-	GetAllocatableDevices() ResourceDeviceInstances
+	GetAllocatableDevices() device.ResourceDeviceInstances
 
 	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
 	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
