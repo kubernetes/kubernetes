@@ -61,7 +61,7 @@ kube::test::find_dirs() {
 
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 # TEMP DO NOT MERGE: testing reduced timeout
-KUBE_TIMEOUT=--timeout=120s
+KUBE_TIMEOUT=--timeout=180s
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # The directory to save test coverage reports to, if generating them. If unset,
