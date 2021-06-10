@@ -64,13 +64,12 @@ func TestCreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, stopCh)
-	if _, err := factory.createFromProvider(schedulerapi.SchedulerDefaultProviderName); err != nil {
+	if _, err := factory.createFromConfig(); err != nil {
 		t.Error(err)
 	}
 }
 
-// createAlgorithmSourceFromPolicy creates the schedulerAlgorithmSource from policy string
-func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
+func createPolicySource(configData []byte, clientSet clientset.Interface) *schedulerapi.SchedulerPolicySource {
 	configPolicyName := "scheduler-custom-policy-config"
 	policyConfigMap := v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -82,12 +81,10 @@ func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Inte
 
 	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
-	return schedulerapi.SchedulerAlgorithmSource{
-		Policy: &schedulerapi.SchedulerPolicySource{
-			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-				Namespace: policyConfigMap.Namespace,
-				Name:      policyConfigMap.Name,
-			},
+	return &schedulerapi.SchedulerPolicySource{
+		ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
+			Namespace: policyConfigMap.Namespace,
+			Name:      policyConfigMap.Name,
 		},
 	}
 }
@@ -405,7 +402,7 @@ func TestCreateFromConfig(t *testing.T) {
 				informerFactory,
 				recorderFactory,
 				make(chan struct{}),
-				WithAlgorithmSource(createAlgorithmSourceFromPolicy(tc.configData, client)),
+				WithLegacyPolicySource(createPolicySource(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {
 					if p.SchedulerName != v1.DefaultSchedulerName {
 						t.Errorf("unexpected scheduler name: want %q, got %q", v1.DefaultSchedulerName, p.SchedulerName)

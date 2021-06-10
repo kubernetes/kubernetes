@@ -25,7 +25,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/utils/pointer"
 )
 
 var (
@@ -142,7 +141,6 @@ func Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigura
 	if err := autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err
 	}
-	out.AlgorithmSource.Provider = pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)
 	return convertToInternalPluginConfigArgs(out)
 }
 

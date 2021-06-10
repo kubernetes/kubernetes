@@ -91,7 +91,6 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 		ctx.Done(),
 		scheduler.WithKubeConfig(kubeConfig),
 		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithAlgorithmSource(cfg.AlgorithmSource),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
@@ -403,7 +402,7 @@ func InitTestSchedulerWithOptions(
 	})
 
 	if policy != nil {
-		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
+		opts = append(opts, scheduler.WithLegacyPolicySource(CreateSchedulerPolicySource(policy, testCtx.ClientSet)))
 	}
 	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
@@ -424,8 +423,8 @@ func InitTestSchedulerWithOptions(
 	return testCtx
 }
 
-// CreateAlgorithmSourceFromPolicy creates the schedulerAlgorithmSource from the policy parameter
-func CreateAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
+// CreateSchedulerPolicySource creates a source from the given policy.
+func CreateSchedulerPolicySource(policy *schedulerapi.Policy, clientSet clientset.Interface) *schedulerapi.SchedulerPolicySource {
 	// Serialize the Policy object into a ConfigMap later.
 	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok {
@@ -441,12 +440,10 @@ func CreateAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clie
 	policyConfigMap.APIVersion = "v1"
 	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
-	return schedulerapi.SchedulerAlgorithmSource{
-		Policy: &schedulerapi.SchedulerPolicySource{
-			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-				Namespace: policyConfigMap.Namespace,
-				Name:      policyConfigMap.Name,
-			},
+	return &schedulerapi.SchedulerPolicySource{
+		ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
+			Namespace: policyConfigMap.Namespace,
+			Name:      policyConfigMap.Name,
 		},
 	}
 }
