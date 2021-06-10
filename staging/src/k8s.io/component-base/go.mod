@@ -34,3 +34,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
+
+replace github.com/moby/term => github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
