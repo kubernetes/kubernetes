@@ -204,10 +204,10 @@ limitations under the License.
 // 	    # certFile: "/etcd/kubernetes/pki/etcd/etcd.crt"
 // 	    # keyFile: "/etcd/kubernetes/pki/etcd/etcd.key"
 // 	networking:
-// 	  serviceSubnet: "10.96.0.0/12"
-// 	  podSubnet: "10.100.0.1/24"
+// 	  serviceSubnet: "10.96.0.0/16"
+// 	  podSubnet: "10.244.0.0/24"
 // 	  dnsDomain: "cluster.local"
-// 	kubernetesVersion: "v1.12.0"
+// 	kubernetesVersion: "v1.21.0"
 // 	controlPlaneEndpoint: "10.100.0.1:6443"
 // 	apiServer:
 // 	  extraArgs:
