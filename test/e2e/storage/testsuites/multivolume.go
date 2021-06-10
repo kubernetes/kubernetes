@@ -381,8 +381,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}()
 
 		// Test access to both volumes on the same node.
-		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name,
-			l.config.ClientNodeSelection, pvcs, true /* sameNode */, false /* readOnly */)
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs)
 	})
 
 	// This tests below configuration:
@@ -426,8 +425,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}()
 
 		// Test access to both volumes on the same node.
-		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name,
-			l.config.ClientNodeSelection, pvcs, true /* sameNode */, false /* readOnly */)
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs)
 	})
 
 	// This tests below configuration:
@@ -696,8 +694,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 // Each provided PVC is used by a single pod. The test ensures that volumes created from
 // another volume (=clone) or volume snapshot can be used together with the original volume.
 func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.Interface, ns string,
-	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, requiresSameNode bool,
-	readOnly bool) {
+	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim) {
 
 	var pods []*v1.Pod
 
@@ -710,7 +707,7 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 			PVCs:          []*v1.PersistentVolumeClaim{pvcs[i]},
 			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
-			PVCsReadOnly:  readOnly,
+			PVCsReadOnly:  false,
 			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
@@ -721,17 +718,8 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 		pods = append(pods, pod)
 		actualNodeName := pod.Spec.NodeName
 
-		// Set affinity depending on requiresSameNode
-		if requiresSameNode {
-			e2epod.SetAffinity(&node, actualNodeName)
-		} else {
-			e2epod.SetAntiAffinity(&node, actualNodeName)
-		}
-	}
-
-	// Delete the last pod and remove from slice of pods
-	if len(pods) < len(pvcs) {
-		framework.Failf("Number of pods shouldn't be less than %d, but got %d", len(pvcs), len(pods))
+		// Always run the subsequent pods on the same node.
+		e2epod.SetAffinity(&node, actualNodeName)
 	}
 }
 
