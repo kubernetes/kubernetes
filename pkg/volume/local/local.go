@@ -57,6 +57,7 @@ type localVolumePlugin struct {
 var _ volume.VolumePlugin = &localVolumePlugin{}
 var _ volume.PersistentVolumePlugin = &localVolumePlugin{}
 var _ volume.BlockVolumePlugin = &localVolumePlugin{}
+var _ volume.NodeExpandableVolumePlugin = &localVolumePlugin{}
 
 const (
 	localVolumePluginName = "kubernetes.io/local-volume"
@@ -373,6 +374,48 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 		return nil
 	default:
 		return fmt.Errorf("only directory and block device are supported")
+	}
+}
+
+func (plugin *localVolumePlugin) RequiresFSResize() bool {
+	return true
+}
+
+func (plugin *localVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	if !fsVolume {
+		return true, nil
+	}
+
+	localDevicePath := resizeOptions.VolumeSpec.PersistentVolume.Spec.Local.Path
+
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return false, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+
+	fileType, err := kvh.GetHostUtil().GetFileType(localDevicePath)
+	if err != nil {
+		return false, err
+	}
+
+	switch fileType {
+	case hostutil.FileTypeBlockDev:
+		_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), localDevicePath, resizeOptions.DeviceMountPath)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	case hostutil.FileTypeDirectory:
+		// if the given local volume path is of already filesystem directory, return directly because
+		// we do not want to prevent mount operation from succeeding.
+		klog.InfoS("expansion of directory based local volumes is NO-OP", "local-volume-path", localDevicePath)
+		return true, nil
+	default:
+		return false, fmt.Errorf("only directory and block device are supported")
 	}
 }
 
