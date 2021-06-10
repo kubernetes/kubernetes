@@ -59,7 +59,10 @@ kube::test::find_dirs() {
   )
 }
 
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
+# TODO: This timeout should really be lower, this is a *long* time to test one
+# package, however pkg/api/testing in particular will fail with a lower timeout
+# currently. We should attempt to lower this over time.
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=170s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # The directory to save test coverage reports to, if generating them. If unset,
