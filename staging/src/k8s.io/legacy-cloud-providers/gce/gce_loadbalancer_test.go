@@ -185,8 +185,10 @@ func TestBasePath(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	// Loadbalancer controller code expects basepath to contain the projects string.
 	expectBasePath := "https://compute.googleapis.com/compute/v1/projects/"
+	// See https://github.com/kubernetes/kubernetes/issues/102757, the endpoint can have mtls in some cases.
+	expectMtlsBasePath := "https://compute.mtls.googleapis.com/compute/v1/projects/"
 	require.NoError(t, err)
-	if gce.service.BasePath != expectBasePath {
-		t.Errorf("Compute basePath has changed. Got %q, want %q", gce.service.BasePath, expectBasePath)
+	if gce.service.BasePath != expectBasePath && gce.service.BasePath != expectMtlsBasePath {
+		t.Errorf("Compute basePath has changed. Got %q, want %q or %q", gce.service.BasePath, expectBasePath, expectMtlsBasePath)
 	}
 }
