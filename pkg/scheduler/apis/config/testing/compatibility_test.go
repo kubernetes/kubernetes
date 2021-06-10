@@ -1394,7 +1394,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}
 
-			gotExtenders := sched.Algorithm.Extenders()
+			gotExtenders := sched.Extenders
 			var wantExtenders []*core.HTTPExtender
 			for _, e := range tc.wantExtenders {
 				extender, err := core.NewHTTPExtender(&e)
