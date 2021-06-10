@@ -99,7 +99,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.15.12
+    version: 1.15.13
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -112,7 +112,7 @@ dependencies:
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.12-legacy-1
+    version: v1.15.13-legacy-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
@@ -146,7 +146,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.15.12-buster.0
+    version: v2.3.1-go1.15.13-buster.0
     refPaths:
     - path: build/common.sh
       match: go_runner_version=
