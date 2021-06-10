@@ -345,6 +345,12 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if pattern.SnapshotType == "" {
 			e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
 		}
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			// TODO: refactor prepareSnapshotDataSourceForProvisioning() below to use
+			// utils.CheckWriteToPath / utils.CheckReadFromPath and remove
+			// redundant InjectContent(). This will enable block volume tests.
+			e2eskipper.Skipf("This test does not support block volumes -- skipping")
+		}
 
 		// Create a volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
@@ -353,13 +359,14 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
 
 		// Create snapshot of it
+		expectedContent := fmt.Sprintf("volume content %d", time.Now().UTC().UnixNano())
 		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
 		if !ok {
 			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		dc := l.config.Framework.DynamicClient
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, "injected content")
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
 		defer cleanupFunc()
 
 		// Create 2nd PVC for testing
@@ -381,7 +388,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}()
 
 		// Test access to both volumes on the same node.
-		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs)
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs, expectedContent)
 	})
 
 	// This tests below configuration:
@@ -396,14 +403,21 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapPVCDataSource] {
 			e2eskipper.Skipf("Driver %q does not support volume clone - skipping", dInfo.Name)
 		}
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			// TODO: refactor preparePVCDataSourceForProvisioning() below to use
+			// utils.CheckWriteToPath / utils.CheckReadFromPath and remove
+			// redundant InjectContent(). This will enable block volume tests.
+			e2eskipper.Skipf("This test does not support block volumes -- skipping")
+		}
 
 		// Create a volume
+		expectedContent := fmt.Sprintf("volume content %d", time.Now().UTC().UnixNano())
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		resource := storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource, cleanupFunc := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, "injected content")
+		dataSource, cleanupFunc := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
 		defer cleanupFunc()
 
 		// Create 2nd PVC for testing
@@ -425,7 +439,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}()
 
 		// Test access to both volumes on the same node.
-		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs)
+		TestConcurrentAccessToRelatedVolumes(l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs, expectedContent)
 	})
 
 	// This tests below configuration:
@@ -694,7 +708,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 // Each provided PVC is used by a single pod. The test ensures that volumes created from
 // another volume (=clone) or volume snapshot can be used together with the original volume.
 func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.Interface, ns string,
-	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim) {
+	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, expectedContent string) {
 
 	var pods []*v1.Pod
 
@@ -720,6 +734,17 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 
 		// Always run the subsequent pods on the same node.
 		e2epod.SetAffinity(&node, actualNodeName)
+	}
+
+	// Check that all pods the same content
+	for i, pod := range pods {
+		fileName := "/mnt/volume1/index.html"
+		index := i + 1
+
+		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
+		commands := e2evolume.GenerateReadFileCmd(fileName)
+		_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, expectedContent, time.Minute)
+		framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 	}
 }
 
