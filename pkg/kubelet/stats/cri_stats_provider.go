@@ -70,6 +70,7 @@ type criStatsProvider struct {
 	cpuUsageCache                  map[string]*cpuUsageRecord
 	mutex                          sync.RWMutex
 	disableAcceleratorUsageMetrics bool
+	podAndContainerStatsFromCRI    bool
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -80,7 +81,8 @@ func newCRIStatsProvider(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
-	disableAcceleratorUsageMetrics bool,
+	disableAcceleratorUsageMetrics,
+	podAndContainerStatsFromCRI bool,
 ) containerStatsProvider {
 	return &criStatsProvider{
 		cadvisor:                       cadvisor,
@@ -90,6 +92,7 @@ func newCRIStatsProvider(
 		hostStatsProvider:              hostStatsProvider,
 		cpuUsageCache:                  make(map[string]*cpuUsageRecord),
 		disableAcceleratorUsageMetrics: disableAcceleratorUsageMetrics,
+		podAndContainerStatsFromCRI:    podAndContainerStatsFromCRI,
 	}
 }
 
@@ -137,6 +140,10 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	for _, s := range podSandboxes {
 		podSandboxMap[s.Id] = s
 	}
+
+	if p.podAndContainerStatsFromCRI {
+		return p.listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage, containers, podSandboxes)
+	}
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
@@ -156,7 +163,6 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	for _, c := range containers {
 		containerMap[c.Id] = c
 	}
-
 	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
@@ -216,6 +222,10 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		result = append(result, *s)
 	}
 	return result, nil
+}
+
+func (p *criStatsProvider) listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage bool, containers []*runtimeapi.Container, podSandboxes []*runtimeapi.PodSandbox) ([]statsapi.PodStats, error) {
+	return []statsapi.PodStats{}, nil
 }
 
 // ListPodCPUAndMemoryStats returns the CPU and Memory stats of all the pod-managed containers.

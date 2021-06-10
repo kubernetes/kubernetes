@@ -236,6 +236,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		false,
+		false,
 	)
 
 	stats, err := provider.ListPodStats()
@@ -396,6 +397,7 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProvider(),
 		true, // this is what the test is actually testing
+		false,
 	)
 
 	stats, err := provider.ListPodStats()
@@ -541,6 +543,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(),
 		false,
+		false,
 	)
 
 	stats, err := provider.ListPodCPUAndMemoryStats()
@@ -670,6 +673,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProvider(),
+		false,
 		false,
 	)
 
