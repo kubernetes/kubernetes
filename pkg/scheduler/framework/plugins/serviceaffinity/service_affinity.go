@@ -31,11 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "ServiceAffinity"
+	Name = names.ServiceAffinity
 
 	// preFilterStateKey is the key in CycleState to ServiceAffinity pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.

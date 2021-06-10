@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // BalancedAllocation is a score plugin that calculates the difference between the cpu and memory fraction
@@ -37,7 +38,7 @@ type BalancedAllocation struct {
 var _ = framework.ScorePlugin(&BalancedAllocation{})
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
-const BalancedAllocationName = "NodeResourcesBalancedAllocation"
+const BalancedAllocationName = names.NodeResourcesBalancedAllocation
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ba *BalancedAllocation) Name() string {
