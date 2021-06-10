@@ -525,7 +525,7 @@ type Framework interface {
 	HasScorePlugins() bool
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
-	ListPlugins() map[string][]config.Plugin
+	ListPlugins() *config.Plugins
 
 	// ProfileName returns the profile name associated to this framework.
 	ProfileName() string
