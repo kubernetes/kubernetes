@@ -635,6 +635,12 @@ const (
 	// Allows user to override pod-level terminationGracePeriod for probes
 	ProbeTerminationGracePeriod featuregate.Feature = "ProbeTerminationGracePeriod"
 
+	// owner: @ehashman
+	// alpha: v1.22
+	//
+	// Permits kubelet to run with swap enabled
+	NodeSwapEnabled featuregate.Feature = "NodeSwapEnabled"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	// beta: v1.22
@@ -825,6 +831,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},
 	PreferNominatedNode:                            {Default: true, PreRelease: featuregate.Beta},
 	ProbeTerminationGracePeriod:                    {Default: false, PreRelease: featuregate.Alpha},
+	NodeSwapEnabled:                                {Default: false, PreRelease: featuregate.Alpha},
 	PodDeletionCost:                                {Default: true, PreRelease: featuregate.Beta},
 	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.Beta},
