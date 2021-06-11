@@ -23,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 // DeprecatedOptions contains deprecated options and their flags.
@@ -32,12 +30,10 @@ import (
 type DeprecatedOptions struct {
 	// The fields below here are placeholders for flags that can't be directly
 	// mapped into componentconfig.KubeSchedulerConfiguration.
-	PolicyConfigFile               string
-	PolicyConfigMapName            string
-	PolicyConfigMapNamespace       string
-	UseLegacyPolicyConfig          bool
-	HardPodAffinitySymmetricWeight int32
-	SchedulerName                  string
+	PolicyConfigFile         string
+	PolicyConfigMapName      string
+	PolicyConfigMapNamespace string
+	UseLegacyPolicyConfig    bool
 }
 
 // AddFlags adds flags for the deprecated options.
@@ -60,14 +56,6 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.Int32Var(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.StringVar(&cfg.LeaderElection.ResourceNamespace, "lock-object-namespace", cfg.LeaderElection.ResourceNamespace, "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace. This parameter is ignored if a config file is specified in --config.")
 	fs.StringVar(&cfg.LeaderElection.ResourceName, "lock-object-name", cfg.LeaderElection.ResourceName, "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name. This parameter is ignored if a config file is specified in --config.")
-
-	fs.Int32Var(&o.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", o.HardPodAffinitySymmetricWeight,
-		"DEPRECATED: RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
-			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule. Must be in the range 0-100."+
-			"This parameter is ignored if a config file is specified in --config.")
-	fs.StringVar(&o.SchedulerName, "scheduler-name", o.SchedulerName, "DEPRECATED: name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.schedulerName\". This parameter is ignored if a config file is specified in --config.")
-	// MarkDeprecated hides the flag from the help. We don't want that:
-	// fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
 }
 
 // Validate validates the deprecated scheduler options.
@@ -78,10 +66,6 @@ func (o *DeprecatedOptions) Validate() []error {
 		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
 	}
 
-	if err := validation.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
-		errs = append(errs, err)
-	}
-
 	return errs
 }
 
@@ -89,7 +73,7 @@ func (o *DeprecatedOptions) Validate() []error {
 //
 // 1. --use-legacy-policy-config to use a policy file.
 // 2. --policy-configmap to use a policy config map value.
-func (o *DeprecatedOptions) ApplyPolicySourceTo(c *schedulerappconfig.Config) {
+func (o *DeprecatedOptions) ApplyTo(c *schedulerappconfig.Config) {
 	if o == nil {
 		return
 	}
@@ -109,30 +93,4 @@ func (o *DeprecatedOptions) ApplyPolicySourceTo(c *schedulerappconfig.Config) {
 			},
 		}
 	}
-}
-
-// ApplyTo sets a default profile plugin config if no config file is specified
-// It also calls ApplyPolicySourceTo to set Policy source if applicable.
-// Deprecated flags have an effect iff no config file was provided, in which
-// case this function expects a default KubeSchedulerConfiguration instance,
-// which has a single profile.
-func (o *DeprecatedOptions) ApplyTo(c *schedulerappconfig.Config) {
-	if o == nil {
-		return
-	}
-	// The following deprecated options affect the only existing profile that is
-	// added by default.
-	profile := &c.ComponentConfig.Profiles[0]
-	if len(o.SchedulerName) > 0 {
-		profile.SchedulerName = o.SchedulerName
-	}
-	plCfg := kubeschedulerconfig.PluginConfig{
-		Name: interpodaffinity.Name,
-		Args: &kubeschedulerconfig.InterPodAffinityArgs{
-			HardPodAffinityWeight: o.HardPodAffinitySymmetricWeight,
-		},
-	}
-
-	profile.PluginConfig = append(profile.PluginConfig, plCfg)
-	o.ApplyPolicySourceTo(c)
 }

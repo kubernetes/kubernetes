@@ -255,16 +255,6 @@ profiles:
 			},
 		},
 		{
-			name: "Deprecated SchedulerName flag",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--scheduler-name", "my-scheduler",
-			},
-			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
-				"my-scheduler": defaultPlugins,
-			},
-		},
-		{
 			name: "default algorithm provider",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
