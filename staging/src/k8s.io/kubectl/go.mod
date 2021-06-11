@@ -57,5 +57,3 @@ replace (
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )
-
-replace github.com/moby/term => github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
