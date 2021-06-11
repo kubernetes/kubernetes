@@ -297,11 +297,14 @@ github.com/go-bindata/go-bindata/go-bindata
 github.com/go-errors/errors
 # github.com/go-logr/logr v0.4.0 => github.com/go-logr/logr v0.4.0
 github.com/go-logr/logr
-# github.com/go-openapi/jsonpointer v0.19.3 => github.com/go-openapi/jsonpointer v0.19.3
+# github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.3
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonreference v0.19.3 => github.com/go-openapi/jsonreference v0.19.3
+# github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.3
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/swag v0.19.5 => github.com/go-openapi/swag v0.19.5
+# github.com/go-openapi/spec v0.20.3 => github.com/go-openapi/spec v0.20.3
+## explicit
+github.com/go-openapi/spec
+# github.com/go-openapi/swag v0.19.14 => github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 ## explicit
@@ -421,7 +424,7 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 => github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 github.com/google/shlex
-# github.com/google/uuid v1.1.2 => github.com/google/uuid v1.1.2
+# github.com/google/uuid v1.2.0 => github.com/google/uuid v1.1.2
 ## explicit
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
@@ -746,10 +749,11 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 github.com/vishvananda/netns
-# github.com/vmware/govmomi v0.20.3 => github.com/vmware/govmomi v0.20.3
+# github.com/vmware/govmomi v0.26.0 => github.com/vmware/govmomi v0.26.0
 ## explicit
 github.com/vmware/govmomi
 github.com/vmware/govmomi/find
+github.com/vmware/govmomi/internal
 github.com/vmware/govmomi/list
 github.com/vmware/govmomi/lookup
 github.com/vmware/govmomi/lookup/methods
@@ -757,22 +761,32 @@ github.com/vmware/govmomi/lookup/simulator
 github.com/vmware/govmomi/lookup/types
 github.com/vmware/govmomi/nfc
 github.com/vmware/govmomi/object
+github.com/vmware/govmomi/ovf
 github.com/vmware/govmomi/pbm
 github.com/vmware/govmomi/pbm/methods
 github.com/vmware/govmomi/pbm/types
 github.com/vmware/govmomi/property
 github.com/vmware/govmomi/session
+github.com/vmware/govmomi/session/keepalive
 github.com/vmware/govmomi/simulator
 github.com/vmware/govmomi/simulator/esx
+github.com/vmware/govmomi/simulator/internal
 github.com/vmware/govmomi/simulator/vpx
 github.com/vmware/govmomi/sts
 github.com/vmware/govmomi/sts/internal
 github.com/vmware/govmomi/sts/simulator
 github.com/vmware/govmomi/task
+github.com/vmware/govmomi/toolbox/hgfs
+github.com/vmware/govmomi/toolbox/process
+github.com/vmware/govmomi/toolbox/vix
+github.com/vmware/govmomi/units
 github.com/vmware/govmomi/vapi/internal
+github.com/vmware/govmomi/vapi/library
 github.com/vmware/govmomi/vapi/rest
 github.com/vmware/govmomi/vapi/simulator
 github.com/vmware/govmomi/vapi/tags
+github.com/vmware/govmomi/vapi/vcenter
+github.com/vmware/govmomi/view
 github.com/vmware/govmomi/vim25
 github.com/vmware/govmomi/vim25/debug
 github.com/vmware/govmomi/vim25/methods
@@ -2326,6 +2340,7 @@ sigs.k8s.io/yaml
 # github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v1.1.1
 # github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
 # github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
+# github.com/a8m/tree => github.com/a8m/tree v0.0.0-20210115125333-10a5fd5b637d
 # github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 # github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 # github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
@@ -2375,6 +2390,7 @@ sigs.k8s.io/yaml
 # github.com/creack/pty => github.com/creack/pty v1.1.11
 # github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
 # github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
+# github.com/davecgh/go-xdr => github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892
 # github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 # github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v3.2.0+incompatible
 # github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
@@ -2409,6 +2425,7 @@ sigs.k8s.io/yaml
 # github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+# github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.3
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
 # github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
@@ -2579,7 +2596,8 @@ sigs.k8s.io/yaml
 # github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
 # github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 # github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
-# github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3
+# github.com/vmware/govmomi => github.com/vmware/govmomi v0.26.0
+# github.com/vmware/vmw-guestinfo => github.com/vmware/vmw-guestinfo v0.0.0-20170707015358-25eff159a728
 # github.com/willf/bitset => github.com/willf/bitset v1.1.11
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 # github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca

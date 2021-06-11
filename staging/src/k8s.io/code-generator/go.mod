@@ -6,6 +6,9 @@ go 1.16
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/go-openapi/jsonpointer v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/go-cmp v0.5.4 // indirect
@@ -31,4 +34,10 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/google/uuid => github.com/google/uuid v1.1.2
+	k8s.io/code-generator => ../code-generator
+)

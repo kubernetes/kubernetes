@@ -25,12 +25,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/esx"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -45,13 +47,21 @@ type VirtualMachine struct {
 	log string
 	sid int32
 	run container
+	uid uuid.UUID
+	imc *types.CustomizationSpec
 }
 
-func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualMachineConfigSpec) (*VirtualMachine, types.BaseMethodFault) {
+func asVirtualMachineMO(obj mo.Reference) (*mo.VirtualMachine, bool) {
+	vm, ok := getManagedObject(obj).Addr().Interface().(*mo.VirtualMachine)
+	return vm, ok
+}
+
+func NewVirtualMachine(ctx *Context, parent types.ManagedObjectReference, spec *types.VirtualMachineConfigSpec) (*VirtualMachine, types.BaseMethodFault) {
 	vm := &VirtualMachine{}
 	vm.Parent = &parent
+	Map.reference(vm)
 
-	Map.Get(parent).(*Folder).putChild(vm)
+	folder := Map.Get(parent)
 
 	if spec.Name == "" {
 		return vm, &types.InvalidVmConfig{Property: "configSpec.name"}
@@ -64,10 +74,13 @@ func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualM
 	rspec := types.DefaultResourceConfigSpec()
 	vm.Guest = &types.GuestInfo{}
 	vm.Config = &types.VirtualMachineConfigInfo{
-		ExtraConfig:      []types.BaseOptionValue{&types.OptionValue{Key: "govcsim", Value: "TRUE"}},
-		Tools:            &types.ToolsConfigInfo{},
-		MemoryAllocation: &rspec.MemoryAllocation,
-		CpuAllocation:    &rspec.CpuAllocation,
+		ExtraConfig:        []types.BaseOptionValue{&types.OptionValue{Key: "govcsim", Value: "TRUE"}},
+		Tools:              &types.ToolsConfigInfo{},
+		MemoryAllocation:   &rspec.MemoryAllocation,
+		CpuAllocation:      &rspec.CpuAllocation,
+		LatencySensitivity: &types.LatencySensitivity{Level: types.LatencySensitivitySensitivityLevelNormal},
+		BootOptions:        &types.VirtualMachineBootOptions{},
+		CreateDate:         types.NewTime(time.Now()),
 	}
 	vm.Layout = &types.VirtualMachineFileLayout{}
 	vm.LayoutEx = &types.VirtualMachineFileLayoutEx{
@@ -83,24 +96,51 @@ func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualM
 		Timestamp: time.Now(),
 	}
 
-	// Append VM Name as the directory name if not specified
-	if strings.HasSuffix(spec.Files.VmPathName, "]") { // e.g. "[datastore1]"
-		spec.Files.VmPathName += " " + spec.Name
+	vmx := vm.vmx(spec)
+	if vmx.Path == "" {
+		// Append VM Name as the directory name if not specified
+		vmx.Path = spec.Name
 	}
 
-	if !strings.HasSuffix(spec.Files.VmPathName, ".vmx") {
-		spec.Files.VmPathName = path.Join(spec.Files.VmPathName, spec.Name+".vmx")
+	dc := Map.getEntityDatacenter(folder.(mo.Entity))
+	ds := Map.FindByName(vmx.Datastore, dc.Datastore).(*Datastore)
+	dir := path.Join(ds.Info.GetDatastoreInfo().Url, vmx.Path)
+
+	if path.Ext(vmx.Path) == ".vmx" {
+		dir = path.Dir(dir)
+		// Ignore error here, deferring to createFile
+		_ = os.Mkdir(dir, 0700)
+	} else {
+		// Create VM directory, renaming if already exists
+		name := dir
+
+		for i := 0; i < 1024; /* just in case */ i++ {
+			err := os.Mkdir(name, 0700)
+			if err != nil {
+				if os.IsExist(err) {
+					name = fmt.Sprintf("%s (%d)", dir, i)
+					continue
+				}
+				return nil, &types.FileFault{File: name}
+			}
+			break
+		}
+		vmx.Path = path.Join(path.Base(name), spec.Name+".vmx")
 	}
+
+	spec.Files.VmPathName = vmx.String()
 
 	dsPath := path.Dir(spec.Files.VmPathName)
+	vm.uid = sha1UUID(spec.Files.VmPathName)
 
 	defaults := types.VirtualMachineConfigSpec{
 		NumCPUs:           1,
 		NumCoresPerSocket: 1,
 		MemoryMB:          32,
-		Uuid:              uuid.New().String(),
-		InstanceUuid:      uuid.New().String(),
+		Uuid:              vm.uid.String(),
+		InstanceUuid:      newUUID(strings.ToUpper(spec.Files.VmPathName)),
 		Version:           esx.HardwareVersion,
+		Firmware:          string(types.GuestOsDescriptorFirmwareTypeBios),
 		Files: &types.VirtualMachineFileInfo{
 			SnapshotDirectory: dsPath,
 			SuspendDirectory:  dsPath,
@@ -111,7 +151,7 @@ func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualM
 	// Add the default devices
 	defaults.DeviceChange, _ = object.VirtualDeviceList(esx.VirtualDevice).ConfigSpec(types.VirtualDeviceConfigSpecOperationAdd)
 
-	err := vm.configure(&defaults)
+	err := vm.configure(ctx, &defaults)
 	if err != nil {
 		return vm, err
 	}
@@ -120,11 +160,24 @@ func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualM
 	vm.Runtime.ConnectionState = types.VirtualMachineConnectionStateConnected
 	vm.Summary.Runtime = vm.Runtime
 
+	vm.Capability.ChangeTrackingSupported = types.NewBool(changeTrackingSupported(spec))
+
 	vm.Summary.QuickStats.GuestHeartbeatStatus = types.ManagedEntityStatusGray
 	vm.Summary.OverallStatus = types.ManagedEntityStatusGreen
 	vm.ConfigStatus = types.ManagedEntityStatusGreen
 
+	f, _ := asFolderMO(folder)
+	folderPutChild(ctx, f, vm)
+
 	return vm, nil
+}
+
+func (o *VirtualMachine) RenameTask(ctx *Context, r *types.Rename_Task) soap.HasFault {
+	return RenameTask(ctx, o, r)
+}
+
+func (*VirtualMachine) Reload(*types.Reload) soap.HasFault {
+	return &methods.ReloadBody{Res: new(types.ReloadResponse)}
 }
 
 func (vm *VirtualMachine) event() types.VmEvent {
@@ -268,10 +321,29 @@ func (vm *VirtualMachine) apply(spec *types.VirtualMachineConfigSpec) {
 		vm.Config.Hardware.NumCoresPerSocket = spec.NumCoresPerSocket
 	}
 
+	if spec.GuestId != "" {
+		vm.Guest.GuestFamily = guestFamily(spec.GuestId)
+	}
+
+	vm.Config.Modified = time.Now()
+}
+
+var extraConfigAlias = map[string]string{
+	"ip0": "SET.guest.ipAddress",
+}
+
+func extraConfigKey(key string) string {
+	if k, ok := extraConfigAlias[key]; ok {
+		return k
+	}
+	return key
+}
+
+func (vm *VirtualMachine) applyExtraConfig(spec *types.VirtualMachineConfigSpec) {
 	var changes []types.PropertyChange
 	for _, c := range spec.ExtraConfig {
 		val := c.GetOptionValue()
-		key := strings.TrimPrefix(val.Key, "SET.")
+		key := strings.TrimPrefix(extraConfigKey(val.Key), "SET.")
 		if key == val.Key {
 			vm.Config.ExtraConfig = append(vm.Config.ExtraConfig, c)
 			continue
@@ -280,12 +352,14 @@ func (vm *VirtualMachine) apply(spec *types.VirtualMachineConfigSpec) {
 
 		switch key {
 		case "guest.ipAddress":
-			ip := val.Value.(string)
-			vm.Guest.Net[0].IpAddress = []string{ip}
-			changes = append(changes,
-				types.PropertyChange{Name: "summary." + key, Val: ip},
-				types.PropertyChange{Name: "guest.net", Val: vm.Guest.Net},
-			)
+			if len(vm.Guest.Net) > 0 {
+				ip := val.Value.(string)
+				vm.Guest.Net[0].IpAddress = []string{ip}
+				changes = append(changes,
+					types.PropertyChange{Name: "summary." + key, Val: ip},
+					types.PropertyChange{Name: "guest.net", Val: vm.Guest.Net},
+				)
+			}
 		case "guest.hostName":
 			changes = append(changes,
 				types.PropertyChange{Name: "summary." + key, Val: val.Value},
@@ -295,8 +369,6 @@ func (vm *VirtualMachine) apply(spec *types.VirtualMachineConfigSpec) {
 	if len(changes) != 0 {
 		Map.Update(vm, changes)
 	}
-
-	vm.Config.Modified = time.Now()
 }
 
 func validateGuestID(id string) types.BaseMethodFault {
@@ -309,7 +381,7 @@ func validateGuestID(id string) types.BaseMethodFault {
 	return &types.InvalidArgument{InvalidProperty: "configSpec.guestId"}
 }
 
-func (vm *VirtualMachine) configure(spec *types.VirtualMachineConfigSpec) types.BaseMethodFault {
+func (vm *VirtualMachine) configure(ctx *Context, spec *types.VirtualMachineConfigSpec) types.BaseMethodFault {
 	vm.apply(spec)
 
 	if spec.MemoryAllocation != nil {
@@ -330,7 +402,13 @@ func (vm *VirtualMachine) configure(spec *types.VirtualMachineConfigSpec) types.
 		}
 	}
 
-	return vm.configureDevices(spec)
+	if o := spec.BootOptions; o != nil {
+		if isTrue(o.EfiSecureBootEnabled) && vm.Config.Firmware != string(types.GuestOsDescriptorFirmwareTypeEfi) {
+			return &types.InvalidVmConfig{Property: "msg.hostd.configSpec.efi"}
+		}
+	}
+
+	return vm.configureDevices(ctx, spec)
 }
 
 func getVMFileType(fileName string) types.VirtualMachineFileLayoutExFileType {
@@ -533,9 +611,8 @@ func (vm *VirtualMachine) updateDiskLayouts() types.BaseMethodFault {
 
 			var fileKeys []int32
 
-			dm := Map.VirtualDiskManager()
 			// Add disk descriptor and extent files
-			for _, diskName := range dm.names(dFileName) {
+			for _, diskName := range vdmNames(dFileName) {
 				// get full path including datastore location
 				p, fault := parseDatastorePath(diskName)
 				if fault != nil {
@@ -724,19 +801,34 @@ func (vm *VirtualMachine) RefreshStorageInfo(ctx *Context, req *types.RefreshSto
 
 	vm.LayoutEx.Timestamp = time.Now()
 
+	body.Res = new(types.RefreshStorageInfoResponse)
+
 	return body
 }
 
-func (vm *VirtualMachine) useDatastore(name string) *Datastore {
+func (vm *VirtualMachine) findDatastore(name string) *Datastore {
 	host := Map.Get(*vm.Runtime.Host).(*HostSystem)
 
-	ds := Map.FindByName(name, host.Datastore).(*Datastore)
+	return Map.FindByName(name, host.Datastore).(*Datastore)
+}
 
+func (vm *VirtualMachine) useDatastore(name string) *Datastore {
+	ds := vm.findDatastore(name)
 	if FindReference(vm.Datastore, ds.Self) == nil {
 		vm.Datastore = append(vm.Datastore, ds.Self)
 	}
 
 	return ds
+}
+
+func (vm *VirtualMachine) vmx(spec *types.VirtualMachineConfigSpec) object.DatastorePath {
+	var p object.DatastorePath
+	vmx := vm.Config.Files.VmPathName
+	if spec != nil {
+		vmx = spec.Files.VmPathName
+	}
+	p.FromString(vmx)
+	return p
 }
 
 func (vm *VirtualMachine) createFile(spec string, name string, register bool) (*os.File, types.BaseMethodFault) {
@@ -746,6 +838,23 @@ func (vm *VirtualMachine) createFile(spec string, name string, register bool) (*
 	}
 
 	ds := vm.useDatastore(p.Datastore)
+
+	nhost := len(ds.Host)
+	if ds.Name == "vsanDatastore" && nhost < 3 {
+		fault := new(types.CannotCreateFile)
+		fault.FaultMessage = []types.LocalizableMessage{
+			{
+				Key:     "vob.vsanprovider.object.creation.failed",
+				Message: "Failed to create object.",
+			},
+			{
+				Key:     "vob.vsan.clomd.needMoreFaultDomains2",
+				Message: fmt.Sprintf("There are currently %d usable fault domains. The operation requires %d more usable fault domains.", nhost, 3-nhost),
+			},
+		}
+		fault.File = p.Path
+		return nil, fault
+	}
 
 	file := path.Join(ds.Info.GetDatastoreInfo().Url, p.Path)
 
@@ -758,7 +867,7 @@ func (vm *VirtualMachine) createFile(spec string, name string, register bool) (*
 	}
 
 	if register {
-		f, err := os.Open(file)
+		f, err := os.Open(filepath.Clean(file))
 		if err != nil {
 			log.Printf("register %s: %s", vm.Reference(), err)
 			if os.IsNotExist(err) {
@@ -771,21 +880,25 @@ func (vm *VirtualMachine) createFile(spec string, name string, register bool) (*
 		return f, nil
 	}
 
-	dir := path.Dir(file)
-
-	_ = os.MkdirAll(dir, 0700)
-
 	_, err := os.Stat(file)
 	if err == nil {
-		return nil, &types.FileAlreadyExists{
-			FileFault: types.FileFault{
-				File: file,
-			},
+		fault := &types.FileAlreadyExists{FileFault: types.FileFault{File: file}}
+		log.Printf("%T: %s", fault, file)
+		return nil, fault
+	}
+
+	// Create parent directory if needed
+	dir := path.Dir(file)
+	_, err = os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			_ = os.Mkdir(dir, 0700)
 		}
 	}
 
 	f, err := os.Create(file)
 	if err != nil {
+		log.Printf("create(%s): %s", file, err)
 		return nil, &types.FileFault{
 			File: file,
 		}
@@ -806,7 +919,7 @@ func (vm *VirtualMachine) logPrintf(format string, v ...interface{}) {
 	_ = f.Close()
 }
 
-func (vm *VirtualMachine) create(spec *types.VirtualMachineConfigSpec, register bool) types.BaseMethodFault {
+func (vm *VirtualMachine) create(ctx *Context, spec *types.VirtualMachineConfigSpec, register bool) types.BaseMethodFault {
 	vm.apply(spec)
 
 	if spec.Version != "" {
@@ -841,7 +954,7 @@ func (vm *VirtualMachine) create(spec *types.VirtualMachineConfigSpec, register 
 
 	vm.logPrintf("created")
 
-	return vm.configureDevices(spec)
+	return vm.configureDevices(ctx, spec)
 }
 
 var vmwOUI = net.HardwareAddr([]byte{0x0, 0xc, 0x29})
@@ -850,12 +963,14 @@ var vmwOUI = net.HardwareAddr([]byte{0x0, 0xc, 0x29})
 // "The host generates generateMAC addresses that consists of the VMware OUI 00:0C:29 and the last three octets in hexadecimal
 //  format of the virtual machine UUID.  The virtual machine UUID is based on a hash calculated by using the UUID of the
 //  ESXi physical machine and the path to the configuration file (.vmx) of the virtual machine."
-func (vm *VirtualMachine) generateMAC() string {
-	id := uuid.New() // Random is fine for now.
+func (vm *VirtualMachine) generateMAC(unit int32) string {
+	id := []byte(vm.Config.Uuid)
 
 	offset := len(id) - len(vmwOUI)
+	key := id[offset] + byte(unit) // add device unit number, giving each VM NIC a unique MAC
+	id = append([]byte{key}, id[offset+1:]...)
 
-	mac := append(vmwOUI, id[offset:]...)
+	mac := append(vmwOUI, id...)
 
 	return mac.String()
 }
@@ -889,7 +1004,48 @@ func getDiskSize(disk *types.VirtualDisk) int64 {
 	return disk.CapacityInBytes
 }
 
-func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec *types.VirtualDeviceConfigSpec) types.BaseMethodFault {
+func (vm *VirtualMachine) validateSwitchMembers(id string) types.BaseMethodFault {
+	var dswitch *DistributedVirtualSwitch
+
+	var find func(types.ManagedObjectReference)
+	find = func(child types.ManagedObjectReference) {
+		s, ok := Map.Get(child).(*DistributedVirtualSwitch)
+		if ok && s.Uuid == id {
+			dswitch = s
+			return
+		}
+		walk(Map.Get(child), find)
+	}
+	f := Map.getEntityDatacenter(vm).NetworkFolder
+	walk(Map.Get(f), find) // search in NetworkFolder and any sub folders
+
+	if dswitch == nil {
+		log.Printf("DVS %s cannot be found", id)
+		return new(types.NotFound)
+	}
+
+	h := Map.Get(*vm.Runtime.Host).(*HostSystem)
+	c := hostParent(&h.HostSystem)
+	isMember := func(val types.ManagedObjectReference) bool {
+		for _, mem := range dswitch.Summary.HostMember {
+			if mem == val {
+				return true
+			}
+		}
+		log.Printf("%s is not a member of VDS %s", h.Name, dswitch.Name)
+		return false
+	}
+
+	for _, ref := range c.Host {
+		if !isMember(ref) {
+			return &types.InvalidArgument{InvalidProperty: "spec.deviceChange.device.port.switchUuid"}
+		}
+	}
+
+	return nil
+}
+
+func (vm *VirtualMachine) configureDevice(ctx *Context, devices object.VirtualDeviceList, spec *types.VirtualDeviceConfigSpec) types.BaseMethodFault {
 	device := spec.Device
 	d := device.GetVirtualDevice()
 	var controller types.BaseVirtualController
@@ -911,7 +1067,6 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 	label := devices.Name(device)
 	summary := label
 	dc := Map.getEntityDatacenter(Map.Get(*vm.Parent).(mo.Entity))
-	dm := Map.VirtualDiskManager()
 
 	switch x := device.(type) {
 	case types.BaseVirtualEthernetCard:
@@ -929,6 +1084,9 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 			summary = fmt.Sprintf("DVSwitch: %s", b.Port.SwitchUuid)
 			net.Type = "DistributedVirtualPortgroup"
 			net.Value = b.Port.PortgroupKey
+			if err := vm.validateSwitchMembers(b.Port.SwitchUuid); err != nil {
+				return err
+			}
 		}
 
 		Map.Update(vm, []types.PropertyChange{
@@ -938,7 +1096,10 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 
 		c := x.GetVirtualEthernetCard()
 		if c.MacAddress == "" {
-			c.MacAddress = vm.generateMAC()
+			if c.UnitNumber == nil {
+				devices.AssignController(device, controller)
+			}
+			c.MacAddress = vm.generateMAC(*c.UnitNumber - 7) // Note 7 == PCI offset
 		}
 
 		if spec.Operation == types.VirtualDeviceConfigSpecOperationAdd {
@@ -967,7 +1128,7 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 				info.FileName = filename
 			}
 
-			err := dm.createVirtualDisk(spec.FileOperation, &types.CreateVirtualDisk_Task{
+			err := vdmCreateVirtualDisk(spec.FileOperation, &types.CreateVirtualDisk_Task{
 				Datacenter: &dc.Self,
 				Name:       info.FileName,
 			})
@@ -980,20 +1141,48 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 			})
 
 			p, _ := parseDatastorePath(info.FileName)
-
-			host := Map.Get(*vm.Runtime.Host).(*HostSystem)
-
-			entity := Map.FindByName(p.Datastore, host.Datastore)
-			ref := entity.Reference()
-			info.Datastore = &ref
-
-			ds := entity.(*Datastore)
+			ds := vm.findDatastore(p.Datastore)
+			info.Datastore = &ds.Self
 
 			// XXX: compare disk size and free space until windows stat is supported
-			ds.Summary.FreeSpace -= getDiskSize(x)
-			ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
+			ctx.WithLock(ds, func() {
+				ds.Summary.FreeSpace -= getDiskSize(x)
+				ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
+			})
 
 			vm.updateDiskLayouts()
+
+			if disk, ok := b.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				// These properties default to false
+				props := []**bool{
+					&disk.EagerlyScrub,
+					&disk.ThinProvisioned,
+					&disk.WriteThrough,
+					&disk.Split,
+					&disk.DigestEnabled,
+				}
+				for _, prop := range props {
+					if *prop == nil {
+						*prop = types.NewBool(false)
+					}
+				}
+				disk.Uuid = virtualDiskUUID(&dc.Self, info.FileName)
+			}
+		}
+	case *types.VirtualCdrom:
+		if b, ok := d.Backing.(types.BaseVirtualDeviceFileBackingInfo); ok {
+			summary = "ISO " + b.GetVirtualDeviceFileBackingInfo().FileName
+		}
+	case *types.VirtualFloppy:
+		if b, ok := d.Backing.(types.BaseVirtualDeviceFileBackingInfo); ok {
+			summary = "Image " + b.GetVirtualDeviceFileBackingInfo().FileName
+		}
+	case *types.VirtualSerialPort:
+		switch b := d.Backing.(type) {
+		case types.BaseVirtualDeviceFileBackingInfo:
+			summary = "File " + b.GetVirtualDeviceFileBackingInfo().FileName
+		case *types.VirtualSerialPortURIBackingInfo:
+			summary = "Remote " + b.ServiceURI
 		}
 	}
 
@@ -1006,12 +1195,27 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 			Label:   label,
 			Summary: summary,
 		}
+	} else {
+		info := d.DeviceInfo.GetDescription()
+		if info.Label == "" {
+			info.Label = label
+		}
+		if info.Summary == "" {
+			info.Summary = summary
+		}
+	}
+
+	switch device.(type) {
+	case types.BaseVirtualEthernetCard, *types.VirtualCdrom, *types.VirtualFloppy, *types.VirtualUSB, *types.VirtualSerialPort:
+		if d.Connectable == nil {
+			d.Connectable = &types.VirtualDeviceConnectInfo{StartConnected: true, Connected: true}
+		}
 	}
 
 	return nil
 }
 
-func (vm *VirtualMachine) removeDevice(devices object.VirtualDeviceList, spec *types.VirtualDeviceConfigSpec) object.VirtualDeviceList {
+func (vm *VirtualMachine) removeDevice(ctx *Context, devices object.VirtualDeviceList, spec *types.VirtualDeviceConfigSpec) object.VirtualDeviceList {
 	key := spec.Device.GetVirtualDevice().Key
 
 	for i, d := range devices {
@@ -1031,23 +1235,26 @@ func (vm *VirtualMachine) removeDevice(devices object.VirtualDeviceList, spec *t
 					file = b.GetVirtualDeviceFileBackingInfo().FileName
 
 					p, _ := parseDatastorePath(file)
+					ds := vm.findDatastore(p.Datastore)
 
-					host := Map.Get(*vm.Runtime.Host).(*HostSystem)
-
-					ds := Map.FindByName(p.Datastore, host.Datastore).(*Datastore)
-
-					ds.Summary.FreeSpace += getDiskSize(device)
-					ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
+					ctx.WithLock(ds, func() {
+						ds.Summary.FreeSpace += getDiskSize(device)
+						ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
+					})
 				}
 
 				if file != "" {
-					dc := Map.getEntityDatacenter(Map.Get(*vm.Parent).(mo.Entity))
+					dc := Map.getEntityDatacenter(vm)
 					dm := Map.VirtualDiskManager()
-
-					dm.DeleteVirtualDiskTask(&types.DeleteVirtualDisk_Task{
+					if dc == nil {
+						continue // parent was destroyed
+					}
+					res := dm.DeleteVirtualDiskTask(ctx, &types.DeleteVirtualDisk_Task{
 						Name:       file,
 						Datacenter: &dc.Self,
 					})
+					ctask := Map.Get(res.(*methods.DeleteVirtualDisk_TaskBody).Res.Returnval).(*Task)
+					ctask.Wait()
 				}
 			}
 			Map.Update(vm, []types.PropertyChange{
@@ -1117,13 +1324,23 @@ func (vm *VirtualMachine) genVmdkPath(p object.DatastorePath) (string, types.Bas
 	}
 }
 
-func (vm *VirtualMachine) configureDevices(spec *types.VirtualMachineConfigSpec) types.BaseMethodFault {
+func (vm *VirtualMachine) configureDevices(ctx *Context, spec *types.VirtualMachineConfigSpec) types.BaseMethodFault {
 	devices := object.VirtualDeviceList(vm.Config.Hardware.Device)
 
 	for i, change := range spec.DeviceChange {
 		dspec := change.GetVirtualDeviceConfigSpec()
 		device := dspec.Device.GetVirtualDevice()
 		invalid := &types.InvalidDeviceSpec{DeviceIndex: int32(i)}
+
+		switch dspec.FileOperation {
+		case types.VirtualDeviceConfigSpecFileOperationCreate:
+			switch dspec.Device.(type) {
+			case *types.VirtualDisk:
+				if device.UnitNumber == nil {
+					return invalid
+				}
+			}
+		}
 
 		switch dspec.Operation {
 		case types.VirtualDeviceConfigSpecOperationAdd:
@@ -1145,29 +1362,41 @@ func (vm *VirtualMachine) configureDevices(spec *types.VirtualMachineConfigSpec)
 				return invalid
 			}
 
-			err := vm.configureDevice(devices, dspec)
+			key := device.Key
+			err := vm.configureDevice(ctx, devices, dspec)
 			if err != nil {
 				return err
 			}
 
 			devices = append(devices, dspec.Device)
+			if key != device.Key {
+				// Update ControllerKey refs
+				for i := range spec.DeviceChange {
+					ckey := &spec.DeviceChange[i].GetVirtualDeviceConfigSpec().Device.GetVirtualDevice().ControllerKey
+					if *ckey == key {
+						*ckey = device.Key
+					}
+				}
+			}
 		case types.VirtualDeviceConfigSpecOperationEdit:
 			rspec := *dspec
 			rspec.Device = devices.FindByKey(device.Key)
 			if rspec.Device == nil {
 				return invalid
 			}
-			devices = vm.removeDevice(devices, &rspec)
-			device.DeviceInfo = nil // regenerate summary + label
+			devices = vm.removeDevice(ctx, devices, &rspec)
+			if device.DeviceInfo != nil {
+				device.DeviceInfo.GetDescription().Summary = "" // regenerate summary
+			}
 
-			err := vm.configureDevice(devices, dspec)
+			err := vm.configureDevice(ctx, devices, dspec)
 			if err != nil {
 				return err
 			}
 
 			devices = append(devices, dspec.Device)
 		case types.VirtualDeviceConfigSpecOperationRemove:
-			devices = vm.removeDevice(devices, dspec)
+			devices = vm.removeDevice(ctx, devices, dspec)
 		}
 	}
 
@@ -1176,6 +1405,8 @@ func (vm *VirtualMachine) configureDevices(spec *types.VirtualMachineConfigSpec)
 	})
 
 	vm.updateDiskLayouts()
+
+	vm.applyExtraConfig(spec) // Do this after device config, as some may apply to the devices themselves (e.g. ethernet -> guest.net)
 
 	return nil
 }
@@ -1206,19 +1437,27 @@ func (c *powerVMTask) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 	event := c.event()
 	switch c.state {
 	case types.VirtualMachinePowerStatePoweredOn:
-		c.run.start(c.VirtualMachine)
+		c.run.start(c.ctx, c.VirtualMachine)
 		c.ctx.postEvent(
 			&types.VmStartingEvent{VmEvent: event},
 			&types.VmPoweredOnEvent{VmEvent: event},
 		)
+		c.customize(c.ctx)
 	case types.VirtualMachinePowerStatePoweredOff:
-		c.run.stop(c.VirtualMachine)
+		c.run.stop(c.ctx, c.VirtualMachine)
 		c.ctx.postEvent(
 			&types.VmStoppingEvent{VmEvent: event},
 			&types.VmPoweredOffEvent{VmEvent: event},
 		)
 	case types.VirtualMachinePowerStateSuspended:
-		c.run.pause(c.VirtualMachine)
+		if c.VirtualMachine.Runtime.PowerState != types.VirtualMachinePowerStatePoweredOn {
+			return nil, &types.InvalidPowerState{
+				RequestedState: types.VirtualMachinePowerStatePoweredOn,
+				ExistingState:  c.VirtualMachine.Runtime.PowerState,
+			}
+		}
+
+		c.run.pause(c.ctx, c.VirtualMachine)
 		c.ctx.postEvent(
 			&types.VmSuspendingEvent{VmEvent: event},
 			&types.VmSuspendedEvent{VmEvent: event},
@@ -1246,7 +1485,7 @@ func (vm *VirtualMachine) PowerOnVMTask(ctx *Context, c *types.PowerOnVM_Task) s
 
 	return &methods.PowerOnVM_TaskBody{
 		Res: &types.PowerOnVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -1257,7 +1496,7 @@ func (vm *VirtualMachine) PowerOffVMTask(ctx *Context, c *types.PowerOffVM_Task)
 
 	return &methods.PowerOffVM_TaskBody{
 		Res: &types.PowerOffVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -1268,7 +1507,7 @@ func (vm *VirtualMachine) SuspendVMTask(ctx *Context, req *types.SuspendVM_Task)
 
 	return &methods.SuspendVM_TaskBody{
 		Res: &types.SuspendVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -1277,45 +1516,77 @@ func (vm *VirtualMachine) ResetVMTask(ctx *Context, req *types.ResetVM_Task) soa
 	task := CreateTask(vm, "reset", func(task *Task) (types.AnyType, types.BaseMethodFault) {
 		res := vm.PowerOffVMTask(ctx, &types.PowerOffVM_Task{This: vm.Self})
 		ctask := Map.Get(res.(*methods.PowerOffVM_TaskBody).Res.Returnval).(*Task)
+		ctask.Wait()
 		if ctask.Info.Error != nil {
 			return nil, ctask.Info.Error.Fault
 		}
 
-		_ = vm.PowerOnVMTask(ctx, &types.PowerOnVM_Task{This: vm.Self})
+		res = vm.PowerOnVMTask(ctx, &types.PowerOnVM_Task{This: vm.Self})
+		ctask = Map.Get(res.(*methods.PowerOnVM_TaskBody).Res.Returnval).(*Task)
+		ctask.Wait()
 
 		return nil, nil
 	})
 
 	return &methods.ResetVM_TaskBody{
 		Res: &types.ResetVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
+func (vm *VirtualMachine) RebootGuest(ctx *Context, req *types.RebootGuest) soap.HasFault {
+	body := new(methods.RebootGuestBody)
+
+	if vm.Runtime.PowerState != types.VirtualMachinePowerStatePoweredOn {
+		body.Fault_ = Fault("", &types.InvalidPowerState{
+			RequestedState: types.VirtualMachinePowerStatePoweredOn,
+			ExistingState:  vm.Runtime.PowerState,
+		})
+		return body
+	}
+
+	if vm.Guest.ToolsRunningStatus == string(types.VirtualMachineToolsRunningStatusGuestToolsRunning) {
+		vm.run.restart(ctx, vm)
+		body.Res = new(types.RebootGuestResponse)
+	} else {
+		body.Fault_ = Fault("", new(types.ToolsUnavailable))
+	}
+
+	return body
+}
+
 func (vm *VirtualMachine) ReconfigVMTask(ctx *Context, req *types.ReconfigVM_Task) soap.HasFault {
 	task := CreateTask(vm, "reconfigVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
-		err := vm.configure(&req.Spec)
-		if err != nil {
-			return nil, err
-		}
-
 		ctx.postEvent(&types.VmReconfiguredEvent{
 			VmEvent:    vm.event(),
 			ConfigSpec: req.Spec,
 		})
 
-		return nil, nil
+		if vm.Config.Template {
+			expect := types.VirtualMachineConfigSpec{
+				Name:       req.Spec.Name,
+				Annotation: req.Spec.Annotation,
+			}
+			if !reflect.DeepEqual(&req.Spec, &expect) {
+				log.Printf("template reconfigure only allows name and annotation change")
+				return nil, new(types.NotSupported)
+			}
+		}
+
+		err := vm.configure(ctx, &req.Spec)
+
+		return nil, err
 	})
 
 	return &methods.ReconfigVM_TaskBody{
 		Res: &types.ReconfigVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (vm *VirtualMachine) UpgradeVMTask(req *types.UpgradeVM_Task) soap.HasFault {
+func (vm *VirtualMachine) UpgradeVMTask(ctx *Context, req *types.UpgradeVM_Task) soap.HasFault {
 	body := &methods.UpgradeVM_TaskBody{}
 
 	task := CreateTask(vm, "upgradeVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
@@ -1328,14 +1599,20 @@ func (vm *VirtualMachine) UpgradeVMTask(req *types.UpgradeVM_Task) soap.HasFault
 	})
 
 	body.Res = &types.UpgradeVM_TaskResponse{
-		Returnval: task.Run(),
+		Returnval: task.Run(ctx),
 	}
 
 	return body
 }
 
 func (vm *VirtualMachine) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
+	dc := ctx.Map.getEntityDatacenter(vm)
+
 	task := CreateTask(vm, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if dc == nil {
+			return nil, &types.ManagedObjectNotFound{Obj: vm.Self} // If our Parent was destroyed, so were we.
+		}
+
 		r := vm.UnregisterVM(ctx, &types.UnregisterVM{
 			This: req.This,
 		})
@@ -1347,16 +1624,15 @@ func (vm *VirtualMachine) DestroyTask(ctx *Context, req *types.Destroy_Task) soa
 		// Remove all devices
 		devices := object.VirtualDeviceList(vm.Config.Hardware.Device)
 		spec, _ := devices.ConfigSpec(types.VirtualDeviceConfigSpecOperationRemove)
-		vm.configureDevices(&types.VirtualMachineConfigSpec{DeviceChange: spec})
+		vm.configureDevices(ctx, &types.VirtualMachineConfigSpec{DeviceChange: spec})
 
 		// Delete VM files from the datastore (ignoring result for now)
 		m := Map.FileManager()
-		dc := Map.getEntityDatacenter(vm).Reference()
 
-		_ = m.DeleteDatastoreFileTask(&types.DeleteDatastoreFile_Task{
+		_ = m.DeleteDatastoreFileTask(ctx, &types.DeleteDatastoreFile_Task{
 			This:       m.Reference(),
 			Name:       vm.Config.Files.LogDirectory,
-			Datacenter: &dc,
+			Datacenter: &dc.Self,
 		})
 
 		vm.run.remove(vm)
@@ -1366,7 +1642,7 @@ func (vm *VirtualMachine) DestroyTask(ctx *Context, req *types.Destroy_Task) soa
 
 	return &methods.Destroy_TaskBody{
 		Res: &types.Destroy_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -1388,31 +1664,44 @@ func (vm *VirtualMachine) UnregisterVM(ctx *Context, c *types.UnregisterVM) soap
 	}
 
 	host := Map.Get(*vm.Runtime.Host).(*HostSystem)
-	Map.RemoveReference(host, &host.Vm, vm.Self)
+	Map.RemoveReference(ctx, host, &host.Vm, vm.Self)
 
-	switch pool := Map.Get(*vm.ResourcePool).(type) {
-	case *ResourcePool:
-		Map.RemoveReference(pool, &pool.Vm, vm.Self)
-	case *VirtualApp:
-		Map.RemoveReference(pool, &pool.Vm, vm.Self)
+	if vm.ResourcePool != nil {
+		switch pool := Map.Get(*vm.ResourcePool).(type) {
+		case *ResourcePool:
+			Map.RemoveReference(ctx, pool, &pool.Vm, vm.Self)
+		case *VirtualApp:
+			Map.RemoveReference(ctx, pool, &pool.Vm, vm.Self)
+		}
 	}
 
 	for i := range vm.Datastore {
 		ds := Map.Get(vm.Datastore[i]).(*Datastore)
-		Map.RemoveReference(ds, &ds.Vm, vm.Self)
+		Map.RemoveReference(ctx, ds, &ds.Vm, vm.Self)
 	}
 
 	ctx.postEvent(&types.VmRemovedEvent{VmEvent: vm.event()})
-	Map.getEntityParent(vm, "Folder").(*Folder).removeChild(c.This)
+	if f, ok := asFolderMO(Map.getEntityParent(vm, "Folder")); ok {
+		folderRemoveChild(ctx, f, c.This)
+	}
 
 	r.Res = new(types.UnregisterVMResponse)
 
 	return r
 }
 
+type vmFolder interface {
+	CreateVMTask(ctx *Context, c *types.CreateVM_Task) soap.HasFault
+}
+
 func (vm *VirtualMachine) CloneVMTask(ctx *Context, req *types.CloneVM_Task) soap.HasFault {
-	ctx.Caller = &vm.Self
-	folder := Map.Get(req.Folder).(*Folder)
+	pool := req.Spec.Location.Pool
+	if pool == nil {
+		if !vm.Config.Template {
+			pool = vm.ResourcePool
+		}
+	}
+	folder, _ := asFolderMO(Map.Get(req.Folder))
 	host := Map.Get(*vm.Runtime.Host).(*HostSystem)
 	event := vm.event()
 
@@ -1420,19 +1709,40 @@ func (vm *VirtualMachine) CloneVMTask(ctx *Context, req *types.CloneVM_Task) soa
 		VmCloneEvent: types.VmCloneEvent{
 			VmEvent: event,
 		},
-		DestFolder: folder.eventArgument(),
+		DestFolder: folderEventArgument(folder),
 		DestName:   req.Name,
 		DestHost:   *host.eventArgument(),
 	})
 
+	vmx := vm.vmx(nil)
+	vmx.Path = req.Name
+	if ref := req.Spec.Location.Datastore; ref != nil {
+		ds := Map.Get(*ref).(*Datastore).Name
+		vmx.Datastore = ds
+	}
+
 	task := CreateTask(vm, "cloneVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if pool == nil {
+			return nil, &types.InvalidArgument{InvalidProperty: "spec.location.pool"}
+		}
 		config := types.VirtualMachineConfigSpec{
 			Name:    req.Name,
 			GuestId: vm.Config.GuestId,
 			Files: &types.VirtualMachineFileInfo{
-				VmPathName: strings.Replace(vm.Config.Files.VmPathName, vm.Name, req.Name, -1),
+				VmPathName: vmx.String(),
 			},
 		}
+		if req.Spec.Config != nil {
+			config.ExtraConfig = req.Spec.Config.ExtraConfig
+			config.InstanceUuid = req.Spec.Config.InstanceUuid
+		}
+
+		// Copying hardware properties
+		config.NumCPUs = vm.Config.Hardware.NumCPU
+		config.MemoryMB = int64(vm.Config.Hardware.MemoryMB)
+		config.NumCoresPerSocket = vm.Config.Hardware.NumCoresPerSocket
+		config.VirtualICH7MPresent = vm.Config.Hardware.VirtualICH7MPresent
+		config.VirtualSMCPresent = vm.Config.Hardware.VirtualSMCPresent
 
 		defaultDevices := object.VirtualDeviceList(esx.VirtualDevice)
 		devices := vm.Config.Hardware.Device
@@ -1461,23 +1771,28 @@ func (vm *VirtualMachine) CloneVMTask(ctx *Context, req *types.CloneVM_Task) soa
 			})
 		}
 
-		res := folder.CreateVMTask(ctx, &types.CreateVM_Task{
+		res := Map.Get(req.Folder).(vmFolder).CreateVMTask(ctx, &types.CreateVM_Task{
 			This:   folder.Self,
 			Config: config,
-			Pool:   *vm.ResourcePool,
+			Pool:   *pool,
 			Host:   vm.Runtime.Host,
 		})
 
 		ctask := Map.Get(res.(*methods.CreateVM_TaskBody).Res.Returnval).(*Task)
+		ctask.Wait()
 		if ctask.Info.Error != nil {
 			return nil, ctask.Info.Error.Fault
 		}
 
 		ref := ctask.Info.Result.(types.ManagedObjectReference)
 		clone := Map.Get(ref).(*VirtualMachine)
-		clone.configureDevices(&types.VirtualMachineConfigSpec{DeviceChange: req.Spec.Location.DeviceChange})
+		clone.configureDevices(ctx, &types.VirtualMachineConfigSpec{DeviceChange: req.Spec.Location.DeviceChange})
 		if req.Spec.Config != nil && req.Spec.Config.DeviceChange != nil {
-			clone.configureDevices(&types.VirtualMachineConfigSpec{DeviceChange: req.Spec.Config.DeviceChange})
+			clone.configureDevices(ctx, &types.VirtualMachineConfigSpec{DeviceChange: req.Spec.Config.DeviceChange})
+		}
+
+		if req.Spec.Template {
+			_ = clone.MarkAsTemplate(&types.MarkAsTemplate{This: clone.Self})
 		}
 
 		ctx.postEvent(&types.VmClonedEvent{
@@ -1490,18 +1805,18 @@ func (vm *VirtualMachine) CloneVMTask(ctx *Context, req *types.CloneVM_Task) soa
 
 	return &methods.CloneVM_TaskBody{
 		Res: &types.CloneVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (vm *VirtualMachine) RelocateVMTask(req *types.RelocateVM_Task) soap.HasFault {
+func (vm *VirtualMachine) RelocateVMTask(ctx *Context, req *types.RelocateVM_Task) soap.HasFault {
 	task := CreateTask(vm, "relocateVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		var changes []types.PropertyChange
 
 		if ref := req.Spec.Datastore; ref != nil {
 			ds := Map.Get(*ref).(*Datastore)
-			Map.RemoveReference(ds, &ds.Vm, *ref)
+			Map.RemoveReference(ctx, ds, &ds.Vm, *ref)
 
 			// TODO: migrate vm.Config.Files, vm.Summary.Config.VmPathName, vm.Layout and vm.LayoutEx
 
@@ -1510,19 +1825,26 @@ func (vm *VirtualMachine) RelocateVMTask(req *types.RelocateVM_Task) soap.HasFau
 
 		if ref := req.Spec.Pool; ref != nil {
 			pool := Map.Get(*ref).(*ResourcePool)
-			Map.RemoveReference(pool, &pool.Vm, *ref)
+			Map.RemoveReference(ctx, pool, &pool.Vm, *ref)
 
 			changes = append(changes, types.PropertyChange{Name: "resourcePool", Val: ref})
 		}
 
 		if ref := req.Spec.Host; ref != nil {
 			host := Map.Get(*ref).(*HostSystem)
-			Map.RemoveReference(host, &host.Vm, *ref)
+			Map.RemoveReference(ctx, host, &host.Vm, *ref)
 
 			changes = append(changes,
 				types.PropertyChange{Name: "runtime.host", Val: ref},
 				types.PropertyChange{Name: "summary.runtime.host", Val: ref},
 			)
+		}
+
+		if ref := req.Spec.Folder; ref != nil {
+			folder := Map.Get(*ref).(*Folder)
+			folder.MoveIntoFolderTask(ctx, &types.MoveIntoFolder_Task{
+				List: []types.ManagedObjectReference{vm.Self},
+			})
 		}
 
 		Map.Update(vm, changes)
@@ -1532,12 +1854,119 @@ func (vm *VirtualMachine) RelocateVMTask(req *types.RelocateVM_Task) soap.HasFau
 
 	return &methods.RelocateVM_TaskBody{
 		Res: &types.RelocateVM_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (vm *VirtualMachine) CreateSnapshotTask(req *types.CreateSnapshot_Task) soap.HasFault {
+func (vm *VirtualMachine) customize(ctx *Context) {
+	if vm.imc == nil {
+		return
+	}
+
+	event := types.CustomizationEvent{VmEvent: vm.event()}
+	ctx.postEvent(&types.CustomizationStartedEvent{CustomizationEvent: event})
+
+	changes := []types.PropertyChange{
+		{Name: "config.tools.pendingCustomization", Val: ""},
+	}
+
+	hostname := ""
+	address := ""
+
+	switch c := vm.imc.Identity.(type) {
+	case *types.CustomizationLinuxPrep:
+		hostname = customizeName(vm, c.HostName)
+	case *types.CustomizationSysprep:
+		hostname = customizeName(vm, c.UserData.ComputerName)
+	}
+
+	for i, s := range vm.imc.NicSettingMap {
+		nic := &vm.Guest.Net[i]
+		if s.MacAddress != "" {
+			nic.MacAddress = s.MacAddress
+		}
+		if nic.DnsConfig == nil {
+			nic.DnsConfig = new(types.NetDnsConfigInfo)
+		}
+		if s.Adapter.DnsDomain != "" {
+			nic.DnsConfig.DomainName = s.Adapter.DnsDomain
+		}
+		if len(s.Adapter.DnsServerList) != 0 {
+			nic.DnsConfig.IpAddress = s.Adapter.DnsServerList
+		}
+		if hostname != "" {
+			nic.DnsConfig.HostName = hostname
+		}
+		if len(vm.imc.GlobalIPSettings.DnsSuffixList) != 0 {
+			nic.DnsConfig.SearchDomain = vm.imc.GlobalIPSettings.DnsSuffixList
+		}
+		if nic.IpConfig == nil {
+			nic.IpConfig = new(types.NetIpConfigInfo)
+		}
+
+		switch ip := s.Adapter.Ip.(type) {
+		case *types.CustomizationCustomIpGenerator:
+		case *types.CustomizationDhcpIpGenerator:
+		case *types.CustomizationFixedIp:
+			if address == "" {
+				address = ip.IpAddress
+			}
+			nic.IpAddress = []string{ip.IpAddress}
+			nic.IpConfig.IpAddress = []types.NetIpConfigInfoIpAddress{{
+				IpAddress: ip.IpAddress,
+			}}
+		case *types.CustomizationUnknownIpGenerator:
+		}
+	}
+
+	if len(vm.imc.NicSettingMap) != 0 {
+		changes = append(changes, types.PropertyChange{Name: "guest.net", Val: vm.Guest.Net})
+	}
+	if hostname != "" {
+		changes = append(changes, types.PropertyChange{Name: "guest.hostName", Val: hostname})
+	}
+	if address != "" {
+		changes = append(changes, types.PropertyChange{Name: "guest.ipAddress", Val: address})
+	}
+
+	vm.imc = nil
+	Map.Update(vm, changes)
+	ctx.postEvent(&types.CustomizationSucceeded{CustomizationEvent: event})
+}
+
+func (vm *VirtualMachine) CustomizeVMTask(ctx *Context, req *types.CustomizeVM_Task) soap.HasFault {
+	task := CreateTask(vm, "customizeVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if vm.Runtime.PowerState == types.VirtualMachinePowerStatePoweredOn {
+			return nil, &types.InvalidPowerState{
+				RequestedState: types.VirtualMachinePowerStatePoweredOff,
+				ExistingState:  vm.Runtime.PowerState,
+			}
+		}
+		if vm.Config.Tools.PendingCustomization != "" {
+			return nil, new(types.CustomizationPending)
+		}
+		if len(vm.Guest.Net) != len(req.Spec.NicSettingMap) {
+			return nil, &types.NicSettingMismatch{
+				NumberOfNicsInSpec: int32(len(req.Spec.NicSettingMap)),
+				NumberOfNicsInVM:   int32(len(vm.Guest.Net)),
+			}
+		}
+
+		vm.imc = &req.Spec
+		vm.Config.Tools.PendingCustomization = uuid.New().String()
+
+		return nil, nil
+	})
+
+	return &methods.CustomizeVM_TaskBody{
+		Res: &types.CustomizeVM_TaskResponse{
+			Returnval: task.Run(ctx),
+		},
+	}
+}
+
+func (vm *VirtualMachine) CreateSnapshotTask(ctx *Context, req *types.CreateSnapshot_Task) soap.HasFault {
 	task := CreateTask(vm, "createSnapshot", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		var changes []types.PropertyChange
 
@@ -1583,17 +2012,17 @@ func (vm *VirtualMachine) CreateSnapshotTask(req *types.CreateSnapshot_Task) soa
 		changes = append(changes, types.PropertyChange{Name: "snapshot.currentSnapshot", Val: snapshot.Self})
 		Map.Update(vm, changes)
 
-		return nil, nil
+		return snapshot.Self, nil
 	})
 
 	return &methods.CreateSnapshot_TaskBody{
 		Res: &types.CreateSnapshot_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (vm *VirtualMachine) RevertToCurrentSnapshotTask(req *types.RevertToCurrentSnapshot_Task) soap.HasFault {
+func (vm *VirtualMachine) RevertToCurrentSnapshotTask(ctx *Context, req *types.RevertToCurrentSnapshot_Task) soap.HasFault {
 	body := &methods.RevertToCurrentSnapshot_TaskBody{}
 
 	if vm.Snapshot == nil || vm.Snapshot.CurrentSnapshot == nil {
@@ -1607,7 +2036,7 @@ func (vm *VirtualMachine) RevertToCurrentSnapshotTask(req *types.RevertToCurrent
 	})
 
 	body.Res = &types.RevertToCurrentSnapshot_TaskResponse{
-		Returnval: task.Run(),
+		Returnval: task.Run(ctx),
 	}
 
 	return body
@@ -1627,7 +2056,7 @@ func (vm *VirtualMachine) RemoveAllSnapshotsTask(ctx *Context, req *types.Remove
 
 		for _, ref := range refs {
 			Map.Get(ref).(*VirtualMachineSnapshot).removeSnapshotFiles(ctx)
-			Map.Remove(ref)
+			Map.Remove(ctx, ref)
 		}
 
 		return nil, nil
@@ -1635,7 +2064,7 @@ func (vm *VirtualMachine) RemoveAllSnapshotsTask(ctx *Context, req *types.Remove
 
 	return &methods.RemoveAllSnapshots_TaskBody{
 		Res: &types.RemoveAllSnapshots_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -1660,7 +2089,7 @@ func (vm *VirtualMachine) ShutdownGuest(ctx *Context, c *types.ShutdownGuest) so
 		&types.VmGuestShutdownEvent{VmEvent: event},
 		&types.VmPoweredOffEvent{VmEvent: event},
 	)
-	vm.run.stop(vm)
+	vm.run.stop(ctx, vm)
 
 	Map.Update(vm, []types.PropertyChange{
 		{Name: "runtime.powerState", Val: types.VirtualMachinePowerStatePoweredOff},
@@ -1675,6 +2104,11 @@ func (vm *VirtualMachine) ShutdownGuest(ctx *Context, c *types.ShutdownGuest) so
 func (vm *VirtualMachine) MarkAsTemplate(req *types.MarkAsTemplate) soap.HasFault {
 	r := &methods.MarkAsTemplateBody{}
 
+	if vm.Config.Template {
+		r.Fault_ = Fault("", new(types.NotSupported))
+		return r
+	}
+
 	if vm.Runtime.PowerState != types.VirtualMachinePowerStatePoweredOff {
 		r.Fault_ = Fault("", &types.InvalidPowerState{
 			RequestedState: types.VirtualMachinePowerStatePoweredOff,
@@ -1684,8 +2118,38 @@ func (vm *VirtualMachine) MarkAsTemplate(req *types.MarkAsTemplate) soap.HasFaul
 	}
 
 	vm.Config.Template = true
+	vm.Summary.Config.Template = true
+	vm.ResourcePool = nil
 
-	r.Res = &types.MarkAsTemplateResponse{}
+	r.Res = new(types.MarkAsTemplateResponse)
+
+	return r
+}
+
+func (vm *VirtualMachine) MarkAsVirtualMachine(req *types.MarkAsVirtualMachine) soap.HasFault {
+	r := &methods.MarkAsVirtualMachineBody{}
+
+	if !vm.Config.Template {
+		r.Fault_ = Fault("", new(types.NotSupported))
+		return r
+	}
+
+	if vm.Runtime.PowerState != types.VirtualMachinePowerStatePoweredOff {
+		r.Fault_ = Fault("", &types.InvalidPowerState{
+			RequestedState: types.VirtualMachinePowerStatePoweredOff,
+			ExistingState:  vm.Runtime.PowerState,
+		})
+		return r
+	}
+
+	vm.Config.Template = false
+	vm.Summary.Config.Template = false
+	vm.ResourcePool = &req.Pool
+	if req.Host != nil {
+		vm.Runtime.Host = req.Host
+	}
+
+	r.Res = new(types.MarkAsVirtualMachineResponse)
 
 	return r
 }
@@ -1773,4 +2237,24 @@ func allSnapshotsInTree(tree []types.VirtualMachineSnapshotTree) []types.Managed
 	}
 
 	return result
+}
+
+func changeTrackingSupported(spec *types.VirtualMachineConfigSpec) bool {
+	for _, device := range spec.DeviceChange {
+		if dev, ok := device.GetVirtualDeviceConfigSpec().Device.(*types.VirtualDisk); ok {
+			switch dev.Backing.(type) {
+			case *types.VirtualDiskFlatVer2BackingInfo:
+				return true
+			case *types.VirtualDiskSparseVer2BackingInfo:
+				return true
+			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+				return true
+			case *types.VirtualDiskRawDiskVer2BackingInfo:
+				return true
+			default:
+				return false
+			}
+		}
+	}
+	return false
 }

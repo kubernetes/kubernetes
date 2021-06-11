@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2021 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -200,8 +200,7 @@ func init() {
 type CannotEnableVmcpForClusterReason string
 
 const (
-	CannotEnableVmcpForClusterReasonAPDTimeoutDisabled      = CannotEnableVmcpForClusterReason("APDTimeoutDisabled")
-	CannotEnableVmcpForClusterReasonIncompatibleHostVersion = CannotEnableVmcpForClusterReason("IncompatibleHostVersion")
+	CannotEnableVmcpForClusterReasonAPDTimeoutDisabled = CannotEnableVmcpForClusterReason("APDTimeoutDisabled")
 )
 
 func init() {
@@ -239,6 +238,8 @@ const (
 	CannotUseNetworkReasonMismatchedNetworkPolicies       = CannotUseNetworkReason("MismatchedNetworkPolicies")
 	CannotUseNetworkReasonMismatchedDvsVersionOrVendor    = CannotUseNetworkReason("MismatchedDvsVersionOrVendor")
 	CannotUseNetworkReasonVMotionToUnsupportedNetworkType = CannotUseNetworkReason("VMotionToUnsupportedNetworkType")
+	CannotUseNetworkReasonNetworkUnderMaintenance         = CannotUseNetworkReason("NetworkUnderMaintenance")
+	CannotUseNetworkReasonMismatchedEnsMode               = CannotUseNetworkReason("MismatchedEnsMode")
 )
 
 func init() {
@@ -257,6 +258,41 @@ const (
 
 func init() {
 	t["CheckTestType"] = reflect.TypeOf((*CheckTestType)(nil)).Elem()
+}
+
+type ClusterComputeResourceHCIWorkflowState string
+
+const (
+	ClusterComputeResourceHCIWorkflowStateIn_progress = ClusterComputeResourceHCIWorkflowState("in_progress")
+	ClusterComputeResourceHCIWorkflowStateDone        = ClusterComputeResourceHCIWorkflowState("done")
+	ClusterComputeResourceHCIWorkflowStateInvalid     = ClusterComputeResourceHCIWorkflowState("invalid")
+)
+
+func init() {
+	t["ClusterComputeResourceHCIWorkflowState"] = reflect.TypeOf((*ClusterComputeResourceHCIWorkflowState)(nil)).Elem()
+}
+
+type ClusterComputeResourceVcsHealthStatus string
+
+const (
+	ClusterComputeResourceVcsHealthStatusHealthy    = ClusterComputeResourceVcsHealthStatus("healthy")
+	ClusterComputeResourceVcsHealthStatusDegraded   = ClusterComputeResourceVcsHealthStatus("degraded")
+	ClusterComputeResourceVcsHealthStatusNonhealthy = ClusterComputeResourceVcsHealthStatus("nonhealthy")
+)
+
+func init() {
+	t["ClusterComputeResourceVcsHealthStatus"] = reflect.TypeOf((*ClusterComputeResourceVcsHealthStatus)(nil)).Elem()
+}
+
+type ClusterCryptoConfigInfoCryptoMode string
+
+const (
+	ClusterCryptoConfigInfoCryptoModeOnDemand    = ClusterCryptoConfigInfoCryptoMode("onDemand")
+	ClusterCryptoConfigInfoCryptoModeForceEnable = ClusterCryptoConfigInfoCryptoMode("forceEnable")
+)
+
+func init() {
+	t["ClusterCryptoConfigInfoCryptoMode"] = reflect.TypeOf((*ClusterCryptoConfigInfoCryptoMode)(nil)).Elem()
 }
 
 type ClusterDasAamNodeStateDasState string
@@ -494,6 +530,32 @@ func init() {
 	t["ConfigSpecOperation"] = reflect.TypeOf((*ConfigSpecOperation)(nil)).Elem()
 }
 
+type CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason string
+
+const (
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateMissingInCache          = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateMissingInCache")
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateClusterInvalid          = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateClusterInvalid")
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateClusterUnreachable      = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateClusterUnreachable")
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateMissingInKMS            = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateMissingInKMS")
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateNotActiveOrEnabled      = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateNotActiveOrEnabled")
+	CryptoManagerKmipCryptoKeyStatusKeyUnavailableReasonKeyStateManagedByTrustAuthority = CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason("KeyStateManagedByTrustAuthority")
+)
+
+func init() {
+	t["CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason"] = reflect.TypeOf((*CryptoManagerKmipCryptoKeyStatusKeyUnavailableReason)(nil)).Elem()
+}
+
+type CustomizationFailedReasonCode string
+
+const (
+	CustomizationFailedReasonCodeUserDefinedScriptDisabled = CustomizationFailedReasonCode("userDefinedScriptDisabled")
+	CustomizationFailedReasonCodeCustomizationDisabled     = CustomizationFailedReasonCode("customizationDisabled")
+)
+
+func init() {
+	t["CustomizationFailedReasonCode"] = reflect.TypeOf((*CustomizationFailedReasonCode)(nil)).Elem()
+}
+
 type CustomizationLicenseDataMode string
 
 const (
@@ -576,6 +638,8 @@ const (
 	DasConfigFaultDasConfigFaultReasonCreateConfigVvolFailed      = DasConfigFaultDasConfigFaultReason("CreateConfigVvolFailed")
 	DasConfigFaultDasConfigFaultReasonVSanNotSupportedOnHost      = DasConfigFaultDasConfigFaultReason("VSanNotSupportedOnHost")
 	DasConfigFaultDasConfigFaultReasonDasNetworkMisconfiguration  = DasConfigFaultDasConfigFaultReason("DasNetworkMisconfiguration")
+	DasConfigFaultDasConfigFaultReasonSetDesiredImageSpecFailed   = DasConfigFaultDasConfigFaultReason("SetDesiredImageSpecFailed")
+	DasConfigFaultDasConfigFaultReasonApplyHAVibsOnClusterFailed  = DasConfigFaultDasConfigFaultReason("ApplyHAVibsOnClusterFailed")
 )
 
 func init() {
@@ -703,6 +767,17 @@ func init() {
 	t["DisallowedChangeByServiceDisallowedChange"] = reflect.TypeOf((*DisallowedChangeByServiceDisallowedChange)(nil)).Elem()
 }
 
+type DistributedVirtualPortgroupBackingType string
+
+const (
+	DistributedVirtualPortgroupBackingTypeStandard = DistributedVirtualPortgroupBackingType("standard")
+	DistributedVirtualPortgroupBackingTypeNsx      = DistributedVirtualPortgroupBackingType("nsx")
+)
+
+func init() {
+	t["DistributedVirtualPortgroupBackingType"] = reflect.TypeOf((*DistributedVirtualPortgroupBackingType)(nil)).Elem()
+}
+
 type DistributedVirtualPortgroupMetaTagName string
 
 const (
@@ -739,6 +814,7 @@ const (
 	DistributedVirtualSwitchHostInfrastructureTrafficClassHbr            = DistributedVirtualSwitchHostInfrastructureTrafficClass("hbr")
 	DistributedVirtualSwitchHostInfrastructureTrafficClassVsan           = DistributedVirtualSwitchHostInfrastructureTrafficClass("vsan")
 	DistributedVirtualSwitchHostInfrastructureTrafficClassVdp            = DistributedVirtualSwitchHostInfrastructureTrafficClass("vdp")
+	DistributedVirtualSwitchHostInfrastructureTrafficClassBackupNfc      = DistributedVirtualSwitchHostInfrastructureTrafficClass("backupNfc")
 )
 
 func init() {
@@ -758,6 +834,17 @@ const (
 
 func init() {
 	t["DistributedVirtualSwitchHostMemberHostComponentState"] = reflect.TypeOf((*DistributedVirtualSwitchHostMemberHostComponentState)(nil)).Elem()
+}
+
+type DistributedVirtualSwitchHostMemberTransportZoneType string
+
+const (
+	DistributedVirtualSwitchHostMemberTransportZoneTypeVlan    = DistributedVirtualSwitchHostMemberTransportZoneType("vlan")
+	DistributedVirtualSwitchHostMemberTransportZoneTypeOverlay = DistributedVirtualSwitchHostMemberTransportZoneType("overlay")
+)
+
+func init() {
+	t["DistributedVirtualSwitchHostMemberTransportZoneType"] = reflect.TypeOf((*DistributedVirtualSwitchHostMemberTransportZoneType)(nil)).Elem()
 }
 
 type DistributedVirtualSwitchNetworkResourceControlVersion string
@@ -997,6 +1084,17 @@ func init() {
 	t["FileSystemMountInfoVStorageSupportStatus"] = reflect.TypeOf((*FileSystemMountInfoVStorageSupportStatus)(nil)).Elem()
 }
 
+type FolderDesiredHostState string
+
+const (
+	FolderDesiredHostStateMaintenance     = FolderDesiredHostState("maintenance")
+	FolderDesiredHostStateNon_maintenance = FolderDesiredHostState("non_maintenance")
+)
+
+func init() {
+	t["FolderDesiredHostState"] = reflect.TypeOf((*FolderDesiredHostState)(nil)).Elem()
+}
+
 type FtIssuesOnHostHostSelectionType string
 
 const (
@@ -1031,6 +1129,20 @@ const (
 
 func init() {
 	t["GuestInfoAppStateType"] = reflect.TypeOf((*GuestInfoAppStateType)(nil)).Elem()
+}
+
+type GuestInfoCustomizationStatus string
+
+const (
+	GuestInfoCustomizationStatusTOOLSDEPLOYPKG_IDLE      = GuestInfoCustomizationStatus("TOOLSDEPLOYPKG_IDLE")
+	GuestInfoCustomizationStatusTOOLSDEPLOYPKG_PENDING   = GuestInfoCustomizationStatus("TOOLSDEPLOYPKG_PENDING")
+	GuestInfoCustomizationStatusTOOLSDEPLOYPKG_RUNNING   = GuestInfoCustomizationStatus("TOOLSDEPLOYPKG_RUNNING")
+	GuestInfoCustomizationStatusTOOLSDEPLOYPKG_SUCCEEDED = GuestInfoCustomizationStatus("TOOLSDEPLOYPKG_SUCCEEDED")
+	GuestInfoCustomizationStatusTOOLSDEPLOYPKG_FAILED    = GuestInfoCustomizationStatus("TOOLSDEPLOYPKG_FAILED")
+)
+
+func init() {
+	t["GuestInfoCustomizationStatus"] = reflect.TypeOf((*GuestInfoCustomizationStatus)(nil)).Elem()
 }
 
 type GuestOsDescriptorFirmwareType string
@@ -1213,6 +1325,7 @@ const (
 	HostCpuPackageVendorUnknown = HostCpuPackageVendor("unknown")
 	HostCpuPackageVendorIntel   = HostCpuPackageVendor("intel")
 	HostCpuPackageVendorAmd     = HostCpuPackageVendor("amd")
+	HostCpuPackageVendorHygon   = HostCpuPackageVendor("hygon")
 )
 
 func init() {
@@ -1234,9 +1347,10 @@ func init() {
 type HostCryptoState string
 
 const (
-	HostCryptoStateIncapable = HostCryptoState("incapable")
-	HostCryptoStatePrepared  = HostCryptoState("prepared")
-	HostCryptoStateSafe      = HostCryptoState("safe")
+	HostCryptoStateIncapable        = HostCryptoState("incapable")
+	HostCryptoStatePrepared         = HostCryptoState("prepared")
+	HostCryptoStateSafe             = HostCryptoState("safe")
+	HostCryptoStatePendingIncapable = HostCryptoState("pendingIncapable")
 )
 
 func init() {
@@ -1258,6 +1372,17 @@ const (
 
 func init() {
 	t["HostDasErrorEventHostDasErrorReason"] = reflect.TypeOf((*HostDasErrorEventHostDasErrorReason)(nil)).Elem()
+}
+
+type HostDateTimeInfoProtocol string
+
+const (
+	HostDateTimeInfoProtocolNtp = HostDateTimeInfoProtocol("ntp")
+	HostDateTimeInfoProtocolPtp = HostDateTimeInfoProtocol("ptp")
+)
+
+func init() {
+	t["HostDateTimeInfoProtocol"] = reflect.TypeOf((*HostDateTimeInfoProtocol)(nil)).Elem()
 }
 
 type HostDigestInfoDigestMethodType string
@@ -1343,6 +1468,7 @@ const (
 	HostFileSystemVolumeFileSystemTypeVFFS  = HostFileSystemVolumeFileSystemType("VFFS")
 	HostFileSystemVolumeFileSystemTypeVVOL  = HostFileSystemVolumeFileSystemType("VVOL")
 	HostFileSystemVolumeFileSystemTypePMEM  = HostFileSystemVolumeFileSystemType("PMEM")
+	HostFileSystemVolumeFileSystemTypeVsanD = HostFileSystemVolumeFileSystemType("vsanD")
 	HostFileSystemVolumeFileSystemTypeOTHER = HostFileSystemVolumeFileSystemType("OTHER")
 )
 
@@ -1632,6 +1758,16 @@ func init() {
 	t["HostLowLevelProvisioningManagerReloadTarget"] = reflect.TypeOf((*HostLowLevelProvisioningManagerReloadTarget)(nil)).Elem()
 }
 
+type HostMaintenanceSpecPurpose string
+
+const (
+	HostMaintenanceSpecPurposeHostUpgrade = HostMaintenanceSpecPurpose("hostUpgrade")
+)
+
+func init() {
+	t["HostMaintenanceSpecPurpose"] = reflect.TypeOf((*HostMaintenanceSpecPurpose)(nil)).Elem()
+}
+
 type HostMountInfoInaccessibleReason string
 
 const (
@@ -1725,12 +1861,65 @@ func init() {
 	t["HostNumericSensorType"] = reflect.TypeOf((*HostNumericSensorType)(nil)).Elem()
 }
 
+type HostNvmeDiscoveryLogSubsystemType string
+
+const (
+	HostNvmeDiscoveryLogSubsystemTypeDiscovery = HostNvmeDiscoveryLogSubsystemType("discovery")
+	HostNvmeDiscoveryLogSubsystemTypeNvm       = HostNvmeDiscoveryLogSubsystemType("nvm")
+)
+
+func init() {
+	t["HostNvmeDiscoveryLogSubsystemType"] = reflect.TypeOf((*HostNvmeDiscoveryLogSubsystemType)(nil)).Elem()
+}
+
+type HostNvmeDiscoveryLogTransportRequirements string
+
+const (
+	HostNvmeDiscoveryLogTransportRequirementsSecureChannelRequired    = HostNvmeDiscoveryLogTransportRequirements("secureChannelRequired")
+	HostNvmeDiscoveryLogTransportRequirementsSecureChannelNotRequired = HostNvmeDiscoveryLogTransportRequirements("secureChannelNotRequired")
+	HostNvmeDiscoveryLogTransportRequirementsRequirementsNotSpecified = HostNvmeDiscoveryLogTransportRequirements("requirementsNotSpecified")
+)
+
+func init() {
+	t["HostNvmeDiscoveryLogTransportRequirements"] = reflect.TypeOf((*HostNvmeDiscoveryLogTransportRequirements)(nil)).Elem()
+}
+
+type HostNvmeTransportParametersNvmeAddressFamily string
+
+const (
+	HostNvmeTransportParametersNvmeAddressFamilyIpv4       = HostNvmeTransportParametersNvmeAddressFamily("ipv4")
+	HostNvmeTransportParametersNvmeAddressFamilyIpv6       = HostNvmeTransportParametersNvmeAddressFamily("ipv6")
+	HostNvmeTransportParametersNvmeAddressFamilyInfiniBand = HostNvmeTransportParametersNvmeAddressFamily("infiniBand")
+	HostNvmeTransportParametersNvmeAddressFamilyFc         = HostNvmeTransportParametersNvmeAddressFamily("fc")
+	HostNvmeTransportParametersNvmeAddressFamilyLoopback   = HostNvmeTransportParametersNvmeAddressFamily("loopback")
+	HostNvmeTransportParametersNvmeAddressFamilyUnknown    = HostNvmeTransportParametersNvmeAddressFamily("unknown")
+)
+
+func init() {
+	t["HostNvmeTransportParametersNvmeAddressFamily"] = reflect.TypeOf((*HostNvmeTransportParametersNvmeAddressFamily)(nil)).Elem()
+}
+
+type HostNvmeTransportType string
+
+const (
+	HostNvmeTransportTypePcie         = HostNvmeTransportType("pcie")
+	HostNvmeTransportTypeFibreChannel = HostNvmeTransportType("fibreChannel")
+	HostNvmeTransportTypeRdma         = HostNvmeTransportType("rdma")
+	HostNvmeTransportTypeLoopback     = HostNvmeTransportType("loopback")
+	HostNvmeTransportTypeUnsupported  = HostNvmeTransportType("unsupported")
+)
+
+func init() {
+	t["HostNvmeTransportType"] = reflect.TypeOf((*HostNvmeTransportType)(nil)).Elem()
+}
+
 type HostOpaqueSwitchOpaqueSwitchState string
 
 const (
-	HostOpaqueSwitchOpaqueSwitchStateUp      = HostOpaqueSwitchOpaqueSwitchState("up")
-	HostOpaqueSwitchOpaqueSwitchStateWarning = HostOpaqueSwitchOpaqueSwitchState("warning")
-	HostOpaqueSwitchOpaqueSwitchStateDown    = HostOpaqueSwitchOpaqueSwitchState("down")
+	HostOpaqueSwitchOpaqueSwitchStateUp          = HostOpaqueSwitchOpaqueSwitchState("up")
+	HostOpaqueSwitchOpaqueSwitchStateWarning     = HostOpaqueSwitchOpaqueSwitchState("warning")
+	HostOpaqueSwitchOpaqueSwitchStateDown        = HostOpaqueSwitchOpaqueSwitchState("down")
+	HostOpaqueSwitchOpaqueSwitchStateMaintenance = HostOpaqueSwitchOpaqueSwitchState("maintenance")
 )
 
 func init() {
@@ -1883,6 +2072,21 @@ func init() {
 	t["HostProtocolEndpointProtocolEndpointType"] = reflect.TypeOf((*HostProtocolEndpointProtocolEndpointType)(nil)).Elem()
 }
 
+type HostRdmaDeviceConnectionState string
+
+const (
+	HostRdmaDeviceConnectionStateUnknown     = HostRdmaDeviceConnectionState("unknown")
+	HostRdmaDeviceConnectionStateDown        = HostRdmaDeviceConnectionState("down")
+	HostRdmaDeviceConnectionStateInit        = HostRdmaDeviceConnectionState("init")
+	HostRdmaDeviceConnectionStateArmed       = HostRdmaDeviceConnectionState("armed")
+	HostRdmaDeviceConnectionStateActive      = HostRdmaDeviceConnectionState("active")
+	HostRdmaDeviceConnectionStateActiveDefer = HostRdmaDeviceConnectionState("activeDefer")
+)
+
+func init() {
+	t["HostRdmaDeviceConnectionState"] = reflect.TypeOf((*HostRdmaDeviceConnectionState)(nil)).Elem()
+}
+
 type HostReplayUnsupportedReason string
 
 const (
@@ -1911,6 +2115,18 @@ func init() {
 	t["HostRuntimeInfoNetStackInstanceRuntimeInfoState"] = reflect.TypeOf((*HostRuntimeInfoNetStackInstanceRuntimeInfoState)(nil)).Elem()
 }
 
+type HostRuntimeInfoStatelessNvdsMigrationState string
+
+const (
+	HostRuntimeInfoStatelessNvdsMigrationStateReady     = HostRuntimeInfoStatelessNvdsMigrationState("ready")
+	HostRuntimeInfoStatelessNvdsMigrationStateNotNeeded = HostRuntimeInfoStatelessNvdsMigrationState("notNeeded")
+	HostRuntimeInfoStatelessNvdsMigrationStateUnknown   = HostRuntimeInfoStatelessNvdsMigrationState("unknown")
+)
+
+func init() {
+	t["HostRuntimeInfoStatelessNvdsMigrationState"] = reflect.TypeOf((*HostRuntimeInfoStatelessNvdsMigrationState)(nil)).Elem()
+}
+
 type HostServicePolicy string
 
 const (
@@ -1921,6 +2137,47 @@ const (
 
 func init() {
 	t["HostServicePolicy"] = reflect.TypeOf((*HostServicePolicy)(nil)).Elem()
+}
+
+type HostSevInfoSevState string
+
+const (
+	HostSevInfoSevStateUninitialized = HostSevInfoSevState("uninitialized")
+	HostSevInfoSevStateInitialized   = HostSevInfoSevState("initialized")
+	HostSevInfoSevStateWorking       = HostSevInfoSevState("working")
+)
+
+func init() {
+	t["HostSevInfoSevState"] = reflect.TypeOf((*HostSevInfoSevState)(nil)).Elem()
+}
+
+type HostSgxInfoFlcModes string
+
+const (
+	HostSgxInfoFlcModesOff      = HostSgxInfoFlcModes("off")
+	HostSgxInfoFlcModesLocked   = HostSgxInfoFlcModes("locked")
+	HostSgxInfoFlcModesUnlocked = HostSgxInfoFlcModes("unlocked")
+)
+
+func init() {
+	t["HostSgxInfoFlcModes"] = reflect.TypeOf((*HostSgxInfoFlcModes)(nil)).Elem()
+}
+
+type HostSgxInfoSgxStates string
+
+const (
+	HostSgxInfoSgxStatesNotPresent          = HostSgxInfoSgxStates("notPresent")
+	HostSgxInfoSgxStatesDisabledBIOS        = HostSgxInfoSgxStates("disabledBIOS")
+	HostSgxInfoSgxStatesDisabledCFW101      = HostSgxInfoSgxStates("disabledCFW101")
+	HostSgxInfoSgxStatesDisabledCPUMismatch = HostSgxInfoSgxStates("disabledCPUMismatch")
+	HostSgxInfoSgxStatesDisabledNoFLC       = HostSgxInfoSgxStates("disabledNoFLC")
+	HostSgxInfoSgxStatesDisabledNUMAUnsup   = HostSgxInfoSgxStates("disabledNUMAUnsup")
+	HostSgxInfoSgxStatesDisabledMaxEPCRegs  = HostSgxInfoSgxStates("disabledMaxEPCRegs")
+	HostSgxInfoSgxStatesEnabled             = HostSgxInfoSgxStates("enabled")
+)
+
+func init() {
+	t["HostSgxInfoSgxStates"] = reflect.TypeOf((*HostSgxInfoSgxStates)(nil)).Elem()
 }
 
 type HostSnmpAgentCapability string
@@ -1948,6 +2205,17 @@ func init() {
 	t["HostStandbyMode"] = reflect.TypeOf((*HostStandbyMode)(nil)).Elem()
 }
 
+type HostStorageProtocol string
+
+const (
+	HostStorageProtocolScsi = HostStorageProtocol("scsi")
+	HostStorageProtocolNvme = HostStorageProtocol("nvme")
+)
+
+func init() {
+	t["HostStorageProtocol"] = reflect.TypeOf((*HostStorageProtocol)(nil)).Elem()
+}
+
 type HostSystemConnectionState string
 
 const (
@@ -1963,9 +2231,11 @@ func init() {
 type HostSystemIdentificationInfoIdentifier string
 
 const (
-	HostSystemIdentificationInfoIdentifierAssetTag          = HostSystemIdentificationInfoIdentifier("AssetTag")
-	HostSystemIdentificationInfoIdentifierServiceTag        = HostSystemIdentificationInfoIdentifier("ServiceTag")
-	HostSystemIdentificationInfoIdentifierOemSpecificString = HostSystemIdentificationInfoIdentifier("OemSpecificString")
+	HostSystemIdentificationInfoIdentifierAssetTag                 = HostSystemIdentificationInfoIdentifier("AssetTag")
+	HostSystemIdentificationInfoIdentifierServiceTag               = HostSystemIdentificationInfoIdentifier("ServiceTag")
+	HostSystemIdentificationInfoIdentifierOemSpecificString        = HostSystemIdentificationInfoIdentifier("OemSpecificString")
+	HostSystemIdentificationInfoIdentifierEnclosureSerialNumberTag = HostSystemIdentificationInfoIdentifier("EnclosureSerialNumberTag")
+	HostSystemIdentificationInfoIdentifierSerialNumberTag          = HostSystemIdentificationInfoIdentifier("SerialNumberTag")
 )
 
 func init() {
@@ -2011,6 +2281,18 @@ func init() {
 	t["HostTpmAttestationInfoAcceptanceStatus"] = reflect.TypeOf((*HostTpmAttestationInfoAcceptanceStatus)(nil)).Elem()
 }
 
+type HostTrustAuthorityAttestationInfoAttestationStatus string
+
+const (
+	HostTrustAuthorityAttestationInfoAttestationStatusAttested    = HostTrustAuthorityAttestationInfoAttestationStatus("attested")
+	HostTrustAuthorityAttestationInfoAttestationStatusNotAttested = HostTrustAuthorityAttestationInfoAttestationStatus("notAttested")
+	HostTrustAuthorityAttestationInfoAttestationStatusUnknown     = HostTrustAuthorityAttestationInfoAttestationStatus("unknown")
+)
+
+func init() {
+	t["HostTrustAuthorityAttestationInfoAttestationStatus"] = reflect.TypeOf((*HostTrustAuthorityAttestationInfoAttestationStatus)(nil)).Elem()
+}
+
 type HostUnresolvedVmfsExtentUnresolvedReason string
 
 const (
@@ -2044,6 +2326,8 @@ const (
 	HostVirtualNicManagerNicTypeVsan                  = HostVirtualNicManagerNicType("vsan")
 	HostVirtualNicManagerNicTypeVSphereProvisioning   = HostVirtualNicManagerNicType("vSphereProvisioning")
 	HostVirtualNicManagerNicTypeVsanWitness           = HostVirtualNicManagerNicType("vsanWitness")
+	HostVirtualNicManagerNicTypeVSphereBackupNFC      = HostVirtualNicManagerNicType("vSphereBackupNFC")
+	HostVirtualNicManagerNicTypePtp                   = HostVirtualNicManagerNicType("ptp")
 )
 
 func init() {
@@ -2204,6 +2488,19 @@ const (
 
 func init() {
 	t["IscsiPortInfoPathStatus"] = reflect.TypeOf((*IscsiPortInfoPathStatus)(nil)).Elem()
+}
+
+type KmipClusterInfoKmsManagementType string
+
+const (
+	KmipClusterInfoKmsManagementTypeUnknown        = KmipClusterInfoKmsManagementType("unknown")
+	KmipClusterInfoKmsManagementTypeVCenter        = KmipClusterInfoKmsManagementType("vCenter")
+	KmipClusterInfoKmsManagementTypeTrustAuthority = KmipClusterInfoKmsManagementType("trustAuthority")
+	KmipClusterInfoKmsManagementTypeNativeProvider = KmipClusterInfoKmsManagementType("nativeProvider")
+)
+
+func init() {
+	t["KmipClusterInfoKmsManagementType"] = reflect.TypeOf((*KmipClusterInfoKmsManagementType)(nil)).Elem()
 }
 
 type LatencySensitivitySensitivityLevel string
@@ -2487,6 +2784,32 @@ func init() {
 	t["NvdimmInterleaveSetState"] = reflect.TypeOf((*NvdimmInterleaveSetState)(nil)).Elem()
 }
 
+type NvdimmNamespaceDetailsHealthStatus string
+
+const (
+	NvdimmNamespaceDetailsHealthStatusNormal            = NvdimmNamespaceDetailsHealthStatus("normal")
+	NvdimmNamespaceDetailsHealthStatusMissing           = NvdimmNamespaceDetailsHealthStatus("missing")
+	NvdimmNamespaceDetailsHealthStatusLabelMissing      = NvdimmNamespaceDetailsHealthStatus("labelMissing")
+	NvdimmNamespaceDetailsHealthStatusInterleaveBroken  = NvdimmNamespaceDetailsHealthStatus("interleaveBroken")
+	NvdimmNamespaceDetailsHealthStatusLabelInconsistent = NvdimmNamespaceDetailsHealthStatus("labelInconsistent")
+)
+
+func init() {
+	t["NvdimmNamespaceDetailsHealthStatus"] = reflect.TypeOf((*NvdimmNamespaceDetailsHealthStatus)(nil)).Elem()
+}
+
+type NvdimmNamespaceDetailsState string
+
+const (
+	NvdimmNamespaceDetailsStateInvalid  = NvdimmNamespaceDetailsState("invalid")
+	NvdimmNamespaceDetailsStateNotInUse = NvdimmNamespaceDetailsState("notInUse")
+	NvdimmNamespaceDetailsStateInUse    = NvdimmNamespaceDetailsState("inUse")
+)
+
+func init() {
+	t["NvdimmNamespaceDetailsState"] = reflect.TypeOf((*NvdimmNamespaceDetailsState)(nil)).Elem()
+}
+
 type NvdimmNamespaceHealthStatus string
 
 const (
@@ -2651,6 +2974,7 @@ const (
 	PerformanceManagerUnitWatt               = PerformanceManagerUnit("watt")
 	PerformanceManagerUnitJoule              = PerformanceManagerUnit("joule")
 	PerformanceManagerUnitTeraBytes          = PerformanceManagerUnit("teraBytes")
+	PerformanceManagerUnitCelsius            = PerformanceManagerUnit("celsius")
 )
 
 func init() {
@@ -2841,6 +3165,10 @@ const (
 	RecommendationReasonCodeHostExitDegradation             = RecommendationReasonCode("hostExitDegradation")
 	RecommendationReasonCodeMaxVmsConstraint                = RecommendationReasonCode("maxVmsConstraint")
 	RecommendationReasonCodeFtConstraints                   = RecommendationReasonCode("ftConstraints")
+	RecommendationReasonCodeVmHostAffinityPolicy            = RecommendationReasonCode("vmHostAffinityPolicy")
+	RecommendationReasonCodeVmHostAntiAffinityPolicy        = RecommendationReasonCode("vmHostAntiAffinityPolicy")
+	RecommendationReasonCodeVmAntiAffinityPolicy            = RecommendationReasonCode("vmAntiAffinityPolicy")
+	RecommendationReasonCodeBalanceVsanUsage                = RecommendationReasonCode("balanceVsanUsage")
 )
 
 func init() {
@@ -2941,6 +3269,17 @@ const (
 
 func init() {
 	t["ReplicationVmState"] = reflect.TypeOf((*ReplicationVmState)(nil)).Elem()
+}
+
+type ResourceConfigSpecScaleSharesBehavior string
+
+const (
+	ResourceConfigSpecScaleSharesBehaviorDisabled                = ResourceConfigSpecScaleSharesBehavior("disabled")
+	ResourceConfigSpecScaleSharesBehaviorScaleCpuAndMemoryShares = ResourceConfigSpecScaleSharesBehavior("scaleCpuAndMemoryShares")
+)
+
+func init() {
+	t["ResourceConfigSpecScaleSharesBehavior"] = reflect.TypeOf((*ResourceConfigSpecScaleSharesBehavior)(nil)).Elem()
 }
 
 type ScheduledHardwareUpgradeInfoHardwareUpgradePolicy string
@@ -3044,6 +3383,18 @@ const (
 
 func init() {
 	t["ScsiLunVStorageSupportStatus"] = reflect.TypeOf((*ScsiLunVStorageSupportStatus)(nil)).Elem()
+}
+
+type SessionManagerGenericServiceTicketTicketType string
+
+const (
+	SessionManagerGenericServiceTicketTicketTypeHttpNfcServiceTicket = SessionManagerGenericServiceTicketTicketType("HttpNfcServiceTicket")
+	SessionManagerGenericServiceTicketTicketTypeHostServiceTicket    = SessionManagerGenericServiceTicketTicketType("HostServiceTicket")
+	SessionManagerGenericServiceTicketTicketTypeVcServiceTicket      = SessionManagerGenericServiceTicketTicketType("VcServiceTicket")
+)
+
+func init() {
+	t["SessionManagerGenericServiceTicketTicketType"] = reflect.TypeOf((*SessionManagerGenericServiceTicketTicketType)(nil)).Elem()
 }
 
 type SessionManagerHttpServiceRequestSpecMethod string
@@ -3430,6 +3781,17 @@ func init() {
 	t["VMwareUplinkLacpMode"] = reflect.TypeOf((*VMwareUplinkLacpMode)(nil)).Elem()
 }
 
+type VMwareUplinkLacpTimeoutMode string
+
+const (
+	VMwareUplinkLacpTimeoutModeFast = VMwareUplinkLacpTimeoutMode("fast")
+	VMwareUplinkLacpTimeoutModeSlow = VMwareUplinkLacpTimeoutMode("slow")
+)
+
+func init() {
+	t["VMwareUplinkLacpTimeoutMode"] = reflect.TypeOf((*VMwareUplinkLacpTimeoutMode)(nil)).Elem()
+}
+
 type VStorageObjectConsumptionType string
 
 const (
@@ -3799,6 +4161,18 @@ func init() {
 	t["VirtualMachineConfigInfoSwapPlacementType"] = reflect.TypeOf((*VirtualMachineConfigInfoSwapPlacementType)(nil)).Elem()
 }
 
+type VirtualMachineConfigSpecEncryptedFtModes string
+
+const (
+	VirtualMachineConfigSpecEncryptedFtModesFtEncryptionDisabled      = VirtualMachineConfigSpecEncryptedFtModes("ftEncryptionDisabled")
+	VirtualMachineConfigSpecEncryptedFtModesFtEncryptionOpportunistic = VirtualMachineConfigSpecEncryptedFtModes("ftEncryptionOpportunistic")
+	VirtualMachineConfigSpecEncryptedFtModesFtEncryptionRequired      = VirtualMachineConfigSpecEncryptedFtModes("ftEncryptionRequired")
+)
+
+func init() {
+	t["VirtualMachineConfigSpecEncryptedFtModes"] = reflect.TypeOf((*VirtualMachineConfigSpecEncryptedFtModes)(nil)).Elem()
+}
+
 type VirtualMachineConfigSpecEncryptedVMotionModes string
 
 const (
@@ -4008,167 +4382,187 @@ func init() {
 type VirtualMachineGuestOsIdentifier string
 
 const (
-	VirtualMachineGuestOsIdentifierDosGuest                = VirtualMachineGuestOsIdentifier("dosGuest")
-	VirtualMachineGuestOsIdentifierWin31Guest              = VirtualMachineGuestOsIdentifier("win31Guest")
-	VirtualMachineGuestOsIdentifierWin95Guest              = VirtualMachineGuestOsIdentifier("win95Guest")
-	VirtualMachineGuestOsIdentifierWin98Guest              = VirtualMachineGuestOsIdentifier("win98Guest")
-	VirtualMachineGuestOsIdentifierWinMeGuest              = VirtualMachineGuestOsIdentifier("winMeGuest")
-	VirtualMachineGuestOsIdentifierWinNTGuest              = VirtualMachineGuestOsIdentifier("winNTGuest")
-	VirtualMachineGuestOsIdentifierWin2000ProGuest         = VirtualMachineGuestOsIdentifier("win2000ProGuest")
-	VirtualMachineGuestOsIdentifierWin2000ServGuest        = VirtualMachineGuestOsIdentifier("win2000ServGuest")
-	VirtualMachineGuestOsIdentifierWin2000AdvServGuest     = VirtualMachineGuestOsIdentifier("win2000AdvServGuest")
-	VirtualMachineGuestOsIdentifierWinXPHomeGuest          = VirtualMachineGuestOsIdentifier("winXPHomeGuest")
-	VirtualMachineGuestOsIdentifierWinXPProGuest           = VirtualMachineGuestOsIdentifier("winXPProGuest")
-	VirtualMachineGuestOsIdentifierWinXPPro64Guest         = VirtualMachineGuestOsIdentifier("winXPPro64Guest")
-	VirtualMachineGuestOsIdentifierWinNetWebGuest          = VirtualMachineGuestOsIdentifier("winNetWebGuest")
-	VirtualMachineGuestOsIdentifierWinNetStandardGuest     = VirtualMachineGuestOsIdentifier("winNetStandardGuest")
-	VirtualMachineGuestOsIdentifierWinNetEnterpriseGuest   = VirtualMachineGuestOsIdentifier("winNetEnterpriseGuest")
-	VirtualMachineGuestOsIdentifierWinNetDatacenterGuest   = VirtualMachineGuestOsIdentifier("winNetDatacenterGuest")
-	VirtualMachineGuestOsIdentifierWinNetBusinessGuest     = VirtualMachineGuestOsIdentifier("winNetBusinessGuest")
-	VirtualMachineGuestOsIdentifierWinNetStandard64Guest   = VirtualMachineGuestOsIdentifier("winNetStandard64Guest")
-	VirtualMachineGuestOsIdentifierWinNetEnterprise64Guest = VirtualMachineGuestOsIdentifier("winNetEnterprise64Guest")
-	VirtualMachineGuestOsIdentifierWinLonghornGuest        = VirtualMachineGuestOsIdentifier("winLonghornGuest")
-	VirtualMachineGuestOsIdentifierWinLonghorn64Guest      = VirtualMachineGuestOsIdentifier("winLonghorn64Guest")
-	VirtualMachineGuestOsIdentifierWinNetDatacenter64Guest = VirtualMachineGuestOsIdentifier("winNetDatacenter64Guest")
-	VirtualMachineGuestOsIdentifierWinVistaGuest           = VirtualMachineGuestOsIdentifier("winVistaGuest")
-	VirtualMachineGuestOsIdentifierWinVista64Guest         = VirtualMachineGuestOsIdentifier("winVista64Guest")
-	VirtualMachineGuestOsIdentifierWindows7Guest           = VirtualMachineGuestOsIdentifier("windows7Guest")
-	VirtualMachineGuestOsIdentifierWindows7_64Guest        = VirtualMachineGuestOsIdentifier("windows7_64Guest")
-	VirtualMachineGuestOsIdentifierWindows7Server64Guest   = VirtualMachineGuestOsIdentifier("windows7Server64Guest")
-	VirtualMachineGuestOsIdentifierWindows8Guest           = VirtualMachineGuestOsIdentifier("windows8Guest")
-	VirtualMachineGuestOsIdentifierWindows8_64Guest        = VirtualMachineGuestOsIdentifier("windows8_64Guest")
-	VirtualMachineGuestOsIdentifierWindows8Server64Guest   = VirtualMachineGuestOsIdentifier("windows8Server64Guest")
-	VirtualMachineGuestOsIdentifierWindows9Guest           = VirtualMachineGuestOsIdentifier("windows9Guest")
-	VirtualMachineGuestOsIdentifierWindows9_64Guest        = VirtualMachineGuestOsIdentifier("windows9_64Guest")
-	VirtualMachineGuestOsIdentifierWindows9Server64Guest   = VirtualMachineGuestOsIdentifier("windows9Server64Guest")
-	VirtualMachineGuestOsIdentifierWindowsHyperVGuest      = VirtualMachineGuestOsIdentifier("windowsHyperVGuest")
-	VirtualMachineGuestOsIdentifierFreebsdGuest            = VirtualMachineGuestOsIdentifier("freebsdGuest")
-	VirtualMachineGuestOsIdentifierFreebsd64Guest          = VirtualMachineGuestOsIdentifier("freebsd64Guest")
-	VirtualMachineGuestOsIdentifierFreebsd11Guest          = VirtualMachineGuestOsIdentifier("freebsd11Guest")
-	VirtualMachineGuestOsIdentifierFreebsd11_64Guest       = VirtualMachineGuestOsIdentifier("freebsd11_64Guest")
-	VirtualMachineGuestOsIdentifierFreebsd12Guest          = VirtualMachineGuestOsIdentifier("freebsd12Guest")
-	VirtualMachineGuestOsIdentifierFreebsd12_64Guest       = VirtualMachineGuestOsIdentifier("freebsd12_64Guest")
-	VirtualMachineGuestOsIdentifierRedhatGuest             = VirtualMachineGuestOsIdentifier("redhatGuest")
-	VirtualMachineGuestOsIdentifierRhel2Guest              = VirtualMachineGuestOsIdentifier("rhel2Guest")
-	VirtualMachineGuestOsIdentifierRhel3Guest              = VirtualMachineGuestOsIdentifier("rhel3Guest")
-	VirtualMachineGuestOsIdentifierRhel3_64Guest           = VirtualMachineGuestOsIdentifier("rhel3_64Guest")
-	VirtualMachineGuestOsIdentifierRhel4Guest              = VirtualMachineGuestOsIdentifier("rhel4Guest")
-	VirtualMachineGuestOsIdentifierRhel4_64Guest           = VirtualMachineGuestOsIdentifier("rhel4_64Guest")
-	VirtualMachineGuestOsIdentifierRhel5Guest              = VirtualMachineGuestOsIdentifier("rhel5Guest")
-	VirtualMachineGuestOsIdentifierRhel5_64Guest           = VirtualMachineGuestOsIdentifier("rhel5_64Guest")
-	VirtualMachineGuestOsIdentifierRhel6Guest              = VirtualMachineGuestOsIdentifier("rhel6Guest")
-	VirtualMachineGuestOsIdentifierRhel6_64Guest           = VirtualMachineGuestOsIdentifier("rhel6_64Guest")
-	VirtualMachineGuestOsIdentifierRhel7Guest              = VirtualMachineGuestOsIdentifier("rhel7Guest")
-	VirtualMachineGuestOsIdentifierRhel7_64Guest           = VirtualMachineGuestOsIdentifier("rhel7_64Guest")
-	VirtualMachineGuestOsIdentifierRhel8_64Guest           = VirtualMachineGuestOsIdentifier("rhel8_64Guest")
-	VirtualMachineGuestOsIdentifierCentosGuest             = VirtualMachineGuestOsIdentifier("centosGuest")
-	VirtualMachineGuestOsIdentifierCentos64Guest           = VirtualMachineGuestOsIdentifier("centos64Guest")
-	VirtualMachineGuestOsIdentifierCentos6Guest            = VirtualMachineGuestOsIdentifier("centos6Guest")
-	VirtualMachineGuestOsIdentifierCentos6_64Guest         = VirtualMachineGuestOsIdentifier("centos6_64Guest")
-	VirtualMachineGuestOsIdentifierCentos7Guest            = VirtualMachineGuestOsIdentifier("centos7Guest")
-	VirtualMachineGuestOsIdentifierCentos7_64Guest         = VirtualMachineGuestOsIdentifier("centos7_64Guest")
-	VirtualMachineGuestOsIdentifierCentos8_64Guest         = VirtualMachineGuestOsIdentifier("centos8_64Guest")
-	VirtualMachineGuestOsIdentifierOracleLinuxGuest        = VirtualMachineGuestOsIdentifier("oracleLinuxGuest")
-	VirtualMachineGuestOsIdentifierOracleLinux64Guest      = VirtualMachineGuestOsIdentifier("oracleLinux64Guest")
-	VirtualMachineGuestOsIdentifierOracleLinux6Guest       = VirtualMachineGuestOsIdentifier("oracleLinux6Guest")
-	VirtualMachineGuestOsIdentifierOracleLinux6_64Guest    = VirtualMachineGuestOsIdentifier("oracleLinux6_64Guest")
-	VirtualMachineGuestOsIdentifierOracleLinux7Guest       = VirtualMachineGuestOsIdentifier("oracleLinux7Guest")
-	VirtualMachineGuestOsIdentifierOracleLinux7_64Guest    = VirtualMachineGuestOsIdentifier("oracleLinux7_64Guest")
-	VirtualMachineGuestOsIdentifierOracleLinux8_64Guest    = VirtualMachineGuestOsIdentifier("oracleLinux8_64Guest")
-	VirtualMachineGuestOsIdentifierSuseGuest               = VirtualMachineGuestOsIdentifier("suseGuest")
-	VirtualMachineGuestOsIdentifierSuse64Guest             = VirtualMachineGuestOsIdentifier("suse64Guest")
-	VirtualMachineGuestOsIdentifierSlesGuest               = VirtualMachineGuestOsIdentifier("slesGuest")
-	VirtualMachineGuestOsIdentifierSles64Guest             = VirtualMachineGuestOsIdentifier("sles64Guest")
-	VirtualMachineGuestOsIdentifierSles10Guest             = VirtualMachineGuestOsIdentifier("sles10Guest")
-	VirtualMachineGuestOsIdentifierSles10_64Guest          = VirtualMachineGuestOsIdentifier("sles10_64Guest")
-	VirtualMachineGuestOsIdentifierSles11Guest             = VirtualMachineGuestOsIdentifier("sles11Guest")
-	VirtualMachineGuestOsIdentifierSles11_64Guest          = VirtualMachineGuestOsIdentifier("sles11_64Guest")
-	VirtualMachineGuestOsIdentifierSles12Guest             = VirtualMachineGuestOsIdentifier("sles12Guest")
-	VirtualMachineGuestOsIdentifierSles12_64Guest          = VirtualMachineGuestOsIdentifier("sles12_64Guest")
-	VirtualMachineGuestOsIdentifierSles15_64Guest          = VirtualMachineGuestOsIdentifier("sles15_64Guest")
-	VirtualMachineGuestOsIdentifierNld9Guest               = VirtualMachineGuestOsIdentifier("nld9Guest")
-	VirtualMachineGuestOsIdentifierOesGuest                = VirtualMachineGuestOsIdentifier("oesGuest")
-	VirtualMachineGuestOsIdentifierSjdsGuest               = VirtualMachineGuestOsIdentifier("sjdsGuest")
-	VirtualMachineGuestOsIdentifierMandrakeGuest           = VirtualMachineGuestOsIdentifier("mandrakeGuest")
-	VirtualMachineGuestOsIdentifierMandrivaGuest           = VirtualMachineGuestOsIdentifier("mandrivaGuest")
-	VirtualMachineGuestOsIdentifierMandriva64Guest         = VirtualMachineGuestOsIdentifier("mandriva64Guest")
-	VirtualMachineGuestOsIdentifierTurboLinuxGuest         = VirtualMachineGuestOsIdentifier("turboLinuxGuest")
-	VirtualMachineGuestOsIdentifierTurboLinux64Guest       = VirtualMachineGuestOsIdentifier("turboLinux64Guest")
-	VirtualMachineGuestOsIdentifierUbuntuGuest             = VirtualMachineGuestOsIdentifier("ubuntuGuest")
-	VirtualMachineGuestOsIdentifierUbuntu64Guest           = VirtualMachineGuestOsIdentifier("ubuntu64Guest")
-	VirtualMachineGuestOsIdentifierDebian4Guest            = VirtualMachineGuestOsIdentifier("debian4Guest")
-	VirtualMachineGuestOsIdentifierDebian4_64Guest         = VirtualMachineGuestOsIdentifier("debian4_64Guest")
-	VirtualMachineGuestOsIdentifierDebian5Guest            = VirtualMachineGuestOsIdentifier("debian5Guest")
-	VirtualMachineGuestOsIdentifierDebian5_64Guest         = VirtualMachineGuestOsIdentifier("debian5_64Guest")
-	VirtualMachineGuestOsIdentifierDebian6Guest            = VirtualMachineGuestOsIdentifier("debian6Guest")
-	VirtualMachineGuestOsIdentifierDebian6_64Guest         = VirtualMachineGuestOsIdentifier("debian6_64Guest")
-	VirtualMachineGuestOsIdentifierDebian7Guest            = VirtualMachineGuestOsIdentifier("debian7Guest")
-	VirtualMachineGuestOsIdentifierDebian7_64Guest         = VirtualMachineGuestOsIdentifier("debian7_64Guest")
-	VirtualMachineGuestOsIdentifierDebian8Guest            = VirtualMachineGuestOsIdentifier("debian8Guest")
-	VirtualMachineGuestOsIdentifierDebian8_64Guest         = VirtualMachineGuestOsIdentifier("debian8_64Guest")
-	VirtualMachineGuestOsIdentifierDebian9Guest            = VirtualMachineGuestOsIdentifier("debian9Guest")
-	VirtualMachineGuestOsIdentifierDebian9_64Guest         = VirtualMachineGuestOsIdentifier("debian9_64Guest")
-	VirtualMachineGuestOsIdentifierDebian10Guest           = VirtualMachineGuestOsIdentifier("debian10Guest")
-	VirtualMachineGuestOsIdentifierDebian10_64Guest        = VirtualMachineGuestOsIdentifier("debian10_64Guest")
-	VirtualMachineGuestOsIdentifierAsianux3Guest           = VirtualMachineGuestOsIdentifier("asianux3Guest")
-	VirtualMachineGuestOsIdentifierAsianux3_64Guest        = VirtualMachineGuestOsIdentifier("asianux3_64Guest")
-	VirtualMachineGuestOsIdentifierAsianux4Guest           = VirtualMachineGuestOsIdentifier("asianux4Guest")
-	VirtualMachineGuestOsIdentifierAsianux4_64Guest        = VirtualMachineGuestOsIdentifier("asianux4_64Guest")
-	VirtualMachineGuestOsIdentifierAsianux5_64Guest        = VirtualMachineGuestOsIdentifier("asianux5_64Guest")
-	VirtualMachineGuestOsIdentifierAsianux7_64Guest        = VirtualMachineGuestOsIdentifier("asianux7_64Guest")
-	VirtualMachineGuestOsIdentifierAsianux8_64Guest        = VirtualMachineGuestOsIdentifier("asianux8_64Guest")
-	VirtualMachineGuestOsIdentifierOpensuseGuest           = VirtualMachineGuestOsIdentifier("opensuseGuest")
-	VirtualMachineGuestOsIdentifierOpensuse64Guest         = VirtualMachineGuestOsIdentifier("opensuse64Guest")
-	VirtualMachineGuestOsIdentifierFedoraGuest             = VirtualMachineGuestOsIdentifier("fedoraGuest")
-	VirtualMachineGuestOsIdentifierFedora64Guest           = VirtualMachineGuestOsIdentifier("fedora64Guest")
-	VirtualMachineGuestOsIdentifierCoreos64Guest           = VirtualMachineGuestOsIdentifier("coreos64Guest")
-	VirtualMachineGuestOsIdentifierVmwarePhoton64Guest     = VirtualMachineGuestOsIdentifier("vmwarePhoton64Guest")
-	VirtualMachineGuestOsIdentifierOther24xLinuxGuest      = VirtualMachineGuestOsIdentifier("other24xLinuxGuest")
-	VirtualMachineGuestOsIdentifierOther26xLinuxGuest      = VirtualMachineGuestOsIdentifier("other26xLinuxGuest")
-	VirtualMachineGuestOsIdentifierOtherLinuxGuest         = VirtualMachineGuestOsIdentifier("otherLinuxGuest")
-	VirtualMachineGuestOsIdentifierOther3xLinuxGuest       = VirtualMachineGuestOsIdentifier("other3xLinuxGuest")
-	VirtualMachineGuestOsIdentifierOther4xLinuxGuest       = VirtualMachineGuestOsIdentifier("other4xLinuxGuest")
-	VirtualMachineGuestOsIdentifierGenericLinuxGuest       = VirtualMachineGuestOsIdentifier("genericLinuxGuest")
-	VirtualMachineGuestOsIdentifierOther24xLinux64Guest    = VirtualMachineGuestOsIdentifier("other24xLinux64Guest")
-	VirtualMachineGuestOsIdentifierOther26xLinux64Guest    = VirtualMachineGuestOsIdentifier("other26xLinux64Guest")
-	VirtualMachineGuestOsIdentifierOther3xLinux64Guest     = VirtualMachineGuestOsIdentifier("other3xLinux64Guest")
-	VirtualMachineGuestOsIdentifierOther4xLinux64Guest     = VirtualMachineGuestOsIdentifier("other4xLinux64Guest")
-	VirtualMachineGuestOsIdentifierOtherLinux64Guest       = VirtualMachineGuestOsIdentifier("otherLinux64Guest")
-	VirtualMachineGuestOsIdentifierSolaris6Guest           = VirtualMachineGuestOsIdentifier("solaris6Guest")
-	VirtualMachineGuestOsIdentifierSolaris7Guest           = VirtualMachineGuestOsIdentifier("solaris7Guest")
-	VirtualMachineGuestOsIdentifierSolaris8Guest           = VirtualMachineGuestOsIdentifier("solaris8Guest")
-	VirtualMachineGuestOsIdentifierSolaris9Guest           = VirtualMachineGuestOsIdentifier("solaris9Guest")
-	VirtualMachineGuestOsIdentifierSolaris10Guest          = VirtualMachineGuestOsIdentifier("solaris10Guest")
-	VirtualMachineGuestOsIdentifierSolaris10_64Guest       = VirtualMachineGuestOsIdentifier("solaris10_64Guest")
-	VirtualMachineGuestOsIdentifierSolaris11_64Guest       = VirtualMachineGuestOsIdentifier("solaris11_64Guest")
-	VirtualMachineGuestOsIdentifierOs2Guest                = VirtualMachineGuestOsIdentifier("os2Guest")
-	VirtualMachineGuestOsIdentifierEComStationGuest        = VirtualMachineGuestOsIdentifier("eComStationGuest")
-	VirtualMachineGuestOsIdentifierEComStation2Guest       = VirtualMachineGuestOsIdentifier("eComStation2Guest")
-	VirtualMachineGuestOsIdentifierNetware4Guest           = VirtualMachineGuestOsIdentifier("netware4Guest")
-	VirtualMachineGuestOsIdentifierNetware5Guest           = VirtualMachineGuestOsIdentifier("netware5Guest")
-	VirtualMachineGuestOsIdentifierNetware6Guest           = VirtualMachineGuestOsIdentifier("netware6Guest")
-	VirtualMachineGuestOsIdentifierOpenServer5Guest        = VirtualMachineGuestOsIdentifier("openServer5Guest")
-	VirtualMachineGuestOsIdentifierOpenServer6Guest        = VirtualMachineGuestOsIdentifier("openServer6Guest")
-	VirtualMachineGuestOsIdentifierUnixWare7Guest          = VirtualMachineGuestOsIdentifier("unixWare7Guest")
-	VirtualMachineGuestOsIdentifierDarwinGuest             = VirtualMachineGuestOsIdentifier("darwinGuest")
-	VirtualMachineGuestOsIdentifierDarwin64Guest           = VirtualMachineGuestOsIdentifier("darwin64Guest")
-	VirtualMachineGuestOsIdentifierDarwin10Guest           = VirtualMachineGuestOsIdentifier("darwin10Guest")
-	VirtualMachineGuestOsIdentifierDarwin10_64Guest        = VirtualMachineGuestOsIdentifier("darwin10_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin11Guest           = VirtualMachineGuestOsIdentifier("darwin11Guest")
-	VirtualMachineGuestOsIdentifierDarwin11_64Guest        = VirtualMachineGuestOsIdentifier("darwin11_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin12_64Guest        = VirtualMachineGuestOsIdentifier("darwin12_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin13_64Guest        = VirtualMachineGuestOsIdentifier("darwin13_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin14_64Guest        = VirtualMachineGuestOsIdentifier("darwin14_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin15_64Guest        = VirtualMachineGuestOsIdentifier("darwin15_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin16_64Guest        = VirtualMachineGuestOsIdentifier("darwin16_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin17_64Guest        = VirtualMachineGuestOsIdentifier("darwin17_64Guest")
-	VirtualMachineGuestOsIdentifierDarwin18_64Guest        = VirtualMachineGuestOsIdentifier("darwin18_64Guest")
-	VirtualMachineGuestOsIdentifierVmkernelGuest           = VirtualMachineGuestOsIdentifier("vmkernelGuest")
-	VirtualMachineGuestOsIdentifierVmkernel5Guest          = VirtualMachineGuestOsIdentifier("vmkernel5Guest")
-	VirtualMachineGuestOsIdentifierVmkernel6Guest          = VirtualMachineGuestOsIdentifier("vmkernel6Guest")
-	VirtualMachineGuestOsIdentifierVmkernel65Guest         = VirtualMachineGuestOsIdentifier("vmkernel65Guest")
-	VirtualMachineGuestOsIdentifierOtherGuest              = VirtualMachineGuestOsIdentifier("otherGuest")
-	VirtualMachineGuestOsIdentifierOtherGuest64            = VirtualMachineGuestOsIdentifier("otherGuest64")
+	VirtualMachineGuestOsIdentifierDosGuest                   = VirtualMachineGuestOsIdentifier("dosGuest")
+	VirtualMachineGuestOsIdentifierWin31Guest                 = VirtualMachineGuestOsIdentifier("win31Guest")
+	VirtualMachineGuestOsIdentifierWin95Guest                 = VirtualMachineGuestOsIdentifier("win95Guest")
+	VirtualMachineGuestOsIdentifierWin98Guest                 = VirtualMachineGuestOsIdentifier("win98Guest")
+	VirtualMachineGuestOsIdentifierWinMeGuest                 = VirtualMachineGuestOsIdentifier("winMeGuest")
+	VirtualMachineGuestOsIdentifierWinNTGuest                 = VirtualMachineGuestOsIdentifier("winNTGuest")
+	VirtualMachineGuestOsIdentifierWin2000ProGuest            = VirtualMachineGuestOsIdentifier("win2000ProGuest")
+	VirtualMachineGuestOsIdentifierWin2000ServGuest           = VirtualMachineGuestOsIdentifier("win2000ServGuest")
+	VirtualMachineGuestOsIdentifierWin2000AdvServGuest        = VirtualMachineGuestOsIdentifier("win2000AdvServGuest")
+	VirtualMachineGuestOsIdentifierWinXPHomeGuest             = VirtualMachineGuestOsIdentifier("winXPHomeGuest")
+	VirtualMachineGuestOsIdentifierWinXPProGuest              = VirtualMachineGuestOsIdentifier("winXPProGuest")
+	VirtualMachineGuestOsIdentifierWinXPPro64Guest            = VirtualMachineGuestOsIdentifier("winXPPro64Guest")
+	VirtualMachineGuestOsIdentifierWinNetWebGuest             = VirtualMachineGuestOsIdentifier("winNetWebGuest")
+	VirtualMachineGuestOsIdentifierWinNetStandardGuest        = VirtualMachineGuestOsIdentifier("winNetStandardGuest")
+	VirtualMachineGuestOsIdentifierWinNetEnterpriseGuest      = VirtualMachineGuestOsIdentifier("winNetEnterpriseGuest")
+	VirtualMachineGuestOsIdentifierWinNetDatacenterGuest      = VirtualMachineGuestOsIdentifier("winNetDatacenterGuest")
+	VirtualMachineGuestOsIdentifierWinNetBusinessGuest        = VirtualMachineGuestOsIdentifier("winNetBusinessGuest")
+	VirtualMachineGuestOsIdentifierWinNetStandard64Guest      = VirtualMachineGuestOsIdentifier("winNetStandard64Guest")
+	VirtualMachineGuestOsIdentifierWinNetEnterprise64Guest    = VirtualMachineGuestOsIdentifier("winNetEnterprise64Guest")
+	VirtualMachineGuestOsIdentifierWinLonghornGuest           = VirtualMachineGuestOsIdentifier("winLonghornGuest")
+	VirtualMachineGuestOsIdentifierWinLonghorn64Guest         = VirtualMachineGuestOsIdentifier("winLonghorn64Guest")
+	VirtualMachineGuestOsIdentifierWinNetDatacenter64Guest    = VirtualMachineGuestOsIdentifier("winNetDatacenter64Guest")
+	VirtualMachineGuestOsIdentifierWinVistaGuest              = VirtualMachineGuestOsIdentifier("winVistaGuest")
+	VirtualMachineGuestOsIdentifierWinVista64Guest            = VirtualMachineGuestOsIdentifier("winVista64Guest")
+	VirtualMachineGuestOsIdentifierWindows7Guest              = VirtualMachineGuestOsIdentifier("windows7Guest")
+	VirtualMachineGuestOsIdentifierWindows7_64Guest           = VirtualMachineGuestOsIdentifier("windows7_64Guest")
+	VirtualMachineGuestOsIdentifierWindows7Server64Guest      = VirtualMachineGuestOsIdentifier("windows7Server64Guest")
+	VirtualMachineGuestOsIdentifierWindows8Guest              = VirtualMachineGuestOsIdentifier("windows8Guest")
+	VirtualMachineGuestOsIdentifierWindows8_64Guest           = VirtualMachineGuestOsIdentifier("windows8_64Guest")
+	VirtualMachineGuestOsIdentifierWindows8Server64Guest      = VirtualMachineGuestOsIdentifier("windows8Server64Guest")
+	VirtualMachineGuestOsIdentifierWindows9Guest              = VirtualMachineGuestOsIdentifier("windows9Guest")
+	VirtualMachineGuestOsIdentifierWindows9_64Guest           = VirtualMachineGuestOsIdentifier("windows9_64Guest")
+	VirtualMachineGuestOsIdentifierWindows9Server64Guest      = VirtualMachineGuestOsIdentifier("windows9Server64Guest")
+	VirtualMachineGuestOsIdentifierWindowsHyperVGuest         = VirtualMachineGuestOsIdentifier("windowsHyperVGuest")
+	VirtualMachineGuestOsIdentifierWindows2019srv_64Guest     = VirtualMachineGuestOsIdentifier("windows2019srv_64Guest")
+	VirtualMachineGuestOsIdentifierWindows2019srvNext_64Guest = VirtualMachineGuestOsIdentifier("windows2019srvNext_64Guest")
+	VirtualMachineGuestOsIdentifierFreebsdGuest               = VirtualMachineGuestOsIdentifier("freebsdGuest")
+	VirtualMachineGuestOsIdentifierFreebsd64Guest             = VirtualMachineGuestOsIdentifier("freebsd64Guest")
+	VirtualMachineGuestOsIdentifierFreebsd11Guest             = VirtualMachineGuestOsIdentifier("freebsd11Guest")
+	VirtualMachineGuestOsIdentifierFreebsd11_64Guest          = VirtualMachineGuestOsIdentifier("freebsd11_64Guest")
+	VirtualMachineGuestOsIdentifierFreebsd12Guest             = VirtualMachineGuestOsIdentifier("freebsd12Guest")
+	VirtualMachineGuestOsIdentifierFreebsd12_64Guest          = VirtualMachineGuestOsIdentifier("freebsd12_64Guest")
+	VirtualMachineGuestOsIdentifierFreebsd13Guest             = VirtualMachineGuestOsIdentifier("freebsd13Guest")
+	VirtualMachineGuestOsIdentifierFreebsd13_64Guest          = VirtualMachineGuestOsIdentifier("freebsd13_64Guest")
+	VirtualMachineGuestOsIdentifierRedhatGuest                = VirtualMachineGuestOsIdentifier("redhatGuest")
+	VirtualMachineGuestOsIdentifierRhel2Guest                 = VirtualMachineGuestOsIdentifier("rhel2Guest")
+	VirtualMachineGuestOsIdentifierRhel3Guest                 = VirtualMachineGuestOsIdentifier("rhel3Guest")
+	VirtualMachineGuestOsIdentifierRhel3_64Guest              = VirtualMachineGuestOsIdentifier("rhel3_64Guest")
+	VirtualMachineGuestOsIdentifierRhel4Guest                 = VirtualMachineGuestOsIdentifier("rhel4Guest")
+	VirtualMachineGuestOsIdentifierRhel4_64Guest              = VirtualMachineGuestOsIdentifier("rhel4_64Guest")
+	VirtualMachineGuestOsIdentifierRhel5Guest                 = VirtualMachineGuestOsIdentifier("rhel5Guest")
+	VirtualMachineGuestOsIdentifierRhel5_64Guest              = VirtualMachineGuestOsIdentifier("rhel5_64Guest")
+	VirtualMachineGuestOsIdentifierRhel6Guest                 = VirtualMachineGuestOsIdentifier("rhel6Guest")
+	VirtualMachineGuestOsIdentifierRhel6_64Guest              = VirtualMachineGuestOsIdentifier("rhel6_64Guest")
+	VirtualMachineGuestOsIdentifierRhel7Guest                 = VirtualMachineGuestOsIdentifier("rhel7Guest")
+	VirtualMachineGuestOsIdentifierRhel7_64Guest              = VirtualMachineGuestOsIdentifier("rhel7_64Guest")
+	VirtualMachineGuestOsIdentifierRhel8_64Guest              = VirtualMachineGuestOsIdentifier("rhel8_64Guest")
+	VirtualMachineGuestOsIdentifierRhel9_64Guest              = VirtualMachineGuestOsIdentifier("rhel9_64Guest")
+	VirtualMachineGuestOsIdentifierCentosGuest                = VirtualMachineGuestOsIdentifier("centosGuest")
+	VirtualMachineGuestOsIdentifierCentos64Guest              = VirtualMachineGuestOsIdentifier("centos64Guest")
+	VirtualMachineGuestOsIdentifierCentos6Guest               = VirtualMachineGuestOsIdentifier("centos6Guest")
+	VirtualMachineGuestOsIdentifierCentos6_64Guest            = VirtualMachineGuestOsIdentifier("centos6_64Guest")
+	VirtualMachineGuestOsIdentifierCentos7Guest               = VirtualMachineGuestOsIdentifier("centos7Guest")
+	VirtualMachineGuestOsIdentifierCentos7_64Guest            = VirtualMachineGuestOsIdentifier("centos7_64Guest")
+	VirtualMachineGuestOsIdentifierCentos8_64Guest            = VirtualMachineGuestOsIdentifier("centos8_64Guest")
+	VirtualMachineGuestOsIdentifierCentos9_64Guest            = VirtualMachineGuestOsIdentifier("centos9_64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinuxGuest           = VirtualMachineGuestOsIdentifier("oracleLinuxGuest")
+	VirtualMachineGuestOsIdentifierOracleLinux64Guest         = VirtualMachineGuestOsIdentifier("oracleLinux64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux6Guest          = VirtualMachineGuestOsIdentifier("oracleLinux6Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux6_64Guest       = VirtualMachineGuestOsIdentifier("oracleLinux6_64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux7Guest          = VirtualMachineGuestOsIdentifier("oracleLinux7Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux7_64Guest       = VirtualMachineGuestOsIdentifier("oracleLinux7_64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux8_64Guest       = VirtualMachineGuestOsIdentifier("oracleLinux8_64Guest")
+	VirtualMachineGuestOsIdentifierOracleLinux9_64Guest       = VirtualMachineGuestOsIdentifier("oracleLinux9_64Guest")
+	VirtualMachineGuestOsIdentifierSuseGuest                  = VirtualMachineGuestOsIdentifier("suseGuest")
+	VirtualMachineGuestOsIdentifierSuse64Guest                = VirtualMachineGuestOsIdentifier("suse64Guest")
+	VirtualMachineGuestOsIdentifierSlesGuest                  = VirtualMachineGuestOsIdentifier("slesGuest")
+	VirtualMachineGuestOsIdentifierSles64Guest                = VirtualMachineGuestOsIdentifier("sles64Guest")
+	VirtualMachineGuestOsIdentifierSles10Guest                = VirtualMachineGuestOsIdentifier("sles10Guest")
+	VirtualMachineGuestOsIdentifierSles10_64Guest             = VirtualMachineGuestOsIdentifier("sles10_64Guest")
+	VirtualMachineGuestOsIdentifierSles11Guest                = VirtualMachineGuestOsIdentifier("sles11Guest")
+	VirtualMachineGuestOsIdentifierSles11_64Guest             = VirtualMachineGuestOsIdentifier("sles11_64Guest")
+	VirtualMachineGuestOsIdentifierSles12Guest                = VirtualMachineGuestOsIdentifier("sles12Guest")
+	VirtualMachineGuestOsIdentifierSles12_64Guest             = VirtualMachineGuestOsIdentifier("sles12_64Guest")
+	VirtualMachineGuestOsIdentifierSles15_64Guest             = VirtualMachineGuestOsIdentifier("sles15_64Guest")
+	VirtualMachineGuestOsIdentifierSles16_64Guest             = VirtualMachineGuestOsIdentifier("sles16_64Guest")
+	VirtualMachineGuestOsIdentifierNld9Guest                  = VirtualMachineGuestOsIdentifier("nld9Guest")
+	VirtualMachineGuestOsIdentifierOesGuest                   = VirtualMachineGuestOsIdentifier("oesGuest")
+	VirtualMachineGuestOsIdentifierSjdsGuest                  = VirtualMachineGuestOsIdentifier("sjdsGuest")
+	VirtualMachineGuestOsIdentifierMandrakeGuest              = VirtualMachineGuestOsIdentifier("mandrakeGuest")
+	VirtualMachineGuestOsIdentifierMandrivaGuest              = VirtualMachineGuestOsIdentifier("mandrivaGuest")
+	VirtualMachineGuestOsIdentifierMandriva64Guest            = VirtualMachineGuestOsIdentifier("mandriva64Guest")
+	VirtualMachineGuestOsIdentifierTurboLinuxGuest            = VirtualMachineGuestOsIdentifier("turboLinuxGuest")
+	VirtualMachineGuestOsIdentifierTurboLinux64Guest          = VirtualMachineGuestOsIdentifier("turboLinux64Guest")
+	VirtualMachineGuestOsIdentifierUbuntuGuest                = VirtualMachineGuestOsIdentifier("ubuntuGuest")
+	VirtualMachineGuestOsIdentifierUbuntu64Guest              = VirtualMachineGuestOsIdentifier("ubuntu64Guest")
+	VirtualMachineGuestOsIdentifierDebian4Guest               = VirtualMachineGuestOsIdentifier("debian4Guest")
+	VirtualMachineGuestOsIdentifierDebian4_64Guest            = VirtualMachineGuestOsIdentifier("debian4_64Guest")
+	VirtualMachineGuestOsIdentifierDebian5Guest               = VirtualMachineGuestOsIdentifier("debian5Guest")
+	VirtualMachineGuestOsIdentifierDebian5_64Guest            = VirtualMachineGuestOsIdentifier("debian5_64Guest")
+	VirtualMachineGuestOsIdentifierDebian6Guest               = VirtualMachineGuestOsIdentifier("debian6Guest")
+	VirtualMachineGuestOsIdentifierDebian6_64Guest            = VirtualMachineGuestOsIdentifier("debian6_64Guest")
+	VirtualMachineGuestOsIdentifierDebian7Guest               = VirtualMachineGuestOsIdentifier("debian7Guest")
+	VirtualMachineGuestOsIdentifierDebian7_64Guest            = VirtualMachineGuestOsIdentifier("debian7_64Guest")
+	VirtualMachineGuestOsIdentifierDebian8Guest               = VirtualMachineGuestOsIdentifier("debian8Guest")
+	VirtualMachineGuestOsIdentifierDebian8_64Guest            = VirtualMachineGuestOsIdentifier("debian8_64Guest")
+	VirtualMachineGuestOsIdentifierDebian9Guest               = VirtualMachineGuestOsIdentifier("debian9Guest")
+	VirtualMachineGuestOsIdentifierDebian9_64Guest            = VirtualMachineGuestOsIdentifier("debian9_64Guest")
+	VirtualMachineGuestOsIdentifierDebian10Guest              = VirtualMachineGuestOsIdentifier("debian10Guest")
+	VirtualMachineGuestOsIdentifierDebian10_64Guest           = VirtualMachineGuestOsIdentifier("debian10_64Guest")
+	VirtualMachineGuestOsIdentifierDebian11Guest              = VirtualMachineGuestOsIdentifier("debian11Guest")
+	VirtualMachineGuestOsIdentifierDebian11_64Guest           = VirtualMachineGuestOsIdentifier("debian11_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux3Guest              = VirtualMachineGuestOsIdentifier("asianux3Guest")
+	VirtualMachineGuestOsIdentifierAsianux3_64Guest           = VirtualMachineGuestOsIdentifier("asianux3_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux4Guest              = VirtualMachineGuestOsIdentifier("asianux4Guest")
+	VirtualMachineGuestOsIdentifierAsianux4_64Guest           = VirtualMachineGuestOsIdentifier("asianux4_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux5_64Guest           = VirtualMachineGuestOsIdentifier("asianux5_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux7_64Guest           = VirtualMachineGuestOsIdentifier("asianux7_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux8_64Guest           = VirtualMachineGuestOsIdentifier("asianux8_64Guest")
+	VirtualMachineGuestOsIdentifierAsianux9_64Guest           = VirtualMachineGuestOsIdentifier("asianux9_64Guest")
+	VirtualMachineGuestOsIdentifierOpensuseGuest              = VirtualMachineGuestOsIdentifier("opensuseGuest")
+	VirtualMachineGuestOsIdentifierOpensuse64Guest            = VirtualMachineGuestOsIdentifier("opensuse64Guest")
+	VirtualMachineGuestOsIdentifierFedoraGuest                = VirtualMachineGuestOsIdentifier("fedoraGuest")
+	VirtualMachineGuestOsIdentifierFedora64Guest              = VirtualMachineGuestOsIdentifier("fedora64Guest")
+	VirtualMachineGuestOsIdentifierCoreos64Guest              = VirtualMachineGuestOsIdentifier("coreos64Guest")
+	VirtualMachineGuestOsIdentifierVmwarePhoton64Guest        = VirtualMachineGuestOsIdentifier("vmwarePhoton64Guest")
+	VirtualMachineGuestOsIdentifierOther24xLinuxGuest         = VirtualMachineGuestOsIdentifier("other24xLinuxGuest")
+	VirtualMachineGuestOsIdentifierOther26xLinuxGuest         = VirtualMachineGuestOsIdentifier("other26xLinuxGuest")
+	VirtualMachineGuestOsIdentifierOtherLinuxGuest            = VirtualMachineGuestOsIdentifier("otherLinuxGuest")
+	VirtualMachineGuestOsIdentifierOther3xLinuxGuest          = VirtualMachineGuestOsIdentifier("other3xLinuxGuest")
+	VirtualMachineGuestOsIdentifierOther4xLinuxGuest          = VirtualMachineGuestOsIdentifier("other4xLinuxGuest")
+	VirtualMachineGuestOsIdentifierOther5xLinuxGuest          = VirtualMachineGuestOsIdentifier("other5xLinuxGuest")
+	VirtualMachineGuestOsIdentifierGenericLinuxGuest          = VirtualMachineGuestOsIdentifier("genericLinuxGuest")
+	VirtualMachineGuestOsIdentifierOther24xLinux64Guest       = VirtualMachineGuestOsIdentifier("other24xLinux64Guest")
+	VirtualMachineGuestOsIdentifierOther26xLinux64Guest       = VirtualMachineGuestOsIdentifier("other26xLinux64Guest")
+	VirtualMachineGuestOsIdentifierOther3xLinux64Guest        = VirtualMachineGuestOsIdentifier("other3xLinux64Guest")
+	VirtualMachineGuestOsIdentifierOther4xLinux64Guest        = VirtualMachineGuestOsIdentifier("other4xLinux64Guest")
+	VirtualMachineGuestOsIdentifierOther5xLinux64Guest        = VirtualMachineGuestOsIdentifier("other5xLinux64Guest")
+	VirtualMachineGuestOsIdentifierOtherLinux64Guest          = VirtualMachineGuestOsIdentifier("otherLinux64Guest")
+	VirtualMachineGuestOsIdentifierSolaris6Guest              = VirtualMachineGuestOsIdentifier("solaris6Guest")
+	VirtualMachineGuestOsIdentifierSolaris7Guest              = VirtualMachineGuestOsIdentifier("solaris7Guest")
+	VirtualMachineGuestOsIdentifierSolaris8Guest              = VirtualMachineGuestOsIdentifier("solaris8Guest")
+	VirtualMachineGuestOsIdentifierSolaris9Guest              = VirtualMachineGuestOsIdentifier("solaris9Guest")
+	VirtualMachineGuestOsIdentifierSolaris10Guest             = VirtualMachineGuestOsIdentifier("solaris10Guest")
+	VirtualMachineGuestOsIdentifierSolaris10_64Guest          = VirtualMachineGuestOsIdentifier("solaris10_64Guest")
+	VirtualMachineGuestOsIdentifierSolaris11_64Guest          = VirtualMachineGuestOsIdentifier("solaris11_64Guest")
+	VirtualMachineGuestOsIdentifierOs2Guest                   = VirtualMachineGuestOsIdentifier("os2Guest")
+	VirtualMachineGuestOsIdentifierEComStationGuest           = VirtualMachineGuestOsIdentifier("eComStationGuest")
+	VirtualMachineGuestOsIdentifierEComStation2Guest          = VirtualMachineGuestOsIdentifier("eComStation2Guest")
+	VirtualMachineGuestOsIdentifierNetware4Guest              = VirtualMachineGuestOsIdentifier("netware4Guest")
+	VirtualMachineGuestOsIdentifierNetware5Guest              = VirtualMachineGuestOsIdentifier("netware5Guest")
+	VirtualMachineGuestOsIdentifierNetware6Guest              = VirtualMachineGuestOsIdentifier("netware6Guest")
+	VirtualMachineGuestOsIdentifierOpenServer5Guest           = VirtualMachineGuestOsIdentifier("openServer5Guest")
+	VirtualMachineGuestOsIdentifierOpenServer6Guest           = VirtualMachineGuestOsIdentifier("openServer6Guest")
+	VirtualMachineGuestOsIdentifierUnixWare7Guest             = VirtualMachineGuestOsIdentifier("unixWare7Guest")
+	VirtualMachineGuestOsIdentifierDarwinGuest                = VirtualMachineGuestOsIdentifier("darwinGuest")
+	VirtualMachineGuestOsIdentifierDarwin64Guest              = VirtualMachineGuestOsIdentifier("darwin64Guest")
+	VirtualMachineGuestOsIdentifierDarwin10Guest              = VirtualMachineGuestOsIdentifier("darwin10Guest")
+	VirtualMachineGuestOsIdentifierDarwin10_64Guest           = VirtualMachineGuestOsIdentifier("darwin10_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin11Guest              = VirtualMachineGuestOsIdentifier("darwin11Guest")
+	VirtualMachineGuestOsIdentifierDarwin11_64Guest           = VirtualMachineGuestOsIdentifier("darwin11_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin12_64Guest           = VirtualMachineGuestOsIdentifier("darwin12_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin13_64Guest           = VirtualMachineGuestOsIdentifier("darwin13_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin14_64Guest           = VirtualMachineGuestOsIdentifier("darwin14_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin15_64Guest           = VirtualMachineGuestOsIdentifier("darwin15_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin16_64Guest           = VirtualMachineGuestOsIdentifier("darwin16_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin17_64Guest           = VirtualMachineGuestOsIdentifier("darwin17_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin18_64Guest           = VirtualMachineGuestOsIdentifier("darwin18_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin19_64Guest           = VirtualMachineGuestOsIdentifier("darwin19_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin20_64Guest           = VirtualMachineGuestOsIdentifier("darwin20_64Guest")
+	VirtualMachineGuestOsIdentifierDarwin21_64Guest           = VirtualMachineGuestOsIdentifier("darwin21_64Guest")
+	VirtualMachineGuestOsIdentifierVmkernelGuest              = VirtualMachineGuestOsIdentifier("vmkernelGuest")
+	VirtualMachineGuestOsIdentifierVmkernel5Guest             = VirtualMachineGuestOsIdentifier("vmkernel5Guest")
+	VirtualMachineGuestOsIdentifierVmkernel6Guest             = VirtualMachineGuestOsIdentifier("vmkernel6Guest")
+	VirtualMachineGuestOsIdentifierVmkernel65Guest            = VirtualMachineGuestOsIdentifier("vmkernel65Guest")
+	VirtualMachineGuestOsIdentifierVmkernel7Guest             = VirtualMachineGuestOsIdentifier("vmkernel7Guest")
+	VirtualMachineGuestOsIdentifierAmazonlinux2_64Guest       = VirtualMachineGuestOsIdentifier("amazonlinux2_64Guest")
+	VirtualMachineGuestOsIdentifierAmazonlinux3_64Guest       = VirtualMachineGuestOsIdentifier("amazonlinux3_64Guest")
+	VirtualMachineGuestOsIdentifierCrxPod1Guest               = VirtualMachineGuestOsIdentifier("crxPod1Guest")
+	VirtualMachineGuestOsIdentifierOtherGuest                 = VirtualMachineGuestOsIdentifier("otherGuest")
+	VirtualMachineGuestOsIdentifierOtherGuest64               = VirtualMachineGuestOsIdentifier("otherGuest64")
 )
 
 func init() {
@@ -4358,6 +4752,17 @@ func init() {
 	t["VirtualMachineScsiPassthroughType"] = reflect.TypeOf((*VirtualMachineScsiPassthroughType)(nil)).Elem()
 }
 
+type VirtualMachineSgxInfoFlcModes string
+
+const (
+	VirtualMachineSgxInfoFlcModesLocked   = VirtualMachineSgxInfoFlcModes("locked")
+	VirtualMachineSgxInfoFlcModesUnlocked = VirtualMachineSgxInfoFlcModes("unlocked")
+)
+
+func init() {
+	t["VirtualMachineSgxInfoFlcModes"] = reflect.TypeOf((*VirtualMachineSgxInfoFlcModes)(nil)).Elem()
+}
+
 type VirtualMachineStandbyActionType string
 
 const (
@@ -4383,11 +4788,12 @@ func init() {
 type VirtualMachineTicketType string
 
 const (
-	VirtualMachineTicketTypeMks            = VirtualMachineTicketType("mks")
-	VirtualMachineTicketTypeDevice         = VirtualMachineTicketType("device")
-	VirtualMachineTicketTypeGuestControl   = VirtualMachineTicketType("guestControl")
-	VirtualMachineTicketTypeWebmks         = VirtualMachineTicketType("webmks")
-	VirtualMachineTicketTypeGuestIntegrity = VirtualMachineTicketType("guestIntegrity")
+	VirtualMachineTicketTypeMks             = VirtualMachineTicketType("mks")
+	VirtualMachineTicketTypeDevice          = VirtualMachineTicketType("device")
+	VirtualMachineTicketTypeGuestControl    = VirtualMachineTicketType("guestControl")
+	VirtualMachineTicketTypeWebmks          = VirtualMachineTicketType("webmks")
+	VirtualMachineTicketTypeGuestIntegrity  = VirtualMachineTicketType("guestIntegrity")
+	VirtualMachineTicketTypeWebRemoteDevice = VirtualMachineTicketType("webRemoteDevice")
 )
 
 func init() {
@@ -4482,11 +4888,12 @@ func init() {
 type VirtualMachineUsbInfoSpeed string
 
 const (
-	VirtualMachineUsbInfoSpeedLow          = VirtualMachineUsbInfoSpeed("low")
-	VirtualMachineUsbInfoSpeedFull         = VirtualMachineUsbInfoSpeed("full")
-	VirtualMachineUsbInfoSpeedHigh         = VirtualMachineUsbInfoSpeed("high")
-	VirtualMachineUsbInfoSpeedSuperSpeed   = VirtualMachineUsbInfoSpeed("superSpeed")
-	VirtualMachineUsbInfoSpeedUnknownSpeed = VirtualMachineUsbInfoSpeed("unknownSpeed")
+	VirtualMachineUsbInfoSpeedLow            = VirtualMachineUsbInfoSpeed("low")
+	VirtualMachineUsbInfoSpeedFull           = VirtualMachineUsbInfoSpeed("full")
+	VirtualMachineUsbInfoSpeedHigh           = VirtualMachineUsbInfoSpeed("high")
+	VirtualMachineUsbInfoSpeedSuperSpeed     = VirtualMachineUsbInfoSpeed("superSpeed")
+	VirtualMachineUsbInfoSpeedSuperSpeedPlus = VirtualMachineUsbInfoSpeed("superSpeedPlus")
+	VirtualMachineUsbInfoSpeedUnknownSpeed   = VirtualMachineUsbInfoSpeed("unknownSpeed")
 )
 
 func init() {
@@ -4665,6 +5072,7 @@ const (
 	VmFaultToleranceConfigIssueReasonForIssueHasEFIFirmware                 = VmFaultToleranceConfigIssueReasonForIssue("hasEFIFirmware")
 	VmFaultToleranceConfigIssueReasonForIssueTooManyVCPUs                   = VmFaultToleranceConfigIssueReasonForIssue("tooManyVCPUs")
 	VmFaultToleranceConfigIssueReasonForIssueTooMuchMemory                  = VmFaultToleranceConfigIssueReasonForIssue("tooMuchMemory")
+	VmFaultToleranceConfigIssueReasonForIssueUnsupportedPMemHAFailOver      = VmFaultToleranceConfigIssueReasonForIssue("unsupportedPMemHAFailOver")
 )
 
 func init() {

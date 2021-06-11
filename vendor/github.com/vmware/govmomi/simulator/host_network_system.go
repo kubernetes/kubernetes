@@ -40,8 +40,19 @@ func NewHostNetworkSystem(host *mo.HostSystem) *HostNetworkSystem {
 						Portgroup: []string{"VM Network"},
 					},
 				},
+				Portgroup: host.Config.Network.Portgroup,
 			},
 		},
+	}
+}
+
+func (s *HostNetworkSystem) init(r *Registry) {
+	for _, obj := range r.objects {
+		if h, ok := obj.(*HostSystem); ok {
+			if h.ConfigManager.NetworkSystem.Value == s.Self.Value {
+				s.Host = &h.HostSystem
+			}
+		}
 	}
 }
 
@@ -87,7 +98,7 @@ func (s *HostNetworkSystem) RemoveVirtualSwitch(c *types.RemoveVirtualSwitch) so
 	return r
 }
 
-func (s *HostNetworkSystem) AddPortGroup(c *types.AddPortGroup) soap.HasFault {
+func (s *HostNetworkSystem) AddPortGroup(ctx *Context, c *types.AddPortGroup) soap.HasFault {
 	var vswitch *types.HostVirtualSwitch
 
 	r := &methods.AddPortGroupBody{}
@@ -124,15 +135,22 @@ func (s *HostNetworkSystem) AddPortGroup(c *types.AddPortGroup) soap.HasFault {
 		return r
 	}
 
-	folder.putChild(network)
+	folderPutChild(ctx, &folder.Folder, network)
 
 	vswitch.Portgroup = append(vswitch.Portgroup, c.Portgrp.Name)
+
+	s.NetworkInfo.Portgroup = append(s.NetworkInfo.Portgroup, types.HostPortGroup{
+		Key:  "key-vim.host.PortGroup-" + c.Portgrp.Name,
+		Port: nil,
+		Spec: c.Portgrp,
+	})
+
 	r.Res = &types.AddPortGroupResponse{}
 
 	return r
 }
 
-func (s *HostNetworkSystem) RemovePortGroup(c *types.RemovePortGroup) soap.HasFault {
+func (s *HostNetworkSystem) RemovePortGroup(ctx *Context, c *types.RemovePortGroup) soap.HasFault {
 	var vswitch *types.HostVirtualSwitch
 
 	r := &methods.RemovePortGroupBody{}
@@ -153,7 +171,14 @@ func (s *HostNetworkSystem) RemovePortGroup(c *types.RemovePortGroup) soap.HasFa
 
 	folder := s.folder()
 	e := Map.FindByName(c.PgName, folder.ChildEntity)
-	folder.removeChild(e.Reference())
+	folderRemoveChild(ctx, &folder.Folder, e.Reference())
+
+	for i, pg := range s.NetworkInfo.Portgroup {
+		if pg.Spec.Name == c.PgName {
+			var portgroup = s.NetworkInfo.Portgroup
+			s.NetworkInfo.Portgroup = append(portgroup[:i], portgroup[i+1:]...)
+		}
+	}
 
 	r.Res = &types.RemovePortGroupResponse{}
 
@@ -166,6 +191,22 @@ func (s *HostNetworkSystem) UpdateNetworkConfig(req *types.UpdateNetworkConfig) 
 	return &methods.UpdateNetworkConfigBody{
 		Res: &types.UpdateNetworkConfigResponse{
 			Returnval: types.HostNetworkConfigResult{},
+		},
+	}
+}
+
+func (s *HostNetworkSystem) QueryNetworkHint(req *types.QueryNetworkHint) soap.HasFault {
+	var info []types.PhysicalNicHintInfo
+
+	for _, nic := range s.Host.Config.Network.Pnic {
+		info = append(info, types.PhysicalNicHintInfo{
+			Device: nic.Device,
+		})
+	}
+
+	return &methods.QueryNetworkHintBody{
+		Res: &types.QueryNetworkHintResponse{
+			Returnval: info,
 		},
 	}
 }

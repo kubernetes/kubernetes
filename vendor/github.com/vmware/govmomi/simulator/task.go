@@ -29,9 +29,16 @@ import (
 const vTaskSuffix = "_Task" // vmomi suffix
 const sTaskSuffix = "Task"  // simulator suffix (avoiding golint warning)
 
+// TaskDelay applies to all tasks.
+// Names for DelayConfig.MethodDelay will differ for task and api delays. API
+// level names often look like PowerOff_Task, whereas the task name is simply
+// PowerOff.
+var TaskDelay = DelayConfig{}
+
 type Task struct {
 	mo.Task
 
+	ctx     *Context
 	Execute func(*Task) (types.AnyType, types.BaseMethodFault)
 }
 
@@ -77,33 +84,84 @@ type TaskRunner interface {
 	Run(*Task) (types.AnyType, types.BaseMethodFault)
 }
 
-func (t *Task) Run() types.ManagedObjectReference {
-	now := time.Now()
+// taskReference is a helper struct so we can call AcquireLock in Run()
+type taskReference struct {
+	ref types.ManagedObjectReference
+}
 
-	Map.Update(t, []types.PropertyChange{
-		{Name: "info.startTime", Val: now},
+func (tr *taskReference) Reference() types.ManagedObjectReference {
+	return tr.ref
+}
+
+func (t *Task) Run(ctx *Context) types.ManagedObjectReference {
+	t.ctx = ctx
+	Map.AtomicUpdate(t.ctx, t, []types.PropertyChange{
+		{Name: "info.startTime", Val: time.Now()},
 		{Name: "info.state", Val: types.TaskInfoStateRunning},
 	})
 
-	res, err := t.Execute(t)
-	state := types.TaskInfoStateSuccess
-	var fault interface{}
-	if err != nil {
-		state = types.TaskInfoStateError
-		fault = types.LocalizedMethodFault{
-			Fault:            err,
-			LocalizedMessage: fmt.Sprintf("%T", err),
-		}
+	tr := &taskReference{
+		ref: *t.Info.Entity,
 	}
+	// in most cases, the caller already holds this lock, and we would like
+	// the lock to be held across the "hand off" to the async goroutine.
+	unlock := Map.AcquireLock(ctx, tr)
 
-	now = time.Now()
+	go func() {
+		TaskDelay.delay(t.Info.Name)
+		res, err := t.Execute(t)
+		unlock()
 
-	Map.Update(t, []types.PropertyChange{
-		{Name: "info.completeTime", Val: now},
-		{Name: "info.state", Val: state},
-		{Name: "info.result", Val: res},
-		{Name: "info.error", Val: fault},
-	})
+		state := types.TaskInfoStateSuccess
+		var fault interface{}
+		if err != nil {
+			state = types.TaskInfoStateError
+			fault = types.LocalizedMethodFault{
+				Fault:            err,
+				LocalizedMessage: fmt.Sprintf("%T", err),
+			}
+		}
+
+		Map.AtomicUpdate(t.ctx, t, []types.PropertyChange{
+			{Name: "info.completeTime", Val: time.Now()},
+			{Name: "info.state", Val: state},
+			{Name: "info.result", Val: res},
+			{Name: "info.error", Val: fault},
+		})
+	}()
 
 	return t.Self
+}
+
+// RunBlocking() should only be used when an async simulator task needs to wait
+// on another async simulator task.
+// It polls for task completion to avoid the need to set up a PropertyCollector.
+func (t *Task) RunBlocking(ctx *Context) {
+	_ = t.Run(ctx)
+	t.Wait()
+}
+
+// Wait blocks until the task is complete.
+func (t *Task) Wait() {
+	// we do NOT want to share our lock with the tasks's context, because
+	// the goroutine that executes the task will use ctx to update the
+	// state (among other things).
+	isolatedLockingContext := &Context{}
+
+	isRunning := func() bool {
+		var running bool
+		Map.WithLock(isolatedLockingContext, t, func() {
+			switch t.Info.State {
+			case types.TaskInfoStateSuccess, types.TaskInfoStateError:
+				running = false
+			default:
+				running = true
+			}
+		})
+		return running
+	}
+
+	for isRunning() {
+		time.Sleep(10 * time.Millisecond)
+	}
 }

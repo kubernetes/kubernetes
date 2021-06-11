@@ -545,6 +545,30 @@ var HostConfigInfo = types.HostConfigInfo{
 				MultiSelectAllowed: true,
 				CandidateVnic: []types.HostVirtualNic{
 					{
+						Device:    "vmk1",
+						Key:       "management.key-vim.host.VirtualNic-vmk1",
+						Portgroup: "",
+						Spec: types.HostVirtualNicSpec{
+							Ip: &types.HostIpConfig{
+								Dhcp:       true,
+								IpAddress:  "192.168.0.1",
+								SubnetMask: "255.0.0.0",
+								IpV6Config: (*types.HostIpConfigIpV6AddressConfiguration)(nil),
+							},
+							Mac:                    "00:0c:29:81:d8:00",
+							DistributedVirtualPort: (*types.DistributedVirtualSwitchPortConnection)(nil),
+							Portgroup:              "Management Network",
+							Mtu:                    1500,
+							TsoEnabled:             types.NewBool(true),
+							NetStackInstanceKey:    "defaultTcpipStack",
+							OpaqueNetwork:          (*types.HostVirtualNicOpaqueNetworkSpec)(nil),
+							ExternalId:             "",
+							PinnedPnic:             "",
+							IpRouteSpec:            (*types.HostVirtualNicIpRouteSpec)(nil),
+						},
+						Port: "",
+					},
+					{
 						Device:    "vmk0",
 						Key:       "management.key-vim.host.VirtualNic-vmk0",
 						Portgroup: "Management Network",

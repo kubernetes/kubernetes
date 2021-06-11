@@ -17,12 +17,14 @@ limitations under the License.
 package simulator
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"path"
 	"strings"
 
 	"github.com/google/uuid"
+
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -34,7 +36,15 @@ type Folder struct {
 	mo.Folder
 }
 
-func (f *Folder) eventArgument() types.FolderEventArgument {
+func asFolderMO(obj mo.Reference) (*mo.Folder, bool) {
+	if obj == nil {
+		return nil, false
+	}
+	f, ok := getManagedObject(obj).Addr().Interface().(*mo.Folder)
+	return f, ok
+}
+
+func folderEventArgument(f *mo.Folder) types.FolderEventArgument {
 	return types.FolderEventArgument{
 		Folder:              f.Self,
 		EntityEventArgument: types.EntityEventArgument{Name: f.Name},
@@ -42,7 +52,7 @@ func (f *Folder) eventArgument() types.FolderEventArgument {
 }
 
 // update references when objects are added/removed from a Folder
-func (f *Folder) update(o mo.Reference, u func(mo.Reference, *[]types.ManagedObjectReference, types.ManagedObjectReference)) {
+func folderUpdate(ctx *Context, f *mo.Folder, o mo.Reference, u func(*Context, mo.Reference, *[]types.ManagedObjectReference, types.ManagedObjectReference)) {
 	ref := o.Reference()
 
 	if f.Parent == nil {
@@ -58,13 +68,16 @@ func (f *Folder) update(o mo.Reference, u func(mo.Reference, *[]types.ManagedObj
 
 	switch ref.Type {
 	case "Network", "DistributedVirtualSwitch", "DistributedVirtualPortgroup":
-		u(dc, &dc.Network, ref)
+		u(ctx, dc, &dc.Network, ref)
 	case "Datastore":
-		u(dc, &dc.Datastore, ref)
+		u(ctx, dc, &dc.Datastore, ref)
 	}
 }
 
-func networkSummary(n *mo.Network) *types.NetworkSummary {
+func networkSummary(n *mo.Network) types.BaseNetworkSummary {
+	if n.Summary != nil {
+		return n.Summary
+	}
 	return &types.NetworkSummary{
 		Network:    &n.Self,
 		Name:       n.Name,
@@ -72,32 +85,38 @@ func networkSummary(n *mo.Network) *types.NetworkSummary {
 	}
 }
 
-func (f *Folder) putChild(o mo.Entity) {
-	Map.PutEntity(f, o)
+func folderPutChild(ctx *Context, f *mo.Folder, o mo.Entity) {
+	ctx.WithLock(f, func() {
+		// Need to update ChildEntity before Map.Put for ContainerView updates to work properly
+		f.ChildEntity = append(f.ChildEntity, Map.reference(o))
+		Map.PutEntity(f, o)
 
-	f.ChildEntity = append(f.ChildEntity, o.Reference())
+		folderUpdate(ctx, f, o, Map.AddReference)
 
-	f.update(o, Map.AddReference)
-
-	switch e := o.(type) {
-	case *mo.Network:
-		e.Summary = networkSummary(e)
-	case *mo.OpaqueNetwork:
-		e.Summary = networkSummary(&e.Network)
-	case *DistributedVirtualPortgroup:
-		e.Summary = networkSummary(&e.Network)
-	}
+		ctx.WithLock(o, func() {
+			switch e := o.(type) {
+			case *mo.Network:
+				e.Summary = networkSummary(e)
+			case *mo.OpaqueNetwork:
+				e.Summary = networkSummary(&e.Network)
+			case *DistributedVirtualPortgroup:
+				e.Summary = networkSummary(&e.Network)
+			}
+		})
+	})
 }
 
-func (f *Folder) removeChild(o mo.Reference) {
-	Map.Remove(o.Reference())
+func folderRemoveChild(ctx *Context, f *mo.Folder, o mo.Reference) {
+	Map.Remove(ctx, o.Reference())
 
-	RemoveReference(&f.ChildEntity, o.Reference())
+	ctx.WithLock(f, func() {
+		RemoveReference(&f.ChildEntity, o.Reference())
 
-	f.update(o, Map.RemoveReference)
+		folderUpdate(ctx, f, o, Map.RemoveReference)
+	})
 }
 
-func (f *Folder) hasChildType(kind string) bool {
+func folderHasChildType(f *mo.Folder, kind string) bool {
 	for _, t := range f.ChildType {
 		if t == kind {
 			return true
@@ -110,14 +129,46 @@ func (f *Folder) typeNotSupported() *soap.Fault {
 	return Fault(fmt.Sprintf("%s supports types: %#v", f.Self, f.ChildType), &types.NotSupported{})
 }
 
+// AddOpaqueNetwork adds an OpaqueNetwork type to the inventory, with default backing to that of an nsx.LogicalSwitch.
+// The vSphere API does not have a method to add this directly, so it must either be called directly or via Model.OpaqueNetwork setting.
+func (f *Folder) AddOpaqueNetwork(ctx *Context, summary types.OpaqueNetworkSummary) error {
+	if !folderHasChildType(&f.Folder, "Network") {
+		return errors.New("not a network folder")
+	}
+
+	if summary.OpaqueNetworkId == "" {
+		summary.OpaqueNetworkId = uuid.New().String()
+	}
+	if summary.OpaqueNetworkType == "" {
+		summary.OpaqueNetworkType = "nsx.LogicalSwitch"
+	}
+	if summary.Name == "" {
+		summary.Name = summary.OpaqueNetworkType + "-" + summary.OpaqueNetworkId
+	}
+
+	net := new(mo.OpaqueNetwork)
+	if summary.Network == nil {
+		summary.Network = &net.Self
+	} else {
+		net.Self = *summary.Network
+	}
+	summary.Accessible = true
+	net.Network.Name = summary.Name
+	net.Summary = &summary
+
+	folderPutChild(ctx, &f.Folder, net)
+
+	return nil
+}
+
 type addStandaloneHost struct {
 	*Folder
-
+	ctx *Context
 	req *types.AddStandaloneHost_Task
 }
 
 func (add *addStandaloneHost) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
-	host, err := CreateStandaloneHost(add.Folder, add.req.Spec)
+	host, err := CreateStandaloneHost(add.ctx, add.Folder, add.req.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +180,12 @@ func (add *addStandaloneHost) Run(task *Task) (types.AnyType, types.BaseMethodFa
 	return host.Reference(), nil
 }
 
-func (f *Folder) AddStandaloneHostTask(a *types.AddStandaloneHost_Task) soap.HasFault {
+func (f *Folder) AddStandaloneHostTask(ctx *Context, a *types.AddStandaloneHost_Task) soap.HasFault {
 	r := &methods.AddStandaloneHost_TaskBody{}
 
-	if f.hasChildType("ComputeResource") && f.hasChildType("Folder") {
+	if folderHasChildType(&f.Folder, "ComputeResource") && folderHasChildType(&f.Folder, "Folder") {
 		r.Res = &types.AddStandaloneHost_TaskResponse{
-			Returnval: NewTask(&addStandaloneHost{f, a}).Run(),
+			Returnval: NewTask(&addStandaloneHost{f, ctx, a}).Run(ctx),
 		}
 	} else {
 		r.Fault_ = f.typeNotSupported()
@@ -143,16 +194,25 @@ func (f *Folder) AddStandaloneHostTask(a *types.AddStandaloneHost_Task) soap.Has
 	return r
 }
 
-func (f *Folder) CreateFolder(c *types.CreateFolder) soap.HasFault {
+func (f *Folder) CreateFolder(ctx *Context, c *types.CreateFolder) soap.HasFault {
 	r := &methods.CreateFolderBody{}
 
-	if f.hasChildType("Folder") {
+	if folderHasChildType(&f.Folder, "Folder") {
+		if obj := Map.FindByName(c.Name, f.ChildEntity); obj != nil {
+			r.Fault_ = Fault("", &types.DuplicateName{
+				Name:   c.Name,
+				Object: f.Self,
+			})
+
+			return r
+		}
+
 		folder := &Folder{}
 
 		folder.Name = c.Name
 		folder.ChildType = f.ChildType
 
-		f.putChild(folder)
+		folderPutChild(ctx, &f.Folder, folder)
 
 		r.Res = &types.CreateFolderResponse{
 			Returnval: folder.Self,
@@ -169,10 +229,19 @@ type StoragePod struct {
 	mo.StoragePod
 }
 
-func (f *Folder) CreateStoragePod(c *types.CreateStoragePod) soap.HasFault {
+func (f *Folder) CreateStoragePod(ctx *Context, c *types.CreateStoragePod) soap.HasFault {
 	r := &methods.CreateStoragePodBody{}
 
-	if f.hasChildType("StoragePod") {
+	if folderHasChildType(&f.Folder, "StoragePod") {
+		if obj := Map.FindByName(c.Name, f.ChildEntity); obj != nil {
+			r.Fault_ = Fault("", &types.DuplicateName{
+				Name:   c.Name,
+				Object: f.Self,
+			})
+
+			return r
+		}
+
 		pod := &StoragePod{}
 
 		pod.Name = c.Name
@@ -181,7 +250,7 @@ func (f *Folder) CreateStoragePod(c *types.CreateStoragePod) soap.HasFault {
 		pod.PodStorageDrsEntry = new(types.PodStorageDrsEntry)
 		pod.PodStorageDrsEntry.StorageDrsConfig.PodConfig.Enabled = true
 
-		f.putChild(pod)
+		folderPutChild(ctx, &f.Folder, pod)
 
 		r.Res = &types.CreateStoragePodResponse{
 			Returnval: pod.Self,
@@ -193,20 +262,34 @@ func (f *Folder) CreateStoragePod(c *types.CreateStoragePod) soap.HasFault {
 	return r
 }
 
-func (p *StoragePod) MoveIntoFolderTask(c *types.MoveIntoFolder_Task) soap.HasFault {
-	f := &Folder{Folder: p.Folder}
-	res := f.MoveIntoFolderTask(c)
-	p.ChildEntity = append(p.ChildEntity, f.ChildEntity...)
-	return res
+func (p *StoragePod) MoveIntoFolderTask(ctx *Context, c *types.MoveIntoFolder_Task) soap.HasFault {
+	task := CreateTask(p, "moveIntoFolder", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		f := &Folder{Folder: p.Folder}
+		id := f.MoveIntoFolderTask(ctx, c).(*methods.MoveIntoFolder_TaskBody).Res.Returnval
+		ftask := Map.Get(id).(*Task)
+		ftask.Wait()
+		if ftask.Info.Error != nil {
+			return nil, ftask.Info.Error.Fault
+		}
+		p.ChildEntity = append(p.ChildEntity, f.ChildEntity...)
+		return nil, nil
+	})
+	return &methods.MoveIntoFolder_TaskBody{
+		Res: &types.MoveIntoFolder_TaskResponse{
+			Returnval: task.Run(ctx),
+		},
+	}
 }
 
 func (f *Folder) CreateDatacenter(ctx *Context, c *types.CreateDatacenter) soap.HasFault {
 	r := &methods.CreateDatacenterBody{}
 
-	if f.hasChildType("Datacenter") && f.hasChildType("Folder") {
-		dc := NewDatacenter(f)
+	if folderHasChildType(&f.Folder, "Datacenter") && folderHasChildType(&f.Folder, "Folder") {
+		dc := NewDatacenter(ctx, &f.Folder)
 
-		dc.Name = c.Name
+		Map.Update(dc, []types.PropertyChange{
+			{Name: "name", Val: c.Name},
+		})
 
 		r.Res = &types.CreateDatacenterResponse{
 			Returnval: dc.Self,
@@ -218,7 +301,7 @@ func (f *Folder) CreateDatacenter(ctx *Context, c *types.CreateDatacenter) soap.
 					Datacenter: datacenterEventArgument(dc),
 				},
 			},
-			Parent: f.eventArgument(),
+			Parent: folderEventArgument(&f.Folder),
 		})
 	} else {
 		r.Fault_ = f.typeNotSupported()
@@ -227,11 +310,11 @@ func (f *Folder) CreateDatacenter(ctx *Context, c *types.CreateDatacenter) soap.
 	return r
 }
 
-func (f *Folder) CreateClusterEx(c *types.CreateClusterEx) soap.HasFault {
+func (f *Folder) CreateClusterEx(ctx *Context, c *types.CreateClusterEx) soap.HasFault {
 	r := &methods.CreateClusterExBody{}
 
-	if f.hasChildType("ComputeResource") && f.hasChildType("Folder") {
-		cluster, err := CreateClusterComputeResource(f, c.Name, c.Spec)
+	if folderHasChildType(&f.Folder, "ComputeResource") && folderHasChildType(&f.Folder, "Folder") {
+		cluster, err := CreateClusterComputeResource(ctx, f, c.Name, c.Spec)
 		if err != nil {
 			r.Fault_ = Fault("", err)
 			return r
@@ -273,36 +356,39 @@ func hostsWithDatastore(hosts []types.ManagedObjectReference, path string) []typ
 }
 
 func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
-	vm, err := NewVirtualMachine(c.Folder.Self, &c.req.Config)
+	vm, err := NewVirtualMachine(c.ctx, c.Folder.Self, &c.req.Config)
 	if err != nil {
-		c.Folder.removeChild(vm)
+		folderRemoveChild(c.ctx, &c.Folder.Folder, vm)
 		return nil, err
 	}
 
 	vm.ResourcePool = &c.req.Pool
 
 	if c.req.Host == nil {
-		var hosts []types.ManagedObjectReference
-
 		pool := Map.Get(c.req.Pool).(mo.Entity)
+		cr := Map.getEntityComputeResource(pool)
 
-		switch cr := Map.getEntityComputeResource(pool).(type) {
-		case *mo.ComputeResource:
-			hosts = cr.Host
-		case *ClusterComputeResource:
-			hosts = cr.Host
-		}
+		c.ctx.WithLock(cr, func() {
+			var hosts []types.ManagedObjectReference
+			switch cr := cr.(type) {
+			case *mo.ComputeResource:
+				hosts = cr.Host
+			case *ClusterComputeResource:
+				hosts = cr.Host
+			}
 
-		hosts = hostsWithDatastore(hosts, c.req.Config.Files.VmPathName)
-		host := hosts[rand.Intn(len(hosts))]
-		vm.Runtime.Host = &host
+			hosts = hostsWithDatastore(hosts, c.req.Config.Files.VmPathName)
+			host := hosts[rand.Intn(len(hosts))]
+			vm.Runtime.Host = &host
+		})
 	} else {
 		vm.Runtime.Host = c.req.Host
 	}
 
 	vm.Guest = &types.GuestInfo{
-		ToolsStatus:  types.VirtualMachineToolsStatusToolsNotInstalled,
-		ToolsVersion: "0",
+		ToolsStatus:        types.VirtualMachineToolsStatusToolsNotInstalled,
+		ToolsVersion:       "0",
+		ToolsRunningStatus: string(types.VirtualMachineToolsRunningStatusGuestToolsNotRunning),
 	}
 
 	vm.Summary.Guest = &types.VirtualMachineGuestSummary{
@@ -311,29 +397,29 @@ func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 	vm.Summary.Config.VmPathName = vm.Config.Files.VmPathName
 	vm.Summary.Runtime.Host = vm.Runtime.Host
 
-	err = vm.create(&c.req.Config, c.register)
+	err = vm.create(c.ctx, &c.req.Config, c.register)
 	if err != nil {
-		c.Folder.removeChild(vm)
+		folderRemoveChild(c.ctx, &c.Folder.Folder, vm)
 		return nil, err
 	}
 
 	host := Map.Get(*vm.Runtime.Host).(*HostSystem)
-	Map.AppendReference(host, &host.Vm, vm.Self)
+	Map.AppendReference(c.ctx, host, &host.Vm, vm.Self)
 	vm.EnvironmentBrowser = *hostParent(&host.HostSystem).EnvironmentBrowser
 
 	for i := range vm.Datastore {
 		ds := Map.Get(vm.Datastore[i]).(*Datastore)
-		Map.AppendReference(ds, &ds.Vm, vm.Self)
+		Map.AppendReference(c.ctx, ds, &ds.Vm, vm.Self)
 	}
 
 	pool := Map.Get(*vm.ResourcePool)
 	// This can be an internal call from VirtualApp.CreateChildVMTask, where pool is already locked.
 	c.ctx.WithLock(pool, func() {
-		switch rp := pool.(type) {
-		case *ResourcePool:
+		if rp, ok := asResourcePoolMO(pool); ok {
 			rp.Vm = append(rp.Vm, vm.Self)
-		case *VirtualApp:
-			rp.Vm = append(rp.Vm, vm.Self)
+		}
+		if vapp, ok := pool.(*VirtualApp); ok {
+			vapp.Vm = append(vapp.Vm, vm.Self)
 		}
 	})
 
@@ -358,13 +444,17 @@ func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 
 	vm.RefreshStorageInfo(c.ctx, nil)
 
+	Map.Update(vm, []types.PropertyChange{
+		{Name: "name", Val: c.req.Config.Name},
+	})
+
 	return vm.Reference(), nil
 }
 
 func (f *Folder) CreateVMTask(ctx *Context, c *types.CreateVM_Task) soap.HasFault {
 	return &methods.CreateVM_TaskBody{
 		Res: &types.CreateVM_TaskResponse{
-			Returnval: NewTask(&createVM{f, ctx, c, false}).Run(),
+			Returnval: NewTask(&createVM{f, ctx, c, false}).Run(ctx),
 		},
 	}
 }
@@ -435,7 +525,7 @@ func (c *registerVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 		},
 	})
 
-	create.Run()
+	create.RunBlocking(c.ctx)
 
 	if create.Info.Error != nil {
 		return nil, create.Info.Error.Fault
@@ -445,28 +535,26 @@ func (c *registerVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 }
 
 func (f *Folder) RegisterVMTask(ctx *Context, c *types.RegisterVM_Task) soap.HasFault {
-	ctx.Caller = &f.Self
-
 	return &methods.RegisterVM_TaskBody{
 		Res: &types.RegisterVM_TaskResponse{
-			Returnval: NewTask(&registerVM{f, ctx, c}).Run(),
+			Returnval: NewTask(&registerVM{f, ctx, c}).Run(ctx),
 		},
 	}
 }
 
-func (f *Folder) MoveIntoFolderTask(c *types.MoveIntoFolder_Task) soap.HasFault {
+func (f *Folder) MoveIntoFolderTask(ctx *Context, c *types.MoveIntoFolder_Task) soap.HasFault {
 	task := CreateTask(f, "moveIntoFolder", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		for _, ref := range c.List {
 			obj := Map.Get(ref).(mo.Entity)
 
 			parent, ok := Map.Get(*(obj.Entity()).Parent).(*Folder)
 
-			if !ok || !f.hasChildType(ref.Type) {
+			if !ok || !folderHasChildType(&f.Folder, ref.Type) {
 				return nil, &types.NotSupported{}
 			}
 
-			parent.removeChild(ref)
-			f.putChild(obj)
+			folderRemoveChild(ctx, &parent.Folder, ref)
+			folderPutChild(ctx, &f.Folder, obj)
 		}
 
 		return nil, nil
@@ -474,12 +562,12 @@ func (f *Folder) MoveIntoFolderTask(c *types.MoveIntoFolder_Task) soap.HasFault 
 
 	return &methods.MoveIntoFolder_TaskBody{
 		Res: &types.MoveIntoFolder_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
+func (f *Folder) CreateDVSTask(ctx *Context, req *types.CreateDVS_Task) soap.HasFault {
 	task := CreateTask(f, "createDVS", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		spec := req.Spec.ConfigSpec.GetDVSConfigSpec()
 		dvs := &DistributedVirtualSwitch{}
@@ -490,9 +578,9 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 			return nil, &types.InvalidArgument{InvalidProperty: "name"}
 		}
 
-		dvs.Uuid = uuid.New().String()
+		dvs.Uuid = newUUID(dvs.Name)
 
-		f.putChild(dvs)
+		folderPutChild(ctx, &f.Folder, dvs)
 
 		dvs.Summary = types.DVSSummary{
 			Name:        dvs.Name,
@@ -540,12 +628,27 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 			}
 		}
 
-		dvs.AddDVPortgroupTask(&types.AddDVPortgroup_Task{
+		dvs.AddDVPortgroupTask(ctx, &types.AddDVPortgroup_Task{
 			Spec: []types.DVPortgroupConfigSpec{{
 				Name: dvs.Name + "-DVUplinks" + strings.TrimPrefix(dvs.Self.Value, "dvs"),
+				Type: string(types.DistributedVirtualPortgroupPortgroupTypeEarlyBinding),
 				DefaultPortConfig: &types.VMwareDVSPortSetting{
 					Vlan: &types.VmwareDistributedVirtualSwitchTrunkVlanSpec{
 						VlanId: []types.NumericRange{{Start: 0, End: 4094}},
+					},
+					UplinkTeamingPolicy: &types.VmwareUplinkPortTeamingPolicy{
+						Policy: &types.StringPolicy{
+							Value: "loadbalance_srcid",
+						},
+						ReversePolicy: &types.BoolPolicy{
+							Value: types.NewBool(true),
+						},
+						NotifySwitches: &types.BoolPolicy{
+							Value: types.NewBool(true),
+						},
+						RollingOrder: &types.BoolPolicy{
+							Value: types.NewBool(true),
+						},
 					},
 				},
 			}},
@@ -556,16 +659,16 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 
 	return &methods.CreateDVS_TaskBody{
 		Res: &types.CreateDVS_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (f *Folder) RenameTask(r *types.Rename_Task) soap.HasFault {
-	return RenameTask(f, r)
+func (f *Folder) RenameTask(ctx *Context, r *types.Rename_Task) soap.HasFault {
+	return RenameTask(ctx, f, r)
 }
 
-func (f *Folder) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+func (f *Folder) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
 	type destroyer interface {
 		mo.Reference
 		DestroyTask(*types.Destroy_Task) soap.HasFault
@@ -580,12 +683,13 @@ func (f *Folder) DestroyTask(req *types.Destroy_Task) soap.HasFault {
 			}
 
 			var fault types.BaseMethodFault
-			Map.WithLock(obj, func() {
+			ctx.WithLock(obj, func() {
 				id := obj.DestroyTask(&types.Destroy_Task{
 					This: c,
 				}).(*methods.Destroy_TaskBody).Res.Returnval
 
 				t := Map.Get(id).(*Task)
+				t.Wait()
 				if t.Info.Error != nil {
 					fault = t.Info.Error.Fault // For example, can't destroy a powered on VM
 				}
@@ -596,13 +700,13 @@ func (f *Folder) DestroyTask(req *types.Destroy_Task) soap.HasFault {
 		}
 
 		// Remove the folder itself
-		Map.Get(*f.Parent).(*Folder).removeChild(f.Self)
+		folderRemoveChild(ctx, &Map.Get(*f.Parent).(*Folder).Folder, f.Self)
 		return nil, nil
 	})
 
 	return &methods.Destroy_TaskBody{
 		Res: &types.Destroy_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }

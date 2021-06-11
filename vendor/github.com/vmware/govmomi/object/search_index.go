@@ -161,3 +161,88 @@ func (s SearchIndex) FindChild(ctx context.Context, entity Reference, name strin
 	}
 	return NewReference(s.c, *res.Returnval), nil
 }
+
+// FindAllByDnsName finds all virtual machines or hosts by DNS name.
+func (s SearchIndex) FindAllByDnsName(ctx context.Context, dc *Datacenter, dnsName string, vmSearch bool) ([]Reference, error) {
+	req := types.FindAllByDnsName{
+		This:     s.Reference(),
+		DnsName:  dnsName,
+		VmSearch: vmSearch,
+	}
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.FindAllByDnsName(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Returnval) == 0 {
+		return nil, nil
+	}
+
+	var references []Reference
+	for _, returnval := range res.Returnval {
+		references = append(references, NewReference(s.c, returnval))
+	}
+	return references, nil
+}
+
+// FindAllByIp finds all virtual machines or hosts by IP address.
+func (s SearchIndex) FindAllByIp(ctx context.Context, dc *Datacenter, ip string, vmSearch bool) ([]Reference, error) {
+	req := types.FindAllByIp{
+		This:     s.Reference(),
+		Ip:       ip,
+		VmSearch: vmSearch,
+	}
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.FindAllByIp(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Returnval) == 0 {
+		return nil, nil
+	}
+
+	var references []Reference
+	for _, returnval := range res.Returnval {
+		references = append(references, NewReference(s.c, returnval))
+	}
+	return references, nil
+}
+
+// FindAllByUuid finds all virtual machines or hosts by UUID.
+func (s SearchIndex) FindAllByUuid(ctx context.Context, dc *Datacenter, uuid string, vmSearch bool, instanceUuid *bool) ([]Reference, error) {
+	req := types.FindAllByUuid{
+		This:         s.Reference(),
+		Uuid:         uuid,
+		VmSearch:     vmSearch,
+		InstanceUuid: instanceUuid,
+	}
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.FindAllByUuid(ctx, s.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Returnval) == 0 {
+		return nil, nil
+	}
+
+	var references []Reference
+	for _, returnval := range res.Returnval {
+		references = append(references, NewReference(s.c, returnval))
+	}
+	return references, nil
+}

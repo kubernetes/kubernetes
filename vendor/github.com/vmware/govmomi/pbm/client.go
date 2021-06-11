@@ -43,6 +43,8 @@ type Client struct {
 	*soap.Client
 
 	ServiceContent types.PbmServiceInstanceContent
+
+	RoundTripper soap.RoundTripper
 }
 
 func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
@@ -57,7 +59,12 @@ func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{sc, res.Returnval}, nil
+	return &Client{sc, res.Returnval, sc}, nil
+}
+
+// RoundTrip dispatches to the RoundTripper field.
+func (c *Client) RoundTrip(ctx context.Context, req, res soap.HasFault) error {
+	return c.RoundTripper.RoundTrip(ctx, req, res)
 }
 
 func (c *Client) QueryProfile(ctx context.Context, rtype types.PbmProfileResourceType, category string) ([]types.PbmProfileId, error) {
@@ -223,4 +230,58 @@ func (c *Client) ProfileIDByName(ctx context.Context, profileName string) (strin
 		}
 	}
 	return "", fmt.Errorf("no pbm profile found with name: %q", profileName)
+}
+
+func (c *Client) FetchCapabilityMetadata(ctx context.Context, rtype *types.PbmProfileResourceType, vendorUuid string) ([]types.PbmCapabilityMetadataPerCategory, error) {
+	req := types.PbmFetchCapabilityMetadata{
+		This:         c.ServiceContent.ProfileManager,
+		ResourceType: rtype,
+		VendorUuid:   vendorUuid,
+	}
+
+	res, err := methods.PbmFetchCapabilityMetadata(ctx, c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (c *Client) FetchComplianceResult(ctx context.Context, entities []types.PbmServerObjectRef) ([]types.PbmComplianceResult, error) {
+	req := types.PbmFetchComplianceResult{
+		This:     c.ServiceContent.ComplianceManager,
+		Entities: entities,
+	}
+
+	res, err := methods.PbmFetchComplianceResult(ctx, c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+// GetProfileNameByID gets storage profile name by ID
+func (c *Client) GetProfileNameByID(ctx context.Context, profileID string) (string, error) {
+	resourceType := types.PbmProfileResourceType{
+		ResourceType: string(types.PbmProfileResourceTypeEnumSTORAGE),
+	}
+	category := types.PbmProfileCategoryEnumREQUIREMENT
+	ids, err := c.QueryProfile(ctx, resourceType, string(category))
+	if err != nil {
+		return "", err
+	}
+
+	profiles, err := c.RetrieveContent(ctx, ids)
+	if err != nil {
+		return "", err
+	}
+
+	for i := range profiles {
+		profile := profiles[i].GetPbmProfile()
+		if profile.ProfileId.UniqueId == profileID {
+			return profile.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no pbm profile found with id: %q", profileID)
 }

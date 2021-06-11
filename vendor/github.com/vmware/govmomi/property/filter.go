@@ -42,6 +42,9 @@ func (f Filter) Keys() []string {
 
 // MatchProperty returns true if a Filter entry matches the given prop.
 func (f Filter) MatchProperty(prop types.DynamicProperty) bool {
+	if prop.Val == nil {
+		return false
+	}
 	match, ok := f[prop.Name]
 	if !ok {
 		return false
@@ -74,7 +77,7 @@ func (f Filter) MatchProperty(prop types.DynamicProperty) bool {
 		}
 
 		// convert if we can
-		switch prop.Val.(type) {
+		switch val := prop.Val.(type) {
 		case bool:
 			match, _ = strconv.ParseBool(s)
 		case int16:
@@ -91,7 +94,9 @@ func (f Filter) MatchProperty(prop types.DynamicProperty) bool {
 		case float64:
 			match, _ = strconv.ParseFloat(s, 64)
 		case fmt.Stringer:
-			prop.Val = prop.Val.(fmt.Stringer).String()
+			prop.Val = val.String()
+		case *types.CustomFieldStringValue:
+			prop.Val = fmt.Sprintf("%d:%s", val.Key, val.Value)
 		default:
 			if ptype.Kind() != reflect.String {
 				return false

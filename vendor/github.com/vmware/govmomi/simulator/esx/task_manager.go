@@ -9735,7 +9735,7 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Retrieve Managed Method Executer",
-				Summary: "Retrieves a referemce to Managed Method Executer",
+				Summary: "Retrieves a reference to Managed Method Executer",
 			},
 			Key: "HostSystem.retrieveManagedMethodExecuter",
 		},
@@ -9819,7 +9819,7 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Query feature capabilities for vSphere Distributed Switch specification",
-				Summary: "Queries feature capabilites available for a given vSphere Distributed Switch specification",
+				Summary: "Queries feature capabilities available for a given vSphere Distributed Switch specification",
 			},
 			Key: "dvs.DistributedVirtualSwitchManager.queryFeatureCapability",
 		},

@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/esx"
 	"github.com/vmware/govmomi/simulator/vpx"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -54,35 +53,32 @@ type PerformanceManager struct {
 	metricData        map[string]map[int32][]int64
 }
 
-func NewPerformanceManager(ref types.ManagedObjectReference) object.Reference {
-	m := &PerformanceManager{}
-	m.Self = ref
-	if Map.IsESX() {
-		m.PerfCounter = esx.PerfCounter[:]
-		m.hostMetrics = esx.HostMetrics[:]
-		m.vmMetrics = esx.VmMetrics[:]
-		m.rpMetrics = esx.ResourcePoolMetrics[:]
+func (m *PerformanceManager) init(r *Registry) {
+	if r.IsESX() {
+		m.PerfCounter = esx.PerfCounter
+		m.hostMetrics = esx.HostMetrics
+		m.vmMetrics = esx.VmMetrics
+		m.rpMetrics = esx.ResourcePoolMetrics
 		m.metricData = esx.MetricData
 	} else {
-		m.PerfCounter = vpx.PerfCounter[:]
-		m.hostMetrics = vpx.HostMetrics[:]
-		m.vmMetrics = vpx.VmMetrics[:]
-		m.rpMetrics = vpx.ResourcePoolMetrics[:]
-		m.clusterMetrics = vpx.ClusterMetrics[:]
-		m.datastoreMetrics = vpx.DatastoreMetrics[:]
-		m.datacenterMetrics = vpx.DatacenterMetrics[:]
+		m.PerfCounter = vpx.PerfCounter
+		m.hostMetrics = vpx.HostMetrics
+		m.vmMetrics = vpx.VmMetrics
+		m.rpMetrics = vpx.ResourcePoolMetrics
+		m.clusterMetrics = vpx.ClusterMetrics
+		m.datastoreMetrics = vpx.DatastoreMetrics
+		m.datacenterMetrics = vpx.DatacenterMetrics
 		m.metricData = vpx.MetricData
 	}
 	m.perfCounterIndex = make(map[int32]types.PerfCounterInfo, len(m.PerfCounter))
 	for _, p := range m.PerfCounter {
 		m.perfCounterIndex[p.Key] = p
 	}
-	return m
 }
 
 func (p *PerformanceManager) QueryPerfCounter(ctx *Context, req *types.QueryPerfCounter) soap.HasFault {
 	body := new(methods.QueryPerfCounterBody)
-	body.Req = req
+	body.Res = new(types.QueryPerfCounterResponse)
 	body.Res.Returnval = make([]types.PerfCounterInfo, len(req.CounterId))
 	for i, id := range req.CounterId {
 		if info, ok := p.perfCounterIndex[id]; !ok {
@@ -99,7 +95,6 @@ func (p *PerformanceManager) QueryPerfCounter(ctx *Context, req *types.QueryPerf
 
 func (p *PerformanceManager) QueryPerfProviderSummary(ctx *Context, req *types.QueryPerfProviderSummary) soap.HasFault {
 	body := new(methods.QueryPerfProviderSummaryBody)
-	body.Req = req
 	body.Res = new(types.QueryPerfProviderSummaryResponse)
 
 	// The entity must exist
@@ -173,7 +168,6 @@ func (p *PerformanceManager) queryAvailablePerfMetric(entity types.ManagedObject
 
 func (p *PerformanceManager) QueryAvailablePerfMetric(ctx *Context, req *types.QueryAvailablePerfMetric) soap.HasFault {
 	body := new(methods.QueryAvailablePerfMetricBody)
-	body.Req = req
 	body.Res = p.queryAvailablePerfMetric(req.Entity, req.IntervalId)
 
 	return body
@@ -181,7 +175,6 @@ func (p *PerformanceManager) QueryAvailablePerfMetric(ctx *Context, req *types.Q
 
 func (p *PerformanceManager) QueryPerf(ctx *Context, req *types.QueryPerf) soap.HasFault {
 	body := new(methods.QueryPerfBody)
-	body.Req = req
 	body.Res = new(types.QueryPerfResponse)
 	body.Res.Returnval = make([]types.BasePerfEntityMetricBase, len(req.QuerySpec))
 

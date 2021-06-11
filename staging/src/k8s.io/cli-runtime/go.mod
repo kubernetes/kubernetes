@@ -7,7 +7,10 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.11.0+incompatible
-	github.com/google/uuid v1.1.2
+	github.com/go-openapi/jsonpointer v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/google/uuid v1.2.0
 	github.com/googleapis/gnostic v0.5.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/spf13/cobra v1.1.1
@@ -24,6 +27,10 @@ require (
 )
 
 replace (
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/google/uuid => github.com/google/uuid v1.1.2
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

@@ -83,14 +83,21 @@ func (h HostSystem) ManagementIPs(ctx context.Context) ([]net.IP, error) {
 
 	var ips []net.IP
 	for _, nc := range mh.Config.VirtualNicManagerInfo.NetConfig {
-		if nc.NicType == "management" && len(nc.CandidateVnic) > 0 {
-			ip := net.ParseIP(nc.CandidateVnic[0].Spec.Ip.IpAddress)
-			if ip != nil {
-				ips = append(ips, ip)
+		if nc.NicType != string(types.HostVirtualNicManagerNicTypeManagement) {
+			continue
+		}
+		for ix := range nc.CandidateVnic {
+			for _, selectedVnicKey := range nc.SelectedVnic {
+				if nc.CandidateVnic[ix].Key != selectedVnicKey {
+					continue
+				}
+				ip := net.ParseIP(nc.CandidateVnic[ix].Spec.Ip.IpAddress)
+				if ip != nil {
+					ips = append(ips, ip)
+				}
 			}
 		}
 	}
-
 	return ips, nil
 }
 

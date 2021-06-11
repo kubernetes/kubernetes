@@ -5,48 +5,86 @@
 
 Abhijeet Kasurde <akasurde@redhat.com>
 abrarshivani <abrarshivani@users.noreply.github.com>
+Adam Chalkley <atc0005@users.noreply.github.com>
 Adam Shannon <adamkshannon@gmail.com>
+Al Biheiri <abiheiri@apple.com>
 Alessandro Cortiana <alessandro.cortiana@gmail.com>
+Alex <puzo2002@gmail.com>
 Alex Bozhenko <alexbozhenko@fb.com>
 Alex Ellis (VMware) <alexellis2@gmail.com>
+Aligator <8278538+yet-another-aligator@users.noreply.github.com>
 Alvaro Miranda <kikitux@gmail.com>
 Amanda H. L. de Andrade <amanda.andrade@serpro.gov.br>
+amanpaha <amanpahariya@microsoft.com>
 Amit Bathla <abathla@.vmware.com>
 amit bezalel <amit.bezalel@hpe.com>
 Andrew <AndrewDi@users.noreply.github.com>
 Andrew Chin <andrew@andrewtchin.com>
 Andrew Kutz <akutz@vmware.com>
+Andrey Klimentyev <andrey.klimentyev@flant.com>
 Anfernee Yongkun Gui <agui@vmware.com>
 angystardust <angystardust@users.noreply.github.com>
 aniketGslab <aniket.shinde@gslab.com>
+Ankit Vaidya <vaidyaa@vmware.com>
+Anna Carrigan <anna.carrigan@hpe.com>
+Ariel Chinn <arielchinn@gmail.com>
 Arran Walker <arran.walker@zopa.com>
+Artem Anisimov <aanisimov@inbox.ru>
+Arunesh Pandey <parunesh@vmware.com>
 Aryeh Weinreb <aryehweinreb@gmail.com>
+Augy StClair <augy@google.com>
 Austin Parker <aparker@apprenda.com>
 Balu Dontu <bdontu@vmware.com>
 bastienbc <bastien.barbe.creuly@gmail.com>
+Ben Corrie <bcorrie@vmware.com>
+Ben Vickers <bvickers@pivotal.io>
+Benjamin Davini <davinib@vmware.com>
+Benjamin Peterson <benjamin@python.org>
+Bhavya Choudhary <bhavyac@vmware.com>
 Bob Killen <killen.bob@gmail.com>
 Brad Fitzpatrick <bradfitz@golang.org>
+brian57860 <brian57860@users.noreply.github.com>
 Bruce Downs <bruceadowns@gmail.com>
-Cédric Blomart <cblomart@gmail.com>
+Cheng Cheng <chengch@vmware.com>
+Chethan Venkatesh <chethanv@vmware.com>
 Chris Marchesi <chrism@vancluevertech.com>
 Christian Höltje <docwhat@gerf.org>
 Clint Greenwood <cgreenwood@vmware.com>
+cpiment <pimentel.carlos@gmail.com>
 CuiHaozhi <cuihaozhi@chinacloud.com.cn>
+Cédric Blomart <cblomart@gmail.com>
+Dan Ilan <danilan@google.com>
+Dan Norris <protochron@users.noreply.github.com>
+Daniel Frederick Crisman <daniel@crisman.org>
+Daniel Mueller <deso@posteo.net>
 Danny Lockard <danny.lockard@banno.com>
+Dave Gress <gressd@vmware.com>
+Dave Smith-Uchida <dsmithuchida@vmware.com>
 Dave Tucker <dave@dtucker.co.uk>
-Davide Agnello <dagnello@hp.com>
+David Gress <gressd@vmware.com>
 David Stark <dave@davidstark.name>
+Davide Agnello <dagnello@hp.com>
 Davinder Kumar <davinderk@vmware.com>
+demarey <christophe.demarey@inria.fr>
+dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
 Deric Crago <deric.crago@gmail.com>
+Divyen Patel <divyenp@vmware.com>
+Dnyanesh Gate <dnyanesh.gate@druva.com>
 Doug MacEachern <dougm@vmware.com>
+East <60801291+houfangdong@users.noreply.github.com>
 Eloy Coto <eloy.coto@gmail.com>
+Eric Edens <ericedens@google.com>
+Eric Graham <16710890+Pheric@users.noreply.github.com>
 Eric Gray <egray@vmware.com>
 Eric Yutao <eric.yutao@gmail.com>
 Erik Hollensbe <github@hollensbe.org>
 Ethan Kaley <ethan.kaley@emc.com>
+Evan Chu <echu@vmware.com>
 Fabio Rapposelli <fabio@vmware.com>
-Faiyaz Ahmed <ahmedf@vmware.com>
+Faiyaz Ahmed <faiyaza@vmware.com>
+Federico Pellegatta <12744504+federico-pellegatta@users.noreply.github.com>
 forkbomber <forkbomber@users.noreply.github.com>
+François Rigault <rigault.francois@gmail.com>
 freebsdly <qinhuajun@outlook.com>
 Gavin Gray <gavin@infinio.com>
 Gavrie Philipson <gavrie.philipson@elastifile.com>
@@ -54,55 +92,114 @@ George Hicken <ghicken@vmware.com>
 Gerrit Renker <Gerrit.Renker@ctl.io>
 gthombare <gthombare@vmware.com>
 Hasan Mahmood <mahmoodh@vmware.com>
+Heiko Reese <hreese@users.noreply.github.com>
 Henrik Hodne <henrik@travis-ci.com>
+hkumar <hkumar@vmware.com>
+hui luo <luoh@vmware.com>
+Ian Eyberg <ian@deferpanic.com>
 Isaac Rodman <isaac@eyz.us>
+Ivan Mikushin <imikushin@vmware.com>
 Ivan Porto Carrero <icarrero@vmware.com>
 James King <james.king@emc.com>
+James Peach <jpeach@vmware.com>
 Jason Kincl <jkincl@gmail.com>
 Jeremy Canady <jcanady@jackhenry.com>
 jeremy-clerc <jeremy@clerc.io>
 Jiatong Wang <wjiatong@vmware.com>
-João Pereira <joaodrp@gmail.com>
+jingyizPensando <jingyiz@pensando.io>
 Jonas Ausevicius <jonas.ausevicius@virtustream.com>
 Jorge Sevilla <jorge.sevilla@rstor.io>
+João Pereira <joaodrp@gmail.com>
+Justin J. Novack <jnovack@users.noreply.github.com>
 kayrus <kay.diam@gmail.com>
 Kevin George <georgek@vmware.com>
+Knappek <andy.knapp.ak@gmail.com>
+Leslie Wang <qiwa@pensando.io>
 leslie-qiwa <leslie.qiwa@gmail.com>
+Lintong Jiang <lintongj@vmware.com>
+Liping Xue <lipingx@vmware.com>
 Louie Jiang <jiangl@vmware.com>
+Luther Monson <luther.monson@gmail.com>
+Madanagopal Arunachalam <marunachalam@vmware.com>
 maplain <fangyuanl@vmware.com>
 Marc Carmier <mcarmier@gmail.com>
+Marcus Tan <marcus.tan@rubrik.com>
 Maria Ntalla <maria.ntalla@gmail.com>
 Marin Atanasov Nikolov <mnikolov@vmware.com>
+Mario Trangoni <mjtrangoni@gmail.com>
+Mark Peek <markpeek@vmware.com>
 Matt Clay <matt@mystile.com>
-Matthew Cosgrove <matthew.cosgrove@dell.com>
+Matt Moore <mattmoor@vmware.com>
 Matt Moriarity <matt@mattmoriarity.com>
+Matthew Cosgrove <matthew.cosgrove@dell.com>
+mbhadale <mbhadale@vmware.com>
+Merlijn Sebrechts <merlijn.sebrechts@gmail.com>
 Mevan Samaratunga <mevansam@gmail.com>
+Michael Gasch <mgasch@vmware.com>
 Michal Jankowski <mjankowski@vmware.com>
+Mincho Tonev <mtonev@vmware.com>
 mingwei <mingwei@smartx.com>
 Nicolas Lamirault <nicolas.lamirault@gmail.com>
+Nikhil Kathare <nikhil.kathare@netapp.com>
 Omar Kohl <omarkohl@gmail.com>
 Parham Alvani <parham.alvani@gmail.com>
+Parveen Chahal <parkuma@microsoft.com>
 Pierre Gronlier <pierre.gronlier@corp.ovh.com>
 Pieter Noordhuis <pnoordhuis@vmware.com>
 prydin <prydin@vmware.com>
+rHermes <teodor_spaeren@riseup.net>
 Rowan Jacobs <rojacobs@pivotal.io>
+rsikdar <rsikdar@berkeley.edu>
 runner.mei <runner.mei@gmail.com>
 S.Çağlar Onur <conur@vmware.com>
+Saad Malik <saad@spectrocloud.com>
+Sandeep Pissay Srinivasa Rao <ssrinivas@vmware.com>
+Scott Holden <scott@nullops.io>
 Sergey Ignatov <sergey.ignatov@jetbrains.com>
+serokles <timbo.alexander@gmail.com>
+shahra <shahra@vmware.com>
+Shalini Bhaskara <sbhaskara@vmware.com>
+Shaozhen Ding <dsz0111@gmail.com>
+Shawn Neal <sneal@sneal.net>
+shylasrinivas <sshyla@vmware.com>
+sky-joker <sky.jokerxx@gmail.com>
+Sten Feldman <exile@chamber.ee>
+Stepan Mazurov <smazurov@gmail.com>
 Steve Purcell <steve@sanityinc.com>
+SUMIT AGRAWAL <asumit@vmware.com>
 Takaaki Furukawa <takaaki.frkw@gmail.com>
 Tamas Eger <tamas.eger@bitrise.io>
+Tanay Kothari <tkothari@vmware.com>
 tanishi <tanishi503@gmail.com>
 Ted Zlatanov <tzz@lifelogs.com>
+Thad Craft <tcraft@pivotal.io>
 Thibaut Ackermann <thibaut.ackermann@alcatel-lucent.com>
+Tim McNamara <tim.mcnamara@canonical.com>
+Tjeu Kayim <15987676+TjeuKayim@users.noreply.github.com>
+Toomas Pelberg <toomas.pelberg@playtech.com>
 Trevor Dawe <trevor.dawe@gmail.com>
+tshihad <tshihad9@gmail.com>
 Uwe Bessle <Uwe.Bessle@iteratec.de>
 Vadim Egorov <vegorov@vmware.com>
 Vikram Krishnamurthy <vikramkrishnamu@vmware.com>
+volanja <volaaanja@gmail.com>
 Volodymyr Bobyr <pupsua@gmail.com>
+Waldek Maleska <w.maleska@gmail.com>
+William Lam <wlam@vmware.com>
 Witold Krecicki <wpk@culm.net>
+xing-yang <xingyang105@gmail.com>
 Yang Yang <yangy@vmware.com>
+yangxi <yangxi@vmware.com>
+Yann Hodique <yhodique@google.com>
+Yash Nitin Desai <desaiy@vmware.com>
+Yassine TIJANI <ytijani@vmware.com>
+yiyingy <yiyingy@vmware.com>
+ykakarap <yuva2811@gmail.com>
+Yogesh Sobale <6104071+ysobale@users.noreply.github.com>
+Yun Zhou <yunz@vmware.com>
 Yuya Kusakabe <yuya.kusakabe@gmail.com>
-Zacharias Taubert <zacharias.taubert@gmail.com>
 Zach Tucker <ztucker@vmware.com>
+Zacharias Taubert <zacharias.taubert@gmail.com>
 Zee Yang <zeey@vmware.com>
+zyuxin <zyuxin@vmware.com>
+Кузаков Евгений <kuzakov@satel.org>

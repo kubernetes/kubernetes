@@ -17,7 +17,6 @@ limitations under the License.
 package simulator
 
 import (
-	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -28,13 +27,6 @@ import (
 
 type HostLocalAccountManager struct {
 	mo.HostLocalAccountManager
-}
-
-func NewHostLocalAccountManager(ref types.ManagedObjectReference) object.Reference {
-	m := &HostLocalAccountManager{}
-	m.Self = ref
-
-	return m
 }
 
 func (h *HostLocalAccountManager) CreateUser(req *types.CreateUser) soap.HasFault {

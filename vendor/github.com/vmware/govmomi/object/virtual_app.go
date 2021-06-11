@@ -103,3 +103,19 @@ func (p VirtualApp) Suspend(ctx context.Context) (*Task, error) {
 
 	return NewTask(p.c, res.Returnval), nil
 }
+
+func (p VirtualApp) Clone(ctx context.Context, name string, target types.ManagedObjectReference, spec types.VAppCloneSpec) (*Task, error) {
+	req := types.CloneVApp_Task{
+		This:   p.Reference(),
+		Name:   name,
+		Target: target,
+		Spec:   spec,
+	}
+
+	res, err := methods.CloneVApp_Task(ctx, p.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(p.c, res.Returnval), nil
+}

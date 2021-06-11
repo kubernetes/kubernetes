@@ -24,7 +24,7 @@ require (
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
-	github.com/vmware/govmomi v0.20.3
+	github.com/vmware/govmomi v0.26.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.20.0
@@ -44,6 +44,10 @@ require (
 )
 
 replace (
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/google/uuid => github.com/google/uuid v1.1.2
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

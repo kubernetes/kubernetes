@@ -19,16 +19,20 @@ package vim25
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"path"
 	"strings"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vim25/xml"
 )
 
 const (
 	Namespace = "vim25"
-	Version   = "6.7"
+	Version   = "7.0"
 	Path      = "/sdk"
 )
 
@@ -54,7 +58,7 @@ type Client struct {
 	RoundTripper soap.RoundTripper
 }
 
-// NewClient creates and returns a new client wirh the ServiceContent field
+// NewClient creates and returns a new client with the ServiceContent field
 // filled in.
 func NewClient(ctx context.Context, rt soap.RoundTripper) (*Client, error) {
 	c := Client{
@@ -67,7 +71,7 @@ func NewClient(ctx context.Context, rt soap.RoundTripper) (*Client, error) {
 
 		if c.Namespace == "" {
 			c.Namespace = "urn:" + Namespace
-		} else if strings.Index(c.Namespace, ":") < 0 {
+		} else if !strings.Contains(c.Namespace, ":") {
 			c.Namespace = "urn:" + c.Namespace // ensure valid URI format
 		}
 		if c.Version == "" {
@@ -82,6 +86,42 @@ func NewClient(ctx context.Context, rt soap.RoundTripper) (*Client, error) {
 	}
 
 	return &c, nil
+}
+
+// UseServiceVersion sets soap.Client.Version to the current version of the service endpoint via /sdk/vimServiceVersions.xml
+func (c *Client) UseServiceVersion(kind ...string) error {
+	ns := "vim"
+	if len(kind) != 0 {
+		ns = kind[0]
+	}
+
+	u := c.URL()
+	u.Path = path.Join(Path, ns+"ServiceVersions.xml")
+
+	res, err := c.Get(u.String())
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("http.Get(%s): %s", u.Path, err)
+	}
+
+	v := struct {
+		Namespace *string `xml:"namespace>name"`
+		Version   *string `xml:"namespace>version"`
+	}{
+		&c.Namespace,
+		&c.Version,
+	}
+
+	err = xml.NewDecoder(res.Body).Decode(&v)
+	_ = res.Body.Close()
+	if err != nil {
+		return fmt.Errorf("xml.Decode(%s): %s", u.Path, err)
+	}
+
+	return nil
 }
 
 // RoundTrip dispatches to the RoundTripper field.
@@ -138,6 +178,11 @@ func (c *Client) Valid() bool {
 	}
 
 	return true
+}
+
+// Path returns vim25.Path (see cache.Client)
+func (c *Client) Path() string {
+	return Path
 }
 
 // IsVC returns true if we are connected to a vCenter

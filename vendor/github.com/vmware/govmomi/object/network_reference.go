@@ -26,6 +26,6 @@ import (
 // which can be used as the backing for a VirtualEthernetCard.
 type NetworkReference interface {
 	Reference
-
+	GetInventoryPath() string
 	EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error)
 }

@@ -234,6 +234,24 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		FullFormat:  "Completed the relocation of the virtual machine",
 	},
 	{
+		Key:         "CustomizationFailed",
+		Description: "An error occurred during customization",
+		Category:    "info",
+		FullFormat:  "An error occurred during customization on VM {{.Vm.Name}}",
+	},
+	{
+		Key:         "CustomizationStartedEvent",
+		Description: "Started customization",
+		Category:    "info",
+		FullFormat:  "Started customization of VM {{.Vm.Name}}",
+	},
+	{
+		Key:         "CustomizationSucceeded",
+		Description: "Customization succeeded",
+		Category:    "info",
+		FullFormat:  "Customization of VM {{.Vm.Name}} succeeded",
+	},
+	{
 		Key:         "DrsVmMigratedEvent",
 		Description: "DRS VM migrated",
 		Category:    "info",

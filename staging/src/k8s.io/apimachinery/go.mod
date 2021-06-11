@@ -13,7 +13,7 @@ require (
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.4
 	github.com/google/gofuzz v1.1.0
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
 	github.com/googleapis/gnostic v0.5.1
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/json-iterator/go v1.1.10
@@ -39,4 +39,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/google/uuid => github.com/google/uuid v1.1.2
+	k8s.io/apimachinery => ../apimachinery
+)

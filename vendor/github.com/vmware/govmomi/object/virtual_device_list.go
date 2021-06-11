@@ -19,6 +19,7 @@ package object
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -67,7 +68,7 @@ func EthernetCardTypes() VirtualDeviceList {
 		&types.VirtualSriovEthernetCard{},
 	}).Select(func(device types.BaseVirtualDevice) bool {
 		c := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
-		c.GetVirtualDevice().Key = -1
+		c.GetVirtualDevice().Key = int32(rand.Uint32()) * -1
 		return true
 	})
 }
@@ -134,6 +135,9 @@ func (l VirtualDeviceList) SelectByBackingInfo(backing types.BaseVirtualDeviceBa
 			b := backing.(*types.VirtualEthernetCardDistributedVirtualPortBackingInfo)
 			return a.Port.SwitchUuid == b.Port.SwitchUuid &&
 				a.Port.PortgroupKey == b.Port.PortgroupKey
+		case *types.VirtualEthernetCardOpaqueNetworkBackingInfo:
+			b := backing.(*types.VirtualEthernetCardOpaqueNetworkBackingInfo)
+			return a.OpaqueNetworkId == b.OpaqueNetworkId
 		case *types.VirtualDiskFlatVer2BackingInfo:
 			b := backing.(*types.VirtualDiskFlatVer2BackingInfo)
 			if a.Parent != nil && b.Parent != nil {
@@ -229,8 +233,10 @@ func (l VirtualDeviceList) FindSCSIController(name string) (*types.VirtualSCSICo
 func (l VirtualDeviceList) CreateSCSIController(name string) (types.BaseVirtualDevice, error) {
 	ctypes := SCSIControllerTypes()
 
-	if name == "scsi" || name == "" {
+	if name == "" || name == "scsi" {
 		name = ctypes.Type(ctypes[0])
+	} else if name == "virtualscsi" {
+		name = "pvscsi" // ovf VirtualSCSI mapping
 	}
 
 	found := ctypes.Select(func(device types.BaseVirtualDevice) bool {
@@ -431,7 +437,7 @@ func (l VirtualDeviceList) AssignController(device types.BaseVirtualDevice, c ty
 	d.UnitNumber = new(int32)
 	*d.UnitNumber = l.newUnitNumber(c)
 	if d.Key == 0 {
-		d.Key = -1
+		d.Key = int32(rand.Uint32()) * -1
 	}
 }
 

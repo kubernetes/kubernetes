@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/vmware/govmomi/units"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -32,7 +33,7 @@ type HostDatastoreSystem struct {
 	Host *mo.HostSystem
 }
 
-func (dss *HostDatastoreSystem) add(ds *Datastore) *soap.Fault {
+func (dss *HostDatastoreSystem) add(ctx *Context, ds *Datastore) *soap.Fault {
 	info := ds.Info.GetDatastoreInfo()
 
 	info.Name = ds.Name
@@ -68,22 +69,40 @@ func (dss *HostDatastoreSystem) add(ds *Datastore) *soap.Fault {
 	ds.Summary.Datastore = &ds.Self
 	ds.Summary.Name = ds.Name
 	ds.Summary.Url = info.Url
+	ds.Capability = types.DatastoreCapability{
+		DirectoryHierarchySupported:      true,
+		RawDiskMappingsSupported:         false,
+		PerFileThinProvisioningSupported: true,
+		StorageIORMSupported:             types.NewBool(true),
+		NativeSnapshotSupported:          types.NewBool(false),
+		TopLevelDirectoryCreateSupported: types.NewBool(true),
+		SeSparseSupported:                types.NewBool(true),
+	}
 
 	dss.Datastore = append(dss.Datastore, ds.Self)
 	dss.Host.Datastore = dss.Datastore
 	parent := hostParent(dss.Host)
-	Map.AddReference(parent, &parent.Datastore, ds.Self)
+	Map.AddReference(ctx, parent, &parent.Datastore, ds.Self)
 
-	browser := &HostDatastoreBrowser{}
-	browser.Datastore = dss.Datastore
-	ds.Browser = Map.Put(browser).Reference()
+	if Map.Get(ds.Self) == nil {
+		browser := &HostDatastoreBrowser{}
+		browser.Datastore = dss.Datastore
+		ds.Browser = Map.Put(browser).Reference()
 
-	folder.putChild(ds)
+		ds.Summary.Capacity = int64(units.TB * 10)
+		ds.Summary.FreeSpace = ds.Summary.Capacity
+
+		info.FreeSpace = ds.Summary.FreeSpace
+		info.MaxMemoryFileSize = ds.Summary.Capacity
+		info.MaxFileSize = ds.Summary.Capacity
+
+		folderPutChild(ctx, folder, ds)
+	}
 
 	return nil
 }
 
-func (dss *HostDatastoreSystem) CreateLocalDatastore(c *types.CreateLocalDatastore) soap.HasFault {
+func (dss *HostDatastoreSystem) CreateLocalDatastore(ctx *Context, c *types.CreateLocalDatastore) soap.HasFault {
 	r := &methods.CreateLocalDatastoreBody{}
 
 	ds := &Datastore{}
@@ -98,9 +117,11 @@ func (dss *HostDatastoreSystem) CreateLocalDatastore(c *types.CreateLocalDatasto
 		Path: c.Path,
 	}
 
-	ds.Summary.Type = "local"
+	ds.Summary.Type = string(types.HostFileSystemVolumeFileSystemTypeOTHER)
+	ds.Summary.MaintenanceMode = string(types.DatastoreSummaryMaintenanceModeStateNormal)
+	ds.Summary.Accessible = true
 
-	if err := dss.add(ds); err != nil {
+	if err := dss.add(ctx, ds); err != nil {
 		r.Fault_ = err
 		return r
 	}
@@ -123,7 +144,7 @@ func (dss *HostDatastoreSystem) CreateLocalDatastore(c *types.CreateLocalDatasto
 	return r
 }
 
-func (dss *HostDatastoreSystem) CreateNasDatastore(c *types.CreateNasDatastore) soap.HasFault {
+func (dss *HostDatastoreSystem) CreateNasDatastore(ctx *Context, c *types.CreateNasDatastore) soap.HasFault {
 	r := &methods.CreateNasDatastoreBody{}
 
 	ds := &Datastore{}
@@ -145,8 +166,10 @@ func (dss *HostDatastoreSystem) CreateNasDatastore(c *types.CreateNasDatastore) 
 	}
 
 	ds.Summary.Type = c.Spec.Type
+	ds.Summary.MaintenanceMode = string(types.DatastoreSummaryMaintenanceModeStateNormal)
+	ds.Summary.Accessible = true
 
-	if err := dss.add(ds); err != nil {
+	if err := dss.add(ctx, ds); err != nil {
 		r.Fault_ = err
 		return r
 	}

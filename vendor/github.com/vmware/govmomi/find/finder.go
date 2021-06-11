@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2020 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/vmware/govmomi/internal"
 	"github.com/vmware/govmomi/list"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -38,14 +39,24 @@ type Finder struct {
 	folders *object.DatacenterFolders
 }
 
-func NewFinder(client *vim25.Client, all bool) *Finder {
+func NewFinder(client *vim25.Client, all ...bool) *Finder {
+	props := false
+	if len(all) == 1 {
+		props = all[0]
+	}
+
 	f := &Finder{
 		client: client,
 		si:     object.NewSearchIndex(client),
 		r: recurser{
 			Collector: property.DefaultCollector(client),
-			All:       all,
+			All:       props,
 		},
+	}
+
+	if len(all) == 0 {
+		// attempt to avoid SetDatacenter() requirement
+		f.dc, _ = f.DefaultDatacenter(context.Background())
 	}
 
 	return f
@@ -55,6 +66,18 @@ func (f *Finder) SetDatacenter(dc *object.Datacenter) *Finder {
 	f.dc = dc
 	f.folders = nil
 	return f
+}
+
+// InventoryPath composes the given object's inventory path.
+// There is no vSphere property or method that provides an inventory path directly.
+// This method uses the ManagedEntity.Parent field to determine the ancestry tree of the object and
+// the ManagedEntity.Name field for each ancestor to compose the path.
+func InventoryPath(ctx context.Context, client *vim25.Client, obj types.ManagedObjectReference) (string, error) {
+	entities, err := mo.Ancestors(ctx, client, client.ServiceContent.PropertyCollector, obj)
+	if err != nil {
+		return "", err
+	}
+	return internal.InventoryPath(entities), nil
 }
 
 // findRoot makes it possible to use "find" mode with a different root path.
@@ -93,8 +116,8 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 	isPath := strings.Contains(arg, "/")
 
 	root := list.Element{
-		Path:   "/",
 		Object: object.NewRootFolder(f.client),
+		Path:   "/",
 	}
 
 	parts := list.ToParts(arg)
@@ -109,19 +132,10 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 				return nil, err
 			}
 
-			mes, err := mo.Ancestors(ctx, f.client, f.client.ServiceContent.PropertyCollector, pivot.Reference())
+			root.Path, err = InventoryPath(ctx, f.client, pivot.Reference())
 			if err != nil {
 				return nil, err
 			}
-
-			for _, me := range mes {
-				// Skip root entity in building inventory path.
-				if me.Parent == nil {
-					continue
-				}
-				root.Path = path.Join(root.Path, me.Name)
-			}
-
 			root.Object = pivot
 			parts = parts[1:]
 		}
@@ -253,7 +267,7 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, in
 		fn = f.dcReference
 	}
 
-	if len(path) == 0 {
+	if path == "" {
 		path = "."
 	}
 
@@ -271,8 +285,7 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, in
 	return f.find(ctx, path, s)
 }
 
-// Element returns an Element for the given ManagedObjectReference
-// This method is only useful for looking up the InventoryPath of a ManagedObjectReference.
+// Element is deprecated, use InventoryPath() instead.
 func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) (*list.Element, error) {
 	rl := func(_ context.Context) (object.Reference, error) {
 		return ref, nil
@@ -301,7 +314,7 @@ func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) 
 // ObjectReference converts the given ManagedObjectReference to a type from the object package via object.NewReference
 // with the object.Common.InventoryPath field set.
 func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectReference) (object.Reference, error) {
-	e, err := f.Element(ctx, ref)
+	path, err := InventoryPath(ctx, f.client, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +325,7 @@ func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectRef
 		SetInventoryPath(string)
 	}
 
-	r.(common).SetInventoryPath(e.Path)
+	r.(common).SetInventoryPath(path)
 
 	if f.dc != nil {
 		if ds, ok := r.(*object.Datastore); ok {

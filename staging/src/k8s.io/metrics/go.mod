@@ -14,6 +14,10 @@ require (
 )
 
 replace (
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/google/uuid => github.com/google/uuid v1.1.2
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

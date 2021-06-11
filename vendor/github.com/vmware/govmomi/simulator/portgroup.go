@@ -27,7 +27,7 @@ type DistributedVirtualPortgroup struct {
 	mo.DistributedVirtualPortgroup
 }
 
-func (s *DistributedVirtualPortgroup) ReconfigureDVPortgroupTask(req *types.ReconfigureDVPortgroup_Task) soap.HasFault {
+func (s *DistributedVirtualPortgroup) ReconfigureDVPortgroupTask(ctx *Context, req *types.ReconfigureDVPortgroup_Task) soap.HasFault {
 	task := CreateTask(s, "reconfigureDvPortgroup", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		s.Config.DefaultPortConfig = req.Spec.DefaultPortConfig
 		s.Config.NumPorts = req.Spec.NumPorts
@@ -39,32 +39,34 @@ func (s *DistributedVirtualPortgroup) ReconfigureDVPortgroupTask(req *types.Reco
 		s.Config.Policy = req.Spec.Policy
 		s.Config.PortNameFormat = req.Spec.PortNameFormat
 		s.Config.VmVnicNetworkResourcePoolKey = req.Spec.VmVnicNetworkResourcePoolKey
+		s.Config.LogicalSwitchUuid = req.Spec.LogicalSwitchUuid
+		s.Config.BackingType = req.Spec.BackingType
 
 		return nil, nil
 	})
 
 	return &methods.ReconfigureDVPortgroup_TaskBody{
 		Res: &types.ReconfigureDVPortgroup_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (s *DistributedVirtualPortgroup) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+func (s *DistributedVirtualPortgroup) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
 	task := CreateTask(s, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		vswitch := Map.Get(*s.Config.DistributedVirtualSwitch).(*DistributedVirtualSwitch)
-		Map.RemoveReference(vswitch, &vswitch.Portgroup, s.Reference())
-		Map.removeString(vswitch, &vswitch.Summary.PortgroupName, s.Name)
+		Map.RemoveReference(ctx, vswitch, &vswitch.Portgroup, s.Reference())
+		Map.removeString(ctx, vswitch, &vswitch.Summary.PortgroupName, s.Name)
 
 		f := Map.getEntityParent(vswitch, "Folder").(*Folder)
-		f.removeChild(s.Reference())
+		folderRemoveChild(ctx, &f.Folder, s.Reference())
 
 		return nil, nil
 	})
 
 	return &methods.Destroy_TaskBody{
 		Res: &types.Destroy_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 
