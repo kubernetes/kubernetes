@@ -624,17 +624,18 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if len(socket) == 0 { // static and dynamic defaulting should have added a value to the field already
+		return append(allErrs, field.Invalid(fldPath, socket, "empty CRI socket"))
+	}
+
 	u, err := url.Parse(socket)
 	if err != nil {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL parsing error: %v", err)))
 	}
 
-	if u.Scheme == "" {
-		if !filepath.IsAbs(u.Path) {
-			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
-		}
-	} else if u.Scheme != kubeadmapiv1.DefaultUrlScheme {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
+	// static and dynamic defaulting should have ensured that an URL scheme is used
+	if u.Scheme != kubeadmapiv1.DefaultContainerRuntimeURLScheme {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("only URL scheme %q is supported, got %q", kubeadmapiv1.DefaultContainerRuntimeURLScheme, u.Scheme)))
 	}
 
 	return allErrs

@@ -21,5 +21,5 @@ package constants
 
 const (
 	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "/var/run/dockershim.sock"
+	DefaultDockerCRISocket = "unix:///var/run/dockershim.sock"
 )

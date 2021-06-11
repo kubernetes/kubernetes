@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package runtime
 
 import (
 	"io/ioutil"
@@ -48,7 +48,6 @@ func TestNewContainerRuntime(t *testing.T) {
 	}{
 		{"valid: default cri socket", execLookPathOK, constants.DefaultDockerCRISocket, true, false},
 		{"valid: cri-o socket url", execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
-		{"valid: cri-o socket path", execLookPathOK, "/var/run/crio/crio.sock", false, false},
 		{"invalid: no crictl", execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
 	}
 
@@ -351,7 +350,7 @@ func TestIsExistingSocket(t *testing.T) {
 				}
 				defer con.Close()
 
-				if !isExistingSocket(theSocket) {
+				if !isExistingSocket("unix://" + theSocket) {
 					t.Fatalf("isExistingSocket(%q) gave unexpected result. Should have been true, instead of false", theSocket)
 				}
 			},
@@ -403,29 +402,29 @@ func TestDetectCRISocketImpl(t *testing.T) {
 		},
 		{
 			name:            "One valid CRI socket leads to success",
-			existingSockets: []string{"/var/run/crio/crio.sock"},
+			existingSockets: []string{"unix:///var/run/crio/crio.sock"},
 			expectedError:   false,
-			expectedSocket:  "/var/run/crio/crio.sock",
+			expectedSocket:  "unix:///var/run/crio/crio.sock",
 		},
 		{
 			name:            "Correct Docker CRI socket is returned",
-			existingSockets: []string{"/var/run/docker.sock"},
+			existingSockets: []string{"unix:///var/run/docker.sock"},
 			expectedError:   false,
 			expectedSocket:  constants.DefaultDockerCRISocket,
 		},
 		{
 			name: "CRI and Docker sockets lead to an error",
 			existingSockets: []string{
-				"/var/run/docker.sock",
-				"/var/run/crio/crio.sock",
+				"unix:///var/run/docker.sock",
+				"unix:///var/run/crio/crio.sock",
 			},
 			expectedError: true,
 		},
 		{
 			name: "Docker and containerd lead to Docker being used",
 			existingSockets: []string{
-				"/var/run/docker.sock",
-				"/run/containerd/containerd.sock",
+				"unix:///var/run/docker.sock",
+				"unix:///run/containerd/containerd.sock",
 			},
 			expectedError:  false,
 			expectedSocket: constants.DefaultDockerCRISocket,
@@ -433,8 +432,8 @@ func TestDetectCRISocketImpl(t *testing.T) {
 		{
 			name: "A couple of CRI sockets lead to an error",
 			existingSockets: []string{
-				"/var/run/crio/crio.sock",
-				"/run/containerd/containerd.sock",
+				"unix:///var/run/crio/crio.sock",
+				"unix:///run/containerd/containerd.sock",
 			},
 			expectedError: true,
 		},
