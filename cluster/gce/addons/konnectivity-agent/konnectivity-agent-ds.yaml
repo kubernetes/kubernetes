@@ -33,6 +33,9 @@ spec:
                   "--ca-cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
                   "--proxy-server-host=__APISERVER_IP__",
                   "--proxy-server-port=8132",
+                  "--sync-interval=5s",
+                  "--sync-interval-cap=30s",
+                  "--probe-interval=5s",
                   "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token"
                   ]
           env:
