@@ -995,7 +995,7 @@ func TestGenericScheduler(t *testing.T) {
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1056,7 +1056,7 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1089,7 +1089,7 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1163,7 +1163,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk, err := st.NewFramework(
 				registerPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1325,7 +1325,7 @@ func TestZeroRequest(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -1427,7 +1427,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1493,7 +1493,8 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, test.feature)()
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
-			client := &clientsetfake.Clientset{}
+			client := clientsetfake.NewSimpleClientset(test.pod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, n := range nodes {
 				cache.AddNode(n)
@@ -1513,7 +1514,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			fwk, err := st.NewFramework(
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)

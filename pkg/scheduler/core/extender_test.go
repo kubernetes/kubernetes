@@ -271,7 +271,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				test.registerPlugins, "",
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
-				runtime.WithPodNominator(internalqueue.NewPodNominator()),
+				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)

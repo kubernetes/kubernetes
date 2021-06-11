@@ -138,7 +138,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewSafePodNominator(c.informerFactory.Core().V1().Pods().Lister())
+	nominator := internalqueue.NewPodNominator(c.informerFactory.Core().V1().Pods().Lister())
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(c.componentConfigVersion),
 		frameworkruntime.WithClientSet(c.client),
