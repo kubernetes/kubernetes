@@ -38,17 +38,6 @@ func TestValidateDeprecatedKubeSchedulerConfiguration(t *testing.T) {
 				UseLegacyPolicyConfig: true,
 			},
 		},
-		"good affinity weight": {
-			config: &DeprecatedOptions{
-				HardPodAffinitySymmetricWeight: 50,
-			},
-		},
-		"bad affinity weight": {
-			expectedToFail: true,
-			config: &DeprecatedOptions{
-				HardPodAffinitySymmetricWeight: -1,
-			},
-		},
 	}
 
 	for name, scenario := range scenarios {
