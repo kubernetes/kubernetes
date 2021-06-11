@@ -106,21 +106,17 @@ aliases:
 
   # SIG Release
   release-engineering-approvers:
-    - cpanato # Release Manager
-    - feiskyer # Release Manager
+    - cpanato # Release Manager / SIG Technical Lead
     - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
     - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager
+    - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
   release-engineering-reviewers:
-    - cpanato # Release Manager
-    - feiskyer # Release Manager
+    - cpanato # Release Manager / SIG Technical Lead
     - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
     - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager
+    - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
   build-image-approvers:
@@ -132,14 +128,12 @@ aliases:
   build-image-reviewers:
     - BenTheElder
     - cblecker
-    - cpanato # Release Manager
+    - cpanato # Release Manager / SIG Technical Lead
     - dims
-    - feiskyer # Release Manager
     - hasheddan # Release Manager / SIG Technical Lead
-    - idealhack # Release Manager
     - justaugustus # Release Manager / SIG Chair
     - listx
-    - puerco # Release Manager
+    - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
 
@@ -178,9 +172,9 @@ aliases:
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
-  # - wojtek-t  
+  # - wojtek-t
   sig-scheduling:
-    - Huang-Wei    
+    - Huang-Wei
     - ahg-g
     - alculquicondor
     - damemi
