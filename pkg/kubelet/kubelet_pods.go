@@ -1587,13 +1587,16 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		validPrimaryIP = utilnet.IsIPv6String
 		validSecondaryIP = utilnet.IsIPv4String
 	}
-	for _, ip := range podStatus.IPs {
+	// clone podStatus.IPs to avoid a panic if it is mutated meanwhile it is being parsed
+	podStatusIPsCopy := make([]string, len(podStatus.IPs))
+	copy(podStatusIPsCopy, podStatus.IPs)
+	for _, ip := range podStatusIPsCopy {
 		if validPrimaryIP(ip) {
 			podIPs = append(podIPs, v1.PodIP{IP: ip})
 			break
 		}
 	}
-	for _, ip := range podStatus.IPs {
+	for _, ip := range podStatusIPsCopy {
 		if validSecondaryIP(ip) {
 			podIPs = append(podIPs, v1.PodIP{IP: ip})
 			break
