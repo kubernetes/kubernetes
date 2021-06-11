@@ -35,7 +35,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			name: "the simplest case",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
+					CRISocket: "unix:///var/run/dockershim.sock",
 					Taints: []v1.Taint{ // This should be ignored as registerTaintsUsingFlags is false
 						{
 							Key:    "foo",
@@ -53,7 +53,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			name: "hostname override from NodeRegistrationOptions.Name",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
+					CRISocket: "unix:///var/run/dockershim.sock",
 					Name:      "override-name",
 				},
 			},
@@ -66,7 +66,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			name: "hostname override from NodeRegistrationOptions.KubeletExtraArgs",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket:        "/var/run/dockershim.sock",
+					CRISocket:        "unix:///var/run/dockershim.sock",
 					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
 				},
 			},
@@ -79,19 +79,19 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			name: "external CRI runtime",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
 				},
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
+				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
 			},
 		},
 		{
 			name: "register with taints",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					Taints: []v1.Taint{
 						{
 							Key:    "foo",
@@ -109,7 +109,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
+				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
 				"register-with-taints":       "foo=bar:baz,key=val:eff",
 			},
 		},
@@ -117,7 +117,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			name: "pause image is set",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
+					CRISocket: "unix:///var/run/dockershim.sock",
 				},
 				pauseImage: "gcr.io/pause:3.5",
 			},

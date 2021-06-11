@@ -19,20 +19,29 @@ limitations under the License.
 package util
 
 import (
-	"os"
+	"net"
+	"net/url"
 )
 
 const (
-	dockerSocket     = "/var/run/docker.sock" // The Docker socket is not CRI compatible
-	containerdSocket = "/run/containerd/containerd.sock"
+	dockerSocket     = "unix:///var/run/docker.sock" // The Docker socket is not CRI compatible
+	containerdSocket = "unix:///run/containerd/containerd.sock"
 )
 
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
-	fileInfo, err := os.Stat(path)
+	u, err := url.Parse(path)
 	if err != nil {
 		return false
 	}
-
-	return fileInfo.Mode()&os.ModeSocket != 0
+	// remove it later if we don't support the path anymore
+	if u.Scheme == "" {
+		u.Scheme = "unix"
+	}
+	c, err := net.Dial(u.Scheme, u.Path)
+	if err != nil {
+		return false
+	}
+	defer c.Close()
+	return true
 }

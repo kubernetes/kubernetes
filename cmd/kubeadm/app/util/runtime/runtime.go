@@ -57,7 +57,7 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 	if criSocket != constants.DefaultDockerCRISocket {
 		toolName = "crictl"
 		// !!! temporary work around crictl warning:
-		// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
+		// Using "unix:///var/run/crio/crio.sock" as endpoint is deprecated,
 		// please consider using full url format "unix:///var/run/crio/crio.sock"
 		if filepath.IsAbs(criSocket) && goruntime.GOOS != "windows" {
 			criSocket = "unix://" + criSocket
@@ -197,7 +197,7 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 	foundCRISockets := []string{}
 	knownCRISockets := []string{
 		// Docker and containerd sockets are special cased below, hence not to be included here
-		"/var/run/crio/crio.sock",
+		"unix:///var/run/crio/crio.sock",
 	}
 
 	if isSocket(dockerSocket) {
