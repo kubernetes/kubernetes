@@ -593,6 +593,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, width uint, flo
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += req.Seats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.Seats())
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(5).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
@@ -627,6 +628,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
 	request.NoteQueued(false)
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.Seats())
 	qs.obsPair.RequestsWaiting.Add(-1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(6).Enabled() {
@@ -727,6 +729,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	qs.totRequestsExecuting--
 	qs.totSeatsInUse -= r.Seats()
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
 	qs.obsPair.RequestsExecuting.Add(-1)
 
 	if r.queue == nil {
