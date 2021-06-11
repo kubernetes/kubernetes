@@ -46,6 +46,7 @@ type PrintOptions struct {
 	ShowLabels    bool
 	Kind          schema.GroupKind
 	ColumnLabels  []string
+	ExtraColumns  []string
 
 	SortBy string
 

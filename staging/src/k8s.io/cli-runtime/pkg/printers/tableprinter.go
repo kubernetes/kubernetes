@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/jsonpath"
 )
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
@@ -290,7 +292,7 @@ func addColumns(pos columnAddPosition, table *metav1.Table, columns []metav1.Tab
 // does not expose metadata). It returns an error if the table cannot
 // be decorated.
 func decorateTable(table *metav1.Table, options PrintOptions) error {
-	width := len(table.ColumnDefinitions) + len(options.ColumnLabels)
+	width := len(table.ColumnDefinitions) + len(options.ColumnLabels) + len(options.ExtraColumns)
 	if options.WithNamespace {
 		width++
 	}
@@ -325,6 +327,12 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 				Type: "string",
 			})
 		}
+		for _, label := range extraColumnKeys(options) {
+			columns = append(columns, metav1.TableColumnDefinition{
+				Name: label,
+				Type: "string",
+			})
+		}
 		if options.ShowLabels {
 			columns = append(columns, metav1.TableColumnDefinition{
 				Name: "Labels",
@@ -336,7 +344,8 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 	rows := table.Rows
 
 	includeLabels := len(options.ColumnLabels) > 0 || options.ShowLabels
-	if includeLabels || options.WithNamespace || nameColumn != -1 {
+	includeExtra := len(options.ExtraColumns) > 0
+	if includeExtra || includeLabels || options.WithNamespace || nameColumn != -1 {
 		for i := range rows {
 			row := rows[i]
 
@@ -371,6 +380,9 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 			if includeLabels {
 				row.Cells = appendLabelCells(row.Cells, m.GetLabels(), options)
 			}
+			if includeExtra {
+				row.Cells = appendLabelCells(row.Cells, m.GetLabels(), options)
+			}
 			rows[i] = row
 		}
 	}
@@ -401,6 +413,7 @@ func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType
 			headers = append(headers, strings.ToUpper(column.Name))
 		}
 		headers = append(headers, formatLabelHeaders(options.ColumnLabels)...)
+		headers = append(headers, extraColumnKeys(options)...)
 		// LABELS is always the last column.
 		headers = append(headers, formatShowLabelsHeader(options.ShowLabels)...)
 		// prepend namespace header
@@ -416,7 +429,9 @@ func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType
 
 	if results[1].IsNil() {
 		rows := results[0].Interface().([]metav1.TableRow)
-		printRows(output, eventType, rows, options)
+		if err := printRows(output, eventType, rows, options); err != nil {
+			return err
+		}
 		return nil
 	}
 	return results[1].Interface().(error)
@@ -437,7 +452,7 @@ func formatEventType(eventType string) string {
 }
 
 // printRows writes the provided rows to output.
-func printRows(output io.Writer, eventType string, rows []metav1.TableRow, options PrintOptions) {
+func printRows(output io.Writer, eventType string, rows []metav1.TableRow, options PrintOptions) error {
 	for _, row := range rows {
 		if len(eventType) > 0 {
 			fmt.Fprint(output, formatEventType(eventType))
@@ -474,9 +489,103 @@ func printRows(output io.Writer, eventType string, rows []metav1.TableRow, optio
 				}
 			}
 		}
+		hasExtra := len(options.ExtraColumns) > 0
+		if obj := row.Object.Object; obj != nil && hasExtra {
+			if m, err := meta.Accessor(obj); err == nil {
+				columnValues, err := extraColumnValues(m, options)
+				if err != nil {
+					return err
+				}
+				for _, value := range columnValues {
+					output.Write([]byte("\t"))
+					output.Write([]byte(value))
+				}
+			}
+		}
 
 		output.Write([]byte("\n"))
 	}
+	return nil
+}
+
+func extraColumnValues(obj metav1.Object, options PrintOptions) ([]string, error) {
+	var columnValues []string
+	for i, expr := range options.ExtraColumns {
+		colSpec := strings.SplitN(expr, ":", 2)
+		if len(colSpec) != 2 {
+			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", expr)
+		}
+		spec, err := relaxedJSONPathExpression(colSpec[1])
+		if err != nil {
+			return nil, err
+		}
+		parser := jsonpath.New(fmt.Sprintf("column%d", i)).AllowMissingKeys(true)
+		if err := parser.Parse(spec); err != nil {
+			return nil, err
+		}
+		var values [][]reflect.Value
+		if unstructured, ok := obj.(runtime.Unstructured); ok {
+			values, err = parser.FindResults(unstructured.UnstructuredContent())
+		} else {
+			values, err = parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
+		}
+		if err != nil {
+			return nil, err
+		}
+		valueStrings := []string{}
+		if len(values) == 0 || len(values[0]) == 0 {
+			valueStrings = append(valueStrings, "<none>")
+		}
+		for arrIx := range values {
+			for valIx := range values[arrIx] {
+				valueStrings = append(valueStrings, fmt.Sprintf("%v", values[arrIx][valIx].Interface()))
+			}
+		}
+		columnValues = append(columnValues, strings.Join(valueStrings, ","))
+	}
+	return columnValues, nil
+}
+
+func extraColumnKeys(options PrintOptions) []string {
+	var keys []string
+	for _, expr := range options.ExtraColumns {
+		colSpec := strings.SplitN(expr, ":", 2)
+		if len(colSpec) != 2 {
+			// TODO validate somewhere else
+			panic(fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", expr))
+		}
+		keys = append(keys, colSpec[0])
+	}
+	return keys
+}
+
+var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
+
+// relaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
+//   * metadata.name (no leading '.' or curly braces '{...}'
+//   * {metadata.name} (no leading '.')
+//   * .metadata.name (no curly braces '{...}')
+//   * {.metadata.name} (complete expression)
+// And transforms them all into a valid jsonpath expression:
+//   {.metadata.name}
+func relaxedJSONPathExpression(pathExpression string) (string, error) {
+	if len(pathExpression) == 0 {
+		return pathExpression, nil
+	}
+	submatches := jsonRegexp.FindStringSubmatch(pathExpression)
+	if submatches == nil {
+		return "", fmt.Errorf("unexpected path string, expected a 'name1.name2' or '.name1.name2' or '{name1.name2}' or '{.name1.name2}'")
+	}
+	if len(submatches) != 3 {
+		return "", fmt.Errorf("unexpected submatch list: %v", submatches)
+	}
+	var fieldSpec string
+	if len(submatches[1]) != 0 {
+		fieldSpec = submatches[1]
+	} else {
+		fieldSpec = submatches[2]
+	}
+	return fmt.Sprintf("{.%s}", fieldSpec), nil
 }
 
 func formatLabelHeaders(columnLabels []string) []string {

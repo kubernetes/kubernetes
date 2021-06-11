@@ -17,6 +17,8 @@ limitations under the License.
 package get
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -67,7 +69,9 @@ func (f *HumanPrintFlags) AllowedFormats() []string {
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
-		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
+		if !strings.HasPrefix(outputFormat, "extra-columns=") {
+			return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
+		}
 	}
 
 	showKind := false
@@ -85,6 +89,12 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
+	extraColumns := []string{}
+	if strings.HasPrefix(outputFormat, "extra-columns=") {
+		os := strings.SplitN(outputFormat, "=", 2)
+		extraColumns = strings.Split(os[1], ",")
+	}
+
 	p := printers.NewTablePrinter(printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
@@ -92,6 +102,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		Wide:          outputFormat == "wide",
 		WithNamespace: f.WithNamespace,
 		ColumnLabels:  columnLabels,
+		ExtraColumns:  extraColumns,
 		ShowLabels:    showLabels,
 	})
 

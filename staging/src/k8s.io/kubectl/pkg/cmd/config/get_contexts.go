@@ -101,7 +101,7 @@ func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
 
 // Validate ensures the of output format
 func (o *GetContextsOptions) Validate(cmd *cobra.Command) error {
-	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
+	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "extra-columns", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
 	supportedOutputTypes := sets.NewString("", "name")
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	if !validOutputTypes.Has(outputFormat) {
