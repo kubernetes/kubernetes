@@ -167,6 +167,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.CPUManagerPolicyOptions != nil {
+		in, out := &in.CPUManagerPolicyOptions, &out.CPUManagerPolicyOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	if in.QOSReserved != nil {
 		in, out := &in.QOSReserved, &out.QOSReserved
