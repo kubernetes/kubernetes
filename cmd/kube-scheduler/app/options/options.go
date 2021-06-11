@@ -179,7 +179,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = o.ComponentConfig
 
 		// apply deprecated flags if no config file is loaded (this is the old behaviour).
-		o.Deprecated.ApplyTo(&c.ComponentConfig)
+		o.Deprecated.ApplyTo(c)
 		if err := o.CombinedInsecureServing.ApplyTo(c, &c.ComponentConfig); err != nil {
 			return err
 		}
@@ -195,11 +195,11 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = *cfg
 
 		// apply any deprecated Policy flags, if applicable
-		o.Deprecated.ApplyAlgorithmSourceTo(&c.ComponentConfig)
+		o.Deprecated.ApplyPolicySourceTo(c)
 
 		// if the user has set CC profiles and is trying to use a Policy config, error out
 		// these configs are no longer merged and they should not be used simultaneously
-		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.ComponentConfig.AlgorithmSource.Policy != nil {
+		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.LegacyPolicySource != nil {
 			return fmt.Errorf("cannot set a Plugin config and Policy config")
 		}
 

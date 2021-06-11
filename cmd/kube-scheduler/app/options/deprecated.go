@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -84,48 +85,44 @@ func (o *DeprecatedOptions) Validate() []error {
 	return errs
 }
 
-// ApplyAlgorithmSourceTo sets cfg.AlgorithmSource from flags passed on the command line in the following precedence order:
+// ApplyPolicySourceTo sets cfg.PolicySource from flags passed on the command line in the following precedence order:
 //
 // 1. --use-legacy-policy-config to use a policy file.
 // 2. --policy-configmap to use a policy config map value.
-func (o *DeprecatedOptions) ApplyAlgorithmSourceTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
+func (o *DeprecatedOptions) ApplyPolicySourceTo(c *schedulerappconfig.Config) {
 	if o == nil {
 		return
 	}
 
 	switch {
 	case o.UseLegacyPolicyConfig || (len(o.PolicyConfigFile) > 0 && o.PolicyConfigMapName == ""):
-		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				File: &kubeschedulerconfig.SchedulerPolicyFileSource{
-					Path: o.PolicyConfigFile,
-				},
+		c.LegacyPolicySource = &kubeschedulerconfig.SchedulerPolicySource{
+			File: &kubeschedulerconfig.SchedulerPolicyFileSource{
+				Path: o.PolicyConfigFile,
 			},
 		}
 	case len(o.PolicyConfigMapName) > 0:
-		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-					Name:      o.PolicyConfigMapName,
-					Namespace: o.PolicyConfigMapNamespace,
-				},
+		c.LegacyPolicySource = &kubeschedulerconfig.SchedulerPolicySource{
+			ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+				Name:      o.PolicyConfigMapName,
+				Namespace: o.PolicyConfigMapNamespace,
 			},
 		}
 	}
 }
 
 // ApplyTo sets a default profile plugin config if no config file is specified
-// It also calls ApplyAlgorithmSourceTo to set Policy settings in AlgorithmSource, if applicable.
+// It also calls ApplyPolicySourceTo to set Policy source if applicable.
 // Deprecated flags have an effect iff no config file was provided, in which
 // case this function expects a default KubeSchedulerConfiguration instance,
 // which has a single profile.
-func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
+func (o *DeprecatedOptions) ApplyTo(c *schedulerappconfig.Config) {
 	if o == nil {
 		return
 	}
 	// The following deprecated options affect the only existing profile that is
 	// added by default.
-	profile := &cfg.Profiles[0]
+	profile := &c.ComponentConfig.Profiles[0]
 	if len(o.SchedulerName) > 0 {
 		profile.SchedulerName = o.SchedulerName
 	}
@@ -137,5 +134,5 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 	}
 
 	profile.PluginConfig = append(profile.PluginConfig, plCfg)
-	o.ApplyAlgorithmSourceTo(cfg)
+	o.ApplyPolicySourceTo(c)
 }

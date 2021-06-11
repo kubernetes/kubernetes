@@ -330,7 +330,6 @@ profiles:
 		defer os.Setenv("KUBERNETES_SERVICE_HOST", originalHost)
 	}
 
-	defaultSource := "DefaultProvider"
 	defaultPodInitialBackoffSeconds := int64(1)
 	defaultPodMaxBackoffSeconds := int64(10)
 	defaultPercentageOfNodesToScore := int32(0)
@@ -386,7 +385,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -459,7 +457,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -560,7 +557,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -629,7 +625,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -672,7 +667,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -750,7 +744,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -829,7 +822,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -895,7 +887,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -974,8 +965,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:     16,
-				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -1030,8 +1020,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:     16,
-				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,

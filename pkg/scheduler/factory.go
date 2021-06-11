@@ -138,7 +138,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewSafePodNominator(c.informerFactory.Core().V1().Pods().Lister())
+	nominator := internalqueue.NewPodNominator(c.informerFactory.Core().V1().Pods().Lister())
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(c.componentConfigVersion),
 		frameworkruntime.WithClientSet(c.client),
@@ -180,13 +180,13 @@ func (c *Configurator) create() (*Scheduler, error) {
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
-		extenders,
 		c.percentageOfNodesToScore,
 	)
 
 	return &Scheduler{
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,
+		Extenders:       extenders,
 		Profiles:        profiles,
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
 		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
@@ -195,10 +195,8 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}, nil
 }
 
-// createFromProvider creates a scheduler from the name of a registered algorithm provider.
-func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
-	klog.V(2).InfoS("Creating scheduler from algorithm provider", "algorithmProvider", providerName)
-
+// createFromConfig creates a scheduler from ComonentConfig profiles.
+func (c *Configurator) createFromConfig() (*Scheduler, error) {
 	defaultPlugins := algorithmprovider.GetDefaultConfig()
 
 	for i := range c.profiles {
@@ -211,9 +209,8 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	return c.create()
 }
 
-// createFromConfig creates a scheduler from the configuration file
-// Only reachable when using v1alpha1 component config
-func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
+// createFromPolicy creates a scheduler from the legacy policy file
+func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler, error) {
 	lr := frameworkplugins.NewLegacyRegistry()
 	args := &frameworkplugins.ConfigProducerArgs{}
 
@@ -226,7 +223,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).InfoS("Using predicates from algorithm provider", "algorithmProvider", schedulerapi.SchedulerDefaultProviderName)
 		predicateKeys = lr.DefaultPredicates
 	} else {
 		for _, predicate := range policy.Predicates {

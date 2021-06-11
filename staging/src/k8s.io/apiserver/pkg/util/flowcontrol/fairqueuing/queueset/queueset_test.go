@@ -153,12 +153,12 @@ func (us uniformScenario) exercise(t *testing.T) {
 type uniformScenarioState struct {
 	t *testing.T
 	uniformScenario
-	startTime                          time.Time
-	doSplit                            bool
-	integrators                        []fq.Integrator
-	failedCount                        uint64
-	expectedInqueue, expectedExecuting string
-	executions, rejects                []int32
+	startTime                                                    time.Time
+	doSplit                                                      bool
+	integrators                                                  []fq.Integrator
+	failedCount                                                  uint64
+	expectedInqueue, expectedExecuting, expectedConcurrencyInUse string
+	executions, rejects                                          []int32
 }
 
 func (uss *uniformScenarioState) exercise() {
@@ -313,6 +313,7 @@ func (uss *uniformScenarioState) finalReview() {
 		fsName := fmt.Sprintf("client%d", i)
 		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
 			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
+			uss.expectedConcurrencyInUse = uss.expectedConcurrencyInUse + fmt.Sprintf(`				apiserver_flowcontrol_request_concurrency_in_use{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
 		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
 			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
@@ -324,6 +325,18 @@ func (uss *uniformScenarioState) finalReview() {
 				# TYPE apiserver_flowcontrol_current_executing_requests gauge
 ` + uss.expectedExecuting
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_executing_requests")
+		if err != nil {
+			uss.t.Error(err)
+		} else {
+			uss.t.Log("Success with" + e)
+		}
+	}
+	if uss.evalExecutingMetrics && len(uss.expectedConcurrencyInUse) > 0 {
+		e := `
+				# HELP apiserver_flowcontrol_request_concurrency_in_use [ALPHA] Concurrency (number of seats) occupided by the currently executing requests in the API Priority and Fairness system
+				# TYPE apiserver_flowcontrol_request_concurrency_in_use gauge
+` + uss.expectedConcurrencyInUse
+		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_request_concurrency_in_use")
 		if err != nil {
 			uss.t.Error(err)
 		} else {
