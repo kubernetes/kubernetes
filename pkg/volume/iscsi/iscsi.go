@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/io"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
 
@@ -211,6 +212,11 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	paths, err := mounter.GetMountRefs(mountPath)
+	if io.IsInconsistentReadError(err) {
+		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
+		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it and all mounts of the same device manually.", mountPath)
+		return nil, err
+	}
 	if err != nil {
 		return nil, err
 	}
