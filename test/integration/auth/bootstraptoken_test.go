@@ -72,7 +72,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
-	tokenExpiredTime := time.Now().Add(-time.Hour).Format(time.RFC3339)
+	tokenExpiredTime := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
 	var expiredBootstrapToken = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
