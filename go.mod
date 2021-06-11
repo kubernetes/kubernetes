@@ -63,7 +63,6 @@ require (
 	github.com/lpabon/godbc v0.1.1 // indirect
 	github.com/miekg/dns v1.1.35
 	github.com/moby/ipvs v1.0.1
-	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
