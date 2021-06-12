@@ -121,7 +121,7 @@ limitations under the License.
 // including settings for:
 //
 // - Networking, that holds configuration for the networking topology of the cluster; use it e.g. to customize
-// node subnet or services subnet.
+// pod subnet or services subnet.
 //
 // - Etcd configurations; use it e.g. to customize the local etcd or to configure the API server
 // for using an external etcd cluster.

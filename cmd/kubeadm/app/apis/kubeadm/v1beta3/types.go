@@ -133,6 +133,8 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// TODO: This is temporary and ideally we would like to switch all components to
 	// use ComponentConfig + ConfigMaps.
 	// +optional
@@ -214,6 +216,8 @@ type NodeRegistrationOptions struct {
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// +optional
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 
@@ -287,6 +291,8 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// +optional
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
