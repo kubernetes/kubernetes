@@ -45,8 +45,8 @@ const (
 )
 
 var (
-	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
-	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 2.5}
+	// Use buckets ranging from 5 ms to 10 seconds (admission webhooks timeout at 30 seconds by default).
+	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 2.5, 5.0, 10.0}
 	latencySummaryMaxAge = 5 * time.Hour
 
 	// Metrics provides access to all admission metrics.
@@ -126,17 +126,17 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	// Admission metrics for a step of the admission flow. The entire admission flow is broken down into a series of steps
 	// Each step is identified by a distinct type label value.
 	step := newMetricSet("step",
-		[]string{"type", "operation", "rejected"},
+		[]string{"type", "operation", "rejected", "namespace"},
 		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
 	controller := newMetricSet("controller",
-		[]string{"name", "type", "operation", "rejected"},
+		[]string{"name", "type", "operation", "rejected", "namespace"},
 		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	// Admission webhook metrics. Each webhook is identified by name.
 	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "rejected"},
+		[]string{"name", "type", "operation", "rejected", "namespace"},
 		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	webhookRejection := metrics.NewCounterVec(
@@ -147,7 +147,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Help:           "Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"name", "type", "operation", "error_type", "rejection_code"})
+		[]string{"name", "type", "operation", "error_type", "rejection_code", "namespace"})
 
 	step.mustRegister()
 	controller.mustRegister()
@@ -164,27 +164,27 @@ func (m *AdmissionMetrics) reset() {
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
 func (m *AdmissionMetrics) ObserveAdmissionStep(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.step.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+	m.step.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected), attr.GetNamespace())...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
 func (m *AdmissionMetrics) ObserveAdmissionController(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.controller.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+	m.controller.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected), attr.GetNamespace())...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
 func (m *AdmissionMetrics) ObserveWebhook(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.webhook.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+	m.webhook.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected), attr.GetNamespace())...)
 }
 
 // ObserveWebhookRejection records admission related metrics for an admission webhook rejection.
-func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, stepType, operation string, errorType WebhookRejectionErrorType, rejectionCode int) {
+func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, stepType string, attr admission.Attributes, errorType WebhookRejectionErrorType, rejectionCode int) {
 	// We truncate codes greater than 600 to keep the cardinality bounded.
 	// This should be rarely done by a malfunctioning webhook server.
 	if rejectionCode > 600 {
 		rejectionCode = 600
 	}
-	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
+	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, string(attr.GetOperation()), string(errorType), strconv.Itoa(rejectionCode), attr.GetNamespace()).Inc()
 }
 
 type metricSet struct {
