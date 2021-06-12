@@ -11429,7 +11429,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] [Serial] Volume metrics should create volume metrics in Volume Manager": "should create volume metrics in Volume Manager [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] [Serial] Volume metrics should create volume metrics with the correct PVC ref": "should create volume metrics with the correct PVC ref [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] [Serial] Volume metrics should create volume metrics with the correct BlockMode PVC ref": "should create volume metrics with the correct BlockMode PVC ref [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] [Serial] Volume metrics should create volume metrics with the correct FilesystemMode PVC ref": "should create volume metrics with the correct FilesystemMode PVC ref [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] vcp at scale [Feature:vsphere]  vsphere scale tests": "vsphere scale tests [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

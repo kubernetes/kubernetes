@@ -566,3 +566,11 @@ func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) erro
 func (f *stubBlockVolume) UnmapPodDevice() error {
 	return nil
 }
+
+func (f *stubBlockVolume) SupportsMetrics() bool {
+	return false
+}
+
+func (f *stubBlockVolume) GetMetrics() (*volume.Metrics, error) {
+	return nil, nil
+}

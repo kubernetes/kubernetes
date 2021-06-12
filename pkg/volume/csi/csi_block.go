@@ -94,6 +94,7 @@ type csiBlockMapper struct {
 	readOnly   bool
 	spec       *volume.Spec
 	podUID     types.UID
+	volume.MetricsProvider
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}
@@ -111,6 +112,12 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{specName}
 func (m *csiBlockMapper) GetStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
+}
+
+// SupportsMetrics returns true for csiBlockMapper as it initializes the
+// MetricsProvider.
+func (m *csiBlockMapper) SupportsMetrics() bool {
+	return true
 }
 
 // getPublishDir returns path to a directory, where the volume is published to each pod.
