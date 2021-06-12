@@ -109,7 +109,7 @@ func (e *endpointImpl) run() {
 		}
 
 		devs := response.Devices
-		klog.V(2).InfoS("State pushed for device plugin", "resourceName", e.resourceName)
+		klog.V(2).InfoS("State pushed for device plugin", "resourceName", e.resourceName, "resourceCapacity", len(devs))
 
 		var newDevs []pluginapi.Device
 		for _, d := range devs {
