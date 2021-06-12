@@ -326,6 +326,10 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// Configure swap memory available to container workloads.
+	// +featureGate=NodeSwapEnabled
+	// +optional
+	MemorySwap MemorySwapConfiguration
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
@@ -567,4 +571,11 @@ type ExecEnvVar struct {
 type MemoryReservation struct {
 	NumaNode int32
 	Limits   v1.ResourceList
+}
+
+type MemorySwapConfiguration struct {
+	// Configure swap memory available to container workloads. May be one of
+	// "", "NoSwap": workloads cannot use swap
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	SwapBehavior string
 }
