@@ -98,7 +98,7 @@ var emptyModels = &typeModels{
 }
 
 func toValidatedModels(openAPISchema *spec.Swagger) (utilproto.Models, error) {
-	// openapi_v2.NewDocument only accepts a yaml.MapSlice
+	// openapi_v2.ParseDocument only accepts a []byte of the JSON or YAML file to be parsed.
 	// so we do an inefficient marshal back to json and then read it back in as yaml
 	// but get the benefit of running the models through utilproto.NewOpenAPIData to
 	// validate all the references between types
