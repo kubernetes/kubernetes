@@ -43,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -247,7 +247,7 @@ type Proxier struct {
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilnet.PortOpener
-	recorder       record.EventRecorder
+	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -349,7 +349,7 @@ func NewProxier(ipt utiliptables.Interface,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
@@ -517,7 +517,7 @@ func NewDualStackProxier(
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP [2]net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
@@ -1273,7 +1273,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, v1.EventTypeWarning, err.Error(), msg)
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
@@ -1476,7 +1476,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, v1.EventTypeWarning, err.Error(), msg)
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
