@@ -393,7 +393,6 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 
 // syncCronJob reconciles a CronJob with a list of any Jobs that it created.
 // All known jobs created by "cj" should be included in "js".
-// The current time is passed in to facilitate testing.
 // It returns a copy of the CronJob that is to be used by other functions
 // that mutates the object
 func (jm *ControllerV2) syncCronJob(
