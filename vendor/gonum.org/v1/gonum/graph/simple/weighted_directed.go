@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/internal/uid"
 	"gonum.org/v1/gonum/graph/iterator"
+	"gonum.org/v1/gonum/graph/set/uid"
 )
 
 var (
@@ -33,7 +33,7 @@ type WeightedDirectedGraph struct {
 
 	self, absent float64
 
-	nodeIDs uid.Set
+	nodeIDs *uid.Set
 }
 
 // NewWeightedDirectedGraph returns a WeightedDirectedGraph with the specified self and absent
@@ -81,21 +81,14 @@ func (g *WeightedDirectedGraph) Edges() graph.Edges {
 }
 
 // From returns all nodes in g that can be reached directly from n.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *WeightedDirectedGraph) From(id int64) graph.Nodes {
-	if _, ok := g.from[id]; !ok {
+	if len(g.from[id]) == 0 {
 		return graph.Empty
 	}
-
-	from := make([]graph.Node, len(g.from[id]))
-	i := 0
-	for vid := range g.from[id] {
-		from[i] = g.nodes[vid]
-		i++
-	}
-	if len(from) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(from)
+	return iterator.NewNodesByWeightedEdge(g.nodes, g.from[id])
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y without
@@ -130,7 +123,7 @@ func (g *WeightedDirectedGraph) NewNode() graph.Node {
 
 // NewWeightedEdge returns a new weighted edge from the source to the destination node.
 func (g *WeightedDirectedGraph) NewWeightedEdge(from, to graph.Node, weight float64) graph.WeightedEdge {
-	return &WeightedEdge{F: from, T: to, W: weight}
+	return WeightedEdge{F: from, T: to, W: weight}
 }
 
 // Node returns the node with the given ID if it exists in the graph,
@@ -140,17 +133,14 @@ func (g *WeightedDirectedGraph) Node(id int64) graph.Node {
 }
 
 // Nodes returns all the nodes in the graph.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *WeightedDirectedGraph) Nodes() graph.Nodes {
 	if len(g.nodes) == 0 {
 		return graph.Empty
 	}
-	nodes := make([]graph.Node, len(g.nodes))
-	i := 0
-	for _, n := range g.nodes {
-		nodes[i] = n
-		i++
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodes(g.nodes)
 }
 
 // RemoveEdge removes the edge with the given end point IDs from the graph, leaving the terminal
@@ -227,21 +217,14 @@ func (g *WeightedDirectedGraph) SetWeightedEdge(e graph.WeightedEdge) {
 }
 
 // To returns all nodes in g that can reach directly to n.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *WeightedDirectedGraph) To(id int64) graph.Nodes {
-	if _, ok := g.to[id]; !ok {
+	if len(g.to[id]) == 0 {
 		return graph.Empty
 	}
-
-	to := make([]graph.Node, len(g.to[id]))
-	i := 0
-	for uid := range g.to[id] {
-		to[i] = g.nodes[uid]
-		i++
-	}
-	if len(to) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(to)
+	return iterator.NewNodesByWeightedEdge(g.nodes, g.to[id])
 }
 
 // Weight returns the weight for the edge between x and y if Edge(x, y) returns a non-nil Edge.

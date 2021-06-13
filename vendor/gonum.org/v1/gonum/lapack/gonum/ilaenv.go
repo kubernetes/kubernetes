@@ -16,8 +16,8 @@ package gonum
 //  7: The number of processors.
 //  8: The crossover point for multi-shift in QR and QZ methods for non-symmetric eigenvalue problems.
 //  9: Maximum size of the subproblems in divide-and-conquer algorithms.
-//  10: ieee NaN arithmetic can be trusted not to trap.
-//  11: infinity arithmetic can be trusted not to trap.
+//  10: ieee infinity and NaN arithmetic can be trusted not to trap.
+//  11: ieee infinity arithmetic can be trusted not to trap.
 //  12...16: parameters for Dhseqr and related functions. See Iparmq for more
 //           information.
 //

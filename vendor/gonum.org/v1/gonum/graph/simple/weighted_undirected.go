@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/internal/uid"
 	"gonum.org/v1/gonum/graph/iterator"
+	"gonum.org/v1/gonum/graph/set/uid"
 )
 
 var (
@@ -32,7 +32,7 @@ type WeightedUndirectedGraph struct {
 
 	self, absent float64
 
-	nodeIDs uid.Set
+	nodeIDs *uid.Set
 }
 
 // NewWeightedUndirectedGraph returns an WeightedUndirectedGraph with the specified self and absent
@@ -96,20 +96,10 @@ func (g *WeightedUndirectedGraph) Edges() graph.Edges {
 
 // From returns all nodes in g that can be reached directly from n.
 func (g *WeightedUndirectedGraph) From(id int64) graph.Nodes {
-	if _, ok := g.nodes[id]; !ok {
+	if len(g.edges[id]) == 0 {
 		return graph.Empty
 	}
-
-	nodes := make([]graph.Node, len(g.edges[id]))
-	i := 0
-	for from := range g.edges[id] {
-		nodes[i] = g.nodes[from]
-		i++
-	}
-	if len(nodes) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodesByWeightedEdge(g.nodes, g.edges[id])
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y.
@@ -132,7 +122,7 @@ func (g *WeightedUndirectedGraph) NewNode() graph.Node {
 
 // NewWeightedEdge returns a new weighted edge from the source to the destination node.
 func (g *WeightedUndirectedGraph) NewWeightedEdge(from, to graph.Node, weight float64) graph.WeightedEdge {
-	return &WeightedEdge{F: from, T: to, W: weight}
+	return WeightedEdge{F: from, T: to, W: weight}
 }
 
 // Node returns the node with the given ID if it exists in the graph,
@@ -142,17 +132,14 @@ func (g *WeightedUndirectedGraph) Node(id int64) graph.Node {
 }
 
 // Nodes returns all the nodes in the graph.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *WeightedUndirectedGraph) Nodes() graph.Nodes {
 	if len(g.nodes) == 0 {
 		return graph.Empty
 	}
-	nodes := make([]graph.Node, len(g.nodes))
-	i := 0
-	for _, n := range g.nodes {
-		nodes[i] = n
-		i++
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodes(g.nodes)
 }
 
 // RemoveEdge removes the edge with the given end point IDs from the graph, leaving the terminal

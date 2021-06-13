@@ -11,7 +11,7 @@ import (
 
 const (
 	badFact   = "mat: use without successful factorization"
-	badNoVect = "mat: eigenvectors not computed"
+	noVectors = "mat: eigenvectors not computed"
 )
 
 // EigenSym is a type for creating and manipulating the Eigen decomposition of
@@ -103,7 +103,7 @@ func (e *EigenSym) VectorsTo(dst *Dense) {
 		panic(badFact)
 	}
 	if !e.vectorsComputed {
-		panic(badNoVect)
+		panic(noVectors)
 	}
 	r, c := e.vectors.Dims()
 	if dst.IsEmpty() {
@@ -320,7 +320,7 @@ func (e *Eigen) VectorsTo(dst *CDense) {
 		panic(badFact)
 	}
 	if e.kind&EigenRight == 0 {
-		panic(badNoVect)
+		panic(noVectors)
 	}
 	if dst.IsEmpty() {
 		dst.ReuseAs(e.n, e.n)
@@ -346,7 +346,7 @@ func (e *Eigen) LeftVectorsTo(dst *CDense) {
 		panic(badFact)
 	}
 	if e.kind&EigenLeft == 0 {
-		panic(badNoVect)
+		panic(noVectors)
 	}
 	if dst.IsEmpty() {
 		dst.ReuseAs(e.n, e.n)

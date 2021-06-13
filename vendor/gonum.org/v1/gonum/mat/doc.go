@@ -12,9 +12,9 @@
 //
 // mat provides:
 //  - Interfaces for Matrix classes (Matrix, Symmetric, Triangular)
-//  - Concrete implementations (Dense, SymDense, TriDense)
+//  - Concrete implementations (Dense, SymDense, TriDense, VecDense)
 //  - Methods and functions for using matrix data (Add, Trace, SymRankOne)
-//  - Types for constructing and using matrix factorizations (QR, LU)
+//  - Types for constructing and using matrix factorizations (QR, LU, etc.)
 //  - The complementary types for complex matrices, CMatrix, CSymDense, etc.
 // In the documentation below, we use "matrix" as a short-hand for all of
 // the FooDense types implemented in this package. We use "Matrix" to
@@ -25,7 +25,8 @@
 //  // Allocate a zeroed real matrix of size 3×5
 //  zero := mat.NewDense(3, 5, nil)
 // If a backing data slice is provided, the matrix will have those elements.
-// All matrices are all stored in row-major format.
+// All matrices are stored in row-major format and users should consider
+// this when expressing matrix arithmetic to ensure optimal performance.
 //  // Generate a 6×6 matrix of random values.
 //  data := make([]float64, 36)
 //  for i := range data {
@@ -44,7 +45,7 @@
 //
 // When a matrix is the destination or receiver for a function or method,
 // the operation will panic if the matrix is not the correct size.
-// An exception is if that destination is empty (see below).
+// An exception to this is when the destination is empty (see below).
 //
 // Empty matrix
 //
@@ -65,7 +66,7 @@
 // The Matrix Interfaces
 //
 // The Matrix interface is the common link between the concrete types of real
-// matrices, The Matrix interface is defined by three functions: Dims, which
+// matrices. The Matrix interface is defined by three functions: Dims, which
 // returns the dimensions of the Matrix, At, which returns the element in the
 // specified location, and T for returning a Transpose (discussed later). All of
 // the matrix types can perform these behaviors and so implement the interface.
@@ -97,10 +98,10 @@
 //  var lu mat.LU
 //  lu.Factorize(a)
 // The elements of the factorization can be extracted through methods on the
-// factorized type, i.e. *LU.UTo. The factorization types can also be used directly,
-// as in *Dense.SolveCholesky. Some factorizations can be updated directly,
-// without needing to update the original matrix and refactorize,
-// as in *LU.RankOne.
+// factorized type, for example *LU.UTo. The factorization types can also be used
+// directly, as in *Cholesky.SolveTo. Some factorizations can be updated directly,
+// without needing to update the original matrix and refactorize, for example with
+// *LU.RankOne.
 //
 // BLAS and LAPACK
 //
@@ -109,10 +110,10 @@
 // in gonum/blas/blas64 and gonum/lapack/lapack64 and their complex equivalents.
 // By default, blas64 and lapack64 call the native Go implementations of the
 // routines. Alternatively, it is possible to use C-based implementations of the
-// APIs through the respective cgo packages and "Use" functions. The Go
-// implementation of LAPACK (used by default) makes calls
-// through blas64, so if a cgo BLAS implementation is registered, the lapack64
-// calls will be partially executed in Go and partially executed in C.
+// APIs through the respective cgo packages and the wrapper packages' "Use"
+// functions. The Go implementation of LAPACK makes calls through blas64, so if
+// a cgo BLAS implementation is registered, the lapack64 calls will be partially
+// executed in Go and partially executed in C.
 //
 // Type Switching
 //
@@ -133,9 +134,9 @@
 //
 // Invariants
 //
-// Matrix input arguments to functions are never directly modified. If an operation
-// changes Matrix data, the mutated matrix will be the receiver of a method, or
-// will be the first argument to a method or function.
+// Matrix input arguments to package functions are never directly modified. If an
+// operation changes Matrix data, the mutated matrix will be the receiver of a
+// method, or will be the first, dst, argument to a method named with a To suffix.
 //
 // For convenience, a matrix may be used as both a receiver and as an input, e.g.
 //  a.Pow(a, 6)

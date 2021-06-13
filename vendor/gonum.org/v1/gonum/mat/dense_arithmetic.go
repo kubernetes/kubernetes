@@ -21,8 +21,8 @@ func (m *Dense) Add(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	aU, _ := untransposeExtract(a)
-	bU, _ := untransposeExtract(b)
+	aU, aTrans := untransposeExtract(a)
+	bU, bTrans := untransposeExtract(b)
 	m.reuseAsNonZeroed(ar, ac)
 
 	if arm, ok := a.(*Dense); ok {
@@ -46,10 +46,10 @@ func (m *Dense) Add(a, b Matrix) {
 	m.checkOverlapMatrix(aU)
 	m.checkOverlapMatrix(bU)
 	var restore func()
-	if m == aU {
+	if aTrans && m == aU {
 		m, restore = m.isolatedWorkspace(aU)
 		defer restore()
-	} else if m == bU {
+	} else if bTrans && m == bU {
 		m, restore = m.isolatedWorkspace(bU)
 		defer restore()
 	}
@@ -70,8 +70,8 @@ func (m *Dense) Sub(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	aU, _ := untransposeExtract(a)
-	bU, _ := untransposeExtract(b)
+	aU, aTrans := untransposeExtract(a)
+	bU, bTrans := untransposeExtract(b)
 	m.reuseAsNonZeroed(ar, ac)
 
 	if arm, ok := a.(*Dense); ok {
@@ -95,10 +95,10 @@ func (m *Dense) Sub(a, b Matrix) {
 	m.checkOverlapMatrix(aU)
 	m.checkOverlapMatrix(bU)
 	var restore func()
-	if m == aU {
+	if aTrans && m == aU {
 		m, restore = m.isolatedWorkspace(aU)
 		defer restore()
-	} else if m == bU {
+	} else if bTrans && m == bU {
 		m, restore = m.isolatedWorkspace(bU)
 		defer restore()
 	}
@@ -120,8 +120,8 @@ func (m *Dense) MulElem(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	aU, _ := untransposeExtract(a)
-	bU, _ := untransposeExtract(b)
+	aU, aTrans := untransposeExtract(a)
+	bU, bTrans := untransposeExtract(b)
 	m.reuseAsNonZeroed(ar, ac)
 
 	if arm, ok := a.(*Dense); ok {
@@ -145,10 +145,10 @@ func (m *Dense) MulElem(a, b Matrix) {
 	m.checkOverlapMatrix(aU)
 	m.checkOverlapMatrix(bU)
 	var restore func()
-	if m == aU {
+	if aTrans && m == aU {
 		m, restore = m.isolatedWorkspace(aU)
 		defer restore()
-	} else if m == bU {
+	} else if bTrans && m == bU {
 		m, restore = m.isolatedWorkspace(bU)
 		defer restore()
 	}
@@ -170,8 +170,8 @@ func (m *Dense) DivElem(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	aU, _ := untransposeExtract(a)
-	bU, _ := untransposeExtract(b)
+	aU, aTrans := untransposeExtract(a)
+	bU, bTrans := untransposeExtract(b)
 	m.reuseAsNonZeroed(ar, ac)
 
 	if arm, ok := a.(*Dense); ok {
@@ -195,10 +195,10 @@ func (m *Dense) DivElem(a, b Matrix) {
 	m.checkOverlapMatrix(aU)
 	m.checkOverlapMatrix(bU)
 	var restore func()
-	if m == aU {
+	if aTrans && m == aU {
 		m, restore = m.isolatedWorkspace(aU)
 		defer restore()
-	} else if m == bU {
+	} else if bTrans && m == bU {
 		m, restore = m.isolatedWorkspace(bU)
 		defer restore()
 	}
@@ -237,28 +237,35 @@ func (m *Dense) Inverse(a Matrix) error {
 	default:
 		m.Copy(a)
 	}
+	// Compute the norm of A.
+	work := getFloats(4*r, false) // Length must be at least 4*r for Gecon.
+	norm := lapack64.Lange(CondNorm, m.mat, work)
+	// Compute the LU factorization of A.
 	ipiv := getInts(r, false)
 	defer putInts(ipiv)
 	ok := lapack64.Getrf(m.mat, ipiv)
 	if !ok {
+		// A is exactly singular.
 		return Condition(math.Inf(1))
 	}
-	work := getFloats(4*r, false) // must be at least 4*r for cond.
+	// Compute the condition number of A using the LU factorization.
+	iwork := getInts(r, false)
+	defer putInts(iwork)
+	rcond := lapack64.Gecon(CondNorm, m.mat, norm, work, iwork)
+	// Compute A^{-1} from the LU factorization regardless of the value of rcond.
 	lapack64.Getri(m.mat, ipiv, work, -1)
-	if int(work[0]) > 4*r {
+	if int(work[0]) > len(work) {
 		l := int(work[0])
 		putFloats(work)
 		work = getFloats(l, false)
-	} else {
-		work = work[:4*r]
 	}
 	defer putFloats(work)
-	lapack64.Getri(m.mat, ipiv, work, len(work))
-	norm := lapack64.Lange(CondNorm, m.mat, work)
-	rcond := lapack64.Gecon(CondNorm, m.mat, norm, work, ipiv) // reuse ipiv
-	if rcond == 0 {
+	ok = lapack64.Getri(m.mat, ipiv, work, len(work))
+	if !ok || rcond == 0 {
+		// A is exactly singular.
 		return Condition(math.Inf(1))
 	}
+	// Check whether A is singular for computational purposes.
 	cond := 1 / rcond
 	if cond > ConditionTolerance {
 		return Condition(cond)
@@ -545,7 +552,7 @@ func (m *Dense) Exp(a Matrix) {
 		vpu.Add(v, u)
 		vmu.Sub(v, u)
 
-		m.Solve(vmu, vpu)
+		_ = m.Solve(vmu, vpu)
 		return
 	}
 
@@ -615,7 +622,7 @@ func (m *Dense) Exp(a Matrix) {
 	vpu.Add(v, u)
 	vmu.Sub(v, u)
 
-	m.Solve(vmu, vpu)
+	_ = m.Solve(vmu, vpu)
 
 	for ; s > 0; s-- {
 		m.Mul(m, m)
@@ -671,6 +678,20 @@ func (m *Dense) Pow(a Matrix, n int) {
 	putWorkspace(w)
 	putWorkspace(s)
 	putWorkspace(x)
+}
+
+// Kronecker calculates the Kronecker product of a and b, placing the result in
+// the receiver.
+func (m *Dense) Kronecker(a, b Matrix) {
+	ra, ca := a.Dims()
+	rb, cb := b.Dims()
+
+	m.reuseAsNonZeroed(ra*rb, ca*cb)
+	for i := 0; i < ra; i++ {
+		for j := 0; j < ca; j++ {
+			m.slice(i*rb, (i+1)*rb, j*cb, (j+1)*cb).Scale(a.At(i, j), b)
+		}
+	}
 }
 
 // Scale multiplies the elements of a by f, placing the result in the receiver.

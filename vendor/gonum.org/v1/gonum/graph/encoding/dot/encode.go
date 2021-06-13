@@ -210,17 +210,18 @@ func (p *simpleGraphPrinter) print(g graph.Graph, name string, needsIndent, isSu
 		sort.Sort(ordered.ByID(to))
 		for _, t := range to {
 			tid := t.ID()
+			f := edge{inGraph: name, from: nid, to: tid}
 			if isDirected {
-				if p.visited[edge{inGraph: name, from: nid, to: tid}] {
+				if p.visited[f] {
 					continue
 				}
-				p.visited[edge{inGraph: name, from: nid, to: tid}] = true
+				p.visited[f] = true
 			} else {
-				if p.visited[edge{inGraph: name, from: nid, to: tid}] {
+				if p.visited[f] {
 					continue
 				}
-				p.visited[edge{inGraph: name, from: nid, to: tid}] = true
-				p.visited[edge{inGraph: name, from: tid, to: n.ID()}] = true
+				p.visited[f] = true
+				p.visited[edge{inGraph: name, from: tid, to: nid}] = true
 			}
 
 			if !havePrintedEdgeHeader {
@@ -432,6 +433,8 @@ type multiGraphPrinter struct {
 
 type line struct {
 	inGraph string
+	from    int64
+	to      int64
 	id      int64
 }
 
@@ -510,10 +513,19 @@ func (p *multiGraphPrinter) print(g graph.Multigraph, name string, needsIndent, 
 
 			for _, l := range lines {
 				lid := l.ID()
-				if p.visited[line{inGraph: name, id: lid}] {
-					continue
+				f := line{inGraph: name, from: nid, to: tid, id: lid}
+				if isDirected {
+					if p.visited[f] {
+						continue
+					}
+					p.visited[f] = true
+				} else {
+					if p.visited[f] {
+						continue
+					}
+					p.visited[f] = true
+					p.visited[line{inGraph: name, from: tid, to: nid, id: lid}] = true
 				}
-				p.visited[line{inGraph: name, id: lid}] = true
 
 				if !havePrintedEdgeHeader {
 					p.buf.WriteByte('\n')

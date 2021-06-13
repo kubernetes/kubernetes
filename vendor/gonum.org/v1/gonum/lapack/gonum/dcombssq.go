@@ -4,6 +4,8 @@
 
 package gonum
 
+import "math"
+
 // Dcombssq adds two scaled sum-of-squares quantities, V := V1 + V2,
 //  V_scale^2 * V_ssq := V1_scale^2 * V1_ssq + V2_scale^2 * V2_ssq
 // and returns the result V.
@@ -14,7 +16,10 @@ func (Implementation) Dcombssq(scale1, ssq1, scale2, ssq2 float64) (scale, ssq f
 		if scale1 != 0 {
 			return scale1, ssq1 + (scale2/scale1)*(scale2/scale1)*ssq2
 		}
-		// If the input is non-negative and we are here, then scale2 must inevitably be 0, too.
+		// Both scales are zero.
+		if math.IsNaN(ssq1) || math.IsNaN(ssq2) {
+			return 0, math.NaN()
+		}
 		return 0, 0
 	}
 	return scale2, ssq2 + (scale1/scale2)*(scale1/scale2)*ssq1

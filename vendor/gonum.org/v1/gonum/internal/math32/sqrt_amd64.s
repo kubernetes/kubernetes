@@ -6,12 +6,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//+build !noasm,!appengine,!safe
+// +build !noasm,!gccgo,!safe
 
-// TODO(kortschak): use textflag.h after we drop Go 1.3 support
-//#include "textflag.h"
-// Don't insert stack check preamble.
-#define NOSPLIT	4
+#include "textflag.h"
 
 // func Sqrt(x float32) float32
 TEXT ·Sqrt(SB),NOSPLIT,$0

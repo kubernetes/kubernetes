@@ -53,7 +53,7 @@ func checkOverlapComplex(a, b cblas128.General) bool {
 	return false
 }
 
-func (m *CDense) checkOverlapComplex(a cblas128.General) bool {
+func (m *CDense) checkOverlap(a cblas128.General) bool {
 	return checkOverlapComplex(m.RawCMatrix(), a)
 }
 
@@ -68,5 +68,5 @@ func (m *CDense) checkOverlapMatrix(a CMatrix) bool {
 	case RawCMatrixer:
 		amat = ar.RawCMatrix()
 	}
-	return m.checkOverlapComplex(amat)
+	return m.checkOverlap(amat)
 }

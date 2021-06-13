@@ -19,6 +19,14 @@ func Use(l lapack.Float64) {
 	lapack64 = l
 }
 
+// Tridiagonal represents a tridiagonal matrix using its three diagonals.
+type Tridiagonal struct {
+	N  int
+	DL []float64
+	D  []float64
+	DU []float64
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a
@@ -71,6 +79,53 @@ func Potri(t blas64.Triangular) (a blas64.Symmetric, ok bool) {
 // side matrix B, on return it contains the solution matrix X.
 func Potrs(t blas64.Triangular, b blas64.General) {
 	lapack64.Dpotrs(t.Uplo, t.N, b.Cols, t.Data, max(1, t.Stride), b.Data, max(1, b.Stride))
+}
+
+// Pbcon returns an estimate of the reciprocal of the condition number (in the
+// 1-norm) of an n×n symmetric positive definite band matrix using the Cholesky
+// factorization
+//  A = Uᵀ*U  if uplo == blas.Upper
+//  A = L*Lᵀ  if uplo == blas.Lower
+// computed by Pbtrf. The estimate is obtained for norm(inv(A)), and the
+// reciprocal of the condition number is computed as
+//  rcond = 1 / (anorm * norm(inv(A))).
+//
+// The length of work must be at least 3*n and the length of iwork must be at
+// least n.
+func Pbcon(a blas64.SymmetricBand, anorm float64, work []float64, iwork []int) float64 {
+	return lapack64.Dpbcon(a.Uplo, a.N, a.K, a.Data, a.Stride, anorm, work, iwork)
+}
+
+// Pbtrf computes the Cholesky factorization of an n×n symmetric positive
+// definite band matrix
+//  A = Uᵀ * U  if a.Uplo == blas.Upper
+//  A = L * Lᵀ  if a.Uplo == blas.Lower
+// where U and L are upper, respectively lower, triangular band matrices.
+//
+// The triangular matrix U or L is returned in t, and the underlying data
+// between a and t is shared. The returned bool indicates whether A is positive
+// definite and the factorization could be finished.
+func Pbtrf(a blas64.SymmetricBand) (t blas64.TriangularBand, ok bool) {
+	ok = lapack64.Dpbtrf(a.Uplo, a.N, a.K, a.Data, max(1, a.Stride))
+	t.Uplo = a.Uplo
+	t.Diag = blas.NonUnit
+	t.N = a.N
+	t.K = a.K
+	t.Data = a.Data
+	t.Stride = a.Stride
+	return t, ok
+}
+
+// Pbtrs solves a system of linear equations A*X = B with an n×n symmetric
+// positive definite band matrix A using the Cholesky factorization
+//  A = Uᵀ * U  if t.Uplo == blas.Upper
+//  A = L * Lᵀ  if t.Uplo == blas.Lower
+// t contains the corresponding triangular factor as returned by Pbtrf.
+//
+// On entry, b contains the right hand side matrix B. On return, it is
+// overwritten with the solution matrix X.
+func Pbtrs(t blas64.TriangularBand, b blas64.General) {
+	lapack64.Dpbtrs(t.Uplo, t.N, t.K, b.Cols, t.Data, max(1, t.Stride), b.Data, max(1, b.Stride))
 }
 
 // Gecon estimates the reciprocal of the condition number of the n×n matrix A
@@ -365,6 +420,40 @@ func Ggsvd3(jobU, jobV, jobQ lapack.GSVDJob, a, b blas64.General, alpha, beta []
 	return lapack64.Dggsvd3(jobU, jobV, jobQ, a.Rows, a.Cols, b.Rows, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride), alpha, beta, u.Data, max(1, u.Stride), v.Data, max(1, v.Stride), q.Data, max(1, q.Stride), work, lwork, iwork)
 }
 
+// Gtsv solves one of the equations
+//  A * X = B   if trans == blas.NoTrans
+//  Aᵀ * X = B  if trans == blas.Trans or blas.ConjTrans
+// where A is an n×n tridiagonal matrix. It uses Gaussian elimination with
+// partial pivoting.
+//
+// On entry, a contains the matrix A, on return it will be overwritten.
+//
+// On entry, b contains the n×nrhs right-hand side matrix B. On return, it will
+// be overwritten. If ok is true, it will be overwritten by the solution matrix X.
+//
+// Gtsv returns whether the solution X has been successfuly computed.
+//
+// Dgtsv is not part of the lapack.Float64 interface and so calls to Gtsv are
+// always executed by the Gonum implementation.
+func Gtsv(trans blas.Transpose, a Tridiagonal, b blas64.General) (ok bool) {
+	if trans != blas.NoTrans {
+		a.DL, a.DU = a.DU, a.DL
+	}
+	return gonum.Implementation{}.Dgtsv(a.N, b.Cols, a.DL, a.D, a.DU, b.Data, max(1, b.Stride))
+}
+
+// Lagtm performs one of the matrix-matrix operations
+//  C = alpha * A * B + beta * C   if trans == blas.NoTrans
+//  C = alpha * Aᵀ * B + beta * C  if trans == blas.Trans or blas.ConjTrans
+// where A is an m×m tridiagonal matrix represented by its diagonals dl, d, du,
+// B and C are m×n dense matrices, and alpha and beta are scalars.
+//
+// Dlagtm is not part of the lapack.Float64 interface and so calls to Lagtm are
+// always executed by the Gonum implementation.
+func Lagtm(trans blas.Transpose, alpha float64, a Tridiagonal, b blas64.General, beta float64, c blas64.General) {
+	gonum.Implementation{}.Dlagtm(trans, c.Rows, c.Cols, alpha, a.DL, a.D, a.DU, b.Data, max(1, b.Stride), beta, c.Data, max(1, c.Stride))
+}
+
 // Lange computes the matrix norm of the general m×n matrix A. The input norm
 // specifies the norm computed.
 //  lapack.MaxAbs: the maximum absolute value of an element.
@@ -377,8 +466,27 @@ func Lange(norm lapack.MatrixNorm, a blas64.General, work []float64) float64 {
 	return lapack64.Dlange(norm, a.Rows, a.Cols, a.Data, max(1, a.Stride), work)
 }
 
+// Langt computes the specified norm of an n×n tridiagonal matrix.
+//
+// Dlangt is not part of the lapack.Float64 interface and so calls to Langt are
+// always executed by the Gonum implementation.
+func Langt(norm lapack.MatrixNorm, a Tridiagonal) float64 {
+	return gonum.Implementation{}.Dlangt(norm, a.N, a.DL, a.D, a.DU)
+}
+
+// Lansb computes the specified norm of an n×n symmetric band matrix. If
+// norm == lapack.MaxColumnSum or norm == lapack.MaxRowSum, work must have length
+// at least n and this function will panic otherwise.
+// There are no restrictions on work for the other matrix norms.
+//
+// Dlansb is not part of the lapack.Float64 interface and so calls to Lansb are always
+// executed by the Gonum implementation.
+func Lansb(norm lapack.MatrixNorm, a blas64.SymmetricBand, work []float64) float64 {
+	return gonum.Implementation{}.Dlansb(norm, a.Uplo, a.N, a.K, a.Data, max(1, a.Stride), work)
+}
+
 // Lansy computes the specified norm of an n×n symmetric matrix. If
-// norm == lapack.MaxColumnSum or norm == lapackMaxRowSum work must have length
+// norm == lapack.MaxColumnSum or norm == lapack.MaxRowSum, work must have length
 // at least n and this function will panic otherwise.
 // There are no restrictions on work for the other matrix norms.
 func Lansy(norm lapack.MatrixNorm, a blas64.Symmetric, work []float64) float64 {
@@ -390,6 +498,14 @@ func Lansy(norm lapack.MatrixNorm, a blas64.Symmetric, work []float64) float64 {
 // will panic otherwise. There are no restrictions on work for the other matrix norms.
 func Lantr(norm lapack.MatrixNorm, a blas64.Triangular, work []float64) float64 {
 	return lapack64.Dlantr(norm, a.Uplo, a.Diag, a.N, a.N, a.Data, max(1, a.Stride), work)
+}
+
+// Lantb computes the specified norm of an n×n triangular band matrix A. If
+// norm == lapack.MaxColumnSum work must have length at least n and this function
+// will panic otherwise. There are no restrictions on work for the other matrix
+// norms.
+func Lantb(norm lapack.MatrixNorm, a blas64.TriangularBand, work []float64) float64 {
+	return gonum.Implementation{}.Dlantb(norm, a.Uplo, a.Diag, a.N, a.K, a.Data, max(1, a.Stride), work)
 }
 
 // Lapmt rearranges the columns of the m×n matrix X as specified by the
@@ -491,6 +607,17 @@ func Pocon(a blas64.Symmetric, anorm float64, work []float64, iwork []int) float
 // optimal work length is stored into work[0].
 func Syev(jobz lapack.EVJob, a blas64.Symmetric, w, work []float64, lwork int) (ok bool) {
 	return lapack64.Dsyev(jobz, a.Uplo, a.N, a.Data, max(1, a.Stride), w, work, lwork)
+}
+
+// Tbtrs solves a triangular system of the form
+//  A * X = B   if trans == blas.NoTrans
+//  Aᵀ * X = B  if trans == blas.Trans or blas.ConjTrans
+// where A is an n×n triangular band matrix, and B is an n×nrhs matrix.
+//
+// Tbtrs returns whether A is non-singular. If A is singular, no solutions X
+// are computed.
+func Tbtrs(trans blas.Transpose, a blas64.TriangularBand, b blas64.General) (ok bool) {
+	return lapack64.Dtbtrs(a.Uplo, trans, a.Diag, a.N, a.K, b.Cols, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride))
 }
 
 // Trcon estimates the reciprocal of the condition number of a triangular matrix A.

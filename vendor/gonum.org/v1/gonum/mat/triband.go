@@ -5,8 +5,11 @@
 package mat
 
 import (
+	"math"
+
 	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
+	"gonum.org/v1/gonum/lapack/lapack64"
 )
 
 var (
@@ -201,10 +204,10 @@ func NewTriBandDense(n, k int, kind TriKind, data []float64) *TriBandDense {
 		if n == 0 {
 			panic(ErrZeroLength)
 		}
-		panic("mat: negative dimension")
+		panic(ErrNegativeDimension)
 	}
 	if k+1 > n {
-		panic("mat: band out of range")
+		panic(ErrBandwidth)
 	}
 	bc := k + 1
 	if data != nil && len(data) != n*bc {
@@ -258,6 +261,94 @@ func (t *TriBandDense) Reset() {
 	t.mat.Stride = 0
 	t.mat.K = 0
 	t.mat.Data = t.mat.Data[:0]
+}
+
+// ReuseAsTriBand changes the receiver to be of size n×n, bandwidth k+1 and of
+// the given kind, re-using the backing data slice if it has sufficient capacity
+// and allocating a new slice otherwise. The backing data is zero on return.
+//
+// The receiver must be empty, n must be positive and k must be non-negative and
+// less than n, otherwise ReuseAsTriBand will panic. To empty the receiver for
+// re-use, Reset should be used.
+func (t *TriBandDense) ReuseAsTriBand(n, k int, kind TriKind) {
+	if n <= 0 || k < 0 {
+		if n == 0 {
+			panic(ErrZeroLength)
+		}
+		panic(ErrNegativeDimension)
+	}
+	if k+1 > n {
+		panic(ErrBandwidth)
+	}
+	if !t.IsEmpty() {
+		panic(ErrReuseNonEmpty)
+	}
+	t.reuseAsZeroed(n, k, kind)
+}
+
+// reuseAsZeroed resizes an empty receiver to an n×n triangular band matrix with
+// the given bandwidth and orientation. If the receiver is not empty,
+// reuseAsZeroed checks that the receiver has the correct size, bandwidth and
+// orientation. It then zeros out the matrix data.
+func (t *TriBandDense) reuseAsZeroed(n, k int, kind TriKind) {
+	// reuseAsZeroed must be kept in sync with reuseAsNonZeroed.
+	if n == 0 {
+		panic(ErrZeroLength)
+	}
+	ul := blas.Lower
+	if kind == Upper {
+		ul = blas.Upper
+	}
+	if t.IsEmpty() {
+		t.mat = blas64.TriangularBand{
+			Uplo:   ul,
+			Diag:   blas.NonUnit,
+			N:      n,
+			K:      k,
+			Data:   useZeroed(t.mat.Data, n*(k+1)),
+			Stride: k + 1,
+		}
+		return
+	}
+	if t.mat.N != n || t.mat.K != k {
+		panic(ErrShape)
+	}
+	if t.mat.Uplo != ul {
+		panic(ErrTriangle)
+	}
+	t.Zero()
+}
+
+// reuseAsNonZeroed resizes an empty receiver to an n×n triangular band matrix
+// with the given bandwidth and orientation. If the receiver is not empty,
+// reuseAsZeroed checks that the receiver has the correct size, bandwidth and
+// orientation.
+func (t *TriBandDense) reuseAsNonZeroed(n, k int, kind TriKind) {
+	// reuseAsNonZeroed must be kept in sync with reuseAsZeroed.
+	if n == 0 {
+		panic(ErrZeroLength)
+	}
+	ul := blas.Lower
+	if kind == Upper {
+		ul = blas.Upper
+	}
+	if t.IsEmpty() {
+		t.mat = blas64.TriangularBand{
+			Uplo:   ul,
+			Diag:   blas.NonUnit,
+			N:      n,
+			K:      k,
+			Data:   use(t.mat.Data, n*(k+1)),
+			Stride: k + 1,
+		}
+		return
+	}
+	if t.mat.N != n || t.mat.K != k {
+		panic(ErrShape)
+	}
+	if t.mat.Uplo != ul {
+		panic(ErrTriangle)
+	}
 }
 
 // Zero sets all of the matrix elements to zero.
@@ -368,4 +459,120 @@ func (t *TriBandDense) Trace() float64 {
 		tr += rb.Data[offsetIndex+i*rb.Stride]
 	}
 	return tr
+}
+
+// SolveTo solves a triangular system T * X = B  or  Tᵀ * X = B where T is an
+// n×n triangular band matrix represented by the receiver and B is a given
+// n×nrhs matrix. If T is non-singular, the result will be stored into dst and
+// nil will be returned. If T is singular, the contents of dst will be undefined
+// and a Condition error will be returned.
+func (t *TriBandDense) SolveTo(dst *Dense, trans bool, b Matrix) error {
+	n, nrhs := b.Dims()
+	if n != t.mat.N {
+		panic(ErrShape)
+	}
+	if b, ok := b.(RawMatrixer); ok && dst != b {
+		dst.checkOverlap(b.RawMatrix())
+	}
+	dst.reuseAsNonZeroed(n, nrhs)
+	if dst != b {
+		dst.Copy(b)
+	}
+	var ok bool
+	if trans {
+		ok = lapack64.Tbtrs(blas.Trans, t.mat, dst.mat)
+	} else {
+		ok = lapack64.Tbtrs(blas.NoTrans, t.mat, dst.mat)
+	}
+	if !ok {
+		return Condition(math.Inf(1))
+	}
+	return nil
+}
+
+// SolveVecTo solves a triangular system T * x = b  or  Tᵀ * x = b where T is an
+// n×n triangular band matrix represented by the receiver and b is a given
+// n-vector. If T is non-singular, the result will be stored into dst and nil
+// will be returned. If T is singular, the contents of dst will be undefined and
+// a Condition error will be returned.
+func (t *TriBandDense) SolveVecTo(dst *VecDense, trans bool, b Vector) error {
+	n, nrhs := b.Dims()
+	if n != t.mat.N || nrhs != 1 {
+		panic(ErrShape)
+	}
+	if b, ok := b.(RawVectorer); ok && dst != b {
+		dst.checkOverlap(b.RawVector())
+	}
+	dst.reuseAsNonZeroed(n)
+	if dst != b {
+		dst.CopyVec(b)
+	}
+	var ok bool
+	if trans {
+		ok = lapack64.Tbtrs(blas.Trans, t.mat, dst.asGeneral())
+	} else {
+		ok = lapack64.Tbtrs(blas.NoTrans, t.mat, dst.asGeneral())
+	}
+	if !ok {
+		return Condition(math.Inf(1))
+	}
+	return nil
+}
+
+func copySymBandIntoTriBand(dst *TriBandDense, s SymBanded) {
+	n, k, upper := dst.TriBand()
+	ns, ks := s.SymBand()
+	if n != ns {
+		panic("mat: triangle size mismatch")
+	}
+	if k != ks {
+		panic("mat: triangle bandwidth mismatch")
+	}
+
+	// TODO(vladimir-ch): implement the missing cases below as needed.
+	t := dst.mat
+	sU, _ := untransposeExtract(s)
+	if sbd, ok := sU.(*SymBandDense); ok {
+		s := sbd.RawSymBand()
+		if upper {
+			if s.Uplo == blas.Upper {
+				// dst is upper triangular, s is stored in upper triangle.
+				for i := 0; i < n; i++ {
+					ilen := min(k+1, n-i)
+					copy(t.Data[i*t.Stride:i*t.Stride+ilen], s.Data[i*s.Stride:i*s.Stride+ilen])
+				}
+			} else {
+				// dst is upper triangular, s is stored in lower triangle.
+				//
+				// The following is a possible implementation for this case but
+				// is commented out due to lack of test coverage.
+				// for i := 0; i < n; i++ {
+				//  ilen := min(k+1, n-i)
+				//  for j := 0; j < ilen; j++ {
+				//      t.Data[i*t.Stride+j] = s.Data[(i+j)*s.Stride+k-j]
+				//  }
+				// }
+				panic("not implemented")
+			}
+		} else {
+			if s.Uplo == blas.Upper {
+				// dst is lower triangular, s is stored in upper triangle.
+				panic("not implemented")
+			} else {
+				// dst is lower triangular, s is stored in lower triangle.
+				panic("not implemented")
+			}
+		}
+		return
+	}
+	if upper {
+		for i := 0; i < n; i++ {
+			ilen := min(k+1, n-i)
+			for j := 0; j < ilen; j++ {
+				t.Data[i*t.Stride+j] = s.At(i, i+j)
+			}
+		}
+	} else {
+		panic("not implemented")
+	}
 }

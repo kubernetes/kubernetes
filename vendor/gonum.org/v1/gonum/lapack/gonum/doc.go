@@ -22,7 +22,7 @@
 //
 // The full LAPACK capability has not been implemented at present. The full
 // API is very large, containing approximately 200 functions for double precision
-// alone. Future additions will be focused on supporting the gonum matrix
-// package (https://godoc.org/github.com/gonum/matrix/mat64), though pull requests
+// alone. Future additions will be focused on supporting the Gonum matrix
+// package (https://godoc.org/gonum.org/v1/gonum/mat), though pull requests
 // with implementations and tests for LAPACK function are encouraged.
 package gonum // import "gonum.org/v1/gonum/lapack/gonum"

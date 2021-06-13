@@ -36,9 +36,7 @@ func abs(a int) int {
 
 const (
 	// dlamchE is the machine epsilon. For IEEE this is 2^{-53}.
-	dlamchE = 1.0 / (1 << 53)
-	// TODO(kortschak) Replace this with 0x1p-53 when go1.12 is no
-	// longer supported.
+	dlamchE = 0x1p-53
 
 	// dlamchB is the radix of the machine (the base of the number system).
 	dlamchB = 2
@@ -49,7 +47,5 @@ const (
 	// dlamchS is the "safe minimum", that is, the lowest number such that
 	// 1/dlamchS does not overflow, or also the smallest normal number.
 	// For IEEE this is 2^{-1022}.
-	dlamchS = 1.0 / (1 << 256) / (1 << 256) / (1 << 256) / (1 << 254)
-	// TODO(kortschak) Replace this with 0x1p-1022 when go1.12 is no
-	// longer supported.
+	dlamchS = 0x1p-1022
 )

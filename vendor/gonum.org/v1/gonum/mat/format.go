@@ -7,6 +7,7 @@ package mat
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Formatted returns a fmt.Formatter for the matrix m using the given options.
@@ -27,13 +28,15 @@ type formatter struct {
 	margin  int
 	dot     byte
 	squeeze bool
+
+	format func(m Matrix, prefix string, margin int, dot byte, squeeze bool, fs fmt.State, c rune)
 }
 
 // FormatOption is a functional option for matrix formatting.
 type FormatOption func(*formatter)
 
 // Prefix sets the formatted prefix to the string p. Prefix is a string that is prepended to
-// each line of output.
+// each line of output after the first line.
 func Prefix(p string) FormatOption {
 	return func(f *formatter) { f.prefix = p }
 }
@@ -51,18 +54,35 @@ func DotByte(b byte) FormatOption {
 	return func(f *formatter) { f.dot = b }
 }
 
-// Squeeze sets the printing behaviour to minimise column width for each individual column.
+// Squeeze sets the printing behavior to minimise column width for each individual column.
 func Squeeze() FormatOption {
 	return func(f *formatter) { f.squeeze = true }
 }
 
+// FormatMATLAB sets the printing behavior to output MATLAB syntax. If MATLAB syntax is
+// specified, the ' ' verb flag and Excerpt option are ignored. If the alternative syntax
+// verb flag, '#' is used the matrix is formatted in rows and columns.
+func FormatMATLAB() FormatOption {
+	return func(f *formatter) { f.format = formatMATLAB }
+}
+
+// FormatPython sets the printing behavior to output Python syntax. If Python syntax is
+// specified, the ' ' verb flag and Excerpt option are ignored. If the alternative syntax
+// verb flag, '#' is used the matrix is formatted in rows and columns.
+func FormatPython() FormatOption {
+	return func(f *formatter) { f.format = formatPython }
+}
+
 // Format satisfies the fmt.Formatter interface.
 func (f formatter) Format(fs fmt.State, c rune) {
-	if c == 'v' && fs.Flag('#') {
+	if c == 'v' && fs.Flag('#') && f.format == nil {
 		fmt.Fprintf(fs, "%#v", f.matrix)
 		return
 	}
-	format(f.matrix, f.prefix, f.margin, f.dot, f.squeeze, fs, c)
+	if f.format == nil {
+		f.format = format
+	}
+	f.format(f.matrix, f.prefix, f.margin, f.dot, f.squeeze, fs, c)
 }
 
 // format prints a pretty representation of m to the fs io.Writer. The format character c
@@ -191,6 +211,264 @@ func format(m Matrix, prefix string, margin int, dot byte, squeeze bool, fs fmt.
 			continue
 		}
 	}
+}
+
+// formatMATLAB prints a MATLAB representation of m to the fs io.Writer. The format character c
+// specifies the numerical representation of elements; valid values are those for float64
+// specified in the fmt package, with their associated flags.
+// The printed range of the matrix can be limited by specifying a positive value for margin;
+// If squeeze is true, column widths are determined on a per-column basis.
+//
+// formatMATLAB will not provide Go syntax output.
+func formatMATLAB(m Matrix, prefix string, _ int, _ byte, squeeze bool, fs fmt.State, c rune) {
+	rows, cols := m.Dims()
+
+	prec, pOk := fs.Precision()
+	width, _ := fs.Width()
+	if !fs.Flag('#') {
+		switch c {
+		case 'v', 'e', 'E', 'f', 'F', 'g', 'G':
+		default:
+			fmt.Fprintf(fs, "%%!%c(%T=Dims(%d, %d))", c, m, rows, cols)
+			return
+		}
+		format := fmtString(fs, c, prec, width)
+		fs.Write([]byte{'['})
+		for i := 0; i < rows; i++ {
+			if i != 0 {
+				fs.Write([]byte("; "))
+			}
+			for j := 0; j < cols; j++ {
+				if j != 0 {
+					fs.Write([]byte{' '})
+				}
+				fmt.Fprintf(fs, format, m.At(i, j))
+			}
+		}
+		fs.Write([]byte{']'})
+		return
+	}
+
+	if !pOk {
+		prec = -1
+	}
+
+	printed := rows
+	if cols > printed {
+		printed = cols
+	}
+
+	var (
+		maxWidth int
+		widths   widther
+		buf, pad []byte
+	)
+	if squeeze {
+		widths = make(columnWidth, cols)
+	} else {
+		widths = new(uniformWidth)
+	}
+	switch c {
+	case 'v', 'e', 'E', 'f', 'F', 'g', 'G':
+		if c == 'v' {
+			buf, maxWidth = maxCellWidth(m, 'g', printed, prec, widths)
+		} else {
+			buf, maxWidth = maxCellWidth(m, c, printed, prec, widths)
+		}
+	default:
+		fmt.Fprintf(fs, "%%!%c(%T=Dims(%d, %d))", c, m, rows, cols)
+		return
+	}
+	width = max(width, maxWidth)
+	pad = make([]byte, max(width, 1))
+	for i := range pad {
+		pad[i] = ' '
+	}
+
+	for i := 0; i < rows; i++ {
+		var el string
+		switch {
+		case rows == 1:
+			fmt.Fprint(fs, "[")
+			el = "]"
+		case i == 0:
+			fmt.Fprint(fs, "[\n"+prefix+" ")
+			el = "\n"
+		case i < rows-1:
+			fmt.Fprint(fs, prefix+" ")
+			el = "\n"
+		default:
+			fmt.Fprint(fs, prefix+" ")
+			el = "\n" + prefix + "]"
+		}
+
+		for j := 0; j < cols; j++ {
+			v := m.At(i, j)
+			if c == 'v' {
+				buf = strconv.AppendFloat(buf[:0], v, 'g', prec, 64)
+			} else {
+				buf = strconv.AppendFloat(buf[:0], v, byte(c), prec, 64)
+			}
+			if fs.Flag('-') {
+				fs.Write(buf)
+				fs.Write(pad[:widths.width(j)-len(buf)])
+			} else {
+				fs.Write(pad[:widths.width(j)-len(buf)])
+				fs.Write(buf)
+			}
+
+			if j < cols-1 {
+				fs.Write(pad[:1])
+			}
+		}
+
+		fmt.Fprint(fs, el)
+	}
+}
+
+// formatPython prints a Python representation of m to the fs io.Writer. The format character c
+// specifies the numerical representation of elements; valid values are those for float64
+// specified in the fmt package, with their associated flags.
+// The printed range of the matrix can be limited by specifying a positive value for margin;
+// If squeeze is true, column widths are determined on a per-column basis.
+//
+// formatPython will not provide Go syntax output.
+func formatPython(m Matrix, prefix string, _ int, _ byte, squeeze bool, fs fmt.State, c rune) {
+	rows, cols := m.Dims()
+
+	prec, pOk := fs.Precision()
+	width, _ := fs.Width()
+	if !fs.Flag('#') {
+		switch c {
+		case 'v', 'e', 'E', 'f', 'F', 'g', 'G':
+		default:
+			fmt.Fprintf(fs, "%%!%c(%T=Dims(%d, %d))", c, m, rows, cols)
+			return
+		}
+		format := fmtString(fs, c, prec, width)
+		fs.Write([]byte{'['})
+		if rows > 1 {
+			fs.Write([]byte{'['})
+		}
+		for i := 0; i < rows; i++ {
+			if i != 0 {
+				fs.Write([]byte("], ["))
+			}
+			for j := 0; j < cols; j++ {
+				if j != 0 {
+					fs.Write([]byte(", "))
+				}
+				fmt.Fprintf(fs, format, m.At(i, j))
+			}
+		}
+		if rows > 1 {
+			fs.Write([]byte{']'})
+		}
+		fs.Write([]byte{']'})
+		return
+	}
+
+	if !pOk {
+		prec = -1
+	}
+
+	printed := rows
+	if cols > printed {
+		printed = cols
+	}
+
+	var (
+		maxWidth int
+		widths   widther
+		buf, pad []byte
+	)
+	if squeeze {
+		widths = make(columnWidth, cols)
+	} else {
+		widths = new(uniformWidth)
+	}
+	switch c {
+	case 'v', 'e', 'E', 'f', 'F', 'g', 'G':
+		if c == 'v' {
+			buf, maxWidth = maxCellWidth(m, 'g', printed, prec, widths)
+		} else {
+			buf, maxWidth = maxCellWidth(m, c, printed, prec, widths)
+		}
+	default:
+		fmt.Fprintf(fs, "%%!%c(%T=Dims(%d, %d))", c, m, rows, cols)
+		return
+	}
+	width = max(width, maxWidth)
+	pad = make([]byte, max(width, 1))
+	for i := range pad {
+		pad[i] = ' '
+	}
+
+	for i := 0; i < rows; i++ {
+		if i != 0 {
+			fmt.Fprint(fs, prefix)
+		}
+		var el string
+		switch {
+		case rows == 1:
+			fmt.Fprint(fs, "[")
+			el = "]"
+		case i == 0:
+			fmt.Fprint(fs, "[[")
+			el = "],\n"
+		case i < rows-1:
+			fmt.Fprint(fs, " [")
+			el = "],\n"
+		default:
+			fmt.Fprint(fs, " [")
+			el = "]]"
+		}
+
+		for j := 0; j < cols; j++ {
+			v := m.At(i, j)
+			if c == 'v' {
+				buf = strconv.AppendFloat(buf[:0], v, 'g', prec, 64)
+			} else {
+				buf = strconv.AppendFloat(buf[:0], v, byte(c), prec, 64)
+			}
+			if fs.Flag('-') {
+				fs.Write(buf)
+				fs.Write(pad[:widths.width(j)-len(buf)])
+			} else {
+				fs.Write(pad[:widths.width(j)-len(buf)])
+				fs.Write(buf)
+			}
+
+			if j < cols-1 {
+				fs.Write([]byte{','})
+				fs.Write(pad[:1])
+			}
+		}
+
+		fmt.Fprint(fs, el)
+	}
+}
+
+// This is horrible, but it's what we have.
+func fmtString(fs fmt.State, c rune, prec, width int) string {
+	var b strings.Builder
+	b.WriteByte('%')
+	for _, f := range "0+- " {
+		if fs.Flag(int(f)) {
+			b.WriteByte(byte(f))
+		}
+	}
+	if width >= 0 {
+		fmt.Fprint(&b, width)
+	}
+	if prec >= 0 {
+		b.WriteByte('.')
+		if prec > 0 {
+			fmt.Fprint(&b, prec)
+		}
+	}
+	b.WriteRune(c)
+	return b.String()
 }
 
 func maxCellWidth(m Matrix, c rune, printed, prec int, w widther) ([]byte, int) {

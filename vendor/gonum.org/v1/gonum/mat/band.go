@@ -5,6 +5,7 @@
 package mat
 
 import (
+	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
@@ -296,4 +297,39 @@ func (b *BandDense) Trace() float64 {
 		tr += rb.Data[rb.KL+i*rb.Stride]
 	}
 	return tr
+}
+
+// MulVecTo computes B⋅x or Bᵀ⋅x storing the result into dst.
+func (b *BandDense) MulVecTo(dst *VecDense, trans bool, x Vector) {
+	m, n := b.Dims()
+	if trans {
+		m, n = n, m
+	}
+	if x.Len() != n {
+		panic(ErrShape)
+	}
+	dst.reuseAsNonZeroed(m)
+
+	t := blas.NoTrans
+	if trans {
+		t = blas.Trans
+	}
+
+	xMat, _ := untransposeExtract(x)
+	if xVec, ok := xMat.(*VecDense); ok {
+		if dst != xVec {
+			dst.checkOverlap(xVec.mat)
+			blas64.Gbmv(t, 1, b.mat, xVec.mat, 0, dst.mat)
+		} else {
+			xCopy := getWorkspaceVec(n, false)
+			xCopy.CloneFromVec(xVec)
+			blas64.Gbmv(t, 1, b.mat, xCopy.mat, 0, dst.mat)
+			putWorkspaceVec(xCopy)
+		}
+	} else {
+		xCopy := getWorkspaceVec(n, false)
+		xCopy.CloneFromVec(x)
+		blas64.Gbmv(t, 1, b.mat, xCopy.mat, 0, dst.mat)
+		putWorkspaceVec(xCopy)
+	}
 }

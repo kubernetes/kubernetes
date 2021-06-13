@@ -251,3 +251,30 @@ func (s *SymBandDense) Trace() float64 {
 	}
 	return tr
 }
+
+// MulVecTo computes S⋅x storing the result into dst.
+func (s *SymBandDense) MulVecTo(dst *VecDense, _ bool, x Vector) {
+	n := s.mat.N
+	if x.Len() != n {
+		panic(ErrShape)
+	}
+	dst.reuseAsNonZeroed(n)
+
+	xMat, _ := untransposeExtract(x)
+	if xVec, ok := xMat.(*VecDense); ok {
+		if dst != xVec {
+			dst.checkOverlap(xVec.mat)
+			blas64.Sbmv(1, s.mat, xVec.mat, 0, dst.mat)
+		} else {
+			xCopy := getWorkspaceVec(n, false)
+			xCopy.CloneFromVec(xVec)
+			blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
+			putWorkspaceVec(xCopy)
+		}
+	} else {
+		xCopy := getWorkspaceVec(n, false)
+		xCopy.CloneFromVec(x)
+		blas64.Sbmv(1, s.mat, xCopy.mat, 0, dst.mat)
+		putWorkspaceVec(xCopy)
+	}
+}

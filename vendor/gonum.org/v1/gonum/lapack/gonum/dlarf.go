@@ -9,16 +9,15 @@ import (
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
-// Dlarf applies an elementary reflector to a general rectangular matrix c.
-// This computes
-//  c = h * c if side == Left
-//  c = c * h if side == right
-// where
-//  h = 1 - tau * v * vᵀ
-// and c is an m * n matrix.
+// Dlarf applies an elementary reflector H to an m×n matrix C:
+//  C = H * C  if side == blas.Left
+//  C = C * H  if side == blas.Right
+// H is represented in the form
+//  H = I - tau * v * vᵀ
+// where tau is a scalar and v is a vector.
 //
-// work is temporary storage of length at least m if side == Left and at least
-// n if side == Right. This function will panic if this length requirement is not met.
+// work must have length at least m if side == blas.Left and
+// at least n if side == blas.Right.
 //
 // Dlarf is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlarf(side blas.Side, m, n int, v []float64, incv int, tau float64, c []float64, ldc int, work []float64) {
@@ -54,19 +53,18 @@ func (impl Implementation) Dlarf(side blas.Side, m, n int, v []float64, incv int
 		panic(shortWork)
 	}
 
-	lastv := 0 // last non-zero element of v
-	lastc := 0 // last non-zero row/column of c
+	lastv := -1 // last non-zero element of v
+	lastc := -1 // last non-zero row/column of C
 	if tau != 0 {
-		var i int
 		if applyleft {
 			lastv = m - 1
 		} else {
 			lastv = n - 1
 		}
+		var i int
 		if incv > 0 {
 			i = lastv * incv
 		}
-
 		// Look for the last non-zero row in v.
 		for lastv >= 0 && v[i] == 0 {
 			lastv--
@@ -83,7 +81,6 @@ func (impl Implementation) Dlarf(side blas.Side, m, n int, v []float64, incv int
 	if lastv == -1 || lastc == -1 {
 		return
 	}
-	// Sometimes 1-indexing is nicer ...
 	bi := blas64.Implementation()
 	if applyleft {
 		// Form H * C
@@ -91,11 +88,11 @@ func (impl Implementation) Dlarf(side blas.Side, m, n int, v []float64, incv int
 		bi.Dgemv(blas.Trans, lastv+1, lastc+1, 1, c, ldc, v, incv, 0, work, 1)
 		// c[0: lastv, 0: lastc] = c[...] - w[0:lastv, 1] * v[1:lastc, 1]ᵀ
 		bi.Dger(lastv+1, lastc+1, -tau, v, incv, work, 1, c, ldc)
-		return
+	} else {
+		// Form C * H
+		// w[0:lastc+1,1] := c[0:lastc+1,0:lastv+1] * v[0:lastv+1,1]
+		bi.Dgemv(blas.NoTrans, lastc+1, lastv+1, 1, c, ldc, v, incv, 0, work, 1)
+		// c[0:lastc+1,0:lastv+1] = c[...] - w[0:lastc+1,0] * v[0:lastv+1,0]ᵀ
+		bi.Dger(lastc+1, lastv+1, -tau, work, 1, v, incv, c, ldc)
 	}
-	// Form C*H
-	// w[0:lastc+1,1] := c[0:lastc+1,0:lastv+1] * v[0:lastv+1,1]
-	bi.Dgemv(blas.NoTrans, lastc+1, lastv+1, 1, c, ldc, v, incv, 0, work, 1)
-	// c[0:lastc+1,0:lastv+1] = c[...] - w[0:lastc+1,0] * v[0:lastv+1,0]ᵀ
-	bi.Dger(lastc+1, lastv+1, -tau, work, 1, v, incv, c, ldc)
 }

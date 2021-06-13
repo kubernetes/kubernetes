@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/internal/uid"
 	"gonum.org/v1/gonum/graph/iterator"
+	"gonum.org/v1/gonum/graph/set/uid"
 )
 
 var (
@@ -28,7 +28,7 @@ type UndirectedGraph struct {
 	nodes map[int64]graph.Node
 	edges map[int64]map[int64]graph.Edge
 
-	nodeIDs uid.Set
+	nodeIDs *uid.Set
 }
 
 // NewUndirectedGraph returns an UndirectedGraph.
@@ -94,21 +94,14 @@ func (g *UndirectedGraph) Edges() graph.Edges {
 }
 
 // From returns all nodes in g that can be reached directly from n.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *UndirectedGraph) From(id int64) graph.Nodes {
-	if _, ok := g.nodes[id]; !ok {
+	if len(g.edges[id]) == 0 {
 		return graph.Empty
 	}
-
-	nodes := make([]graph.Node, len(g.edges[id]))
-	i := 0
-	for from := range g.edges[id] {
-		nodes[i] = g.nodes[from]
-		i++
-	}
-	if len(nodes) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodesByEdge(g.nodes, g.edges[id])
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y.
@@ -119,7 +112,7 @@ func (g *UndirectedGraph) HasEdgeBetween(xid, yid int64) bool {
 
 // NewEdge returns a new Edge from the source to the destination node.
 func (g *UndirectedGraph) NewEdge(from, to graph.Node) graph.Edge {
-	return &Edge{F: from, T: to}
+	return Edge{F: from, T: to}
 }
 
 // NewNode returns a new unique Node to be added to g. The Node's ID does
@@ -141,17 +134,14 @@ func (g *UndirectedGraph) Node(id int64) graph.Node {
 }
 
 // Nodes returns all the nodes in the graph.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *UndirectedGraph) Nodes() graph.Nodes {
 	if len(g.nodes) == 0 {
 		return graph.Empty
 	}
-	nodes := make([]graph.Node, len(g.nodes))
-	i := 0
-	for _, n := range g.nodes {
-		nodes[i] = n
-		i++
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodes(g.nodes)
 }
 
 // RemoveEdge removes the edge with the given end IDs from the graph, leaving the terminal nodes.

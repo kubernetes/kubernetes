@@ -20,7 +20,7 @@ import (
 // number of A is sufficiently large. If A is exactly singular to working precision,
 // Condition == ∞, and the solve algorithm may have completed early. If Condition
 // is large and finite the solve algorithm will be performed, but the computed
-// solution may be innacurate. Due to the nature of finite precision arithmetic,
+// solution may be inaccurate. Due to the nature of finite precision arithmetic,
 // the value of Condition is only an approximate test of singularity.
 type Condition float64
 
@@ -131,6 +131,7 @@ var (
 	ErrPivot               = Error{"mat: malformed pivot list"}
 	ErrTriangle            = Error{"mat: triangular storage mismatch"}
 	ErrTriangleSet         = Error{"mat: triangular set out of bounds"}
+	ErrBandwidth           = Error{"mat: bandwidth out of range"}
 	ErrBandSet             = Error{"mat: band set out of bounds"}
 	ErrDiagSet             = Error{"mat: diagonal set out of bounds"}
 	ErrSliceLengthMismatch = Error{"mat: input slice length mismatch"}
@@ -149,3 +150,5 @@ type ErrorStack struct {
 }
 
 func (err ErrorStack) Error() string { return err.Err.Error() }
+
+const badCap = "mat: bad capacity"

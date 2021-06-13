@@ -97,7 +97,7 @@ func (m *Dense) reuseAsNonZeroed(r, c int) {
 	// reuseAs must be kept in sync with reuseAsZeroed.
 	if m.mat.Rows > m.capRows || m.mat.Cols > m.capCols {
 		// Panic as a string, not a mat.Error.
-		panic("mat: caps not correctly set")
+		panic(badCap)
 	}
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
@@ -125,7 +125,7 @@ func (m *Dense) reuseAsZeroed(r, c int) {
 	// reuseAsZeroed must be kept in sync with reuseAsNonZeroed.
 	if m.mat.Rows > m.capRows || m.mat.Cols > m.capCols {
 		// Panic as a string, not a mat.Error.
-		panic("mat: caps not correctly set")
+		panic(badCap)
 	}
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
@@ -318,6 +318,10 @@ func (m *Dense) DiagView() Diagonal {
 // Slice panics with ErrIndexOutOfRange if the slice is outside the capacity
 // of the receiver.
 func (m *Dense) Slice(i, k, j, l int) Matrix {
+	return m.slice(i, k, j, l)
+}
+
+func (m *Dense) slice(i, k, j, l int) *Dense {
 	mr, mc := m.Caps()
 	if i < 0 || mr <= i || j < 0 || mc <= j || k < i || mr < k || l < j || mc < l {
 		if i == k || j == l {
@@ -545,7 +549,7 @@ func (m *Dense) Stack(a, b Matrix) {
 	m.reuseAsNonZeroed(ar+br, ac)
 
 	m.Copy(a)
-	w := m.Slice(ar, ar+br, 0, bc).(*Dense)
+	w := m.slice(ar, ar+br, 0, bc)
 	w.Copy(b)
 }
 
@@ -563,7 +567,7 @@ func (m *Dense) Augment(a, b Matrix) {
 	m.reuseAsNonZeroed(ar, ac+bc)
 
 	m.Copy(a)
-	w := m.Slice(0, br, ac, ac+bc).(*Dense)
+	w := m.slice(0, br, ac, ac+bc)
 	w.Copy(b)
 }
 

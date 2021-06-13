@@ -9,7 +9,7 @@ import (
 
 	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
-	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/floats/scalar"
 	"gonum.org/v1/gonum/lapack"
 	"gonum.org/v1/gonum/lapack/lapack64"
 )
@@ -244,7 +244,7 @@ func untranspose(a Matrix) (Matrix, bool) {
 func untransposeExtract(a Matrix) (Matrix, bool) {
 	ut, trans := untranspose(a)
 	switch m := ut.(type) {
-	case *DiagDense, *SymBandDense, *TriBandDense, *BandDense, *TriDense, *SymDense, *Dense:
+	case *DiagDense, *SymBandDense, *TriBandDense, *BandDense, *TriDense, *SymDense, *Dense, *VecDense:
 		return m, trans
 	// TODO(btracey): Add here if we ever have an equivalent of RawDiagDense.
 	case RawSymBander:
@@ -287,6 +287,10 @@ func untransposeExtract(a Matrix) (Matrix, bool) {
 		var d Dense
 		d.SetRawMatrix(m.RawMatrix())
 		return &d, trans
+	case RawVectorer:
+		var v VecDense
+		v.SetRawVector(m.RawVector())
+		return &v, trans
 	default:
 		return ut, trans
 	}
@@ -367,7 +371,7 @@ func Row(dst []float64, i int, a Matrix) []float64 {
 // Cond will panic with matrix.ErrShape if the matrix has zero size.
 //
 // BUG(btracey): The computation of the 1-norm and ∞-norm for non-square matrices
-// is innacurate, although is typically the right order of magnitude. See
+// is inaccurate, although is typically the right order of magnitude. See
 // https://github.com/xianyi/OpenBLAS/issues/636. While the value returned will
 // change with the resolution of this bug, the result from Cond will match the
 // condition number used internally.
@@ -527,7 +531,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 			if aTrans == bTrans {
 				for i := 0; i < ra.Rows; i++ {
 					for j := 0; j < ra.Cols; j++ {
-						if !floats.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[i*rb.Stride+j], epsilon, epsilon) {
+						if !scalar.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[i*rb.Stride+j], epsilon, epsilon) {
 							return false
 						}
 					}
@@ -536,7 +540,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 			}
 			for i := 0; i < ra.Rows; i++ {
 				for j := 0; j < ra.Cols; j++ {
-					if !floats.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[j*rb.Stride+i], epsilon, epsilon) {
+					if !scalar.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[j*rb.Stride+i], epsilon, epsilon) {
 						return false
 					}
 				}
@@ -551,7 +555,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 			// Symmetric matrices are always upper and equal to their transpose.
 			for i := 0; i < ra.N; i++ {
 				for j := i; j < ra.N; j++ {
-					if !floats.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[i*rb.Stride+j], epsilon, epsilon) {
+					if !scalar.EqualWithinAbsOrRel(ra.Data[i*ra.Stride+j], rb.Data[i*rb.Stride+j], epsilon, epsilon) {
 						return false
 					}
 				}
@@ -564,7 +568,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 			// If the raw vectors are the same length they must either both be
 			// transposed or both not transposed (or have length 1).
 			for i := 0; i < ra.mat.N; i++ {
-				if !floats.EqualWithinAbsOrRel(ra.mat.Data[i*ra.mat.Inc], rb.mat.Data[i*rb.mat.Inc], epsilon, epsilon) {
+				if !scalar.EqualWithinAbsOrRel(ra.mat.Data[i*ra.mat.Inc], rb.mat.Data[i*rb.mat.Inc], epsilon, epsilon) {
 					return false
 				}
 			}
@@ -573,7 +577,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 	}
 	for i := 0; i < ar; i++ {
 		for j := 0; j < ac; j++ {
-			if !floats.EqualWithinAbsOrRel(a.At(i, j), b.At(i, j), epsilon, epsilon) {
+			if !scalar.EqualWithinAbsOrRel(a.At(i, j), b.At(i, j), epsilon, epsilon) {
 				return false
 			}
 		}
@@ -741,15 +745,13 @@ func Min(a Matrix) float64 {
 	}
 }
 
-// Norm returns the specified (induced) norm of the matrix a. See
-// https://en.wikipedia.org/wiki/Matrix_norm for the definition of an induced norm.
+// Norm returns the specified norm of the matrix A. Valid norms are:
+//  1 - The maximum absolute column sum
+//  2 - The Frobenius norm, the square root of the sum of the squares of the elements
+//  Inf - The maximum absolute row sum
 //
-// Valid norms are:
-//    1 - The maximum absolute column sum
-//    2 - Frobenius norm, the square root of the sum of the squares of the elements.
-//  Inf - The maximum absolute row sum.
 // Norm will panic with ErrNormOrder if an illegal norm order is specified and
-// with matrix.ErrShape if the matrix has zero size.
+// with ErrShape if the matrix has zero size.
 func Norm(a Matrix, norm float64) float64 {
 	r, c := a.Dims()
 	if r == 0 || c == 0 {
@@ -934,7 +936,8 @@ type Tracer interface {
 }
 
 // Trace returns the trace of the matrix. Trace will panic if the
-// matrix is not square.
+// matrix is not square. If a is a Tracer, its Trace method will be
+// used to calculate the matrix trace.
 func Trace(a Matrix) float64 {
 	m, _ := untransposeExtract(a)
 	if t, ok := m.(Tracer); ok {

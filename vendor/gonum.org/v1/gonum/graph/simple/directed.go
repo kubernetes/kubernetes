@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/internal/uid"
 	"gonum.org/v1/gonum/graph/iterator"
+	"gonum.org/v1/gonum/graph/set/uid"
 )
 
 var (
@@ -29,7 +29,7 @@ type DirectedGraph struct {
 	from  map[int64]map[int64]graph.Edge
 	to    map[int64]map[int64]graph.Edge
 
-	nodeIDs uid.Set
+	nodeIDs *uid.Set
 }
 
 // NewDirectedGraph returns a DirectedGraph.
@@ -77,21 +77,14 @@ func (g *DirectedGraph) Edges() graph.Edges {
 }
 
 // From returns all nodes in g that can be reached directly from n.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *DirectedGraph) From(id int64) graph.Nodes {
-	if _, ok := g.from[id]; !ok {
+	if len(g.from[id]) == 0 {
 		return graph.Empty
 	}
-
-	from := make([]graph.Node, len(g.from[id]))
-	i := 0
-	for vid := range g.from[id] {
-		from[i] = g.nodes[vid]
-		i++
-	}
-	if len(from) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(from)
+	return iterator.NewNodesByEdge(g.nodes, g.from[id])
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y without
@@ -114,7 +107,7 @@ func (g *DirectedGraph) HasEdgeFromTo(uid, vid int64) bool {
 
 // NewEdge returns a new Edge from the source to the destination node.
 func (g *DirectedGraph) NewEdge(from, to graph.Node) graph.Edge {
-	return &Edge{F: from, T: to}
+	return Edge{F: from, T: to}
 }
 
 // NewNode returns a new unique Node to be added to g. The Node's ID does
@@ -136,17 +129,14 @@ func (g *DirectedGraph) Node(id int64) graph.Node {
 }
 
 // Nodes returns all the nodes in the graph.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *DirectedGraph) Nodes() graph.Nodes {
 	if len(g.nodes) == 0 {
 		return graph.Empty
 	}
-	nodes := make([]graph.Node, len(g.nodes))
-	i := 0
-	for _, n := range g.nodes {
-		nodes[i] = n
-		i++
-	}
-	return iterator.NewOrderedNodes(nodes)
+	return iterator.NewNodes(g.nodes)
 }
 
 // RemoveEdge removes the edge with the given end point IDs from the graph, leaving the terminal
@@ -223,19 +213,12 @@ func (g *DirectedGraph) SetEdge(e graph.Edge) {
 }
 
 // To returns all nodes in g that can reach directly to n.
+//
+// The returned graph.Nodes is only valid until the next mutation of
+// the receiver.
 func (g *DirectedGraph) To(id int64) graph.Nodes {
-	if _, ok := g.to[id]; !ok {
+	if len(g.to[id]) == 0 {
 		return graph.Empty
 	}
-
-	to := make([]graph.Node, len(g.to[id]))
-	i := 0
-	for uid := range g.to[id] {
-		to[i] = g.nodes[uid]
-		i++
-	}
-	if len(to) == 0 {
-		return graph.Empty
-	}
-	return iterator.NewOrderedNodes(to)
+	return iterator.NewNodesByEdge(g.nodes, g.to[id])
 }

@@ -13,10 +13,11 @@ import (
 var (
 	vector *VecDense
 
-	_ Matrix    = vector
-	_ allMatrix = vector
-	_ Vector    = vector
-	_ Reseter   = vector
+	_ Matrix        = vector
+	_ allMatrix     = vector
+	_ Vector        = vector
+	_ Reseter       = vector
+	_ MutableVector = vector
 )
 
 // Vector is a vector.
@@ -24,6 +25,12 @@ type Vector interface {
 	Matrix
 	AtVec(int) float64
 	Len() int
+}
+
+// A MutableVector can set elements of a vector.
+type MutableVector interface {
+	Vector
+	SetVec(i int, v float64)
 }
 
 // TransposeVec is a type for performing an implicit transpose of a Vector.
@@ -114,6 +121,10 @@ func NewVecDense(n int, data []float64) *VecDense {
 // SliceVec panics with ErrIndexOutOfRange if the slice is outside the capacity
 // of the receiver.
 func (v *VecDense) SliceVec(i, k int) Vector {
+	return v.sliceVec(i, k)
+}
+
+func (v *VecDense) sliceVec(i, k int) *VecDense {
 	if i < 0 || k <= i || v.Cap() < k {
 		panic(ErrIndexOutOfRange)
 	}
@@ -187,9 +198,9 @@ func (v *VecDense) Zero() {
 	}
 }
 
-// CloneVec makes a copy of a into the receiver, overwriting the previous value
+// CloneFromVec makes a copy of a into the receiver, overwriting the previous value
 // of the receiver.
-func (v *VecDense) CloneVec(a Vector) {
+func (v *VecDense) CloneFromVec(a Vector) {
 	if v == a {
 		return
 	}
@@ -204,19 +215,29 @@ func (v *VecDense) CloneVec(a Vector) {
 		return
 	}
 	for i := 0; i < a.Len(); i++ {
-		v.SetVec(i, a.AtVec(i))
+		v.setVec(i, a.AtVec(i))
 	}
 }
 
 // VecDenseCopyOf returns a newly allocated copy of the elements of a.
 func VecDenseCopyOf(a Vector) *VecDense {
 	v := &VecDense{}
-	v.CloneVec(a)
+	v.CloneFromVec(a)
 	return v
 }
 
+// RawVector returns the underlying blas64.Vector used by the receiver.
+// Changes to elements in the receiver following the call will be reflected
+// in returned blas64.Vector.
 func (v *VecDense) RawVector() blas64.Vector {
 	return v.mat
+}
+
+// SetRawVector sets the underlying blas64.Vector used by the receiver.
+// Changes to elements in the receiver following the call will be reflected
+// in the input.
+func (v *VecDense) SetRawVector(a blas64.Vector) {
+	v.mat = a
 }
 
 // CopyVec makes a copy of elements of a into the receiver. It is similar to the
@@ -608,13 +629,16 @@ func (v *VecDense) MulVec(a Matrix, b Vector) {
 			return
 		}
 	case *TriDense:
-		v.CopyVec(b)
-		aU.checkOverlap(v.asGeneral())
-		ta := blas.NoTrans
-		if trans {
-			ta = blas.Trans
+		if fast {
+			v.CopyVec(b)
+			aU.checkOverlap(v.asGeneral())
+			ta := blas.NoTrans
+			if trans {
+				ta = blas.Trans
+			}
+			blas64.Trmv(ta, aU.mat, v.mat)
+			return
 		}
-		blas64.Trmv(ta, aU.mat, v.mat)
 	case *Dense:
 		if fast {
 			aU.checkOverlap(v.asGeneral())

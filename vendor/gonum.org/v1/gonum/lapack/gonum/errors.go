@@ -116,6 +116,8 @@ const (
 	shortC     = "lapack: insufficient length of c"
 	shortCNorm = "lapack: insufficient length of cnorm"
 	shortD     = "lapack: insufficient length of d"
+	shortDL    = "lapack: insufficient length of dl"
+	shortDU    = "lapack: insufficient length of du"
 	shortE     = "lapack: insufficient length of e"
 	shortF     = "lapack: insufficient length of f"
 	shortH     = "lapack: insufficient length of h"

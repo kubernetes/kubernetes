@@ -9,6 +9,7 @@ import (
 
 	"gonum.org/v1/gonum/blas"
 	"gonum.org/v1/gonum/blas/blas64"
+	"gonum.org/v1/gonum/blas/cblas128"
 )
 
 var tab64 = [64]byte{
@@ -59,6 +60,9 @@ var (
 
 	// poolInts is the []int equivalent of pool.
 	poolInts [63]sync.Pool
+
+	// poolCmplx is the CDense equivalent of pool.
+	poolCmplx [63]sync.Pool
 )
 
 func init() {
@@ -93,6 +97,12 @@ func init() {
 		poolInts[i].New = func() interface{} {
 			s := make([]int, l)
 			return &s
+		}
+
+		poolCmplx[i].New = func() interface{} {
+			return &CDense{mat: cblas128.General{
+				Data: make([]complex128, l),
+			}}
 		}
 	}
 }
@@ -235,4 +245,29 @@ func getInts(l int, clear bool) []int {
 // where references to the underlying data have been kept.
 func putInts(w []int) {
 	poolInts[bits(uint64(cap(w)))].Put(&w)
+}
+
+// getWorkspaceCmplx returns a *CDense of size r×c and a data slice
+// with a cap that is less than 2*r*c. If clear is true, the
+// data slice visible through the CMatrix interface is zeroed.
+func getWorkspaceCmplx(r, c int, clear bool) *CDense {
+	l := uint64(r * c)
+	w := poolCmplx[bits(l)].Get().(*CDense)
+	w.mat.Data = w.mat.Data[:l]
+	if clear {
+		zeroC(w.mat.Data)
+	}
+	w.mat.Rows = r
+	w.mat.Cols = c
+	w.mat.Stride = c
+	w.capRows = r
+	w.capCols = c
+	return w
+}
+
+// putWorkspaceCmplx replaces a used *CDense into the appropriate size
+// workspace pool. putWorkspace must not be called with a matrix
+// where references to the underlying data slice have been kept.
+func putWorkspaceCmplx(w *CDense) {
+	poolCmplx[bits(uint64(cap(w.mat.Data)))].Put(w)
 }

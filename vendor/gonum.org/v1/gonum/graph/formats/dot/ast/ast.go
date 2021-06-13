@@ -1,4 +1,4 @@
-// This file is dual licensed under CC0 and The gonum license.
+// This file is dual licensed under CC0 and The Gonum License.
 //
 // Copyright ©2017 The Gonum Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style

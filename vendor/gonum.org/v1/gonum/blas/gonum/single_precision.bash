@@ -24,6 +24,8 @@ cat level1float64.go \
 | gofmt -r 'f64.AxpyInc -> f32.AxpyInc' \
 | gofmt -r 'f64.AxpyUnitary -> f32.AxpyUnitary' \
 | gofmt -r 'f64.DotUnitary -> f32.DotUnitary' \
+| gofmt -r 'f64.L2NormInc -> f32.L2NormInc' \
+| gofmt -r 'f64.L2NormUnitary -> f32.L2NormUnitary' \
 | gofmt -r 'f64.ScalInc -> f32.ScalInc' \
 | gofmt -r 'f64.ScalUnitary -> f32.ScalUnitary' \
 \

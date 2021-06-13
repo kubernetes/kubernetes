@@ -19,8 +19,12 @@ type Edge interface {
 	// To returns the to node of the edge.
 	To() Node
 
-	// ReversedEdge returns an edge that has
-	// the end points of the receiver swapped.
+	// ReversedEdge returns the edge reversal of the receiver
+	// if a reversal is valid for the data type.
+	// When a reversal is valid an edge of the same type as
+	// the receiver with nodes of the receiver swapped should
+	// be returned, otherwise the receiver should be returned
+	// unaltered.
 	ReversedEdge() Edge
 }
 

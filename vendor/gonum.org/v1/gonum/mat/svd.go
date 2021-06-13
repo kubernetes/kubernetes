@@ -10,7 +10,9 @@ import (
 	"gonum.org/v1/gonum/lapack/lapack64"
 )
 
-// SVD is a type for creating and using the Singular Value Decomposition (SVD)
+const badRcond = "mat: invalid rcond value"
+
+// SVD is a type for creating and using the Singular Value Decomposition
 // of a matrix.
 type SVD struct {
 	kind SVDKind
@@ -147,6 +149,26 @@ func (svd *SVD) Kind() SVDKind {
 	return svd.kind
 }
 
+// Rank returns the rank of A based on the count of singular values greater than
+// rcond scaled by the largest singular value.
+// Rank will panic if the receiver does not contain a successful factorization or
+// rcond is negative.
+func (svd *SVD) Rank(rcond float64) int {
+	if rcond < 0 {
+		panic(badRcond)
+	}
+	if !svd.succFact() {
+		panic(badFact)
+	}
+	s0 := svd.s[0]
+	for i, v := range svd.s {
+		if v <= rcond*s0 {
+			return i
+		}
+	}
+	return len(svd.s)
+}
+
 // Cond returns the 2-norm condition number for the factorized matrix. Cond will
 // panic if the receiver does not contain a successful factorization.
 func (svd *SVD) Cond() float64 {
@@ -228,7 +250,7 @@ func (svd *SVD) VTo(dst *Dense) {
 		panic(badFact)
 	}
 	kind := svd.kind
-	if kind&SVDThinU == 0 && kind&SVDFullV == 0 {
+	if kind&SVDThinV == 0 && kind&SVDFullV == 0 {
 		panic("svd: v not computed during factorization")
 	}
 	r := svd.vt.Rows
@@ -248,4 +270,144 @@ func (svd *SVD) VTo(dst *Dense) {
 		capCols: c,
 	}
 	dst.Copy(tmp.T())
+}
+
+// SolveTo calculates the minimum-norm solution to a linear least squares problem
+//  minimize over n-element vectors x: |b - A*x|_2 and |x|_2
+// where b is a given m-element vector, using the SVD of m×n matrix A stored in
+// the receiver. A may be rank-deficient, that is, the given effective rank can be
+//  rank ≤ min(m,n)
+// The rank can be computed using SVD.Rank.
+//
+// Several right-hand side vectors b and solution vectors x can be handled in a
+// single call. Vectors b are stored in the columns of the m×k matrix B and the
+// resulting vectors x will be stored in the columns of dst. dst must be either
+// empty or have the size equal to n×k.
+//
+// The decomposition must have been factorized computing both the U and V
+// singular vectors.
+//
+// SolveTo returns the residuals calculated from the complete SVD. For this
+// value to be valid the factorization must have been performed with at least
+// SVDFullU.
+func (svd *SVD) SolveTo(dst *Dense, b Matrix, rank int) []float64 {
+	if !svd.succFact() {
+		panic(badFact)
+	}
+	if rank < 1 || len(svd.s) < rank {
+		panic("svd: rank out of range")
+	}
+	kind := svd.kind
+	if kind&SVDThinU == 0 && kind&SVDFullU == 0 {
+		panic("svd: u not computed during factorization")
+	}
+	if kind&SVDThinV == 0 && kind&SVDFullV == 0 {
+		panic("svd: v not computed during factorization")
+	}
+
+	u := Dense{
+		mat:     svd.u,
+		capRows: svd.u.Rows,
+		capCols: svd.u.Cols,
+	}
+	vt := Dense{
+		mat:     svd.vt,
+		capRows: svd.vt.Rows,
+		capCols: svd.vt.Cols,
+	}
+	s := svd.s[:rank]
+
+	_, bc := b.Dims()
+	c := getWorkspace(svd.u.Cols, bc, false)
+	defer putWorkspace(c)
+	c.Mul(u.T(), b)
+
+	y := getWorkspace(rank, bc, false)
+	defer putWorkspace(y)
+	y.DivElem(c.slice(0, rank, 0, bc), repVector{vec: s, cols: bc})
+	dst.Mul(vt.slice(0, rank, 0, svd.vt.Cols).T(), y)
+
+	res := make([]float64, bc)
+	if rank < svd.u.Cols {
+		c = c.slice(len(s), svd.u.Cols, 0, bc)
+		for j := range res {
+			col := c.ColView(j)
+			res[j] = Dot(col, col)
+		}
+	}
+	return res
+}
+
+type repVector struct {
+	vec  []float64
+	cols int
+}
+
+func (m repVector) Dims() (r, c int) { return len(m.vec), m.cols }
+func (m repVector) At(i, j int) float64 {
+	if i < 0 || len(m.vec) <= i || j < 0 || m.cols <= j {
+		panic(ErrIndexOutOfRange.string) // Panic with string to prevent mat.Error recovery.
+	}
+	return m.vec[i]
+}
+func (m repVector) T() Matrix { return Transpose{m} }
+
+// SolveVecTo calculates the minimum-norm solution to a linear least squares problem
+//  minimize over n-element vectors x: |b - A*x|_2 and |x|_2
+// where b is a given m-element vector, using the SVD of m×n matrix A stored in
+// the receiver. A may be rank-deficient, that is, the given effective rank can be
+//  rank ≤ min(m,n)
+// The rank can be computed using SVD.Rank.
+//
+// The resulting vector x will be stored in dst. dst must be either empty or
+// have length equal to n.
+//
+// The decomposition must have been factorized computing both the U and V
+// singular vectors.
+//
+// SolveVecTo returns the residuals calculated from the complete SVD. For this
+// value to be valid the factorization must have been performed with at least
+// SVDFullU.
+func (svd *SVD) SolveVecTo(dst *VecDense, b Vector, rank int) float64 {
+	if !svd.succFact() {
+		panic(badFact)
+	}
+	if rank < 1 || len(svd.s) < rank {
+		panic("svd: rank out of range")
+	}
+	kind := svd.kind
+	if kind&SVDThinU == 0 && kind&SVDFullU == 0 {
+		panic("svd: u not computed during factorization")
+	}
+	if kind&SVDThinV == 0 && kind&SVDFullV == 0 {
+		panic("svd: v not computed during factorization")
+	}
+
+	u := Dense{
+		mat:     svd.u,
+		capRows: svd.u.Rows,
+		capCols: svd.u.Cols,
+	}
+	vt := Dense{
+		mat:     svd.vt,
+		capRows: svd.vt.Rows,
+		capCols: svd.vt.Cols,
+	}
+	s := svd.s[:rank]
+
+	c := getWorkspaceVec(svd.u.Cols, false)
+	defer putWorkspaceVec(c)
+	c.MulVec(u.T(), b)
+
+	y := getWorkspaceVec(rank, false)
+	defer putWorkspaceVec(y)
+	y.DivElemVec(c.sliceVec(0, rank), NewVecDense(rank, s))
+	dst.MulVec(vt.slice(0, rank, 0, svd.vt.Cols).T(), y)
+
+	var res float64
+	if rank < c.Len() {
+		c = c.sliceVec(rank, c.Len())
+		res = Dot(c, c)
+	}
+	return res
 }

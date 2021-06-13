@@ -4,11 +4,7 @@
 
 package iterator
 
-import (
-	"reflect"
-
-	"gonum.org/v1/gonum/graph"
-)
+import "gonum.org/v1/gonum/graph"
 
 // OrderedNodes implements the graph.Nodes and graph.NodeSlicer interfaces.
 // The iteration order of OrderedNodes is the order of nodes passed to
@@ -28,10 +24,7 @@ func (n *OrderedNodes) Len() int {
 	if n.idx >= len(n.nodes) {
 		return 0
 	}
-	if n.idx <= 0 {
-		return len(n.nodes)
-	}
-	return len(n.nodes[n.idx:])
+	return len(n.nodes[n.idx+1:])
 }
 
 // Next returns whether the next call of Node will return a valid node.
@@ -59,10 +52,7 @@ func (n *OrderedNodes) NodeSlice() []graph.Node {
 	if n.idx >= len(n.nodes) {
 		return nil
 	}
-	idx := n.idx
-	if idx == -1 {
-		idx = 0
-	}
+	idx := n.idx + 1
 	n.idx = len(n.nodes)
 	return n.nodes[idx:]
 }
@@ -70,6 +60,313 @@ func (n *OrderedNodes) NodeSlice() []graph.Node {
 // Reset returns the iterator to its initial state.
 func (n *OrderedNodes) Reset() {
 	n.idx = -1
+}
+
+// LazyOrderedNodes implements the graph.Nodes and graph.NodeSlicer interfaces.
+// The iteration order of LazyOrderedNodes is not determined until the first
+// call to Next or NodeSlice. After that, the iteration order is fixed.
+type LazyOrderedNodes struct {
+	iter  OrderedNodes
+	nodes map[int64]graph.Node
+}
+
+// NewLazyOrderedNodes returns a LazyOrderedNodes initialized with the provided nodes.
+func NewLazyOrderedNodes(nodes map[int64]graph.Node) *LazyOrderedNodes {
+	return &LazyOrderedNodes{nodes: nodes}
+}
+
+// Len returns the remaining number of nodes to be iterated over.
+func (n *LazyOrderedNodes) Len() int {
+	if n.iter.nodes == nil {
+		return len(n.nodes)
+	}
+	return n.iter.Len()
+}
+
+// Next returns whether the next call of Node will return a valid node.
+func (n *LazyOrderedNodes) Next() bool {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.Next()
+}
+
+// Node returns the current node of the iterator. Next must have been
+// called prior to a call to Node.
+func (n *LazyOrderedNodes) Node() graph.Node {
+	return n.iter.Node()
+}
+
+// NodeSlice returns all the remaining nodes in the iterator and advances
+// the iterator.
+func (n *LazyOrderedNodes) NodeSlice() []graph.Node {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.NodeSlice()
+}
+
+// Reset returns the iterator to its initial state.
+func (n *LazyOrderedNodes) Reset() {
+	n.iter.Reset()
+}
+
+func (n *LazyOrderedNodes) fillSlice() {
+	n.iter = OrderedNodes{idx: -1, nodes: make([]graph.Node, len(n.nodes))}
+	i := 0
+	for _, u := range n.nodes {
+		n.iter.nodes[i] = u
+		i++
+	}
+	n.nodes = nil
+}
+
+// LazyOrderedNodesByEdge implements the graph.Nodes and graph.NodeSlicer interfaces.
+// The iteration order of LazyOrderedNodesByEdge is not determined until the first
+// call to Next or NodeSlice. After that, the iteration order is fixed.
+type LazyOrderedNodesByEdge struct {
+	iter  OrderedNodes
+	nodes map[int64]graph.Node
+	edges map[int64]graph.Edge
+}
+
+// NewLazyOrderedNodesByEdge returns a LazyOrderedNodesByEdge initialized with the
+// provided nodes.
+func NewLazyOrderedNodesByEdge(nodes map[int64]graph.Node, edges map[int64]graph.Edge) *LazyOrderedNodesByEdge {
+	return &LazyOrderedNodesByEdge{nodes: nodes, edges: edges}
+}
+
+// Len returns the remaining number of nodes to be iterated over.
+func (n *LazyOrderedNodesByEdge) Len() int {
+	if n.iter.nodes == nil {
+		return len(n.edges)
+	}
+	return n.iter.Len()
+}
+
+// Next returns whether the next call of Node will return a valid node.
+func (n *LazyOrderedNodesByEdge) Next() bool {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.Next()
+}
+
+// Node returns the current node of the iterator. Next must have been
+// called prior to a call to Node.
+func (n *LazyOrderedNodesByEdge) Node() graph.Node {
+	return n.iter.Node()
+}
+
+// NodeSlice returns all the remaining nodes in the iterator and advances
+// the iterator.
+func (n *LazyOrderedNodesByEdge) NodeSlice() []graph.Node {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.NodeSlice()
+}
+
+// Reset returns the iterator to its initial state.
+func (n *LazyOrderedNodesByEdge) Reset() {
+	n.iter.Reset()
+}
+
+func (n *LazyOrderedNodesByEdge) fillSlice() {
+	n.iter = OrderedNodes{idx: -1, nodes: make([]graph.Node, len(n.edges))}
+	i := 0
+	for id := range n.edges {
+		n.iter.nodes[i] = n.nodes[id]
+		i++
+	}
+	n.nodes = nil
+	n.edges = nil
+}
+
+// LazyOrderedNodesByWeightedEdge implements the graph.Nodes and graph.NodeSlicer interfaces.
+// The iteration order of LazyOrderedNodesByEeightedEdge is not determined until the first
+// call to Next or NodeSlice. After that, the iteration order is fixed.
+type LazyOrderedNodesByWeightedEdge struct {
+	iter  OrderedNodes
+	nodes map[int64]graph.Node
+	edges map[int64]graph.WeightedEdge
+}
+
+// NewLazyOrderedNodesByWeightedEdge returns a LazyOrderedNodesByEdge initialized with the
+// provided nodes.
+func NewLazyOrderedNodesByWeightedEdge(nodes map[int64]graph.Node, edges map[int64]graph.WeightedEdge) *LazyOrderedNodesByWeightedEdge {
+	return &LazyOrderedNodesByWeightedEdge{nodes: nodes, edges: edges}
+}
+
+// Len returns the remaining number of nodes to be iterated over.
+func (n *LazyOrderedNodesByWeightedEdge) Len() int {
+	if n.iter.nodes == nil {
+		return len(n.edges)
+	}
+	return n.iter.Len()
+}
+
+// Next returns whether the next call of Node will return a valid node.
+func (n *LazyOrderedNodesByWeightedEdge) Next() bool {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.Next()
+}
+
+// Node returns the current node of the iterator. Next must have been
+// called prior to a call to Node.
+func (n *LazyOrderedNodesByWeightedEdge) Node() graph.Node {
+	return n.iter.Node()
+}
+
+// NodeSlice returns all the remaining nodes in the iterator and advances
+// the iterator.
+func (n *LazyOrderedNodesByWeightedEdge) NodeSlice() []graph.Node {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.NodeSlice()
+}
+
+// Reset returns the iterator to its initial state.
+func (n *LazyOrderedNodesByWeightedEdge) Reset() {
+	n.iter.Reset()
+}
+
+func (n *LazyOrderedNodesByWeightedEdge) fillSlice() {
+	n.iter = OrderedNodes{idx: -1, nodes: make([]graph.Node, len(n.edges))}
+	i := 0
+	for id := range n.edges {
+		n.iter.nodes[i] = n.nodes[id]
+		i++
+	}
+	n.nodes = nil
+	n.edges = nil
+}
+
+// LazyOrderedNodesByLines implements the graph.Nodes and graph.NodeSlicer interfaces.
+// The iteration order of LazyOrderedNodesByLines is not determined until the first
+// call to Next or NodeSlice. After that, the iteration order is fixed.
+type LazyOrderedNodesByLines struct {
+	iter  OrderedNodes
+	nodes map[int64]graph.Node
+	edges map[int64]map[int64]graph.Line
+}
+
+// NewLazyOrderedNodesByLine returns a LazyOrderedNodesByLines initialized with the
+// provided nodes.
+func NewLazyOrderedNodesByLines(nodes map[int64]graph.Node, edges map[int64]map[int64]graph.Line) *LazyOrderedNodesByLines {
+	return &LazyOrderedNodesByLines{nodes: nodes, edges: edges}
+}
+
+// Len returns the remaining number of nodes to be iterated over.
+func (n *LazyOrderedNodesByLines) Len() int {
+	if n.iter.nodes == nil {
+		return len(n.edges)
+	}
+	return n.iter.Len()
+}
+
+// Next returns whether the next call of Node will return a valid node.
+func (n *LazyOrderedNodesByLines) Next() bool {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.Next()
+}
+
+// Node returns the current node of the iterator. Next must have been
+// called prior to a call to Node.
+func (n *LazyOrderedNodesByLines) Node() graph.Node {
+	return n.iter.Node()
+}
+
+// NodeSlice returns all the remaining nodes in the iterator and advances
+// the iterator.
+func (n *LazyOrderedNodesByLines) NodeSlice() []graph.Node {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.NodeSlice()
+}
+
+// Reset returns the iterator to its initial state.
+func (n *LazyOrderedNodesByLines) Reset() {
+	n.iter.Reset()
+}
+
+func (n *LazyOrderedNodesByLines) fillSlice() {
+	n.iter = OrderedNodes{idx: -1, nodes: make([]graph.Node, len(n.edges))}
+	i := 0
+	for id := range n.edges {
+		n.iter.nodes[i] = n.nodes[id]
+		i++
+	}
+	n.nodes = nil
+	n.edges = nil
+}
+
+// LazyOrderedNodesByWeightedLines implements the graph.Nodes and graph.NodeSlicer interfaces.
+// The iteration order of LazyOrderedNodesByEeightedLine is not determined until the first
+// call to Next or NodeSlice. After that, the iteration order is fixed.
+type LazyOrderedNodesByWeightedLines struct {
+	iter  OrderedNodes
+	nodes map[int64]graph.Node
+	edges map[int64]map[int64]graph.WeightedLine
+}
+
+// NewLazyOrderedNodesByWeightedLines returns a LazyOrderedNodesByLines initialized with the
+// provided nodes.
+func NewLazyOrderedNodesByWeightedLines(nodes map[int64]graph.Node, edges map[int64]map[int64]graph.WeightedLine) *LazyOrderedNodesByWeightedLines {
+	return &LazyOrderedNodesByWeightedLines{nodes: nodes, edges: edges}
+}
+
+// Len returns the remaining number of nodes to be iterated over.
+func (n *LazyOrderedNodesByWeightedLines) Len() int {
+	if n.iter.nodes == nil {
+		return len(n.edges)
+	}
+	return n.iter.Len()
+}
+
+// Next returns whether the next call of Node will return a valid node.
+func (n *LazyOrderedNodesByWeightedLines) Next() bool {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.Next()
+}
+
+// Node returns the current node of the iterator. Next must have been
+// called prior to a call to Node.
+func (n *LazyOrderedNodesByWeightedLines) Node() graph.Node {
+	return n.iter.Node()
+}
+
+// NodeSlice returns all the remaining nodes in the iterator and advances
+// the iterator.
+func (n *LazyOrderedNodesByWeightedLines) NodeSlice() []graph.Node {
+	if n.iter.nodes == nil {
+		n.fillSlice()
+	}
+	return n.iter.NodeSlice()
+}
+
+// Reset returns the iterator to its initial state.
+func (n *LazyOrderedNodesByWeightedLines) Reset() {
+	n.iter.Reset()
+}
+
+func (n *LazyOrderedNodesByWeightedLines) fillSlice() {
+	n.iter = OrderedNodes{idx: -1, nodes: make([]graph.Node, len(n.edges))}
+	i := 0
+	for id := range n.edges {
+		n.iter.nodes[i] = n.nodes[id]
+		i++
+	}
+	n.nodes = nil
+	n.edges = nil
 }
 
 // ImplicitNodes implements the graph.Nodes interface for a set of nodes over
@@ -121,60 +418,12 @@ func (n *ImplicitNodes) Reset() {
 // NodeSlice returns all the remaining nodes in the iterator and advances
 // the iterator.
 func (n *ImplicitNodes) NodeSlice() []graph.Node {
+	if n.Len() == 0 {
+		return nil
+	}
 	nodes := make([]graph.Node, 0, n.Len())
 	for n.curr++; n.curr < n.end; n.curr++ {
 		nodes = append(nodes, n.newNode(n.curr))
 	}
 	return nodes
-}
-
-// Nodes implements the graph.Nodes interfaces.
-// The iteration order of Nodes is randomized.
-type Nodes struct {
-	nodes reflect.Value
-	iter  *reflect.MapIter
-	pos   int
-	curr  graph.Node
-}
-
-// NewNodes returns a Nodes initialized with the provided nodes, a
-// map of node IDs to graph.Nodes. No check is made that the keys
-// match the graph.Node IDs, and the map keys are not used.
-//
-// Behavior of the Nodes is unspecified if nodes is mutated after
-// the call the NewNodes.
-func NewNodes(nodes map[int64]graph.Node) *Nodes {
-	rv := reflect.ValueOf(nodes)
-	return &Nodes{nodes: rv, iter: rv.MapRange()}
-}
-
-// Len returns the remaining number of nodes to be iterated over.
-func (n *Nodes) Len() int {
-	return n.nodes.Len() - n.pos
-}
-
-// Next returns whether the next call of Node will return a valid node.
-func (n *Nodes) Next() bool {
-	if n.pos >= n.nodes.Len() {
-		return false
-	}
-	ok := n.iter.Next()
-	if ok {
-		n.pos++
-		n.curr = n.iter.Value().Interface().(graph.Node)
-	}
-	return ok
-}
-
-// Node returns the current node of the iterator. Next must have been
-// called prior to a call to Node.
-func (n *Nodes) Node() graph.Node {
-	return n.curr
-}
-
-// Reset returns the iterator to its initial state.
-func (n *Nodes) Reset() {
-	n.curr = nil
-	n.pos = 0
-	n.iter = n.nodes.MapRange()
 }

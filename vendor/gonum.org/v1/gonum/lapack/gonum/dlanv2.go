@@ -66,7 +66,24 @@ func (impl Implementation) Dlanv2(a, b, c, d float64) (aa, bb, cc, dd float64, r
 		} else {
 			// Complex eigenvalues, or real (almost) equal eigenvalues.
 			// Make diagonal elements equal.
+			safmn2 := math.Pow(dlamchB, math.Log(dlamchS/dlamchE)/math.Log(dlamchB)/2)
+			safmx2 := 1 / safmn2
 			sigma := b + c
+		loop:
+			for iter := 0; iter < 20; iter++ {
+				scale = math.Max(math.Abs(temp), math.Abs(sigma))
+				switch {
+				case scale >= safmx2:
+					sigma *= safmn2
+					temp *= safmn2
+				case scale <= safmn2:
+					sigma *= safmx2
+					temp *= safmx2
+				default:
+					break loop
+				}
+			}
+			p = temp / 2
 			tau := impl.Dlapy2(sigma, temp)
 			cs = math.Sqrt((1 + math.Abs(sigma)/tau) / 2)
 			sn = -p / (tau * cs)
@@ -110,7 +127,7 @@ func (impl Implementation) Dlanv2(a, b, c, d float64) (aa, bb, cc, dd float64, r
 						dd = temp - p
 						cs1 := sab * tau
 						sn1 := sac * tau
-						cs, sn = cs*cs1-sn*sn1, cs*sn1+sn+cs1
+						cs, sn = cs*cs1-sn*sn1, cs*sn1+sn*cs1
 					}
 				} else {
 					bb = -cc

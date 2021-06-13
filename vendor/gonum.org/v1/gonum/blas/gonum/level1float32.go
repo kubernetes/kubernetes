@@ -39,52 +39,10 @@ func (Implementation) Snrm2(n int, x []float32, incX int) float32 {
 		}
 		panic(nLT0)
 	}
-	var (
-		scale      float32 = 0
-		sumSquares float32 = 1
-	)
 	if incX == 1 {
-		x = x[:n]
-		for _, v := range x {
-			if v == 0 {
-				continue
-			}
-			absxi := math.Abs(v)
-			if math.IsNaN(absxi) {
-				return math.NaN()
-			}
-			if scale < absxi {
-				sumSquares = 1 + sumSquares*(scale/absxi)*(scale/absxi)
-				scale = absxi
-			} else {
-				sumSquares = sumSquares + (absxi/scale)*(absxi/scale)
-			}
-		}
-		if math.IsInf(scale, 1) {
-			return math.Inf(1)
-		}
-		return scale * math.Sqrt(sumSquares)
+		return f32.L2NormUnitary(x[:n])
 	}
-	for ix := 0; ix < n*incX; ix += incX {
-		val := x[ix]
-		if val == 0 {
-			continue
-		}
-		absxi := math.Abs(val)
-		if math.IsNaN(absxi) {
-			return math.NaN()
-		}
-		if scale < absxi {
-			sumSquares = 1 + sumSquares*(scale/absxi)*(scale/absxi)
-			scale = absxi
-		} else {
-			sumSquares = sumSquares + (absxi/scale)*(absxi/scale)
-		}
-	}
-	if math.IsInf(scale, 1) {
-		return math.Inf(1)
-	}
-	return scale * math.Sqrt(sumSquares)
+	return f32.L2NormInc(x, uintptr(n), uintptr(incX))
 }
 
 // Sasum computes the sum of the absolute values of the elements of x.
@@ -378,7 +336,7 @@ func (Implementation) Srotmg(d1, d2, x1, y1 float32) (p blas.SrotmParams, rd1, r
 			h22 = 1
 			h21 = -y1 / x1
 			h12 = p2 / p1
-			u := 1 - h12*h21
+			u := 1 - float32(h12*h21)
 			if u <= 0 {
 				p.Flag = blas.Rescaling // Error state.
 				return p, 0, 0, 0
@@ -398,7 +356,7 @@ func (Implementation) Srotmg(d1, d2, x1, y1 float32) (p blas.SrotmParams, rd1, r
 			h12 = 1
 			h11 = p1 / p2
 			h22 = x1 / y1
-			u := 1 + h11*h22
+			u := 1 + float32(h11*h22)
 			d1, d2 = d2/u, d1/u
 			x1 = y1 * u
 		}
@@ -531,7 +489,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 			x = x[:n]
 			for i, vx := range x {
 				vy := y[i]
-				x[i], y[i] = vx*h11+vy*h12, vx*h21+vy*h22
+				x[i], y[i] = float32(vx*h11)+float32(vy*h12), float32(vx*h21)+float32(vy*h22)
 			}
 			return
 		}
@@ -545,7 +503,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 		for i := 0; i < n; i++ {
 			vx := x[ix]
 			vy := y[iy]
-			x[ix], y[iy] = vx*h11+vy*h12, vx*h21+vy*h22
+			x[ix], y[iy] = float32(vx*h11)+float32(vy*h12), float32(vx*h21)+float32(vy*h22)
 			ix += incX
 			iy += incY
 		}
@@ -556,7 +514,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 			x = x[:n]
 			for i, vx := range x {
 				vy := y[i]
-				x[i], y[i] = vx+vy*h12, vx*h21+vy
+				x[i], y[i] = vx+float32(vy*h12), float32(vx*h21)+vy
 			}
 			return
 		}
@@ -570,7 +528,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 		for i := 0; i < n; i++ {
 			vx := x[ix]
 			vy := y[iy]
-			x[ix], y[iy] = vx+vy*h12, vx*h21+vy
+			x[ix], y[iy] = vx+float32(vy*h12), float32(vx*h21)+vy
 			ix += incX
 			iy += incY
 		}
@@ -581,7 +539,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 			x = x[:n]
 			for i, vx := range x {
 				vy := y[i]
-				x[i], y[i] = vx*h11+vy, -vx+vy*h22
+				x[i], y[i] = float32(vx*h11)+vy, -vx+float32(vy*h22)
 			}
 			return
 		}
@@ -595,7 +553,7 @@ func (Implementation) Srotm(n int, x []float32, incX int, y []float32, incY int,
 		for i := 0; i < n; i++ {
 			vx := x[ix]
 			vy := y[iy]
-			x[ix], y[iy] = vx*h11+vy, -vx+vy*h22
+			x[ix], y[iy] = float32(vx*h11)+vy, -vx+float32(vy*h22)
 			ix += incX
 			iy += incY
 		}

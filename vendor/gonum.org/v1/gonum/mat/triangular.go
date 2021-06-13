@@ -26,8 +26,6 @@ var (
 	_ ColNonZeroDoer = triDense
 )
 
-const badTriCap = "mat: bad capacity for TriDense"
-
 // TriDense represents an upper or lower triangular matrix in dense storage
 // format.
 type TriDense struct {
@@ -178,17 +176,6 @@ func isUpperUplo(u blas.Uplo) bool {
 	}
 }
 
-func uploToTriKind(u blas.Uplo) TriKind {
-	switch u {
-	case blas.Upper:
-		return Upper
-	case blas.Lower:
-		return Lower
-	default:
-		panic(badTriangle)
-	}
-}
-
 // asSymBlas returns the receiver restructured as a blas64.Symmetric with the
 // same backing memory. Panics if the receiver is unit.
 // This returns a blas64.Symmetric and not a *SymDense because SymDense can only
@@ -268,8 +255,8 @@ func (t *TriDense) IsEmpty() bool {
 	return t.mat.Stride == 0
 }
 
-// untranspose untransposes a matrix if applicable. If a is an Untransposer, then
-// untranspose returns the underlying matrix and true. If it is not, then it returns
+// untransposeTri untransposes a matrix if applicable. If a is an UntransposeTrier, then
+// untransposeTri returns the underlying matrix and true. If it is not, then it returns
 // the input matrix and false.
 func untransposeTri(a Triangular) (Triangular, bool) {
 	if ut, ok := a.(UntransposeTrier); ok {
@@ -299,8 +286,8 @@ func (t *TriDense) ReuseAsTri(n int, kind TriKind) {
 	t.reuseAsZeroed(n, kind)
 }
 
-// reuseAsNonZeroed resizes a zero receiver to an n×n triangular matrix with the given
-// orientation. If the receiver is non-zero, reuseAsNonZeroed checks that the receiver
+// reuseAsNonZeroed resizes an empty receiver to an n×n triangular matrix with the given
+// orientation. If the receiver is not empty, reuseAsNonZeroed checks that the receiver
 // is the correct size and orientation.
 func (t *TriDense) reuseAsNonZeroed(n int, kind TriKind) {
 	// reuseAsNonZeroed must be kept in sync with reuseAsZeroed.
@@ -312,7 +299,8 @@ func (t *TriDense) reuseAsNonZeroed(n int, kind TriKind) {
 		ul = blas.Upper
 	}
 	if t.mat.N > t.cap {
-		panic(badTriCap)
+		// Panic as a string, not a mat.Error.
+		panic(badCap)
 	}
 	if t.IsEmpty() {
 		t.mat = blas64.Triangular{
@@ -333,8 +321,8 @@ func (t *TriDense) reuseAsNonZeroed(n int, kind TriKind) {
 	}
 }
 
-// reuseAsZeroed resizes a zero receiver to an n×n triangular matrix with the given
-// orientation. If the receiver is non-zero, reuseAsZeroed checks that the receiver
+// reuseAsZeroed resizes an empty receiver to an n×n triangular matrix with the given
+// orientation. If the receiver is not empty, reuseAsZeroed checks that the receiver
 // is the correct size and orientation. It then zeros out the matrix data.
 func (t *TriDense) reuseAsZeroed(n int, kind TriKind) {
 	// reuseAsZeroed must be kept in sync with reuseAsNonZeroed.
@@ -346,7 +334,8 @@ func (t *TriDense) reuseAsZeroed(n int, kind TriKind) {
 		ul = blas.Upper
 	}
 	if t.mat.N > t.cap {
-		panic(badTriCap)
+		// Panic as a string, not a mat.Error.
+		panic(badCap)
 	}
 	if t.IsEmpty() {
 		t.mat = blas64.Triangular{
@@ -609,6 +598,26 @@ func (t *TriDense) ScaleTri(f float64, a Triangular) {
 			}
 		}
 	}
+}
+
+// SliceTri returns a new Triangular that shares backing data with the receiver.
+// The returned matrix starts at {i,i} of the receiver and extends k-i rows and
+// columns. The final row and column in the resulting matrix is k-1.
+// SliceTri panics with ErrIndexOutOfRange if the slice is outside the capacity
+// of the receiver.
+func (t *TriDense) SliceTri(i, k int) Triangular {
+	return t.sliceTri(i, k)
+}
+
+func (t *TriDense) sliceTri(i, k int) *TriDense {
+	if i < 0 || t.cap < i || k < i || t.cap < k {
+		panic(ErrIndexOutOfRange)
+	}
+	v := *t
+	v.mat.Data = t.mat.Data[i*t.mat.Stride+i : (k-1)*t.mat.Stride+k]
+	v.mat.N = k - i
+	v.cap = t.cap - i
+	return &v
 }
 
 // Trace returns the trace of the matrix.

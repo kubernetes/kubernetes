@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !amd64 noasm appengine safe
+// +build !amd64 noasm gccgo safe
 
 package f32
 
@@ -110,4 +110,18 @@ func DdotInc(x, y []float32, n, incX, incY, ix, iy uintptr) (sum float64) {
 		iy += incY
 	}
 	return
+}
+
+// Sum is
+//  var sum float32
+//  for _, v := range x {
+//  	sum += v
+//  }
+//  return sum
+func Sum(x []float32) float32 {
+	var sum float32
+	for _, v := range x {
+		sum += v
+	}
+	return sum
 }

@@ -1,6 +1,6 @@
 # This is the official list of people who can contribute
-# (and typically have contributed) code to the gonum
-# repository.
+# (and typically have contributed) code to the Gonum
+# project.
 #
 # The AUTHORS file lists the copyright holders; this file
 # lists people.  For example, Google employees would be listed here
@@ -16,6 +16,7 @@
 # Please keep the list sorted.
 
 Alexander Egurnov <alexander.egurnov@gmail.com>
+Andrei Blinnikov <goofinator@mail.ru>
 Andrew Brampton <brampton@gmail.com>
 Bill Gray <wgray@gogray.com>
 Bill Noon <noon.bill@gmail.com>
@@ -25,8 +26,10 @@ Chad Kunde <kunde21@gmail.com>
 Chih-Wei Chang <bert.cwchang@gmail.com>
 Chris Tessum <ctessum@gmail.com>
 Christophe Meessen <christophe.meessen@gmail.com>
+Christopher Waldon <christopher.waldon.dev@gmail.com>
 Clayton Northey <clayton.northey@gmail.com>
 Dan Kortschak <dan.kortschak@adelaide.edu.au> <dan@kortschak.io>
+Dan Lorenc <lorenc.d@gmail.com>
 Daniel Fireman <danielfireman@gmail.com>
 Dario Heinisch <dario.heinisch@gmail.com>
 David Kleiven <davidkleiven446@gmail.com>
@@ -39,6 +42,7 @@ Egon Elbre <egonelbre@gmail.com>
 Ekaterina Efimova <katerina.efimova@gmail.com>
 Ethan Burns <burns.ethan@gmail.com>
 Evert Lammerts <evert.lammerts@gmail.com>
+Fabian Wickborn <fabian@wickborn.net>
 Facundo Gaich <facugaich@gmail.com>
 Fazlul Shahriar <fshahriar@gmail.com>
 Francesc Campoy <campoy@golang.org>
@@ -51,13 +55,14 @@ James Bell <james@stellentus.com>
 James Bowman <james.edward.bowman@gmail.com>
 James Holmes <32bitkid@gmail.com>
 Janne Snabb <snabb@epipe.com>
-Jeff Juozapaitis <jjjuozap@email.arizona.edu>
 Jeremy Atkinson <jchatkinson@gmail.com>
+Jon Richards <noj.richards@gmail.com>
 Jonas Kahler <jonas@derkahler.de>
 Jonas Schulze <jonas.schulze@ovgu.de>
 Jonathan J Lawlor <jonathan.lawlor@gmail.com>
 Jonathan Reiter <jonreiter@gmail.com>
 Jonathan Schroeder <jd.schroeder@gmail.com>
+Joost van Amersfoort <git@joo.st>
 Joseph Watson <jtwatson@linux-consulting.us>
 Josh Wilson <josh.craig.wilson@gmail.com>
 Julien Roland <juroland@gmail.com>
@@ -67,8 +72,12 @@ Kevin C. Zimmerman <kevinczimmerman@gmail.com>
 Kirill Motkov <motkov.kirill@gmail.com>
 Konstantin Shaposhnikov <k.shaposhnikov@gmail.com>
 Leonid Kneller <recondite.matter@gmail.com>
-Lyron Winderbaum <lyron.winderbaum@student.adelaide.edu.au>
+Lyron Winderbaum <lyron.winderbaum@student.adelaide.edu.au> <armadilloa16@gmail.com> <lyron.winderbaum@uwa.edu.au>
+Marco Leogrande <dark.knight.ita@gmail.com>
+Mark Canning <argusdusty@gmail.com>
+Mark Skilbeck <markskilbeck@gmail.com>
 Martin Diz <github@martindiz.com.ar>
+Matthew Connelly <matthew.b.connelly@gmail.com>
 Matthieu Di Mercurio <matthieu.dimercurio@gmail.com>
 Max Halford <maxhalford25@gmail.com>
 MinJae Kwon <k239507@gmail.com>
@@ -77,10 +86,14 @@ Nick Potts <nick@the-potts.com>
 Nils Wogatzky <odog@netcologne.de>
 Olivier Wulveryck <olivier.wulveryck@gmail.com>
 Or Rikon <rikonor@gmail.com>
+Patrick DeVivo <patrick@tickgit.com>
 Pontus Melke <pontusmelke@gmail.com>
-Renée French
+Renee French
 Rishi Desai <desai.rishi1@gmail.com>
 Robin Eklind <r.eklind.87@gmail.com>
+Roger Welin <roger.welin@icloud.com>
+Roman Werpachowski <roman.werpachowski@gmail.com>
+Rondall Jones <rejones7@gmail.com>
 Sam Zaydel <szaydel@gmail.com>
 Samuel Kelemen <Samuel@Kelemen.us>
 Saran Ahluwalia <ahlusar.ahluwalia@gmail.com>
@@ -91,9 +104,11 @@ Spencer Lyon <spencerlyon2@gmail.com>
 Steve McCoy <mccoyst@gmail.com>
 Taesu Pyo <pyotaesu@gmail.com>
 Takeshi Yoneda <cz.rk.t0415y.g@gmail.com>
+Tamir Hyman <hyman.tamir@gmail.com>
 Thomas Berg <tomfuture@gmail.com>
 Tobin Harding <me@tobin.cc>
 Vincent Thiery <vjmthiery@gmail.com>
 Vladimír Chalupecký <vladimir.chalupecky@gmail.com>
 Yevgeniy Vahlis <evahlis@gmail.com>
 Yucheng Zhu <zyctc000@gmail.com>
+Zoe Juozapaitis

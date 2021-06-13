@@ -5,10 +5,14 @@
 // Package uid implements unique ID provision for graphs.
 package uid
 
-import "gonum.org/v1/gonum/graph/internal/set"
+import (
+	"math"
 
-// Max is the maximum value of int64.
-const Max = int64(^uint64(0) >> 1)
+	"gonum.org/v1/gonum/graph/internal/set"
+)
+
+// Max is the maximum ID value.
+const Max = math.MaxInt64
 
 // Set implements available ID storage.
 type Set struct {
@@ -16,9 +20,9 @@ type Set struct {
 	used, free set.Int64s
 }
 
-// NewSet returns a new Set. The returned value should not be passed except by pointer.
-func NewSet() Set {
-	return Set{maxID: -1, used: make(set.Int64s), free: make(set.Int64s)}
+// NewSet returns a new Set.
+func NewSet() *Set {
+	return &Set{maxID: -1, used: make(set.Int64s), free: make(set.Int64s)}
 }
 
 // NewID returns a new unique ID. The ID returned is not considered used
@@ -27,10 +31,10 @@ func (s *Set) NewID() int64 {
 	for id := range s.free {
 		return id
 	}
-	if s.maxID != Max {
+	if s.maxID != math.MaxInt64 {
 		return s.maxID + 1
 	}
-	for id := int64(0); id <= s.maxID+1; id++ {
+	for id := int64(0); id <= s.maxID; id++ {
 		if !s.used.Has(id) {
 			return id
 		}

@@ -53,7 +53,7 @@ import (
 // larger.  On return, optimal value of lwork will be stored in work[0].
 //
 // If lwork == -1, instead of performing Dgeev, the function only calculates the
-// optimal vaule of lwork and stores it into work[0].
+// optimal value of lwork and stores it into work[0].
 //
 // On return, first is the index of the first valid eigenvalue. If first == 0,
 // all eigenvalues and eigenvectors have been computed. If first is positive,
