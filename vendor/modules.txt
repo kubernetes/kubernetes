@@ -420,7 +420,7 @@ github.com/google/shlex
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
-# github.com/googleapis/gnostic v0.5.1 => github.com/googleapis/gnostic v0.5.1
+# github.com/googleapis/gnostic v0.5.5 => github.com/googleapis/gnostic v0.5.5
 ## explicit
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
@@ -2506,7 +2506,7 @@ sigs.k8s.io/yaml
 # github.com/google/shlex => github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 # github.com/google/uuid => github.com/google/uuid v1.1.2
 # github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
-# github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.1
+# github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.5
 # github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 # github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 # github.com/gorilla/mux => github.com/gorilla/mux v1.8.0
