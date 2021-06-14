@@ -155,6 +155,8 @@ func (c *Controller) Run(ch <-chan struct{}) {
 		return
 	}
 
+	KubeAPIServerEmitEventFn(corev1.EventTypeWarning, "KubeAPIReadyz", "readyz=true")
+
 	wait.NonSlidingUntil(func() {
 		// Service definition is not reconciled after first
 		// run, ports and type will be corrected only during
