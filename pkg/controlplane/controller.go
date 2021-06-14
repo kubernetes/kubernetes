@@ -251,6 +251,8 @@ func (c *Controller) RunKubernetesService(ch chan struct{}) {
 		return code == http.StatusOK, nil
 	}, ch)
 
+	kubeAPIServerEmitEventFn(corev1.EventTypeWarning, "KubeAPIReadyz", "readyz=true")
+
 	wait.NonSlidingUntil(func() {
 		// Service definition is not reconciled after first
 		// run, ports and type will be corrected only during

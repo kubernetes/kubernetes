@@ -398,6 +398,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		GenericAPIServer:          s,
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
+	kubeAPIServerEmitEventFn = m.GenericAPIServer.Eventf
 
 	// install legacy rest storage
 
