@@ -163,10 +163,6 @@ func (h *httpStreamHandler) removeStreamPair(requestID string) {
 	h.streamPairsLock.Lock()
 	defer h.streamPairsLock.Unlock()
 
-	if h.conn != nil {
-		pair := h.streamPairs[requestID]
-		h.conn.RemoveStreams(pair.dataStream, pair.errorStream)
-	}
 	delete(h.streamPairs, requestID)
 }
 
