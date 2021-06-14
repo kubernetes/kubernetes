@@ -1529,11 +1529,12 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(spec, allStatus)
+	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "phase", s.Phase)
 	// Check for illegal phase transition
 	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
 		// API server shows terminal phase; transitions are not allowed
 		if s.Phase != pod.Status.Phase {
-			klog.ErrorS(nil, "Pod attempted illegal phase transition", "originalStatusPhase", pod.Status.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
+			klog.ErrorS(nil, "Pod attempted illegal phase transition", "pod", klog.KObj(pod), "originalStatusPhase", pod.Status.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
 			// Force back to phase from the API server
 			s.Phase = pod.Status.Phase
 		}
@@ -1736,8 +1737,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		oldStatus, found := oldStatuses[container.Name]
 		if found {
 			if oldStatus.State.Terminated != nil {
-				// Do not update status on terminated init containers as
-				// they be removed at any time.
 				status = &oldStatus
 			} else {
 				// Apply some values from the old statuses as the default values.
@@ -1760,7 +1759,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			continue
 		}
 		// if no container is found, then assuming it should be waiting seems plausible, but the status code requires
-		// that a previous termination be present.  If we're offline long enough (or something removed the container?), then
+		// that a previous termination be present.  If we're offline long enough or something removed the container, then
 		// the previous termination may not be present.  This next code block ensures that if the container was previously running
 		// then when that container status disappears, we can infer that it terminated even if we don't know the status code.
 		// By setting the lasttermination state we are able to leave the container status waiting and present more accurate
@@ -1779,21 +1778,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			continue
 		}
 
-		if pod.DeletionTimestamp == nil {
-			continue
-		}
-
-		// and if the pod itself is being deleted, then the CRI may have removed the container already and for whatever reason the kubelet missed the exit code
-		// (this seems not awesome).  We know at this point that we will not be restarting the container.
+		// If we're here, we know the pod was previously running, but doesn't have a terminated status. We will check now to
+		// see if it's in a pending state.
 		status := statuses[container.Name]
-		// if the status we're about to write indicates the default, the Waiting status will force this pod back into Pending.
-		// That isn't true, we know the pod is going away.
+		// If the status we're about to write indicates the default, the Waiting status will force this pod back into Pending.
+		// That isn't true, we know the pod was previously running.
 		isDefaultWaitingStatus := status.State.Waiting != nil && status.State.Waiting.Reason == ContainerCreating
 		if hasInitContainers {
 			isDefaultWaitingStatus = status.State.Waiting != nil && status.State.Waiting.Reason == PodInitializing
 		}
 		if !isDefaultWaitingStatus {
-			// we the status was written, don't override
+			// the status was written, don't override
 			continue
 		}
 		if status.LastTerminationState.Terminated != nil {
@@ -1809,6 +1804,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 			ExitCode: 137,
 		}
+
+		// If the pod was not deleted, then it's been restarted. Increment restart count.
+		if pod.DeletionTimestamp == nil {
+			status.RestartCount += 1
+		}
+
 		statuses[container.Name] = status
 	}
 
