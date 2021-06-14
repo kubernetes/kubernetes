@@ -426,7 +426,9 @@ func TestWatchdog(t *testing.T) {
 	// configure watchdog
 	wusec := 3000000 // 3 secs
 	os.Setenv("NOTIFY_SOCKET", notifySocket)
+	defer os.Unsetenv("NOTIFY_SOCKET")
 	os.Setenv("WATCHDOG_USEC", fmt.Sprintf("%v", wusec))
+	defer os.Unsetenv("WATCHDOG_USEC")
 
 	// read notify messages in a loop
 	var msgCount int
