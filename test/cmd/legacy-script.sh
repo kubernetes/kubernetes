@@ -775,6 +775,7 @@ runTests() {
   ########################
 
   record_command run_exec_credentials_tests
+  record_command run_exec_credentials_interactive_tests
 
   ########################
   # authorization.k8s.io #

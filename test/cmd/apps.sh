@@ -432,6 +432,9 @@ run_deployment_tests() {
   kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]:?}"
   # Remove specific env of deployment
   kubectl set env deployment nginx-deployment env-
+  # Assert that we cannot use standard input for both resource and environment variable
+  output_message="$(echo SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL | kubectl set env -f - - "${kube_flags[@]:?}" 2>&1 || true)"
+  kube::test::if_has_string "${output_message}" 'standard input cannot be used for multiple arguments'
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]:?}"
   kubectl delete configmap test-set-env-config "${kube_flags[@]:?}"
