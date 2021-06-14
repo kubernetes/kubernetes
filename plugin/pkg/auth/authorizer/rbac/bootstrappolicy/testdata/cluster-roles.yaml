@@ -129,6 +129,7 @@ items:
     resources:
     - configmaps
     - endpoints
+    - events
     - persistentvolumeclaims
     - replicationcontrollers
     - replicationcontrollers/scale
