@@ -34,10 +34,12 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -54,20 +56,8 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir, patchesDir string, nodeNa
 	if cfg.Etcd.External != nil {
 		return errors.New("etcd static pod manifest cannot be generated for cluster using external etcd")
 	}
-	// gets etcd StaticPodSpec
-	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, []etcdutil.Member{})
 
-	// if patchesDir is defined, patch the static Pod manifest
-	if patchesDir != "" {
-		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
-		if err != nil {
-			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
-		}
-		spec = *patchedSpec
-	}
-
-	// writes etcd StaticPod to disk
-	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, cfg, endpoint, nodeName, []etcdutil.Member{}, isDryRun); err != nil {
 		return err
 	}
 
@@ -143,7 +133,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 // CreateStackedEtcdStaticPodManifestFile will write local etcd static pod manifest file
 // for an additional etcd member that is joining an existing local/stacked etcd cluster.
 // Other members of the etcd cluster will be notified of the joining node in beforehand as well.
-func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
+func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
@@ -188,20 +178,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 
 	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
 
-	// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members
-	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
-
-	// if patchesDir is defined, patch the static Pod manifest
-	if patchesDir != "" {
-		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
-		if err != nil {
-			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
-		}
-		spec = *patchedSpec
-	}
-
-	// writes etcd StaticPod to disk
-	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, cfg, endpoint, nodeName, initialCluster, isDryRun); err != nil {
 		return err
 	}
 
@@ -291,4 +268,45 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	command := []string{"etcd"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Etcd.Local.ExtraArgs)...)
 	return command
+}
+
+func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, isDryRun bool) error {
+	// gets etcd StaticPodSpec, actualized for the current ClusterConfiguration and the new list of etcd members
+	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
+
+	var usersAndGroups *users.UsersAndGroups
+	var err error
+	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+		if isDryRun {
+			fmt.Printf("[dryrun] Would create users and groups for %q to run as non-root\n", kubeadmconstants.Etcd)
+			fmt.Printf("[dryrun] Would update static pod manifest for %q to run run as non-root\n", kubeadmconstants.Etcd)
+		} else {
+			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
+			if err != nil {
+				return errors.Wrap(err, "failed to create users and groups")
+			}
+			// usersAndGroups is nil on non-linux.
+			if usersAndGroups != nil {
+				if err := staticpodutil.RunComponentAsNonRoot(kubeadmconstants.Etcd, &spec, usersAndGroups, cfg); err != nil {
+					return errors.Wrapf(err, "failed to run component %q as non-root", kubeadmconstants.Etcd)
+				}
+			}
+		}
+	}
+
+	// if patchesDir is defined, patch the static Pod manifest
+	if patchesDir != "" {
+		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
+		if err != nil {
+			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
+		}
+		spec = *patchedSpec
+	}
+
+	// writes etcd StaticPod to disk
+	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+		return err
+	}
+
+	return nil
 }
