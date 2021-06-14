@@ -415,6 +415,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		GenericAPIServer:          s,
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
+	kubernetesservice.KubeAPIServerEmitEventFn = m.GenericAPIServer.Eventf
 
 	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
