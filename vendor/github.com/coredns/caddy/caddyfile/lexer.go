@@ -48,6 +48,9 @@ func (l *lexer) load(input io.Reader) error {
 	// discard byte order mark, if present
 	firstCh, _, err := l.reader.ReadRune()
 	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	}
 	if firstCh != 0xFEFF {
