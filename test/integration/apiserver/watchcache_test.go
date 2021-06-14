@@ -54,7 +54,7 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	etcdOptions.EtcdServersOverrides = []string{fmt.Sprintf("/events#%s", etcd1URL)}
 	etcdOptions.EnableWatchCache = true
 
-	opts := framework.MasterConfigOptions{EtcdOptions: etcdOptions}
+	opts := framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions}
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	// Switch off endpoints reconciler to avoid unnecessary operations.
 	controlPlaneConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
