@@ -138,32 +138,6 @@ const (
 	// Enable pods to set sysctls on a pod
 	Sysctls featuregate.Feature = "Sysctls"
 
-	// owner @smarterclayton
-	// alpha: v1.16
-	// beta:  v1.19
-	// ga:  v1.21
-	//
-	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
-	// Lock to false in v1.21 and remove in v1.22.
-	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
-
-	// owner @brendandburns
-	// kep: http://kep.k8s.io/1143
-	// alpha: v1.9
-	// beta:  v1.19
-	// ga:  v1.21
-	//
-	// Enable nodes to exclude themselves from service load balancers
-	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
-
-	// owner @smarterclayton
-	// alpha: v1.16
-	// beta:  v1.19
-	// ga:  v1.21
-	//
-	// Enable nodes to exclude themselves from network disruption checks
-	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
-
 	// owner: @pospispa
 	// GA: v1.11
 	//
@@ -779,8 +753,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MemoryManager:                                  {Default: false, PreRelease: featuregate.Alpha},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
-	ServiceNodeExclusion:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	NodeDisruptionExclusion:                        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
@@ -879,6 +851,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
-	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 }
