@@ -351,7 +351,7 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationO
 		maxLength = csiNodeIDLongerMaxLength
 	}
 	if len(nodeID) > maxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", maxLength)))
 	}
 	return allErrs
 }
