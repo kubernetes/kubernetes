@@ -46,6 +46,9 @@ type ExecCredentialSpec struct {
 	// ExecConfig.ProvideClusterInfo).
 	// +optional
 	Cluster *Cluster `json:"cluster,omitempty"`
+
+	// Interactive declares whether stdin has been passed to this exec plugin.
+	Interactive bool `json:"interactive"`
 }
 
 // ExecCredentialStatus holds credentials for the transport to use.
