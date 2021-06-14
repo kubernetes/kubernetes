@@ -789,6 +789,182 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	}
 }
 
+func TestSelectQueueLocked(t *testing.T) {
+	var G float64 = 60
+	tests := []struct {
+		name                    string
+		robinIndex              int
+		concurrencyLimit        int
+		totSeatsInUse           int
+		queues                  []*queue
+		attempts                int
+		beforeSelectQueueLocked func(attempt int, qs *queueSet)
+		minQueueIndexExpected   []int
+		robinIndexExpected      []int
+	}{
+		{
+			name:             "width=1, seats are available, the queue with less virtual start time wins",
+			concurrencyLimit: 1,
+			totSeatsInUse:    0,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: 1},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: 1},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{1},
+			robinIndexExpected:    []int{1},
+		},
+		{
+			name:             "width=1, all seats are occupied, no queue is picked",
+			concurrencyLimit: 1,
+			totSeatsInUse:    1,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: 1},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{-1},
+			robinIndexExpected:    []int{0},
+		},
+		{
+			name:             "width > 1, seats are available for request with the least finish time, queue is picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    25,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: 50},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: 25},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{1},
+			robinIndexExpected:    []int{1},
+		},
+		{
+			name:             "width > 1, seats are not available for request with the least finish time, queue is not picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    26,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: 10},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: 25},
+					),
+				},
+			},
+			attempts:              3,
+			minQueueIndexExpected: []int{-1, -1, -1},
+			robinIndexExpected:    []int{1, 1, 1},
+		},
+		{
+			name:             "width > 1, seats become available before 3rd attempt, queue is picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    26,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: 10},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: 25},
+					),
+				},
+			},
+			beforeSelectQueueLocked: func(attempt int, qs *queueSet) {
+				if attempt == 3 {
+					qs.totSeatsInUse = 25
+				}
+			},
+			attempts:              3,
+			minQueueIndexExpected: []int{-1, -1, 1},
+			robinIndexExpected:    []int{1, 1, 1},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			qs := &queueSet{
+				estimatedServiceTime: G,
+				robinIndex:           test.robinIndex,
+				totSeatsInUse:        test.totSeatsInUse,
+				dCfg: fq.DispatchingConfig{
+					ConcurrencyLimit: test.concurrencyLimit,
+				},
+				queues: test.queues,
+			}
+
+			t.Logf("QS: robin index=%d, seats in use=%d limit=%d", qs.robinIndex, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
+
+			for i := 0; i < test.attempts; i++ {
+				attempt := i + 1
+				if test.beforeSelectQueueLocked != nil {
+					test.beforeSelectQueueLocked(attempt, qs)
+				}
+
+				var minQueueExpected *queue
+				if queueIdx := test.minQueueIndexExpected[i]; queueIdx >= 0 {
+					minQueueExpected = test.queues[queueIdx]
+				}
+
+				minQueueGot := qs.selectQueueLocked()
+				if minQueueExpected != minQueueGot {
+					t.Errorf("Expected queue: %#v, but got: %#v", minQueueExpected, minQueueGot)
+				}
+
+				robinIndexExpected := test.robinIndexExpected[i]
+				if robinIndexExpected != qs.robinIndex {
+					t.Errorf("Expected robin index: %d for attempt: %d, but got: %d", robinIndexExpected, attempt, qs.robinIndex)
+				}
+			}
+		})
+	}
+}
+
+func newFIFO(requests ...*request) fifo {
+	l := newRequestFIFO()
+	for i := range requests {
+		l.Enqueue(requests[i])
+	}
+	return l
+}
+
 func newObserverPair(clk clock.PassiveClock) metrics.TimedObserverPair {
 	return metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, []string{"test"})
 }
