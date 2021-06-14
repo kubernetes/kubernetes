@@ -328,12 +328,13 @@ aliases:
     - dashpole
     - ehashman
     - s-urbaniak
-    - DirectXMan12
     - andyxning
     - coffeepac
     - logicalhan
     - RainbowMango
     - serathius
+  # emeritus
+  # - directxman12
 
   api-approvers:
     - erictune
