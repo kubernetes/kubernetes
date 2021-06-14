@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -1868,24 +1869,24 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	if watchdogTimeout, err := daemon.SdWatchdogEnabled(false); watchdogTimeout != 0 || err != nil {
 		switch {
 		case err != nil:
-			klog.Errorf("Reading watchdog configuration failed: %v", err)
+			klog.ErrorS(err, "Reading watchdog configuration failed")
 			break
 		case watchdogTimeout != 0:
 			notifyPeriod := watchdogTimeout / 3
 			loopTimeout := 2 * kl.resyncInterval
 			healthy := true
-			klog.Infof("Arming watchdog: configured watchdog timeout is %v, will report every %v, and stop reporting when sync loop is stalled for more than %v", watchdogTimeout, notifyPeriod, loopTimeout)
+			klog.InfoS("Arming watchdog", "watchdogTimeout", watchdogTimeout, "notifyPeriod", notifyPeriod, "loopTimeout", loopTimeout)
 			go wait.Forever(func() {
 				// check syncLoopMonitor: if it reports an old time, something is going wrong
 				if kl.clock.Now().After(kl.LatestLoopEntryTime().Add(loopTimeout)) {
 					if healthy {
 						healthy = false
-						klog.Warningf("SyncLoopMonitor not updated for at least %v, stopping to notify watchdog", loopTimeout)
+						klog.ErrorS(errors.New("SyncLoopMonitor not updated in time"), "Stopping to notify watchdog", "latestLoopEntryTime", kl.LatestLoopEntryTime(), "loopTimeout", loopTimeout)
 					}
 				} else {
 					if !healthy {
 						healthy = true
-						klog.Infof("SyncLoopMonitor was updated, restarting to notify watchdog")
+						klog.InfoS("SyncLoopMonitor was updated, restarting to notify watchdog")
 					}
 					_, _ = daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 				}
