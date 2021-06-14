@@ -1073,11 +1073,17 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 }
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
-	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+	if cm.cpuManager != nil {
+		return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+	}
+	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
-	return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
+	if cm.cpuManager != nil {
+		return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
+	}
+	return []int64{}
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
