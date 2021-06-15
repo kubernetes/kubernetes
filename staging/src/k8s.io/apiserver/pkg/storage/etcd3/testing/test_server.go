@@ -17,49 +17,27 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
 	"testing"
 
-	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	grpclogsettable "github.com/grpc-ecosystem/go-grpc-middleware/logging/settable"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/tests/v3/integration"
-	"google.golang.org/grpc/grpclog"
+
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
-
-var grpc_logger grpclogsettable.SettableLoggerV2
-
-func init() {
-	// override logger set up by etcd integration test package
-	grpc_logger = grpclogsettable.ReplaceGrpcLoggerV2()
-}
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
-	CertificatesDir string
-	CertFile        string
-	KeyFile         string
-	CAFile          string
-
-	// The following are lumped etcd3 test server params
-	v3Cluster *integration.ClusterV3
-	V3Client  *clientv3.Client
+	V3Client *clientv3.Client
 }
 
-// Terminate will shutdown the running etcd server
-func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.v3Cluster.Terminate(t)
+func (e *EtcdTestServer) Terminate(t *testing.T) {
+	// no-op, server termination moved to test cleanup
 }
 
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
-	integration.BeforeTestExternal(t)
-	grpc_logger.Set(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, &testErrorWriter{t}))
-	server := &EtcdTestServer{
-		v3Cluster: integration.NewClusterV3(&noLogT{t}, &integration.ClusterConfig{Size: 1}),
-	}
-	server.V3Client = server.v3Cluster.RandClient()
+	server := &EtcdTestServer{}
+	server.V3Client = testserver.RunEtcd(t, nil)
 	config := &storagebackend.Config{
 		Type:   "etcd3",
 		Prefix: PathPrefix(),
@@ -69,22 +47,4 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 		Paging: true,
 	}
 	return server, config
-}
-
-type noLogT struct {
-	testing.TB
-}
-
-func (q *noLogT) Log(s ...interface{}) {
-}
-func (q *noLogT) Logf(s string, params ...interface{}) {
-}
-
-type testErrorWriter struct {
-	testing.TB
-}
-
-func (t *testErrorWriter) Write(b []byte) (int, error) {
-	t.TB.Error(string(b))
-	return len(b), nil
 }
