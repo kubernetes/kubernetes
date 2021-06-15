@@ -267,10 +267,11 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          labels,
-			Annotations:     annotations,
-			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
+			Labels:            labels,
+			Annotations:       annotations,
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: scheduledTime},
+			OwnerReferences:   []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
 		},
 	}
 	cj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
