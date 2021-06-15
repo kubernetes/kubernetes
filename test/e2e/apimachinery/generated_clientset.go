@@ -22,7 +22,6 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -164,20 +162,20 @@ var _ = SIGDescribe("Generated clientset", func() {
 	})
 })
 
-func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
+func newTestingCronJob(name string, value string) *batchv1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batchv1beta1.CronJob{
+	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"time": value,
 			},
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "*/1 * * * ?",
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
@@ -215,12 +213,8 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
-	})
-
-	ginkgo.It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
-		cronJobClient := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name)
+	ginkgo.It("should create v1 cronJobs, delete cronJobs, watch cronJobs", func() {
+		cronJobClient := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name)
 		ginkgo.By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
