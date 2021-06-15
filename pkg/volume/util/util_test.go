@@ -341,18 +341,20 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	}
 }
 
-func TestFsUserFrom(t *testing.T) {
+func TestFsUserOrUserNameFrom(t *testing.T) {
 	tests := []struct {
-		desc       string
-		pod        *v1.Pod
-		wantFsUser *int64
+		desc           string
+		pod            *v1.Pod
+		wantFsUser     *int64
+		wantFsUserName *string
 	}{
 		{
-			desc: "no runAsUser specified",
+			desc: "no runAsUser or runAsUserName specified",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{},
 			},
-			wantFsUser: nil,
+			wantFsUser:     nil,
+			wantFsUserName: nil,
 		},
 		{
 			desc: "some have runAsUser specified",
@@ -378,7 +380,8 @@ func TestFsUserFrom(t *testing.T) {
 					},
 				},
 			},
-			wantFsUser: nil,
+			wantFsUser:     nil,
+			wantFsUserName: nil,
 		},
 		{
 			desc: "all have runAsUser specified but not the same",
@@ -406,7 +409,8 @@ func TestFsUserFrom(t *testing.T) {
 					},
 				},
 			},
-			wantFsUser: nil,
+			wantFsUser:     nil,
+			wantFsUserName: nil,
 		},
 		{
 			desc: "all have runAsUser specified and the same",
@@ -434,21 +438,173 @@ func TestFsUserFrom(t *testing.T) {
 					},
 				},
 			},
-			wantFsUser: utilptr.Int64Ptr(1000),
+			wantFsUser:     utilptr.Int64Ptr(1000),
+			wantFsUserName: nil,
+		},
+		{
+			desc: "some have runAsUserName specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantFsUser:     nil,
+			wantFsUserName: nil,
+		},
+		{
+			desc: "all have runAsUserName specified but not the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("Administrator"),
+								},
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("Administrator"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFsUser:     nil,
+			wantFsUserName: nil,
+		},
+		{
+			desc: "all have runAsUserName specified and the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFsUser:     nil,
+			wantFsUserName: utilptr.StringPtr("ContainerAdministrator"),
+		},
+		{
+			desc: "runAsUserName and runAsUser are specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+								WindowsOptions: &v1.WindowsSecurityContextOptions{
+									RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFsUser:     nil,
+			wantFsUserName: utilptr.StringPtr("ContainerAdministrator"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			fsUser := FsUserFrom(test.pod)
+			fsUser, fsUserName := FsUserOrUserNameFrom(test.pod)
+			if fsUser != nil && fsUserName != nil {
+				t.Errorf("FsUserOrUserNameFrom(%v) = FsUser %d, FsUserName %s, both can't be set", test.pod, *fsUser,
+					*fsUserName)
+			}
 			if fsUser == nil && test.wantFsUser != nil {
-				t.Errorf("FsUserFrom(%v) = %v, want %d", test.pod, fsUser, *test.wantFsUser)
+				t.Errorf("FsUserOrUserNameFrom(%v) = %v, want FsUser %d", test.pod, fsUser, *test.wantFsUser)
 			}
 			if fsUser != nil && test.wantFsUser == nil {
-				t.Errorf("FsUserFrom(%v) = %d, want %v", test.pod, *fsUser, test.wantFsUser)
+				t.Errorf("FsUserOrUserNameFrom(%v) = %d, want FsUser %v", test.pod, *fsUser, test.wantFsUser)
 			}
 			if fsUser != nil && test.wantFsUser != nil && *fsUser != *test.wantFsUser {
-				t.Errorf("FsUserFrom(%v) = %d, want %d", test.pod, *fsUser, *test.wantFsUser)
+				t.Errorf("FsUserOrUserNameFrom(%v) = %d, want FsUser %d", test.pod, *fsUser, *test.wantFsUser)
+			}
+			if fsUserName == nil && test.wantFsUserName != nil {
+				t.Errorf("FsUserOrUserNameFrom(%v) = %v, want FsUserName %s", test.pod, fsUserName,
+					*test.wantFsUserName)
+			}
+			if fsUserName != nil && test.wantFsUserName != nil && *fsUserName != *test.wantFsUserName {
+				t.Errorf("FsUserOrUserNameFrom(%v) = %s, want FsUserName %s", test.pod, *fsUserName,
+					*test.wantFsUserName)
 			}
 		})
 	}

@@ -160,6 +160,27 @@ func DetermineEffectiveRunAsUser(pod *v1.Pod, container *v1.Container) (*int64, 
 	return runAsUser, true
 }
 
+// DetermineEffectiveRunAsUserName returns a string pointer from the provided  pod's or
+// container's security context and a bool value to indicate if it's  present. Container's
+// runAsUserName take precedence in cases where both are set.
+func DetermineEffectiveRunAsUserName(pod *v1.Pod, container *v1.Container) (*string, bool) {
+	var runAsUserName *string
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.WindowsOptions != nil &&
+		pod.Spec.SecurityContext.WindowsOptions.RunAsUserName != nil {
+		runAsUserName = new(string)
+		*runAsUserName = *pod.Spec.SecurityContext.WindowsOptions.RunAsUserName
+	}
+	if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil &&
+		container.SecurityContext.WindowsOptions.RunAsUserName != nil {
+		runAsUserName = new(string)
+		*runAsUserName = *container.SecurityContext.WindowsOptions.RunAsUserName
+	}
+	if runAsUserName == nil {
+		return nil, false
+	}
+	return runAsUserName, true
+}
+
 func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	if pod.Spec.SecurityContext == nil {
 		return nil

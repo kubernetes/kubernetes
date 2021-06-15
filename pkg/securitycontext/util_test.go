@@ -210,3 +210,101 @@ func TestDetermineEffectiveRunAsUser(t *testing.T) {
 		})
 	}
 }
+
+func TestDetermineEffectiveRunAsUserName(t *testing.T) {
+	tests := []struct {
+		desc              string
+		pod               *v1.Pod
+		container         *v1.Container
+		wantRunAsUserName *string
+	}{
+		{
+			desc: "no securityContext in pod, no securityContext in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			container:         &v1.Container{},
+			wantRunAsUserName: nil,
+		},
+		{
+			desc: "no runAsUserName in pod, no runAsUserName in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{},
+			},
+			wantRunAsUserName: nil,
+		},
+		{
+			desc: "runAsUserName in pod, no runAsUserName in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							RunAsUserName: utilptr.StringPtr("ContainerAdministrator")},
+					},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{},
+			},
+			wantRunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+		},
+		{
+			desc: "no runAsUserName in pod, runAsUserName in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						RunAsUserName: utilptr.StringPtr("ContainerAdministrator")},
+				},
+			},
+			wantRunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+		},
+		{
+			desc: "runAsUserName in pod, runAsUserName in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							RunAsUserName: utilptr.StringPtr("Administrator"),
+						},
+					},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						RunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+					},
+				},
+			},
+			wantRunAsUserName: utilptr.StringPtr("ContainerAdministrator"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			runAsUserName, ok := DetermineEffectiveRunAsUserName(test.pod, test.container)
+			if !ok && test.wantRunAsUserName != nil {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %v, want %s", test.pod, test.container,
+					runAsUserName, *test.wantRunAsUserName)
+			}
+			if ok && test.wantRunAsUserName == nil {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %s, want %v", test.pod, test.container,
+					*runAsUserName, test.wantRunAsUserName)
+			}
+			if ok && test.wantRunAsUserName != nil && *runAsUserName != *test.wantRunAsUserName {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %s, want %s", test.pod, test.container,
+					*runAsUserName, *test.wantRunAsUserName)
+			}
+		})
+	}
+}

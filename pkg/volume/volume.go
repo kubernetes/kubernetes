@@ -125,7 +125,13 @@ type MounterArgs struct {
 	// When FsUser is set, the ownership of the volume will be modified to be
 	// owned and writable by FsUser. Otherwise, there is no side effects.
 	// Currently only supported with projected service account tokens.
-	FsUser              *int64
+	FsUser *int64
+	// When FsUserName is set, the ownership of the volume will be modified to
+	// be owned and writable by FsUserName for Windows containers. Otherwise,
+	// there is no side effects. When both FsUser and FsUserName are set,
+	// FsUserName takes precedence.
+	// Currently only supported with projected service account tokens.
+	FsUserName          *string
 	FsGroup             *int64
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
@@ -149,9 +155,9 @@ type Mounter interface {
 
 	// SetUp prepares and mounts/unpacks the volume to a
 	// self-determined directory path. The mount point and its
-	// content should be owned by `fsUser` or 'fsGroup' so that it can be
-	// accessed by the pod. This may be called more than once, so
-	// implementations must be idempotent.
+	// content should be owned by `fsUser` or 'fsGroup' or 'fsUserName`
+	// so that it can be  accessed by the pod. This may be called more
+	// than once, so  implementations must be idempotent.
 	// It could return following types of errors:
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
@@ -161,9 +167,9 @@ type Mounter interface {
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by `fsUser`
-	// 'fsGroup' so that it can be accessed by the pod. This may
-	// be called more than once, so implementations must be
-	// idempotent.
+	// or 'fsGroup' or 'fsUserName' so that it can be accessed by
+	// the pod. This may be called more than once, so implementations
+	// must be idempotent.
 	SetUpAt(dir string, mounterArgs MounterArgs) error
 	// GetAttributes returns the attributes of the mounter.
 	// This function is called after SetUp()/SetUpAt().

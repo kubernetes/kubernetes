@@ -615,25 +615,40 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
 	return
 }
 
-// FsUserFrom returns FsUser of pod, which is determined by the runAsUser
+// FsUserOrUserNameFrom returns FsUser or FsUserName of pod, which is determined by the runAsUser or runAsUserName
 // attributes.
-func FsUserFrom(pod *v1.Pod) *int64 {
+func FsUserOrUserNameFrom(pod *v1.Pod) (*int64, *string) {
 	var fsUser *int64
+	var fsUserName *string
 	// Exclude ephemeral containers because SecurityContext is not allowed.
 	podutil.VisitContainers(&pod.Spec, podutil.InitContainers|podutil.Containers, func(container *v1.Container, containerType podutil.ContainerType) bool {
-		runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
-		// One container doesn't specify user or there are more than one
-		// non-root UIDs.
-		if !ok || (fsUser != nil && *fsUser != *runAsUser) {
-			fsUser = nil
+		// If runAsUserName is set, it implies that this is a Windows pod and runAsUser can be ignored for Windows pods
+		runAsUserName, ok := securitycontext.DetermineEffectiveRunAsUserName(pod, container)
+		if !ok {
+			fsUserName = nil
+			runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
+			// One container doesn't specify user or there are more than one
+			// non-root UIDs.
+			if !ok || (fsUser != nil && *fsUser != *runAsUser) {
+				fsUser = nil
+				return false
+			}
+			if fsUser == nil {
+				fsUser = runAsUser
+			}
+			return true
+		}
+
+		if fsUserName != nil && *fsUserName != *runAsUserName {
+			fsUserName = nil
 			return false
 		}
-		if fsUser == nil {
-			fsUser = runAsUser
+		if fsUserName == nil {
+			fsUserName = runAsUserName
 		}
 		return true
 	})
-	return fsUser
+	return fsUser, fsUserName
 }
 
 // HasMountRefs checks if the given mountPath has mountRefs.

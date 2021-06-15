@@ -325,7 +325,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			// When FsGroup is set, we depend on SetVolumeOwnership to
 			// change from 0600 to 0640.
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil || mounterArgs.FsUserName != nil {
 				mode = 0600
 			}
 
@@ -350,9 +350,10 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 			payload[tp.Path] = volumeutil.FileProjection{
-				Data:   []byte(tr.Status.Token),
-				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				Data:       []byte(tr.Status.Token),
+				Mode:       mode,
+				FsUser:     mounterArgs.FsUser,
+				FsUserName: mounterArgs.FsUserName,
 			}
 		}
 	}

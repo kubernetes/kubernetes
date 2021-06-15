@@ -727,6 +727,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		audience    string
 		defaultMode *int32
 		fsUser      *int64
+		fsUserName  *string
 		fsGroup     *int64
 		expiration  *int64
 		path        string
@@ -789,6 +790,19 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
 					Mode:   0600,
 					FsUser: utilptr.Int64Ptr(1000),
+				},
+			},
+		},
+		{
+			name:        "fsUserName != nil",
+			defaultMode: utilptr.Int32Ptr(0644),
+			fsUserName:  utilptr.StringPtr("ContainerAdministrator"),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:       []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:       0600,
+					FsUserName: utilptr.StringPtr("ContainerAdministrator"),
 				},
 			},
 		},
@@ -862,7 +876,8 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 				pod:    pod,
 			}
 
-			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup,
+				FsUserName: tc.fsUserName})
 			if err != nil && (tc.wantErr == nil || tc.wantErr.Error() != err.Error()) {
 				t.Fatalf("collectData() = unexpected err: %v", err)
 			}

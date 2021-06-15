@@ -664,9 +664,11 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 		}
 
+		fsUser, fsUserName := util.FsUserOrUserNameFrom(volumeToMount.Pod)
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsUser:              util.FsUserFrom(volumeToMount.Pod),
+			FsUser:              fsUser,
+			FsUserName:          fsUserName,
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,

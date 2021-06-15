@@ -63,9 +63,10 @@ type AtomicWriter struct {
 
 // FileProjection contains file Data and access Mode
 type FileProjection struct {
-	Data   []byte
-	Mode   int32
-	FsUser *int64
+	Data       []byte
+	Mode       int32
+	FsUser     *int64
+	FsUserName *string
 }
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
@@ -397,10 +398,12 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 			return err
 		}
 
-		if fileProjection.FsUser == nil {
+		if fileProjection.FsUser == nil && fileProjection.FsUserName == nil {
 			continue
 		}
-		if err := os.Chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
+		if fileProjection.FsUserName != nil {
+			// Do windows.Chown()
+		} else if err := os.Chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
 			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
 			return err
 		}
