@@ -254,6 +254,7 @@ const (
 	// owner: @rikatz
 	// kep: http://kep.k8s.io/2079
 	// alpha: v1.21
+	// beta:  v1.22
 	//
 	// Enables the endPort field in NetworkPolicy to enable a Port Range behavior in Network Policies.
 	NetworkPolicyEndPort featuregate.Feature = "NetworkPolicyEndPort"
@@ -781,7 +782,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	NetworkPolicyEndPort:                           {Default: false, PreRelease: featuregate.Alpha},
+	NetworkPolicyEndPort:                           {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.Beta},
 	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
