@@ -33,11 +33,19 @@ type jsonRawMessageCodec struct {
 }
 
 func (codec *jsonRawMessageCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
-	*((*json.RawMessage)(ptr)) = json.RawMessage(iter.SkipAndReturnBytes())
+	if iter.ReadNil() {
+		*((*json.RawMessage)(ptr)) = nil
+	} else {
+		*((*json.RawMessage)(ptr)) = iter.SkipAndReturnBytes()
+	}
 }
 
 func (codec *jsonRawMessageCodec) Encode(ptr unsafe.Pointer, stream *Stream) {
-	stream.WriteRaw(string(*((*json.RawMessage)(ptr))))
+	if *((*json.RawMessage)(ptr)) == nil {
+		stream.WriteNil()
+	} else {
+		stream.WriteRaw(string(*((*json.RawMessage)(ptr))))
+	}
 }
 
 func (codec *jsonRawMessageCodec) IsEmpty(ptr unsafe.Pointer) bool {
@@ -48,11 +56,19 @@ type jsoniterRawMessageCodec struct {
 }
 
 func (codec *jsoniterRawMessageCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
-	*((*RawMessage)(ptr)) = RawMessage(iter.SkipAndReturnBytes())
+	if iter.ReadNil() {
+		*((*RawMessage)(ptr)) = nil
+	} else {
+		*((*RawMessage)(ptr)) = iter.SkipAndReturnBytes()
+	}
 }
 
 func (codec *jsoniterRawMessageCodec) Encode(ptr unsafe.Pointer, stream *Stream) {
-	stream.WriteRaw(string(*((*RawMessage)(ptr))))
+	if *((*RawMessage)(ptr)) == nil {
+		stream.WriteNil()
+	} else {
+		stream.WriteRaw(string(*((*RawMessage)(ptr))))
+	}
 }
 
 func (codec *jsoniterRawMessageCodec) IsEmpty(ptr unsafe.Pointer) bool {

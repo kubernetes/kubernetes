@@ -9,10 +9,10 @@ import (
 	"net/textproto"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -57,19 +57,45 @@ except that the forwarded destination is not another HTTP service but rather
 a gRPC service.
 */
 func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (context.Context, error) {
+	ctx, md, err := annotateContext(ctx, mux, req)
+	if err != nil {
+		return nil, err
+	}
+	if md == nil {
+		return ctx, nil
+	}
+
+	return metadata.NewOutgoingContext(ctx, md), nil
+}
+
+// AnnotateIncomingContext adds context information such as metadata from the request.
+// Attach metadata as incoming context.
+func AnnotateIncomingContext(ctx context.Context, mux *ServeMux, req *http.Request) (context.Context, error) {
+	ctx, md, err := annotateContext(ctx, mux, req)
+	if err != nil {
+		return nil, err
+	}
+	if md == nil {
+		return ctx, nil
+	}
+
+	return metadata.NewIncomingContext(ctx, md), nil
+}
+
+func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (context.Context, metadata.MD, error) {
 	var pairs []string
 	timeout := DefaultContextTimeout
 	if tm := req.Header.Get(metadataGrpcTimeout); tm != "" {
 		var err error
 		timeout, err = timeoutDecode(tm)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid grpc-timeout: %s", tm)
+			return nil, nil, status.Errorf(codes.InvalidArgument, "invalid grpc-timeout: %s", tm)
 		}
 	}
 
 	for key, vals := range req.Header {
+		key = textproto.CanonicalMIMEHeaderKey(key)
 		for _, val := range vals {
-			key = textproto.CanonicalMIMEHeaderKey(key)
 			// For backwards-compatibility, pass through 'authorization' header with no prefix.
 			if key == "Authorization" {
 				pairs = append(pairs, "authorization", val)
@@ -80,7 +106,7 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 				if strings.HasSuffix(key, metadataHeaderBinarySuffix) {
 					b, err := decodeBinHeader(val)
 					if err != nil {
-						return nil, status.Errorf(codes.InvalidArgument, "invalid binary header %s: %s", key, err)
+						return nil, nil, status.Errorf(codes.InvalidArgument, "invalid binary header %s: %s", key, err)
 					}
 
 					val = string(b)
@@ -102,8 +128,6 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 			} else {
 				pairs = append(pairs, strings.ToLower(xForwardedFor), fmt.Sprintf("%s, %s", fwd, remoteIP))
 			}
-		} else {
-			grpclog.Infof("invalid remote addr: %s", addr)
 		}
 	}
 
@@ -111,13 +135,13 @@ func AnnotateContext(ctx context.Context, mux *ServeMux, req *http.Request) (con
 		ctx, _ = context.WithTimeout(ctx, timeout)
 	}
 	if len(pairs) == 0 {
-		return ctx, nil
+		return ctx, nil, nil
 	}
 	md := metadata.Pairs(pairs...)
 	for _, mda := range mux.metadataAnnotators {
 		md = metadata.Join(md, mda(ctx, req))
 	}
-	return metadata.NewOutgoingContext(ctx, md), nil
+	return ctx, md, nil
 }
 
 // ServerMetadata consists of metadata sent from gRPC server.
@@ -137,6 +161,63 @@ func NewServerMetadataContext(ctx context.Context, md ServerMetadata) context.Co
 func ServerMetadataFromContext(ctx context.Context) (md ServerMetadata, ok bool) {
 	md, ok = ctx.Value(serverMetadataKey{}).(ServerMetadata)
 	return
+}
+
+// ServerTransportStream implements grpc.ServerTransportStream.
+// It should only be used by the generated files to support grpc.SendHeader
+// outside of gRPC server use.
+type ServerTransportStream struct {
+	mu      sync.Mutex
+	header  metadata.MD
+	trailer metadata.MD
+}
+
+// Method returns the method for the stream.
+func (s *ServerTransportStream) Method() string {
+	return ""
+}
+
+// Header returns the header metadata of the stream.
+func (s *ServerTransportStream) Header() metadata.MD {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.header.Copy()
+}
+
+// SetHeader sets the header metadata.
+func (s *ServerTransportStream) SetHeader(md metadata.MD) error {
+	if md.Len() == 0 {
+		return nil
+	}
+
+	s.mu.Lock()
+	s.header = metadata.Join(s.header, md)
+	s.mu.Unlock()
+	return nil
+}
+
+// SendHeader sets the header metadata.
+func (s *ServerTransportStream) SendHeader(md metadata.MD) error {
+	return s.SetHeader(md)
+}
+
+// Trailer returns the cached trailer metadata.
+func (s *ServerTransportStream) Trailer() metadata.MD {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.trailer.Copy()
+}
+
+// SetTrailer sets the trailer metadata.
+func (s *ServerTransportStream) SetTrailer(md metadata.MD) error {
+	if md.Len() == 0 {
+		return nil
+	}
+
+	s.mu.Lock()
+	s.trailer = metadata.Join(s.trailer, md)
+	s.mu.Unlock()
+	return nil
 }
 
 func timeoutDecode(s string) (time.Duration, error) {
@@ -175,7 +256,7 @@ func timeoutUnitToDuration(u uint8) (d time.Duration, ok bool) {
 }
 
 // isPermanentHTTPHeader checks whether hdr belongs to the list of
-// permenant request headers maintained by IANA.
+// permanent request headers maintained by IANA.
 // http://www.iana.org/assignments/message-headers/message-headers.xml
 func isPermanentHTTPHeader(hdr string) bool {
 	switch hdr {

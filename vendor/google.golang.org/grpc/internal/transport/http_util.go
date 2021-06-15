@@ -27,6 +27,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,8 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/status"
 )
 
@@ -50,7 +53,7 @@ const (
 	// "proto" as a suffix after "+" or ";".  See
 	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
 	// for more details.
-	baseContentType = "application/grpc"
+
 )
 
 var (
@@ -71,13 +74,6 @@ var (
 		http2.ErrCodeInadequateSecurity: codes.PermissionDenied,
 		http2.ErrCodeHTTP11Required:     codes.Internal,
 	}
-	statusCodeConvTab = map[codes.Code]http2.ErrCode{
-		codes.Internal:          http2.ErrCodeInternal,
-		codes.Canceled:          http2.ErrCodeCancel,
-		codes.Unavailable:       http2.ErrCodeRefusedStream,
-		codes.ResourceExhausted: http2.ErrCodeEnhanceYourCalm,
-		codes.PermissionDenied:  http2.ErrCodeInadequateSecurity,
-	}
 	// HTTPStatusConvTab is the HTTP status code to gRPC error code conversion table.
 	HTTPStatusConvTab = map[int]codes.Code{
 		// 400 Bad Request - INTERNAL.
@@ -97,6 +93,7 @@ var (
 		// 504 Gateway timeout - UNAVAILABLE.
 		http.StatusGatewayTimeout: codes.Unavailable,
 	}
+	logger = grpclog.Component("transport")
 )
 
 type parsedHeaderData struct {
@@ -114,6 +111,7 @@ type parsedHeaderData struct {
 	timeoutSet bool
 	timeout    time.Duration
 	method     string
+	httpMethod string
 	// key-value metadata map from the peer.
 	mdata          map[string][]string
 	statsTags      []byte
@@ -182,46 +180,6 @@ func isWhitelistedHeader(hdr string) bool {
 	}
 }
 
-// contentSubtype returns the content-subtype for the given content-type.  The
-// given content-type must be a valid content-type that starts with
-// "application/grpc". A content-subtype will follow "application/grpc" after a
-// "+" or ";". See
-// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests for
-// more details.
-//
-// If contentType is not a valid content-type for gRPC, the boolean
-// will be false, otherwise true. If content-type == "application/grpc",
-// "application/grpc+", or "application/grpc;", the boolean will be true,
-// but no content-subtype will be returned.
-//
-// contentType is assumed to be lowercase already.
-func contentSubtype(contentType string) (string, bool) {
-	if contentType == baseContentType {
-		return "", true
-	}
-	if !strings.HasPrefix(contentType, baseContentType) {
-		return "", false
-	}
-	// guaranteed since != baseContentType and has baseContentType prefix
-	switch contentType[len(baseContentType)] {
-	case '+', ';':
-		// this will return true for "application/grpc+" or "application/grpc;"
-		// which the previous validContentType function tested to be valid, so we
-		// just say that no content-subtype is specified in this case
-		return contentType[len(baseContentType)+1:], true
-	default:
-		return "", false
-	}
-}
-
-// contentSubtype is assumed to be lowercase
-func contentType(contentSubtype string) string {
-	if contentSubtype == "" {
-		return baseContentType
-	}
-	return baseContentType + "+" + contentSubtype
-}
-
 func (d *decodeState) status() *status.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
@@ -259,11 +217,11 @@ func decodeMetadataHeader(k, v string) (string, error) {
 	return v, nil
 }
 
-func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
+func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) (http2.ErrCode, error) {
 	// frame.Truncated is set to true when framer detects that the current header
 	// list size hits MaxHeaderListSize limit.
 	if frame.Truncated {
-		return status.Error(codes.Internal, "peer header list size exceeded limit")
+		return http2.ErrCodeFrameSize, status.Error(codes.Internal, "peer header list size exceeded limit")
 	}
 
 	for _, hf := range frame.Fields {
@@ -272,10 +230,10 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 
 	if d.data.isGRPC {
 		if d.data.grpcErr != nil {
-			return d.data.grpcErr
+			return http2.ErrCodeProtocol, d.data.grpcErr
 		}
 		if d.serverSide {
-			return nil
+			return http2.ErrCodeNo, nil
 		}
 		if d.data.rawStatusCode == nil && d.data.statusGen == nil {
 			// gRPC status doesn't exist.
@@ -287,12 +245,12 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 			code := int(codes.Unknown)
 			d.data.rawStatusCode = &code
 		}
-		return nil
+		return http2.ErrCodeNo, nil
 	}
 
 	// HTTP fallback mode
 	if d.data.httpErr != nil {
-		return d.data.httpErr
+		return http2.ErrCodeProtocol, d.data.httpErr
 	}
 
 	var (
@@ -307,7 +265,7 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 		}
 	}
 
-	return status.Error(code, d.constructHTTPErrMsg())
+	return http2.ErrCodeProtocol, status.Error(code, d.constructHTTPErrMsg())
 }
 
 // constructErrMsg constructs error message to be returned in HTTP fallback mode.
@@ -340,7 +298,7 @@ func (d *decodeState) addMetadata(k, v string) {
 func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	switch f.Name {
 	case "content-type":
-		contentSubtype, validContentType := contentSubtype(f.Value)
+		contentSubtype, validContentType := grpcutil.ContentSubtype(f.Value)
 		if !validContentType {
 			d.data.contentTypeErr = fmt.Sprintf("transport: received the unexpected content-type %q", f.Value)
 			return
@@ -406,13 +364,17 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		}
 		d.data.statsTrace = v
 		d.addMetadata(f.Name, string(v))
+	case ":method":
+		d.data.httpMethod = f.Value
 	default:
 		if isReservedHeader(f.Name) && !isWhitelistedHeader(f.Name) {
 			break
 		}
 		v, err := decodeMetadataHeader(f.Name, f.Value)
 		if err != nil {
-			errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+			if logger.V(logLevel) {
+				logger.Errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+			}
 			return
 		}
 		d.addMetadata(f.Name, v)
@@ -447,41 +409,6 @@ func timeoutUnitToDuration(u timeoutUnit) (d time.Duration, ok bool) {
 	default:
 	}
 	return
-}
-
-const maxTimeoutValue int64 = 100000000 - 1
-
-// div does integer division and round-up the result. Note that this is
-// equivalent to (d+r-1)/r but has less chance to overflow.
-func div(d, r time.Duration) int64 {
-	if m := d % r; m > 0 {
-		return int64(d/r + 1)
-	}
-	return int64(d / r)
-}
-
-// TODO(zhaoq): It is the simplistic and not bandwidth efficient. Improve it.
-func encodeTimeout(t time.Duration) string {
-	if t <= 0 {
-		return "0n"
-	}
-	if d := div(t, time.Nanosecond); d <= maxTimeoutValue {
-		return strconv.FormatInt(d, 10) + "n"
-	}
-	if d := div(t, time.Microsecond); d <= maxTimeoutValue {
-		return strconv.FormatInt(d, 10) + "u"
-	}
-	if d := div(t, time.Millisecond); d <= maxTimeoutValue {
-		return strconv.FormatInt(d, 10) + "m"
-	}
-	if d := div(t, time.Second); d <= maxTimeoutValue {
-		return strconv.FormatInt(d, 10) + "S"
-	}
-	if d := div(t, time.Minute); d <= maxTimeoutValue {
-		return strconv.FormatInt(d, 10) + "M"
-	}
-	// Note that maxTimeoutValue * time.Hour > MaxInt64.
-	return strconv.FormatInt(div(t, time.Hour), 10) + "H"
 }
 
 func decodeTimeout(s string) (time.Duration, error) {
@@ -674,4 +601,32 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, maxHeaderList
 	f.fr.MaxHeaderListSize = maxHeaderListSize
 	f.fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
 	return f
+}
+
+// parseDialTarget returns the network and address to pass to dialer.
+func parseDialTarget(target string) (string, string) {
+	net := "tcp"
+	m1 := strings.Index(target, ":")
+	m2 := strings.Index(target, ":/")
+	// handle unix:addr which will fail with url.Parse
+	if m1 >= 0 && m2 < 0 {
+		if n := target[0:m1]; n == "unix" {
+			return n, target[m1+1:]
+		}
+	}
+	if m2 >= 0 {
+		t, err := url.Parse(target)
+		if err != nil {
+			return net, target
+		}
+		scheme := t.Scheme
+		addr := t.Path
+		if scheme == "unix" {
+			if addr == "" {
+				addr = t.Host
+			}
+			return scheme, addr
+		}
+	}
+	return net, target
 }

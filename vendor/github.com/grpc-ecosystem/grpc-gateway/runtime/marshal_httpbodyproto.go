@@ -19,7 +19,7 @@ type HTTPBodyMarshaler struct {
 	Marshaler
 }
 
-// ContentType implementation to keep backwards compatability with marshal interface
+// ContentType implementation to keep backwards compatibility with marshal interface
 func (h *HTTPBodyMarshaler) ContentType() string {
 	return h.ContentTypeFromMessage(nil)
 }

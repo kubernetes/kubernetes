@@ -10,18 +10,11 @@ import (
 
 	"golang.org/x/net/internal/iana"
 	"golang.org/x/net/internal/socket"
+
+	"golang.org/x/sys/windows"
 )
 
 const (
-	// See ws2tcpip.h.
-	sysIPV6_UNICAST_HOPS   = 0x4
-	sysIPV6_MULTICAST_IF   = 0x9
-	sysIPV6_MULTICAST_HOPS = 0xa
-	sysIPV6_MULTICAST_LOOP = 0xb
-	sysIPV6_JOIN_GROUP     = 0xc
-	sysIPV6_LEAVE_GROUP    = 0xd
-	sysIPV6_PKTINFO        = 0x13
-
 	sizeofSockaddrInet6 = 0x1c
 
 	sizeofIPv6Mreq     = 0x14
@@ -55,12 +48,12 @@ var (
 	ctlOpts = [ctlMax]ctlOpt{}
 
 	sockOpts = map[int]*sockOpt{
-		ssoHopLimit:           {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_UNICAST_HOPS, Len: 4}},
-		ssoMulticastInterface: {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_MULTICAST_IF, Len: 4}},
-		ssoMulticastHopLimit:  {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_MULTICAST_HOPS, Len: 4}},
-		ssoMulticastLoopback:  {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_MULTICAST_LOOP, Len: 4}},
-		ssoJoinGroup:          {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_JOIN_GROUP, Len: sizeofIPv6Mreq}, typ: ssoTypeIPMreq},
-		ssoLeaveGroup:         {Option: socket.Option{Level: iana.ProtocolIPv6, Name: sysIPV6_LEAVE_GROUP, Len: sizeofIPv6Mreq}, typ: ssoTypeIPMreq},
+		ssoHopLimit:           {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_UNICAST_HOPS, Len: 4}},
+		ssoMulticastInterface: {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_MULTICAST_IF, Len: 4}},
+		ssoMulticastHopLimit:  {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_MULTICAST_HOPS, Len: 4}},
+		ssoMulticastLoopback:  {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_MULTICAST_LOOP, Len: 4}},
+		ssoJoinGroup:          {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_JOIN_GROUP, Len: sizeofIPv6Mreq}, typ: ssoTypeIPMreq},
+		ssoLeaveGroup:         {Option: socket.Option{Level: iana.ProtocolIPv6, Name: windows.IPV6_LEAVE_GROUP, Len: sizeofIPv6Mreq}, typ: ssoTypeIPMreq},
 	}
 )
 
