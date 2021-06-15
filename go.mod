@@ -147,7 +147,7 @@ replace (
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.6.0
 	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
-	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
+	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20210608223527-2377c96fe795
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
 	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.17
 	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.10
@@ -339,7 +339,7 @@ replace (
 	github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 	github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
 	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.4.1
-	github.com/moby/term => github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
+	github.com/moby/term => github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
