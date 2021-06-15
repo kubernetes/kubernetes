@@ -72,6 +72,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
+        "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
