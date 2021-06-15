@@ -162,42 +162,22 @@ func isPodInTerminatedState(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
-// updateMetrics updates the gauge metrics that track how many pods and containers this kubelet manages.
-// oldPod or newPod may be nil to signify creation or deletion, respectively.
+// updateMetrics updates the metrics surfaced by the pod manager.
+// oldPod or newPod may be nil to signify creation or deletion.
 func updateMetrics(oldPod, newPod *v1.Pod) {
-	var numC, numIC, numEC int
-	countEC := utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return
+	}
 
+	var numEC int
 	if oldPod != nil {
-		if newPod == nil {
-			metrics.ManagedPods.Dec()
-		}
-		numC -= len(oldPod.Spec.Containers)
-		numIC -= len(oldPod.Spec.InitContainers)
-		if countEC {
-			numEC -= len(oldPod.Spec.EphemeralContainers)
-		}
+		numEC -= len(oldPod.Spec.EphemeralContainers)
 	}
-
 	if newPod != nil {
-		if oldPod == nil {
-			metrics.ManagedPods.Inc()
-		}
-		numC += len(newPod.Spec.Containers)
-		numIC += len(newPod.Spec.InitContainers)
-		if countEC {
-			numEC += len(newPod.Spec.EphemeralContainers)
-		}
+		numEC += len(newPod.Spec.EphemeralContainers)
 	}
-
-	if numC != 0 {
-		metrics.ManagedContainers.WithLabelValues(metrics.Container).Add(float64(numC))
-	}
-	if numIC != 0 {
-		metrics.ManagedContainers.WithLabelValues(metrics.InitContainer).Add(float64(numIC))
-	}
-	if countEC && numEC != 0 {
-		metrics.ManagedContainers.WithLabelValues(metrics.EphemeralContainer).Add(float64(numEC))
+	if numEC != 0 {
+		metrics.ManagedEphemeralContainers.Add(float64(numEC))
 	}
 }
 
