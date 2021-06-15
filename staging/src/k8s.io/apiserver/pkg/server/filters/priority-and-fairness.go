@@ -114,6 +114,7 @@ func WithPriorityAndFairness(
 			}
 		}
 		var resultCh chan interface{}
+		var forgetWatch utilflowcontrol.ForgetWatchFunc
 		if isWatchRequest {
 			resultCh = make(chan interface{})
 		}
@@ -132,6 +133,8 @@ func WithPriorityAndFairness(
 				innerReq = r.Clone(innerCtx)
 			}
 			setResponseHeaders(classification, w)
+
+			forgetWatch = fcIfc.RegisterWatch(requestInfo)
 
 			if isWatchRequest {
 				go func() {
@@ -163,6 +166,8 @@ func WithPriorityAndFairness(
 		}
 
 		// find the estimated "width" of the request
+		// TODO: Maybe just make it costEstimator and let it return additionalLatency too for the watch?
+		// TODO: Estimate cost should also take fcIfc.GetWatchCount(requestInfo) as a parameter.
 		width := widthEstimator.EstimateWidth(r)
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user, Width: width}
 
@@ -194,6 +199,9 @@ func WithPriorityAndFairness(
 		// 1) finished being processed or
 		// 2) rejected
 		if isWatchRequest {
+			if forgetWatch != nil {
+				forgetWatch()
+			}
 			err := <-resultCh
 			if err != nil {
 				panic(err)
