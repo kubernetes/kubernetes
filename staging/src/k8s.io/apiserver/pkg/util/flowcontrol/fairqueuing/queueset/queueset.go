@@ -335,6 +335,16 @@ func (req *request) Finish(execFn func()) bool {
 		}()
 
 		execFn()
+
+		// Sleep for additional latency to block concurrency units.
+		if req.additionalLatency > 0 {
+			// TODO: In the current form this means that it's actually contributing to the
+			// API call latency (as reported).
+			// In practice, user can return response earlier and that is what they care about it.
+			// So ideally this sleep should be happening asynchronously.
+				time.Sleep(req.additionalLatency)
+//			req.qs.clock.Sleep(req.additionalLatency)
+		}
 	}()
 
 	return idle
@@ -615,6 +625,15 @@ func (qs *queueSet) dispatchLocked() bool {
 		return false
 	}
 	request.startTime = qs.clock.Now()
+
+	// We use more seats than concurrency limit.
+	if request.Seats() > qs.dCfg.ConcurrencyLimit {
+		// TODO: do we want to modify this?
+		request.width = uint(qs.dCfg.ConcurrencyLimit)
+		// TODO: This should be a more fancy logic.
+		request.additionalLatency = 50 * time.Millisecond
+	}
+
 	// At this moment the request leaves its queue and starts
 	// executing.  We do not recognize any interim state between
 	// "queued" and "executing".  While that means "executing"

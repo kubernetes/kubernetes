@@ -46,6 +46,10 @@ type request struct {
 	// width of the request
 	width uint
 
+	// additionalLatency is represent the latency that a request should
+	// block its seats after it already finished processing.
+	additionalLatency time.Duration
+
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
 	// is removed from its queue.  The value will be decisionReject,
