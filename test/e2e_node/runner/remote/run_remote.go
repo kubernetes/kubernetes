@@ -557,7 +557,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 func createInstance(imageConfig *internalGCEImage) (string, error) {
 	p, err := computeService.Projects.Get(*project).Do()
 	if err != nil {
-		return "", fmt.Errorf("failed to get project info %q", *project)
+		return "", fmt.Errorf("failed to get project info %q: %v", *project, err)
 	}
 	// Use default service account
 	serviceAccount := p.DefaultServiceAccount
