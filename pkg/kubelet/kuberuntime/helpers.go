@@ -54,6 +54,12 @@ func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
+type podSandboxStatusByCreated []*runtimeapi.PodSandboxStatus
+
+func (p podSandboxStatusByCreated) Len() int           { return len(p) }
+func (p podSandboxStatusByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p podSandboxStatusByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
+
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
 	switch state {

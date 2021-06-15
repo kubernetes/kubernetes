@@ -289,6 +289,15 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*kube
 	return &status, f.Err
 }
 
+func (f *FakeRuntime) FetchPodStatus(pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "FetchPodStatus")
+	status := f.PodStatus
+	return &status, f.Err
+}
+
 func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	goruntime "runtime"
+	"sort"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -1025,6 +1026,68 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		ID:                uid,
 		Name:              name,
 		Namespace:         namespace,
+		IPs:               podIPs,
+		SandboxStatuses:   sandboxStatuses,
+		ContainerStatuses: containerStatuses,
+	}, nil
+}
+
+// FetchPodStatus retrieves the status of the pod, including the
+// information of all containers in the pod that are visible in Runtime.
+func (m *kubeGenericRuntimeManager) FetchPodStatus(pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	// Now we retain restart count of container as a container label. Each time a container
+	// restarts, pod will read the restart count from the registered dead container, increment
+	// it to get the new restart count, and then add a label with the new restart count on
+	// the newly started container.
+	// However, there are some limitations of this method:
+	//	1. When all dead containers were garbage collected, the container status could
+	//	not get the historical value and would be *inaccurate*. Fortunately, the chance
+	//	is really slim.
+	//	2. When working with old version containers which have no restart count label,
+	//	we can only assume their restart count is 0.
+	// Anyhow, we only promised "best-effort" restart count reporting, we can just ignore
+	// these limitations now.
+	// TODO: move this comment to SyncPod.
+	apiPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			UID:       pod.ID,
+		},
+	}
+
+	podFullName := format.Pod(apiPod)
+
+	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(pod.Sandboxes))
+	podIPs := []string{}
+	for i, c := range pod.Sandboxes {
+		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(c.ID.ID)
+		if err != nil {
+			klog.ErrorS(err, "PodSandboxStatus of sandbox for pod", "podSandboxID", c.ID.ID, "pod", klog.KObj(apiPod))
+			return nil, err
+		}
+		sandboxStatuses[i] = podSandboxStatus
+	}
+	sort.Sort(podSandboxStatusByCreated(sandboxStatuses))
+	// Only get pod IP from latest sandbox
+	if len(sandboxStatuses) > 0 && sandboxStatuses[0].State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, sandboxStatuses[0])
+	}
+
+	// Get statuses of all containers visible in the pod.
+	containerStatuses, err := m.getContainerStatuses(pod.Containers, pod.ID, pod.Name, pod.Namespace)
+	if err != nil {
+		if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
+			klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(apiPod))
+		}
+		return nil, err
+	}
+	m.logReduction.ClearID(podFullName)
+
+	return &kubecontainer.PodStatus{
+		ID:                pod.ID,
+		Name:              pod.Name,
+		Namespace:         pod.Namespace,
 		IPs:               podIPs,
 		SandboxStatuses:   sandboxStatuses,
 		ContainerStatuses: containerStatuses,

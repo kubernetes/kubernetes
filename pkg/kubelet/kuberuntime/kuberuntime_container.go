@@ -505,38 +505,63 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 	statuses := make([]*kubecontainer.Status, len(containers))
 	// TODO: optimization: set maximum number of containers per container name to examine.
 	for i, c := range containers {
-		status, err := m.runtimeService.ContainerStatus(c.Id)
+		cStatus, err := m.getContainerStatus(c.Id, uid, name, namespace)
 		if err != nil {
-			// Merely log this here; GetPodStatus will actually report the error out.
-			klog.V(4).InfoS("ContainerStatus return error", "containerID", c.Id, "err", err)
 			return nil, err
 		}
-		cStatus := toKubeContainerStatus(status, m.runtimeName)
-		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
-			// Populate the termination message if needed.
-			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-			// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
-				cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
-			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
-			if checkLogs {
-				// if dockerLegacyService is populated, we're supposed to use it to fetch logs
-				if m.legacyLogProvider != nil {
-					tMessage, err = m.legacyLogProvider.GetContainerLogTail(uid, name, namespace, kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id})
-					if err != nil {
-						tMessage = fmt.Sprintf("Error reading termination message from logs: %v", err)
-					}
-				} else {
-					tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
+		statuses[i] = cStatus
+	}
+
+	sort.Sort(containerStatusByCreated(statuses))
+	return statuses, nil
+}
+
+// getContainerStatus gets the containers' status.
+func (m *kubeGenericRuntimeManager) getContainerStatus(cid string, uid kubetypes.UID, name string, namespace string) (*kubecontainer.Status, error) {
+	status, err := m.runtimeService.ContainerStatus(cid)
+	if err != nil {
+		// Merely log this here; GetPodStatus will actually report the error out.
+		klog.V(4).InfoS("ContainerStatus return error", "containerID", cid, "err", err)
+		return nil, err
+	}
+	cStatus := toKubeContainerStatus(status, m.runtimeName)
+	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		// Populate the termination message if needed.
+		annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+		// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
+		fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
+			cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
+		tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
+		if checkLogs {
+			// if dockerLegacyService is populated, we're supposed to use it to fetch logs
+			if m.legacyLogProvider != nil {
+				tMessage, err = m.legacyLogProvider.GetContainerLogTail(uid, name, namespace, kubecontainer.ContainerID{Type: m.runtimeName, ID: cid})
+				if err != nil {
+					tMessage = fmt.Sprintf("Error reading termination message from logs: %v", err)
 				}
+			} else {
+				tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
 			}
-			// Enrich the termination message written by the application is not empty
-			if len(tMessage) != 0 {
-				if len(cStatus.Message) != 0 {
-					cStatus.Message += ": "
-				}
-				cStatus.Message += tMessage
+		}
+		// Enrich the termination message written by the application is not empty
+		if len(tMessage) != 0 {
+			if len(cStatus.Message) != 0 {
+				cStatus.Message += ": "
 			}
+			cStatus.Message += tMessage
+		}
+	}
+	return cStatus, nil
+}
+
+// getContainerStatuses gets the containers' statuses.
+func (m *kubeGenericRuntimeManager) getContainerStatuses(containers []*kubecontainer.Container, uid kubetypes.UID, name, namespace string) ([]*kubecontainer.Status, error) {
+	statuses := make([]*kubecontainer.Status, len(containers))
+	// TODO: optimization: set maximum number of containers per container name to examine.
+	for i, c := range containers {
+		cStatus, err := m.getContainerStatus(c.ID.ID, uid, name, namespace)
+		if err != nil {
+			return nil, err
 		}
 		statuses[i] = cStatus
 	}

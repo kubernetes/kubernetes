@@ -328,6 +328,81 @@ func TestGetPodStatus(t *testing.T) {
 	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
 }
 
+func TestFetchPodStatus(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+				{
+					Name:            "foo2",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Set fake sandbox and fake containers to fakeRuntime.
+	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+
+	// Convert the fakeContainers to kubecontainer.Container
+	containers := make([]*kubecontainer.Container, len(fakeContainers))
+	for i := range containers {
+		fakeContainer := fakeContainers[i]
+		c, err := m.toKubeContainer(&runtimeapi.Container{
+			Id:          fakeContainer.Id,
+			Metadata:    fakeContainer.Metadata,
+			State:       fakeContainer.State,
+			Image:       fakeContainer.Image,
+			ImageRef:    fakeContainer.ImageRef,
+			Labels:      fakeContainer.Labels,
+			Annotations: fakeContainer.Annotations,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		containers[i] = c
+	}
+	// Convert fakeSandbox to kubecontainer.Container
+	sandbox, err := m.sandboxToKubeContainer(&runtimeapi.PodSandbox{
+		Id:          fakeSandbox.Id,
+		Metadata:    fakeSandbox.Metadata,
+		State:       fakeSandbox.State,
+		CreatedAt:   fakeSandbox.CreatedAt,
+		Labels:      fakeSandbox.Labels,
+		Annotations: fakeSandbox.Annotations,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := &kubecontainer.Pod{
+		ID:         types.UID("12345678"),
+		Name:       "foo",
+		Namespace:  "new",
+		Containers: []*kubecontainer.Container{containers[0], containers[1]},
+		Sandboxes:  []*kubecontainer.Container{sandbox},
+	}
+	podStatus, err := m.FetchPodStatus(expected)
+	assert.NoError(t, err)
+	assert.Equal(t, pod.UID, podStatus.ID)
+	assert.Equal(t, pod.Name, podStatus.Name)
+	assert.Equal(t, pod.Namespace, podStatus.Namespace)
+	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
+}
+
 func TestGetPods(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)

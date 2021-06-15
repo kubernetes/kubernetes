@@ -97,6 +97,11 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*kubecontain
 	return args.Get(0).(*kubecontainer.PodStatus), args.Error(1)
 }
 
+func (r *Mock) FetchPodStatus(pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	args := r.Called(pod)
+	return args.Get(0).(*kubecontainer.PodStatus), args.Error(1)
+}
+
 func (r *Mock) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
