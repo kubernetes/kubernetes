@@ -297,7 +297,7 @@ func Parse(s string) (CPUSet, error) {
 	}
 
 	// Split CPU list string:
-	// "0-5,34,46-48 => ["0-5", "34", "46-48"]
+	// "0-5,34,46-48" => ["0-5", "34", "46-48"]
 	ranges := strings.Split(s, ",")
 
 	for _, r := range ranges {
