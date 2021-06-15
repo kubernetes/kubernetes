@@ -439,8 +439,8 @@ func TestSetEnvRemote(t *testing.T) {
 			object: &batchv1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: batchv1.CronJobSpec{
-					JobTemplate: batchv1.JobTemplateSpec {
-						Spec: batchv1.JobSpec {
+					JobTemplate: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{
