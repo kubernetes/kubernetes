@@ -355,6 +355,11 @@ type CronJobSpec struct {
 	// Defaults to 1.
 	// +optional
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,7,opt,name=failedJobsHistoryLimit"`
+
+	// The time zone to be used when scheduling the job given the schedule specified above.
+	// Valid options include anything in the IANA Time Zone database.
+	// +optional
+	TimeZone string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 }
 
 // ConcurrencyPolicy describes how the job will be handled.

@@ -96,6 +96,11 @@ message CronJobSpec {
   // Defaults to 1.
   // +optional
   optional int32 failedJobsHistoryLimit = 7;
+
+  // The time zone to be used when scheduling the job given the schedule specified above.
+  // Valid options include anything in the IANA Time Zone database.
+  // +optional
+  optional string timeZone = 8;
 }
 
 // CronJobStatus represents the current state of a cron job.

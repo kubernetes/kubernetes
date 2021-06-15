@@ -812,6 +812,23 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"spec.timeZone: Invalid value: \"Mars/Olympus_Mons\": not a valid timezone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				TimeZone:          "Mars/Olympus_Mons",
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{

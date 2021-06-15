@@ -57,6 +57,7 @@ var map_CronJobSpec = map[string]string{
 	"jobTemplate":                "Specifies the job that will be created when executing a CronJob.",
 	"successfulJobsHistoryLimit": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
 	"failedJobsHistoryLimit":     "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+	"timeZone":                   "The time zone to be used when scheduling the job given the schedule specified above. Valid options include anything in the IANA Time Zone database.",
 }
 
 func (CronJobSpec) SwaggerDoc() map[string]string {

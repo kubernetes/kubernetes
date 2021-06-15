@@ -166,7 +166,7 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		// started a job, but have not noticed it yet (distributed systems can
 		// have arbitrary delays).  In any case, use the creation time of the
 		// CronJob as last known start time.
-		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
+		earliestTime = cj.ObjectMeta.CreationTimestamp.Time.In(now.Location())
 	}
 	if cj.Spec.StartingDeadlineSeconds != nil {
 		// Controller is not going to schedule anything below this point

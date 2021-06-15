@@ -477,6 +477,17 @@ func (jm *ControllerV2) syncCronJob(
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
+	if cj.Spec.TimeZone != "" {
+		loc, err := time.LoadLocation(cj.Spec.TimeZone)
+		if err != nil {
+			// We validate that the CronJob time zone is valid.
+			// However, it is possible that the list of time zones could change at runtime which would cause an error when getting the time.
+			jm.recorder.Eventf(cj, corev1.EventTypeWarning, "InvalidTimeZone", "attempted to run a job with an invalid time zone: %s", cj.Spec.TimeZone)
+			return cj, nil, nil
+		}
+		now = now.In(loc)
+	}
+
 	scheduledTime, err := getNextScheduleTime(*cj, now, sched, jm.recorder)
 	if err != nil {
 		// this is likely a user error in defining the spec value

@@ -1092,12 +1092,13 @@ spec:
   startingDeadlineSeconds: -2555947251840004808
   successfulJobsHistoryLimit: -2006986560
   suspend: true
+  timeZone: "504"
 status:
   active:
-  - apiVersion: "507"
-    fieldPath: "509"
-    kind: "504"
-    name: "506"
-    namespace: "505"
-    resourceVersion: "508"
+  - apiVersion: "508"
+    fieldPath: "510"
+    kind: "505"
+    name: "507"
+    namespace: "506"
+    resourceVersion: "509"
     uid: 暉Ŝ!ȣ绰

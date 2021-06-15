@@ -1590,18 +1590,19 @@
       }
     },
     "successfulJobsHistoryLimit": -2006986560,
-    "failedJobsHistoryLimit": -380889943
+    "failedJobsHistoryLimit": -380889943,
+    "timeZone": "504"
   },
   "status": {
     "active": [
       {
-        "kind": "504",
-        "namespace": "505",
-        "name": "506",
+        "kind": "505",
+        "namespace": "506",
+        "name": "507",
         "uid": "暉Ŝ!ȣ绰",
-        "apiVersion": "507",
-        "resourceVersion": "508",
-        "fieldPath": "509"
+        "apiVersion": "508",
+        "resourceVersion": "509",
+        "fieldPath": "510"
       }
     ]
   }
