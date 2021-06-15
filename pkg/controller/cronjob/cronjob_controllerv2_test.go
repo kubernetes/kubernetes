@@ -41,11 +41,60 @@ import (
 
 var (
 	// no timezone given
-	noTimezone   = ""
-	goodTimezone = "America/Detroit"
-	badTimezone  = "Mars/Olympus_Mons"
+	noTimeZone     = ""
+	goodTimeZone   = "America/Detroit"
+	errorTimeZone  = "Mars/Olympus_Mons"
+	onTheFirstHour = "0 1 * * ?"
 )
 
+func inGoodTimeZone(t time.Time) time.Time {
+	loc, err := time.LoadLocation(goodTimeZone)
+	if err != nil {
+		panic("missing timezone database!")
+	}
+	return t.In(loc)
+}
+
+func justBeforeTheFirstHourInZone() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T00:59:00-04:00")
+	if err != nil {
+		panic("test setup error")
+	}
+	return inGoodTimeZone(T1)
+}
+
+func justBeforeTheFirstHourYesterdayInZone() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-18T00:59:00-04:00")
+	if err != nil {
+		panic("test setup error")
+	}
+	return inGoodTimeZone(T1)
+}
+
+func justAfterTheFirstHourInZone() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T01:01:00-04:00")
+	if err != nil {
+		panic("test setup error")
+	}
+	return inGoodTimeZone(T1)
+}
+
+func justAfterTheFirstHourYesterdayInZone() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-18T01:01:00-04:00")
+	if err != nil {
+		panic("test setup error")
+	}
+	return inGoodTimeZone(T1)
+}
+
+
+func justAfterMidnightInZone() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T00:01:00-04:00")
+	if err != nil {
+		panic("test setup error")
+	}
+	return inGoodTimeZone(T1)
+}
 
 func justASecondBeforeTheHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:59Z")
@@ -74,7 +123,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
-		timezone          string
+		timeZone          string
 		deadline          int64
 
 		// cj status
@@ -97,70 +146,75 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		jobPresentInCJActiveStatus bool
 		jobCreateError             error
 	}{
-		"never ran, not valid schedule, A":      {A, F, errorSchedule, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not valid schedule, F":      {f, F, errorSchedule, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not valid schedule, R":      {f, F, errorSchedule, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not time, A":                {A, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, not time, F":                {f, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, not time, R":                {R, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, is time, A":                 {A, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, F":                 {f, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, R":                 {R, F, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, suspended":         {A, T, onTheHour, noTimezone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
-		"never ran, is time, past deadline":     {A, F, onTheHour, noTimezone, shortDead, F, F, justAfterThePriorHour(), justAfterTheHour().Add(time.Minute * time.Duration(shortDead+1)), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, is time, not past deadline": {A, F, onTheHour, noTimezone, longDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, not valid schedule, A":      {A, F, errorSchedule, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not valid schedule, F":      {f, F, errorSchedule, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not valid schedule, R":      {f, F, errorSchedule, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not valid timezone, A":      {A, F, errorSchedule, errorTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not time, A":                {A, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, not time, F":                {f, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, not time, R":                {R, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, not time, with timezone":    {A, F, onTheFirstHour, goodTimeZone, noDead, F, F, justAfterMidnightInZone(), justBeforeTheFirstHourInZone(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, is time, A":                 {A, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, F":                 {f, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, R":                 {R, F, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, with timezone":     {A, F, onTheHour, goodTimeZone, noDead, F, F, justAfterMidnightInZone(), justAfterTheFirstHourInZone(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, suspended":         {A, T, onTheHour, noTimeZone, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
+		"never ran, is time, past deadline":     {A, F, onTheHour, noTimeZone, shortDead, F, F, justAfterThePriorHour(), justAfterTheHour().Add(time.Minute * time.Duration(shortDead+1)), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, is time, not past deadline": {A, F, onTheHour, noTimeZone, longDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, not time, A":                {A, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, not time, F":                {f, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, not time, R":                {R, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, is time, A":                 {A, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, F":                 {f, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, R":                 {R, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, suspended":         {A, T, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
-		"prev ran but done, is time, past deadline":     {A, F, onTheHour, noTimezone, shortDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, is time, not past deadline": {A, F, onTheHour, noTimezone, longDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, not time, A":                {A, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, not time, F":                {f, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, not time, R":                {R, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, not time, with timezone":    {A, F, onTheFirstHour, goodTimeZone, noDead, T, F, justAfterMidnightInZone(), justBeforeTheFirstHourInZone(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, is time, A":                 {A, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, F":                 {f, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, R":                 {R, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, with timezone":     {A, F, onTheFirstHour, goodTimeZone, noDead, T, F, justAfterMidnightInZone(), justAfterTheFirstHourInZone(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, suspended":         {A, T, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
+		"prev ran but done, is time, past deadline":     {A, F, onTheHour, noTimeZone, shortDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, is time, not past deadline": {A, F, onTheHour, noTimeZone, longDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"still active, not time, A":                {A, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, not time, F":                {f, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, not time, R":                {R, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, A":                 {A, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
-		"still active, is time, F":                 {f, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, R":                 {R, F, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, T, 1, 0, F, T, F, T, nil},
-		"still active, is time, suspended":         {A, T, onTheHour, noTimezone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, F, F, T, nil},
-		"still active, is time, past deadline":     {A, F, onTheHour, noTimezone, shortDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, not past deadline": {A, F, onTheHour, noTimezone, longDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
+		"still active, not time, A":                {A, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, not time, F":                {f, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, not time, R":                {R, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, A":                 {A, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
+		"still active, is time, F":                 {f, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, R":                 {R, F, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, T, 1, 0, F, T, F, T, nil},
+		"still active, is time, suspended":         {A, T, onTheHour, noTimeZone, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, F, F, T, nil},
+		"still active, is time, past deadline":     {A, F, onTheHour, noTimeZone, shortDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, not past deadline": {A, F, onTheHour, noTimeZone, longDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
 
 		// Controller should fail to schedule these, as there are too many missed starting times
 		// and either no deadline or a too long deadline.
-		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, noTimezone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, noTimezone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, noTimezone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noTimezone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, noTimeZone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, noTimeZone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, noTimeZone, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noTimeZone, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, noTimezone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, noTimezone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, noTimeZone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, noTimeZone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, noTimezone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, noTimezone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, noTimeZone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, noTimeZone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, noTimezone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, noTimezone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, noTimeZone, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, noTimeZone, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
 		// Tests for time skews
 		// the controller sees job is created, takes no actions
-		"this ran but done, time drifted back, F": {f, F, onTheHour, noTimezone, noDead, T, F, *justAfterTheHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, F, errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, "")},
+		"this ran but done, time drifted back, F": {f, F, onTheHour, noTimeZone, noDead, T, F, *justAfterTheHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, F, errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, "")},
 
 		// Tests for slow job lister
-		"this started but went missing, not past deadline, A": {A, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
-		"this started but went missing, not past deadline, f": {f, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
-		"this started but went missing, not past deadline, R": {R, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, A": {A, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, f": {f, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, R": {R, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
 
 		// Tests for slow cronjob list
-		"this started but is not present in cronjob active list, not past deadline, A": {A, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
-		"this started but is not present in cronjob active list, not past deadline, f": {f, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
-		"this started but is not present in cronjob active list, not past deadline, R": {R, F, onTheHour, noTimezone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, A": {A, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, f": {f, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, R": {R, F, onTheHour, noTimeZone, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
 	}
 	for name, tc := range testCases {
 		name := name
@@ -173,6 +227,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
 			cj.Spec.Schedule = tc.schedule
+			cj.Spec.TimeZone = tc.timeZone
 			if tc.deadline != noDead {
 				cj.Spec.StartingDeadlineSeconds = &tc.deadline
 			}
@@ -184,8 +239,13 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			js := []*batchv1.Job{}
 			realCJ := cj.DeepCopy()
 			if tc.ranPreviously {
-				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
-				cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
+				if tc.timeZone == goodTimeZone {
+					cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheFirstHourYesterdayInZone()}
+					cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterTheFirstHourYesterdayInZone()}
+				} else {
+					cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
+					cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
+				}
 				job, err = getJobFromTemplate2(&cj, tc.jobCreationTime)
 				if err != nil {
 					t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
@@ -206,7 +266,11 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					}
 				}
 			} else {
-				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+				if tc.timeZone == goodTimeZone {
+					cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheFirstHourInZone()}
+				} else {
+					cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+				}
 				if tc.stillActive {
 					t.Errorf("%s: test setup error: this case makes no sense", name)
 				}
