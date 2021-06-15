@@ -59,7 +59,7 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 // onto machines.
 // TODO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(context.Context, []framework.Extender, framework.Framework, *framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
+	Schedule(int32, context.Context, []framework.Extender, framework.Framework, *framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -74,10 +74,9 @@ type ScheduleResult struct {
 }
 
 type genericScheduler struct {
-	cache                    internalcache.Cache
-	nodeInfoSnapshot         *internalcache.Snapshot
-	percentageOfNodesToScore int32
-	nextStartNodeIndex       int
+	cache              internalcache.Cache
+	nodeInfoSnapshot   *internalcache.Snapshot
+	nextStartNodeIndex int
 }
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
@@ -90,7 +89,7 @@ func (g *genericScheduler) snapshot() error {
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+func (g *genericScheduler) Schedule(percentageOfNodesToScore int32, ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -103,7 +102,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.E
 		return result, ErrNoNodesAvailable
 	}
 
-	feasibleNodes, diagnosis, err := g.findNodesThatFitPod(ctx, extenders, fwk, state, pod)
+	feasibleNodes, diagnosis, err := g.findNodesThatFitPod(percentageOfNodesToScore, ctx, extenders, fwk, state, pod)
 	if err != nil {
 		return result, err
 	}
@@ -168,12 +167,12 @@ func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (st
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
-func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) {
-	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore >= 100 {
+func numFeasibleNodesToFind(percentageOfNodesToScore int32, numAllNodes int32) (numNodes int32) {
+	if numAllNodes < minFeasibleNodesToFind || percentageOfNodesToScore >= 100 {
 		return numAllNodes
 	}
 
-	adaptivePercentage := g.percentageOfNodesToScore
+	adaptivePercentage := percentageOfNodesToScore
 	if adaptivePercentage <= 0 {
 		basePercentageOfNodesToScore := int32(50)
 		adaptivePercentage = basePercentageOfNodesToScore - numAllNodes/125
@@ -190,14 +189,14 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 	return numNodes
 }
 
-func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*v1.Node, error) {
+func (g *genericScheduler) evaluateNominatedNode(percentageOfNodesToScore int32, ctx context.Context, extenders []framework.Extender, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*v1.Node, error) {
 	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := g.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
 		return nil, err
 	}
 	node := []*framework.NodeInfo{nodeInfo}
-	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, node)
+	feasibleNodes, err := g.findNodesThatPassFilters(percentageOfNodesToScore, ctx, fwk, state, pod, diagnosis, node)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +211,7 @@ func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, extenders 
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
+func (g *genericScheduler) findNodesThatFitPod(percentageOfNodesToScore int32, ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
 	diagnosis := framework.Diagnosis{
 		NodeToStatusMap:      make(framework.NodeToStatusMap),
 		UnschedulablePlugins: sets.NewString(),
@@ -241,7 +240,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
 	if len(pod.Status.NominatedNodeName) > 0 && feature.DefaultFeatureGate.Enabled(features.PreferNominatedNode) {
-		feasibleNodes, err := g.evaluateNominatedNode(ctx, extenders, pod, fwk, state, diagnosis)
+		feasibleNodes, err := g.evaluateNominatedNode(percentageOfNodesToScore, ctx, extenders, pod, fwk, state, diagnosis)
 		if err != nil {
 			klog.ErrorS(err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
 		}
@@ -250,7 +249,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 			return feasibleNodes, diagnosis, nil
 		}
 	}
-	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, allNodes)
+	feasibleNodes, err := g.findNodesThatPassFilters(percentageOfNodesToScore, ctx, fwk, state, pod, diagnosis, allNodes)
 	if err != nil {
 		return nil, diagnosis, err
 	}
@@ -264,13 +263,14 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
 func (g *genericScheduler) findNodesThatPassFilters(
+	percentageOfNodesToScore int32,
 	ctx context.Context,
 	fwk framework.Framework,
 	state *framework.CycleState,
 	pod *v1.Pod,
 	diagnosis framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
-	numNodesToFind := g.numFeasibleNodesToFind(int32(len(nodes)))
+	numNodesToFind := numFeasibleNodesToFind(percentageOfNodesToScore, int32(len(nodes)))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
@@ -497,11 +497,9 @@ func prioritizeNodes(
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache internalcache.Cache,
-	nodeInfoSnapshot *internalcache.Snapshot,
-	percentageOfNodesToScore int32) ScheduleAlgorithm {
+	nodeInfoSnapshot *internalcache.Snapshot) ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                    cache,
-		nodeInfoSnapshot:         nodeInfoSnapshot,
-		percentageOfNodesToScore: percentageOfNodesToScore,
+		cache:            cache,
+		nodeInfoSnapshot: nodeInfoSnapshot,
 	}
 }

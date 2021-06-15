@@ -180,18 +180,18 @@ func (c *Configurator) create() (*Scheduler, error) {
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
-		c.percentageOfNodesToScore,
 	)
 
 	return &Scheduler{
-		SchedulerCache:  c.schedulerCache,
-		Algorithm:       algo,
-		Extenders:       extenders,
-		Profiles:        profiles,
-		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
-		StopEverything:  c.StopEverything,
-		SchedulingQueue: podQueue,
+		SchedulerCache:           c.schedulerCache,
+		Algorithm:                algo,
+		Extenders:                extenders,
+		PercentageOfNodesToScore: c.percentageOfNodesToScore,
+		Profiles:                 profiles,
+		NextPod:                  internalqueue.MakeNextPodFunc(podQueue),
+		Error:                    MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
+		StopEverything:           c.StopEverything,
+		SchedulingQueue:          podQueue,
 	}, nil
 }
 

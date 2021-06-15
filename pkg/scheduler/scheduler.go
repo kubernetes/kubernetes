@@ -73,6 +73,8 @@ type Scheduler struct {
 
 	Extenders []framework.Extender
 
+	PercentageOfNodesToScore int32
+
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -508,7 +510,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, sched.Extenders, fwk, state, pod)
+	scheduleResult, err := sched.Algorithm.Schedule(sched.PercentageOfNodesToScore, schedulingCycleCtx, sched.Extenders, fwk, state, pod)
 	if err != nil {
 		// Schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it

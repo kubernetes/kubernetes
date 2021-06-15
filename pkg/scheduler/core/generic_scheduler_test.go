@@ -1004,12 +1004,11 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore,
 			)
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.Schedule(ctx, nil, fwk, framework.NewCycleState(), test.pod)
+			result, err := scheduler.Schedule(schedulerapi.DefaultPercentageOfNodesToScore, ctx, nil, fwk, framework.NewCycleState(), test.pod)
 			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
@@ -1040,7 +1039,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
-		schedulerapi.DefaultPercentageOfNodesToScore)
+	)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 }
@@ -1062,7 +1061,7 @@ func TestFindFitAllError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.findNodesThatFitPod(schedulerapi.DefaultPercentageOfNodesToScore, context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1096,7 +1095,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.findNodesThatFitPod(schedulerapi.DefaultPercentageOfNodesToScore, context.Background(), nil, fwk, framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1175,7 +1174,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(schedulerapi.DefaultPercentageOfNodesToScore, context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1333,13 +1332,12 @@ func TestZeroRequest(t *testing.T) {
 
 			scheduler := NewGenericScheduler(
 				nil,
-				emptySnapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+				emptySnapshot).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, nil, fwk, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(schedulerapi.DefaultPercentageOfNodesToScore, ctx, nil, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -1402,10 +1400,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &genericScheduler{
-				percentageOfNodesToScore: tt.percentageOfNodesToScore,
-			}
-			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+			if gotNumNodes := numFeasibleNodesToFind(tt.percentageOfNodesToScore, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
@@ -1434,12 +1429,12 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 
 	// To make numAllNodes % nodesToFind != 0
-	g.percentageOfNodesToScore = 30
-	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+	percentageOfNodesToScore := int32(30)
+	nodesToFind := int(numFeasibleNodesToFind(percentageOfNodesToScore, int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.findNodesThatFitPod(percentageOfNodesToScore, context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1523,9 +1518,9 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+			).(*genericScheduler)
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(schedulerapi.DefaultPercentageOfNodesToScore, context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

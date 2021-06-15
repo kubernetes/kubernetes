@@ -114,7 +114,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(percentageOfNodesToScore int32, ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -833,7 +833,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	algo := core.NewGenericScheduler(
 		scache,
 		internalcache.NewEmptySnapshot(),
-		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 
 	errChan := make(chan error, 1)
@@ -1179,12 +1178,12 @@ func TestSchedulerBinding(t *testing.T) {
 			algo := core.NewGenericScheduler(
 				scache,
 				nil,
-				0,
 			)
 			sched := Scheduler{
-				Algorithm:      algo,
-				Extenders:      test.extenders,
-				SchedulerCache: scache,
+				Algorithm:                algo,
+				Extenders:                test.extenders,
+				SchedulerCache:           scache,
+				PercentageOfNodesToScore: 0,
 			}
 			err = sched.bind(context.Background(), fwk, pod, "node", nil)
 			if err != nil {
