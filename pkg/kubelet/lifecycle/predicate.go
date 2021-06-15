@@ -61,6 +61,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	klog.InfoS("admitting pod", "pod", attrs.Pod)
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
 		klog.ErrorS(err, "Cannot get Node info")
