@@ -95,24 +95,27 @@ func (fs FS) Schedstat() (*Schedstat, error) {
 	return stats, nil
 }
 
-func parseProcSchedstat(contents string) (stats ProcSchedstat, err error) {
+func parseProcSchedstat(contents string) (ProcSchedstat, error) {
+	var (
+		stats ProcSchedstat
+		err   error
+	)
 	match := procLineRE.FindStringSubmatch(contents)
 
 	if match != nil {
 		stats.RunningNanoseconds, err = strconv.ParseUint(match[1], 10, 64)
 		if err != nil {
-			return
+			return stats, err
 		}
 
 		stats.WaitingNanoseconds, err = strconv.ParseUint(match[2], 10, 64)
 		if err != nil {
-			return
+			return stats, err
 		}
 
 		stats.RunTimeslices, err = strconv.ParseUint(match[3], 10, 64)
-		return
+		return stats, err
 	}
 
-	err = errors.New("could not parse schedstat")
-	return
+	return stats, errors.New("could not parse schedstat")
 }

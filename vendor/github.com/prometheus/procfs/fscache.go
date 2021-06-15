@@ -236,7 +236,7 @@ func (fs FS) Fscacheinfo() (Fscacheinfo, error) {
 
 	m, err := parseFscacheinfo(bytes.NewReader(b))
 	if err != nil {
-		return Fscacheinfo{}, fmt.Errorf("failed to parse Fscacheinfo: %v", err)
+		return Fscacheinfo{}, fmt.Errorf("failed to parse Fscacheinfo: %w", err)
 	}
 
 	return *m, nil

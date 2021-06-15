@@ -74,11 +74,11 @@ var nodeZoneRE = regexp.MustCompile(`(\d+), zone\s+(\w+)`)
 func (fs FS) Zoneinfo() ([]Zoneinfo, error) {
 	data, err := ioutil.ReadFile(fs.proc.Path("zoneinfo"))
 	if err != nil {
-		return nil, fmt.Errorf("error reading zoneinfo %s: %s", fs.proc.Path("zoneinfo"), err)
+		return nil, fmt.Errorf("error reading zoneinfo %q: %w", fs.proc.Path("zoneinfo"), err)
 	}
 	zoneinfo, err := parseZoneinfo(data)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing zoneinfo %s: %s", fs.proc.Path("zoneinfo"), err)
+		return nil, fmt.Errorf("error parsing zoneinfo %q: %w", fs.proc.Path("zoneinfo"), err)
 	}
 	return zoneinfo, nil
 }

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	defaultLog "log"
+	"math"
 	"net"
 	"net/http"
 	"strings"
@@ -221,6 +222,10 @@ func (sctx *serveCtx) registerGateway(opts []grpc.DialOption) (*gw.ServeMux, err
 		// explicitly define unix network for gRPC socket support
 		addr = fmt.Sprintf("%s://%s", network, addr)
 	}
+
+	opts = append(opts, grpc.WithDefaultCallOptions([]grpc.CallOption{
+		grpc.MaxCallRecvMsgSize(math.MaxInt32),
+	}...))
 
 	conn, err := grpc.DialContext(ctx, addr, opts...)
 	if err != nil {

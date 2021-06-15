@@ -721,6 +721,9 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 	case pb.AlarmRequest_GET:
 		resp.Alarms = a.s.alarmStore.Get(ar.Alarm)
 	case pb.AlarmRequest_ACTIVATE:
+		if ar.Alarm == pb.AlarmType_NONE {
+			break
+		}
 		m := a.s.alarmStore.Activate(types.ID(ar.MemberID), ar.Alarm)
 		if m == nil {
 			break
@@ -738,7 +741,7 @@ func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 		case pb.AlarmType_NOSPACE:
 			a.s.applyV3 = newApplierV3Capped(a)
 		default:
-			lg.Warn("unimplemented alarm activation", zap.String("alarm", fmt.Sprintf("%+v", m)))
+			lg.Panic("unimplemented alarm activation", zap.String("alarm", fmt.Sprintf("%+v", m)))
 		}
 	case pb.AlarmRequest_DEACTIVATE:
 		m := a.s.alarmStore.Deactivate(types.ID(ar.MemberID), ar.Alarm)

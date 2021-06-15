@@ -77,6 +77,7 @@ var toGRPCErrorMap = map[error]error{
 	auth.ErrRoleNotFound:         rpctypes.ErrGRPCRoleNotFound,
 	auth.ErrRoleEmpty:            rpctypes.ErrGRPCRoleEmpty,
 	auth.ErrAuthFailed:           rpctypes.ErrGRPCAuthFailed,
+	auth.ErrPermissionNotGiven:   rpctypes.ErrGRPCPermissionNotGiven,
 	auth.ErrPermissionDenied:     rpctypes.ErrGRPCPermissionDenied,
 	auth.ErrRoleNotGranted:       rpctypes.ErrGRPCRoleNotGranted,
 	auth.ErrPermissionNotGranted: rpctypes.ErrGRPCPermissionNotGranted,

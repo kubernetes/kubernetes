@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright 2020 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,19 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build go1.12
+// +build linux
+// +build riscv riscv64
 
-package prometheus
+package procfs
 
-import "runtime/debug"
-
-// readBuildInfo is a wrapper around debug.ReadBuildInfo for Go 1.12+.
-func readBuildInfo() (path, version, sum string) {
-	path, version, sum = "unknown", "unknown", "unknown"
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		path = bi.Main.Path
-		version = bi.Main.Version
-		sum = bi.Main.Sum
-	}
-	return
-}
+var parseCPUInfo = parseCPUInfoRISCV

@@ -73,7 +73,7 @@ require (
 	github.com/opencontainers/selinux v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.26.0
 	github.com/quobyte/api v0.1.8
@@ -86,13 +86,13 @@ require (
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.20.3
-	go.etcd.io/etcd/client/pkg/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/client/v3 v3.5.0-rc.0
+	go.etcd.io/etcd/client/pkg/v3 v3.5.0
+	go.etcd.io/etcd/client/v3 v3.5.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
+	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools v0.1.2
@@ -379,10 +379,10 @@ replace (
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/posener/complete => github.com/posener/complete v1.1.1
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common => github.com/prometheus/common v0.26.0
-	github.com/prometheus/procfs => github.com/prometheus/procfs v0.2.0
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.6.0
 	github.com/quobyte/api => github.com/quobyte/api v0.1.8
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/robfig/cron/v3 => github.com/robfig/cron/v3 v3.0.1
@@ -423,15 +423,15 @@ replace (
 	github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
 	github.com/yuin/goldmark => github.com/yuin/goldmark v1.3.5
 	go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.6
-	go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/client/v2 => go.etcd.io/etcd/client/v2 v2.305.0-rc.0
-	go.etcd.io/etcd/client/v3 => go.etcd.io/etcd/client/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/etcdutl/v3 => go.etcd.io/etcd/etcdutl/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/raft/v3 => go.etcd.io/etcd/raft/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.5.0-rc.0
-	go.etcd.io/etcd/tests/v3 => go.etcd.io/etcd/tests/v3 v3.5.0-rc.0
+	go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.0
+	go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.0
+	go.etcd.io/etcd/client/v2 => go.etcd.io/etcd/client/v2 v2.305.0
+	go.etcd.io/etcd/client/v3 => go.etcd.io/etcd/client/v3 v3.5.0
+	go.etcd.io/etcd/etcdutl/v3 => go.etcd.io/etcd/etcdutl/v3 v3.5.0
+	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.5.0
+	go.etcd.io/etcd/raft/v3 => go.etcd.io/etcd/raft/v3 v3.5.0
+	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.5.0
+	go.etcd.io/etcd/tests/v3 => go.etcd.io/etcd/tests/v3 v3.5.0
 	go.opencensus.io => go.opencensus.io v0.22.3
 	go.opentelemetry.io/contrib => go.opentelemetry.io/contrib v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
@@ -458,7 +458,7 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20210510120138-977fb7262007
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
 	golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/text => golang.org/x/text v0.3.6
 	golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
