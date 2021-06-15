@@ -26,6 +26,10 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+func uint64Ptr(u uint64) *uint64 {
+	return &u
+}
+
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
 		SampleCount: uint64Ptr(0),

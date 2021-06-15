@@ -126,11 +126,6 @@ func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime 
 	}
 }
 
-// newLogged turns a normal response writer into a logged response writer.
-func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
-	return newLoggedWithStartTime(req, w, time.Now())
-}
-
 // LogOf returns the logger hiding in w. If there is not an existing logger
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.

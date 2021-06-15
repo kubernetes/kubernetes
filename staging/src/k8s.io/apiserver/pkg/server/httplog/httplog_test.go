@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestDefaultStacktracePred(t *testing.T) {
@@ -132,6 +133,11 @@ type testResponseWriter struct{}
 func (*testResponseWriter) Header() http.Header       { return nil }
 func (*testResponseWriter) Write([]byte) (int, error) { return 0, nil }
 func (*testResponseWriter) WriteHeader(int)           {}
+
+// newLogged turns a normal response writer into a logged response writer.
+func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
+	return newLoggedWithStartTime(req, w, time.Now())
+}
 
 func TestLoggedStatus(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com", nil)

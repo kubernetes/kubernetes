@@ -149,6 +149,7 @@ type timeoutWriter interface {
 func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
 	base := &baseTimeoutWriter{w: w}
 
+	//lint:ignore SA1019 backward compatibility
 	_, notifiable := w.(http.CloseNotifier)
 	_, hijackable := w.(http.Hijacker)
 
@@ -269,6 +270,7 @@ func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
 		return done
 	}
 
+	//lint:ignore SA1019 backward compatibility
 	return tw.w.(http.CloseNotifier).CloseNotify()
 }
 

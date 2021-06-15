@@ -30,6 +30,7 @@ type DefaultMetrics struct{}
 // Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
 	register()
+	//lint:ignore SA1019 backwards compatibility
 	c.Handle("/metrics", legacyregistry.Handler())
 }
 

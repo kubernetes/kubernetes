@@ -228,6 +228,8 @@ type fancyResponseWriterDelegator struct {
 	*auditResponseWriter
 }
 
+// CloseNotify implements http.CloseNotifier.
+// Deprecated: use Request.Context instead
 func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
 	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
@@ -243,6 +245,7 @@ func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, er
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
+//lint:ignore SA1019 backwards compatibility
 var _ http.CloseNotifier = &fancyResponseWriterDelegator{}
 var _ http.Flusher = &fancyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyResponseWriterDelegator{}

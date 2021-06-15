@@ -497,6 +497,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: w}
 
+		//lint:ignore SA1019 backwards compatibility
 		_, cn := w.(http.CloseNotifier)
 		_, fl := w.(http.Flusher)
 		_, hj := w.(http.Hijacker)
@@ -624,6 +625,8 @@ type fancyResponseWriterDelegator struct {
 	*ResponseWriterDelegator
 }
 
+// CloseNotify implements http.CloseNotifier.
+// Deprecated: use Request.Context instead
 func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
 	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
