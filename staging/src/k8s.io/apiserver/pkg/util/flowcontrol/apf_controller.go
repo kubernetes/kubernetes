@@ -145,6 +145,9 @@ type configController struct {
 	// to a given FlowSchema in any minute.
 	// This may only be accessed from the one and only worker goroutine.
 	mostRecentUpdates []updateAttempt
+
+	// watchTracker implements the necessary WatchTracker interface.
+	WatchTracker
 }
 
 type updateAttempt struct {
@@ -192,6 +195,7 @@ func newTestableController(config TestableConfig) *configController {
 		requestWaitLimit:       config.RequestWaitLimit,
 		flowcontrolClient:      config.FlowcontrolClient,
 		priorityLevelStates:    make(map[string]*priorityLevelState),
+		WatchTracker:           NewWatchTracker(),
 	}
 	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
