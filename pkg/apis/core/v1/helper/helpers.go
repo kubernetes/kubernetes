@@ -174,13 +174,13 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
-	if containsAccessMode(modes, v1.ReadWriteOnce) {
+	if ContainsAccessMode(modes, v1.ReadWriteOnce) {
 		modesStr = append(modesStr, "RWO")
 	}
-	if containsAccessMode(modes, v1.ReadOnlyMany) {
+	if ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		modesStr = append(modesStr, "ROX")
 	}
-	if containsAccessMode(modes, v1.ReadWriteMany) {
+	if ContainsAccessMode(modes, v1.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
 	}
 	return strings.Join(modesStr, ",")
@@ -208,14 +208,14 @@ func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 func removeDuplicateAccessModes(modes []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	accessModes := []v1.PersistentVolumeAccessMode{}
 	for _, m := range modes {
-		if !containsAccessMode(accessModes, m) {
+		if !ContainsAccessMode(accessModes, m) {
 			accessModes = append(accessModes, m)
 		}
 	}
 	return accessModes
 }
 
-func containsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true

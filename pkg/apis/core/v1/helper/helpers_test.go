@@ -213,23 +213,23 @@ func TestIsOvercommitAllowed(t *testing.T) {
 
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
-	if !containsAccessMode(modes, v1.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadOnlyMany, modes)
 	}
 
 	modes = GetAccessModesFromString("ROX,RWX")
-	if !containsAccessMode(modes, v1.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, v1.ReadWriteMany) {
+	if !ContainsAccessMode(modes, v1.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteMany, modes)
 	}
 
 	modes = GetAccessModesFromString("RWO,ROX,RWX")
-	if !containsAccessMode(modes, v1.ReadOnlyMany) {
+	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, v1.ReadWriteMany) {
+	if !ContainsAccessMode(modes, v1.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteMany, modes)
 	}
 }
