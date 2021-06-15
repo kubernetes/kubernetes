@@ -87,9 +87,9 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
 	epSlice.Labels[discovery.LabelManagedBy] = controllerName
 
-	// clone all annotations but EndpointsLastChangeTriggerTime
+	// clone all annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
 	for annotation, val := range endpoints.Annotations {
-		if annotation == corev1.EndpointsLastChangeTriggerTime {
+		if annotation == corev1.EndpointsLastChangeTriggerTime || annotation == corev1.LastAppliedConfigAnnotation {
 			continue
 		}
 		epSlice.Annotations[annotation] = val

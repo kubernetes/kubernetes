@@ -197,8 +197,8 @@ func (r *reconciler) reconcileByPortMapping(
 		// if >0 existing slices, mark all but 1 for deletion.
 		slices.toDelete = existingSlices[1:]
 
-		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime
-		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime)
+		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
+		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime, corev1.LastAppliedConfigAnnotation)
 		compareLabels := cloneAndRemoveKeys(existingSlices[0].Labels, discovery.LabelManagedBy, discovery.LabelServiceName)
 		// Return early if first slice matches desired endpoints, labels and annotations
 		totals = totalChanges(existingSlices[0], desiredSet)
