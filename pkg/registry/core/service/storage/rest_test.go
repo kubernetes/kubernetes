@@ -3676,6 +3676,7 @@ func TestDefaultingValidation(t *testing.T) {
 	testCases := []struct {
 		name       string
 		modifyRest func(rest *REST)
+		oldSvc     *api.Service
 		svc        api.Service
 
 		expectedIPFamilyPolicy *api.IPFamilyPolicyType
@@ -5086,6 +5087,109 @@ func TestDefaultingValidation(t *testing.T) {
 			expectedIPFamilies:     nil,
 			expectError:            true,
 		},
+
+		// preferDualStack services should not be updated
+		// to match cluster config if the user didn't change any
+		// ClusterIPs related fields
+		{
+			name:       "unchanged preferDualStack-1-ClusterUpgraded",
+			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+			expectedIPFamilyPolicy: &preferDualStack,
+			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
+			expectError:            false,
+		},
+
+		{
+			name:       "unchanged preferDualStack-2-ClusterDowngraded",
+			modifyRest: fnMakeSingleStackIPv4Allocator,
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+			expectedIPFamilyPolicy: &preferDualStack,
+			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			expectError:            false,
+		},
+
+		{
+			name:       "changed preferDualStack-1 (cluster upgraded)",
+			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     nil,
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+					IPFamilyPolicy: &requireDualStack,
+				},
+			},
+			expectedIPFamilyPolicy: &requireDualStack,
+			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			expectError:            false,
+		},
+
+		{
+			name:       "changed preferDualStack-2-ClusterDowngraded",
+			modifyRest: fnMakeSingleStackIPv4Allocator,
+			oldSvc: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					IPFamilyPolicy: &preferDualStack,
+				},
+			},
+
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					ClusterIPs:     []string{"1.1.1.1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+					IPFamilyPolicy: &singleStack,
+				},
+			},
+			expectedIPFamilyPolicy: &singleStack,
+			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
+			expectError:            false,
+		},
 	}
 
 	// This func only runs when feature gate is on
@@ -5100,7 +5204,7 @@ func TestDefaultingValidation(t *testing.T) {
 				testCase.modifyRest(storage)
 			}
 
-			err := storage.tryDefaultValidateServiceClusterIPFields(&testCase.svc)
+			err := storage.tryDefaultValidateServiceClusterIPFields(testCase.oldSvc, &testCase.svc)
 			if err != nil && !testCase.expectError {
 				t.Fatalf("error %v was not expected", err)
 			}
