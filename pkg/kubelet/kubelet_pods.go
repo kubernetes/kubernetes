@@ -636,6 +636,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			}
 
 			invalidKeys := []string{}
+			keysOfInvalidValue := []string{}
 			for k, v := range configMap.Data {
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
@@ -644,11 +645,19 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					invalidKeys = append(invalidKeys, k)
 					continue
 				}
+				if errMsgs := utilvalidation.IsEnvVarValue(v); len(errMsgs) != 0 {
+					keysOfInvalidValue = append(keysOfInvalidValue, k)
+					continue
+				}
 				tmpEnv[k] = v
 			}
 			if len(invalidKeys) > 0 {
 				sort.Strings(invalidKeys)
 				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableNames", "Keys [%s] from the EnvFrom configMap %s/%s were skipped since they are considered invalid environment variable names.", strings.Join(invalidKeys, ", "), pod.Namespace, name)
+			}
+			if len(keysOfInvalidValue) > 0 {
+				sort.Strings(keysOfInvalidValue)
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableValues", "Keys [%s] from the EnvFrom configMap %s/%s were skipped since they are considered invalid environment variable value.", strings.Join(keysOfInvalidValue, ", "), pod.Namespace, name)
 			}
 		case envFrom.SecretRef != nil:
 			s := envFrom.SecretRef
@@ -671,6 +680,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			}
 
 			invalidKeys := []string{}
+			keysOfInvalidValue := []string{}
 			for k, v := range secret.Data {
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
@@ -679,11 +689,19 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					invalidKeys = append(invalidKeys, k)
 					continue
 				}
+				if errMsgs := utilvalidation.IsEnvVarValue(string(v)); len(errMsgs) != 0 {
+					keysOfInvalidValue = append(keysOfInvalidValue, k)
+					continue
+				}
 				tmpEnv[k] = string(v)
 			}
 			if len(invalidKeys) > 0 {
 				sort.Strings(invalidKeys)
 				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableNames", "Keys [%s] from the EnvFrom secret %s/%s were skipped since they are considered invalid environment variable names.", strings.Join(invalidKeys, ", "), pod.Namespace, name)
+			}
+			if len(keysOfInvalidValue) > 0 {
+				sort.Strings(keysOfInvalidValue)
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableValues", "Keys [%s] from the EnvFrom secret %s/%s were skipped since they are considered invalid environment variable value.", strings.Join(keysOfInvalidValue, ", "), pod.Namespace, name)
 			}
 		}
 	}

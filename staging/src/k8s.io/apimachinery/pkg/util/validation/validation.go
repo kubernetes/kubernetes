@@ -21,6 +21,7 @@ import (
 	"math"
 	"net"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -412,6 +413,23 @@ func IsEnvVarName(value string) []string {
 	}
 
 	errs = append(errs, hasChDirPrefix(value)...)
+	return errs
+}
+
+// IsEnvVarValue tests if a string is a valid environment variable value.
+// this is follow syscall.Setenv
+// syscall/env_unix.go
+// syscall/env_windows.go
+func IsEnvVarValue(value string) []string {
+	var errs []string
+
+	// on Plan 9, null is used as a separator, eg in $path.
+	if runtime.GOOS == "plan9" {
+		return errs
+	}
+	if strings.IndexByte(value, 0) >= 0 {
+		errs = append(errs, "a valid value must can't contain null")
+	}
 	return errs
 }
 
