@@ -109,15 +109,20 @@ func RemoveAllOneFilesystemCommon(mounter mount.Interface, path string, remove f
 
 // RemoveAllOneFilesystem removes the path and any children it contains, using
 // the os.Remove function. It makes sure it does not cross mount boundaries,
-// i.e. it does *not* remove files from another filesystem.
+// i.e. it returns an error rather than remove files from another filesystem.
+// It removes everything it can but returns the first error it encounters.
+// If the path does not exist, it returns nil (no error).
 func RemoveAllOneFilesystem(mounter mount.Interface, path string) error {
 	return RemoveAllOneFilesystemCommon(mounter, path, os.Remove)
 }
 
 // RemoveDirsOneFilesystem removes the path and any empty subdirectories it
 // contains, using the syscall.Rmdir function. Unlike RemoveAllOneFilesystem,
-// RemoveDirsOneFilesystem will remove only directories and fails if it
-// encounters any files in the directory tree.
+// RemoveDirsOneFilesystem will remove only directories and returns an error if
+// it encounters any files in the directory tree. It makes sure it does not
+// cross mount boundaries, i.e. it returns an error rather than remove dirs
+// from another filesystem. It removes everything it can but returns the first
+// error it encounters. If the path does not exist, it returns nil (no error).
 func RemoveDirsOneFilesystem(mounter mount.Interface, path string) error {
 	return RemoveAllOneFilesystemCommon(mounter, path, syscall.Rmdir)
 }
