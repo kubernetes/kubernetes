@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -199,6 +200,20 @@ func main() {
 	default:
 		klog.Fatalf("--test-suite must be one of default, cadvisor, or conformance")
 	}
+
+	// Listen for SIGINT and ignore the first one. In case SIGINT is sent to this
+	// process and all its children, we ignore it here, while our children ssh connections
+	// are stopped. This allows us to gather artifacts and print out test state before
+	// being killed.
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		fmt.Printf("Received SIGINT. Will exit on next SIGINT.\n")
+		<-c
+		fmt.Printf("Received another SIGINT. Will exit.\n")
+		os.Exit(1)
+	}()
 
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
