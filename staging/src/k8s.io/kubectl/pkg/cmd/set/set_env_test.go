@@ -765,3 +765,32 @@ func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
 		})
 	}
 }
+
+func TestSetEnvDoubleStdinUsage(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+
+	streams, bufIn, _, _ := genericclioptions.NewTestIOStreams()
+	bufIn.WriteString("SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL")
+	opts := NewEnvOptions(streams)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"-"},
+	}
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"-"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.ErrorIs(t, err, resource.StdinMultiUseError)
+}

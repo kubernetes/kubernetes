@@ -438,6 +438,7 @@ func TestExecPluginViaClient(t *testing.T) {
 					"--random-arg-to-avoid-authenticator-cache-hits",
 					rand.String(10),
 				},
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			}
 			clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 				return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -653,7 +654,8 @@ func TestExecPluginViaInformer(t *testing.T) {
 			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
 				Command: "testdata/exec-plugin.sh",
 				// TODO(ankeesler): move to v1 once exec plugins go GA.
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			}
 
 			if test.clientConfigFunc != nil {
@@ -687,7 +689,8 @@ func (e *execPlugin) config() *clientcmdapi.ExecConfig {
 	return &clientcmdapi.ExecConfig{
 		Command: "testdata/exec-plugin.sh",
 		// TODO(ankeesler): move to v1 once exec plugins go GA.
-		APIVersion: "client.authentication.k8s.io/v1beta1",
+		APIVersion:      "client.authentication.k8s.io/v1beta1",
+		InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		Env: []clientcmdapi.ExecEnvVar{
 			{
 				Name:  outputFileEnvVar,
