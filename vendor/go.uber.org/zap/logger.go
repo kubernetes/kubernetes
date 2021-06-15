@@ -42,14 +42,15 @@ type Logger struct {
 	core zapcore.Core
 
 	development bool
+	addCaller   bool
+	onFatal     zapcore.CheckWriteAction // default is WriteThenFatal
+
 	name        string
 	errorOutput zapcore.WriteSyncer
 
-	addCaller bool
-	addStack  zapcore.LevelEnabler
+	addStack zapcore.LevelEnabler
 
 	callerSkip int
-	onFatal    zapcore.CheckWriteAction // default is WriteThenFatal
 }
 
 // New constructs a new Logger from the provided zapcore.Core and Options. If
@@ -334,7 +335,7 @@ func getCallerFrame(skip int) (frame runtime.Frame, ok bool) {
 	const skipOffset = 2 // skip getCallerFrame and Callers
 
 	pc := make([]uintptr, 1)
-	numFrames := runtime.Callers(skip+skipOffset, pc[:])
+	numFrames := runtime.Callers(skip+skipOffset, pc)
 	if numFrames < 1 {
 		return
 	}

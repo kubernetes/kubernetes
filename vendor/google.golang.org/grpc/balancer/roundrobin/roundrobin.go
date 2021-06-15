@@ -33,9 +33,11 @@ import (
 // Name is the name of round_robin balancer.
 const Name = "round_robin"
 
+var logger = grpclog.Component("roundrobin")
+
 // newBuilder creates a new roundrobin balancer builder.
 func newBuilder() balancer.Builder {
-	return base.NewBalancerBuilderV2(Name, &rrPickerBuilder{}, base.Config{HealthCheck: true})
+	return base.NewBalancerBuilder(Name, &rrPickerBuilder{}, base.Config{HealthCheck: true})
 }
 
 func init() {
@@ -44,10 +46,10 @@ func init() {
 
 type rrPickerBuilder struct{}
 
-func (*rrPickerBuilder) Build(info base.PickerBuildInfo) balancer.V2Picker {
-	grpclog.Infof("roundrobinPicker: newPicker called with info: %v", info)
+func (*rrPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+	logger.Infof("roundrobinPicker: newPicker called with info: %v", info)
 	if len(info.ReadySCs) == 0 {
-		return base.NewErrPickerV2(balancer.ErrNoSubConnAvailable)
+		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
 	var scs []balancer.SubConn
 	for sc := range info.ReadySCs {
