@@ -591,20 +591,33 @@ func (m *ManagerImpl) writeCheckpoint() error {
 // Reads device to container allocation information from disk, and populates
 // m.allocatedDevices accordingly.
 func (m *ManagerImpl) readCheckpoint() error {
-	registeredDevs := make(map[string][]string)
-	devEntries := make([]checkpoint.PodDevicesEntry, 0)
-	cp := checkpoint.New(devEntries, registeredDevs)
-	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
+	// the vast majority of time we restore a compatible checkpoint, so we try
+	// the current version first. Trying to restore older format checkpoints is
+	// relevant only in the kubelet upgrade flow, which happens once in a
+	// (long) while.
+	cp, err := m.getCheckpointV2()
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
-			klog.InfoS("Failed to retrieve checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint, "err", err)
+			// no point in trying anything else
+			klog.InfoS("Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint, "err", err)
 			return nil
 		}
-		return err
+
+		var errv1 error
+		// one last try: maybe it's a old format checkpoint?
+		cp, errv1 = m.getCheckpointV1()
+		if errv1 != nil {
+			klog.InfoS("Failed to read checkpoint V1 file", "err", errv1)
+			// intentionally return the parent error. We expect to restore V1 checkpoints
+			// a tiny fraction of time, so what matters most is the current checkpoint read error.
+			return err
+		}
+		klog.InfoS("Read data from a V1 checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
 	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	podDevices, registeredDevs := cp.GetData()
+	podDevices, registeredDevs := cp.GetDataInLatestFormat()
 	m.podDevices.fromCheckpointData(podDevices)
 	m.allocatedDevices = m.podDevices.devices()
 	for resource := range registeredDevs {
@@ -615,6 +628,22 @@ func (m *ManagerImpl) readCheckpoint() error {
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
 	return nil
+}
+
+func (m *ManagerImpl) getCheckpointV2() (checkpoint.DeviceManagerCheckpoint, error) {
+	registeredDevs := make(map[string][]string)
+	devEntries := make([]checkpoint.PodDevicesEntry, 0)
+	cp := checkpoint.New(devEntries, registeredDevs)
+	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
+	return cp, err
+}
+
+func (m *ManagerImpl) getCheckpointV1() (checkpoint.DeviceManagerCheckpoint, error) {
+	registeredDevs := make(map[string][]string)
+	devEntries := make([]checkpoint.PodDevicesEntryV1, 0)
+	cp := checkpoint.NewV1(devEntries, registeredDevs)
+	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
+	return cp, err
 }
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
