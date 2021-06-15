@@ -1630,6 +1630,62 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name:               "configmapref_value_has_null",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"invalid": "xxx\x00",
+					"a":       "b",
+				},
+			},
+			expectedEnvs:  []kubecontainer.EnvVar{{Name: "a", Value: "b"}},
+			expectedEvent: "Warning InvalidEnvironmentVariableValues Keys [invalid] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable value.",
+		},
+		{
+			name:               "secretref_value_has_null",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						SecretRef: &v1.SecretEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"invalid": []byte("xxx\x00"),
+					"a":       []byte("b"),
+				},
+			},
+			expectedEnvs:  []kubecontainer.EnvVar{{Name: "a", Value: "b"}},
+			expectedEvent: "Warning InvalidEnvironmentVariableValues Keys [invalid] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable value.",
+		},
 	}
 
 	for _, tc := range testCases {
