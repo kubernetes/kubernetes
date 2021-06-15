@@ -19,7 +19,7 @@ package validation
 import (
 	"fmt"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
