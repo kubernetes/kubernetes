@@ -258,9 +258,9 @@ func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, opts apiv
 		// zero is a valid SuccessfulJobsHistoryLimit
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.FailedJobsHistoryLimit), fldPath.Child("failedJobsHistoryLimit"))...)
 	}
-	if spec.TimeZone != "" {
-		if _, err := time.LoadLocation(spec.TimeZone); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("timeZone"), spec.TimeZone, "not a valid time zone"))
+	if spec.TimeZone != nil && *spec.TimeZone != "" {
+		if _, err := time.LoadLocation(*spec.TimeZone); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("timeZone"), *spec.TimeZone, "not a valid time zone"))
 		}
 	}
 

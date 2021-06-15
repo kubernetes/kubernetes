@@ -111,6 +111,11 @@ func (in *CronJobSpec) DeepCopyInto(out *CronJobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.TimeZone != nil {
+		in, out := &in.TimeZone, &out.TimeZone
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

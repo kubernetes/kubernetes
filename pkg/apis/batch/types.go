@@ -363,7 +363,7 @@ type CronJobSpec struct {
 	// The time zone to be used when scheduling the job given the schedule specified above.
 	// Valid options include anything in the IANA Time Zone database.
 	// +optional
-	TimeZone string
+	TimeZone *string
 }
 
 // ConcurrencyPolicy describes how the job will be handled.

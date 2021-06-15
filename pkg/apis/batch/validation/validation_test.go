@@ -821,7 +821,7 @@ func TestValidateCronJob(t *testing.T) {
 			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
-				TimeZone:          "Mars/Olympus_Mons",
+				TimeZone:          pointer.StringPtr("Mars/Olympus_Mons"),
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: validPodTemplateSpec,

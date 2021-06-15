@@ -227,7 +227,7 @@ func autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in *v1.CronJobSpec, out *ba
 	}
 	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
 	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
-	out.TimeZone = in.TimeZone
+	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	return nil
 }
 
@@ -241,7 +241,7 @@ func autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out 
 	}
 	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
 	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
-	out.TimeZone = in.TimeZone
+	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	return nil
 }
 

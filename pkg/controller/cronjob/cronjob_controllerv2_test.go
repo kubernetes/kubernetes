@@ -227,7 +227,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
 			cj.Spec.Schedule = tc.schedule
-			cj.Spec.TimeZone = tc.timeZone
+			cj.Spec.TimeZone = &tc.timeZone
 			if tc.deadline != noDead {
 				cj.Spec.StartingDeadlineSeconds = &tc.deadline
 			}

@@ -359,7 +359,7 @@ type CronJobSpec struct {
 	// The time zone to be used when scheduling the job given the schedule specified above.
 	// Valid options include anything in the IANA Time Zone database.
 	// +optional
-	TimeZone string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
+	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 }
 
 // ConcurrencyPolicy describes how the job will be handled.
