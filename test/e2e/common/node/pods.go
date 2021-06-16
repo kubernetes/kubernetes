@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -800,11 +801,13 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				podReady := podClient.PodIsReady(podName)
+			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				podReady := podutils.IsPodReady(pod)
 				res := expectReady == podReady
 				if !res {
-					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v (pod status %#v)", podName, expectReady, podReady, pod.Status)
 				}
 				return res, nil
 			})
