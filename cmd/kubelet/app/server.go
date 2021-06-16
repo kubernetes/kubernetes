@@ -434,9 +434,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 // Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
-	logOption := logs.NewOptions()
-	logOption.LogFormat = s.Logging.Format
-	logOption.LogSanitization = s.Logging.Sanitization
+	logOption := &logs.Options{Config: s.Logging}
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())

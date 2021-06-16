@@ -22,20 +22,23 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/config"
 )
 
-func ValidateLoggingConfiguration(o *Options) []error {
-	errs := []error{}
-	if o.LogFormat != DefaultLogFormat {
+func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	if c.Format != DefaultLogFormat {
 		allFlags := UnsupportedLoggingFlags(hyphensToUnderscores)
 		for _, fname := range allFlags {
 			if flagIsSet(fname, hyphensToUnderscores) {
-				errs = append(errs, fmt.Errorf("non-default logging format doesn't honor flag: %s", fname))
+				errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, fmt.Sprintf("Non-default format doesn't honor flag: %s", fname)))
 			}
 		}
 	}
-	if _, err := o.Get(); err != nil {
-		errs = append(errs, fmt.Errorf("unsupported log format: %s", o.LogFormat))
+	if _, err := LogRegistry.Get(c.Format); err != nil {
+		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	}
 	return errs
 }
