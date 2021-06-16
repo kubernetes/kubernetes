@@ -48,7 +48,7 @@ type podDesc struct {
 	cntName        string
 	resourceName   string
 	resourceAmount int
-	cpuCount       int
+	cpuRequest     string
 }
 
 func makePodResourcesTestPod(desc podDesc) *v1.Pod {
@@ -61,9 +61,10 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 		},
 		Command: []string{"sh", "-c", "sleep 1d"},
 	}
-	if desc.cpuCount > 0 {
-		cnt.Resources.Requests[v1.ResourceCPU] = resource.MustParse(fmt.Sprintf("%d", desc.cpuCount))
-		cnt.Resources.Limits[v1.ResourceCPU] = resource.MustParse(fmt.Sprintf("%d", desc.cpuCount))
+	cpuRequest := getCpuRequest(desc.cpuRequest)
+	if cpuRequest > 0 {
+		cnt.Resources.Requests[v1.ResourceCPU] = resource.MustParse(desc.cpuRequest)
+		cnt.Resources.Limits[v1.ResourceCPU] = resource.MustParse(desc.cpuRequest)
 		// we don't really care, we only need to be in guaranteed QoS
 		cnt.Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		cnt.Resources.Limits[v1.ResourceMemory] = resource.MustParse("100Mi")
@@ -182,9 +183,10 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, podReq.cntName)
 		}
 
-		if podReq.cpuCount > 0 {
-			if len(cntInfo.CpuIds) != podReq.cpuCount {
-				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, podReq.cpuCount, cntInfo.CpuIds)
+		cpuRequest := getCpuRequest(podReq.cpuRequest)
+		if cpuRequest > 0 && cpuRequest == float32(int(cpuRequest)) {
+			if len(cntInfo.CpuIds) != int(cpuRequest) {
+				return fmt.Errorf("pod %q container %q expected %f cpus got %v", podReq.podName, podReq.cntName, cpuRequest, cntInfo.CpuIds)
 			}
 		}
 
@@ -244,12 +246,14 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	ginkgo.By("checking the output when only pods which don't require resources are present")
 	expected = []podDesc{
 		{
-			podName: "pod-00",
-			cntName: "cnt-00",
+			podName:    "pod-00",
+			cntName:    "cnt-00",
+			cpuRequest: "0m",
 		},
 		{
-			podName: "pod-01",
-			cntName: "cnt-00",
+			podName:    "pod-01",
+			cntName:    "cnt-00",
+			cpuRequest: "0m",
 		},
 	}
 	tpd.createPodsForTest(f, expected)
@@ -261,49 +265,51 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	if sd != nil {
 		expected = []podDesc{
 			{
-				podName: "pod-00",
-				cntName: "cnt-00",
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
 				podName:        "pod-01",
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuCount:       2,
+				cpuRequest:     "2000m",
 			},
 			{
-				podName:  "pod-02",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 			{
 				podName:        "pod-03",
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuCount:       1,
+				cpuRequest:     "1000m",
 			},
 		}
 	} else {
 		expected = []podDesc{
 			{
-				podName: "pod-00",
-				cntName: "cnt-00",
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
-				podName:  "pod-01",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-01",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 			{
-				podName:  "pod-02",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 			{
-				podName:  "pod-03",
-				cntName:  "cnt-00",
-				cpuCount: 1,
+				podName:    "pod-03",
+				cntName:    "cnt-00",
+				cpuRequest: "1000m",
 			},
 		}
 
@@ -317,37 +323,39 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	if sd != nil {
 		expected = []podDesc{
 			{
-				podName: "pod-00",
-				cntName: "cnt-00",
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
 				podName:        "pod-01",
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuCount:       2,
+				cpuRequest:     "2000m",
 			},
 			{
-				podName:  "pod-02",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 		}
 	} else {
 		expected = []podDesc{
 			{
-				podName: "pod-00",
-				cntName: "cnt-00",
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
-				podName:  "pod-01",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-01",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 			{
-				podName:  "pod-02",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "2000m",
 			},
 		}
 	}
@@ -361,13 +369,13 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 			cntName:        "cnt-00",
 			resourceName:   sd.resourceName,
 			resourceAmount: 1,
-			cpuCount:       1,
+			cpuRequest:     "1000m",
 		}
 	} else {
 		extra = podDesc{
-			podName:  "pod-03",
-			cntName:  "cnt-00",
-			cpuCount: 1,
+			podName:    "pod-03",
+			cntName:    "cnt-00",
+			cpuRequest: "1000m",
 		}
 
 	}
@@ -386,49 +394,51 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	if sd != nil {
 		expected = []podDesc{
 			{
-				podName:  "pod-00",
-				cntName:  "cnt-00",
-				cpuCount: 1,
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "1000m",
 			},
 			{
 				podName:        "pod-01",
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuCount:       2,
+				cpuRequest:     "2000m",
 			},
 			{
-				podName: "pod-02",
-				cntName: "cnt-00",
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
 				podName:        "pod-03",
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuCount:       1,
+				cpuRequest:     "1000m",
 			},
 		}
 	} else {
 		expected = []podDesc{
 			{
-				podName:  "pod-00",
-				cntName:  "cnt-00",
-				cpuCount: 1,
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "1000m",
 			},
 			{
-				podName:  "pod-01",
-				cntName:  "cnt-00",
-				cpuCount: 2,
+				podName:    "pod-01",
+				cntName:    "cnt-00",
+				cpuRequest: "1000m",
 			},
 			{
-				podName: "pod-02",
-				cntName: "cnt-00",
+				podName:    "pod-02",
+				cntName:    "cnt-00",
+				cpuRequest: "0m",
 			},
 			{
-				podName:  "pod-03",
-				cntName:  "cnt-00",
-				cpuCount: 1,
+				podName:    "pod-03",
+				cntName:    "cnt-00",
+				cpuRequest: "1000m",
 			},
 		}
 	}
@@ -738,4 +748,12 @@ func enablePodResourcesFeatureGateInKubelet(f *framework.Framework) (oldCfg *kub
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
+}
+
+func getCpuRequest(cpuQuantity string) float32 {
+	cpuQty := resource.MustParse(cpuQuantity)
+	if cpuQty.Value()*1000 != cpuQty.MilliValue() {
+		return float32(cpuQty.MilliValue()) / 1000
+	}
+	return float32(cpuQty.Value())
 }
