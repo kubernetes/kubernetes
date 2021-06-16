@@ -19,9 +19,11 @@ package framework
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +57,9 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 	}
 	config, err := LoadConfig()
 	ExpectNoError(err, "failed to load restclient config")
+
+	fmt.Printf("README: %+v\n", config)
+	config.Timeout = time.Minute
 
 	const tty = false
 
