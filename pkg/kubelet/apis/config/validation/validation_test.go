@@ -145,9 +145,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.NoneTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
+		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"NodeSwapEnabled":         true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
@@ -225,15 +227,17 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           "invalid",
 		ShutdownGracePeriod:             metav1.Duration{Duration: 40 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: "invalid"},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"NodeSwapEnabled":         true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
 		},
 	}
-	const numErrsErrorCase2 = 3
+	const numErrsErrorCase2 = 4
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
