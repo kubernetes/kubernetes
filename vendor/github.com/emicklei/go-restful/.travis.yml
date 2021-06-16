@@ -3,4 +3,11 @@ language: go
 go:
   - 1.x
 
-script: go test -v
+before_install:
+  - go test -v
+
+script:
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

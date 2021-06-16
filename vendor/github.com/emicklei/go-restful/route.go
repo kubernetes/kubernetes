@@ -49,11 +49,20 @@ type Route struct {
 
 	//Overrides the container.contentEncodingEnabled
 	contentEncodingEnabled *bool
+
+	// indicate route path has custom verb
+	hasCustomVerb bool
+
+	// if a request does not include a content-type header then
+	// depending on the method, it may return a 415 Unsupported Media
+	// Must have uppercase HTTP Method names such as GET,HEAD,OPTIONS,...
+	allowedMethodsWithoutContentType []string
 }
 
 // Initialize for Route
 func (r *Route) postBuild() {
 	r.pathParts = tokenizePath(r.Path)
+	r.hasCustomVerb = hasCustomVerb(r.Path)
 }
 
 // Create Request and Response from their http versions
@@ -65,17 +74,6 @@ func (r *Route) wrapRequestResponse(httpWriter http.ResponseWriter, httpRequest 
 	wrappedResponse.requestAccept = httpRequest.Header.Get(HEADER_Accept)
 	wrappedResponse.routeProduces = r.Produces
 	return wrappedRequest, wrappedResponse
-}
-
-// dispatchWithFilters call the function after passing through its own filters
-func (r *Route) dispatchWithFilters(wrappedRequest *Request, wrappedResponse *Response) {
-	if len(r.Filters) > 0 {
-		chain := FilterChain{Filters: r.Filters, Target: r.Function}
-		chain.ProcessFilter(wrappedRequest, wrappedResponse)
-	} else {
-		// unfiltered
-		r.Function(wrappedRequest, wrappedResponse)
-	}
 }
 
 func stringTrimSpaceCutset(r rune) bool {
@@ -121,8 +119,17 @@ func (r Route) matchesContentType(mimeTypes string) bool {
 	if len(mimeTypes) == 0 {
 		// idempotent methods with (most-likely or guaranteed) empty content match missing Content-Type
 		m := r.Method
-		if m == "GET" || m == "HEAD" || m == "OPTIONS" || m == "DELETE" || m == "TRACE" {
-			return true
+		// if route specifies less or non-idempotent methods then use that
+		if len(r.allowedMethodsWithoutContentType) > 0 {
+			for _, each := range r.allowedMethodsWithoutContentType {
+				if m == each {
+					return true
+				}
+			}
+		} else {
+			if m == "GET" || m == "HEAD" || m == "OPTIONS" || m == "DELETE" || m == "TRACE" {
+				return true
+			}
 		}
 		// proceed with default
 		mimeTypes = MIME_OCTET

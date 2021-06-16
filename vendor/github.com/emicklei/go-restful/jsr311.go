@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 )
 
 // RouterJSR311 implements the flow for matching Requests to Routes (and consequently Resource Functions)
@@ -98,7 +99,18 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		if trace {
 			traceLogger.Printf("no Route found (in %d routes) that matches HTTP method %s\n", len(previous), httpRequest.Method)
 		}
-		return nil, NewError(http.StatusMethodNotAllowed, "405: Method Not Allowed")
+		allowed := []string{}
+	allowedLoop:
+		for _, candidate := range previous {
+			for _, method := range allowed {
+				if method == candidate.Method {
+					continue allowedLoop
+				}
+			}
+			allowed = append(allowed, candidate.Method)
+		}
+		header := http.Header{"Allow": []string{strings.Join(allowed, ", ")}}
+		return nil, NewErrorWithHeader(http.StatusMethodNotAllowed, "405: Method Not Allowed", header)
 	}
 
 	// content-type
@@ -135,7 +147,14 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		if trace {
 			traceLogger.Printf("no Route found (from %d) that matches HTTP Accept: %s\n", len(previous), accept)
 		}
-		return nil, NewError(http.StatusNotAcceptable, "406: Not Acceptable")
+		available := []string{}
+		for _, candidate := range previous {
+			available = append(available, candidate.Produces...)
+		}
+		return nil, NewError(
+			http.StatusNotAcceptable,
+			fmt.Sprintf("406: Not Acceptable\n\nAvailable representations: %s", strings.Join(available, ", ")),
+		)
 	}
 	// return r.bestMatchByMedia(outputMediaOk, contentType, accept), nil
 	return candidates[0], nil

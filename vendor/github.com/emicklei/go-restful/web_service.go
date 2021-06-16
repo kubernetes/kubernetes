@@ -188,7 +188,7 @@ func (w *WebService) RemoveRoute(path, method string) error {
 			continue
 		}
 		newRoutes[current] = w.routes[ix]
-		current = current + 1
+		current++
 	}
 	w.routes = newRoutes
 	return nil
@@ -287,4 +287,9 @@ func (w *WebService) PATCH(subPath string) *RouteBuilder {
 // DELETE is a shortcut for .Method("DELETE").Path(subPath)
 func (w *WebService) DELETE(subPath string) *RouteBuilder {
 	return new(RouteBuilder).typeNameHandler(w.typeNameHandleFunc).servicePath(w.rootPath).Method("DELETE").Path(subPath)
+}
+
+// OPTIONS is a shortcut for .Method("OPTIONS").Path(subPath)
+func (w *WebService) OPTIONS(subPath string) *RouteBuilder {
+	return new(RouteBuilder).typeNameHandler(w.typeNameHandleFunc).servicePath(w.rootPath).Method("OPTIONS").Path(subPath)
 }
