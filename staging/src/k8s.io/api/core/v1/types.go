@@ -551,6 +551,7 @@ type PersistentVolumeClaimStatus struct {
 	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 }
 
+// PersistentVolumeAccessMode describes the persistent volume can be mounted on host access mode.
 type PersistentVolumeAccessMode string
 
 const (
@@ -562,6 +563,7 @@ const (
 	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
 )
 
+// PersistentVolumePhase describes a persistent volume phase.
 type PersistentVolumePhase string
 
 const (
@@ -580,6 +582,7 @@ const (
 	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
+// PersistentVolumeClaimPhase describes a persistent volume claim phase.
 type PersistentVolumeClaimPhase string
 
 const (
