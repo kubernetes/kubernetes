@@ -22,10 +22,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -179,7 +178,7 @@ type ConfigProducerArgs struct {
 type configProducer func(ConfigProducerArgs, *config.Plugins, *[]config.PluginConfig)
 
 // NewLegacyRegistry returns a legacy algorithm registry of predicates and priorities.
-func NewLegacyRegistry() *LegacyRegistry {
+func NewLegacyRegistry(fts feature.Features) *LegacyRegistry {
 	registry := &LegacyRegistry{
 		// mandatoryPredicates the set of keys for predicates that the scheduler will
 		// be configured with all the time.
@@ -333,7 +332,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 	// Register Priorities.
 	registry.registerPriorityConfigProducer(SelectorSpreadPriority,
 		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
-			if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+			if !fts.EnableDefaultPodTopologySpread {
 				plugins.Score = appendToPluginSet(plugins.Score, selectorspread.Name, &args.Weight)
 				plugins.PreScore = appendToPluginSet(plugins.PreScore, selectorspread.Name, nil)
 				return
@@ -446,7 +445,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
 			plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
-			if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+			if fts.EnableDefaultPodTopologySpread {
 				// The order in which SelectorSpreadPriority or EvenPodsSpreadPriority producers
 				// are called is not guaranteed. If plugin was not configured yet, append
 				// configuration where system default constraints are disabled.

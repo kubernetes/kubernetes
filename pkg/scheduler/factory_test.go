@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -680,7 +681,7 @@ func newConfigFactoryWithFrameworkRegistry(
 
 func newConfigFactory(client clientset.Interface, stopCh <-chan struct{}) *Configurator {
 	return newConfigFactoryWithFrameworkRegistry(client, stopCh,
-		frameworkplugins.NewInTreeRegistry())
+		frameworkplugins.NewInTreeRegistry(feature.Features{}))
 }
 
 type fakeExtender struct {

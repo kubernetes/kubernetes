@@ -27,16 +27,12 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	"k8s.io/kubernetes/pkg/features"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/utils/pointer"
 )
@@ -183,17 +179,17 @@ func makePod(name string, pvcNames []string) *v1.Pod {
 
 func TestVolumeBinding(t *testing.T) {
 	table := []struct {
-		name                    string
-		pod                     *v1.Pod
-		nodes                   []*v1.Node
-		pvcs                    []*v1.PersistentVolumeClaim
-		pvs                     []*v1.PersistentVolume
-		feature                 featuregate.Feature
-		args                    *config.VolumeBindingArgs
-		wantPreFilterStatus     *framework.Status
-		wantStateAfterPreFilter *stateData
-		wantFilterStatus        []*framework.Status
-		wantScores              []int64
+		name                         string
+		pod                          *v1.Pod
+		nodes                        []*v1.Node
+		pvcs                         []*v1.PersistentVolumeClaim
+		pvs                          []*v1.PersistentVolume
+		enableVolumeCapacityPriority bool
+		args                         *config.VolumeBindingArgs
+		wantPreFilterStatus          *framework.Status
+		wantStateAfterPreFilter      *stateData
+		wantFilterStatus             []*framework.Status
+		wantScores                   []int64
 	}{
 		{
 			name: "pod has not pvcs",
@@ -228,7 +224,7 @@ func TestVolumeBinding(t *testing.T) {
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
 				claimsToBind:     []*v1.PersistentVolumeClaim{},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -300,10 +296,10 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "", waitSC.Name),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonBindConflict)),
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(ErrReasonBindConflict)),
 			},
 			wantScores: []int64{
 				0,
@@ -333,10 +329,10 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-b", "", waitSC.Name),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonNodeConflict), string(scheduling.ErrReasonBindConflict)),
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(ErrReasonNodeConflict), string(ErrReasonBindConflict)),
 			},
 			wantScores: []int64{
 				0,
@@ -371,7 +367,7 @@ func TestVolumeBinding(t *testing.T) {
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
 				claimsToBind:     []*v1.PersistentVolumeClaim{},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				framework.NewStatus(framework.UnschedulableAndUnresolvable, `pvc(s) bound to non-existent pv(s)`),
@@ -397,14 +393,14 @@ func TestVolumeBinding(t *testing.T) {
 				setPVNodeAffinity(setPVCapacity(makePV("pv-b-0", waitSC.Name), resource.MustParse("100Gi")), map[string][]string{v1.LabelHostname: {"node-b"}}),
 				setPVNodeAffinity(setPVCapacity(makePV("pv-b-1", waitSC.Name), resource.MustParse("100Gi")), map[string][]string{v1.LabelHostname: {"node-b"}}),
 			},
-			feature:             features.VolumeCapacityPriority,
-			wantPreFilterStatus: nil,
+			enableVolumeCapacityPriority: true,
+			wantPreFilterStatus:          nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					setPVCRequestStorage(makePVC("pvc-a", "", waitSC.Name), resource.MustParse("50Gi")),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -439,15 +435,15 @@ func TestVolumeBinding(t *testing.T) {
 				setPVNodeAffinity(setPVCapacity(makePV("pv-b-2", waitHDDSC.Name), resource.MustParse("100Gi")), map[string][]string{v1.LabelHostname: {"node-b"}}),
 				setPVNodeAffinity(setPVCapacity(makePV("pv-b-3", waitHDDSC.Name), resource.MustParse("100Gi")), map[string][]string{v1.LabelHostname: {"node-b"}}),
 			},
-			feature:             features.VolumeCapacityPriority,
-			wantPreFilterStatus: nil,
+			enableVolumeCapacityPriority: true,
+			wantPreFilterStatus:          nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					setPVCRequestStorage(makePVC("pvc-0", "", waitSC.Name), resource.MustParse("50Gi")),
 					setPVCRequestStorage(makePVC("pvc-1", "", waitHDDSC.Name), resource.MustParse("100Gi")),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -510,14 +506,14 @@ func TestVolumeBinding(t *testing.T) {
 					"topology.kubernetes.io/zone":   {"zone-b"},
 				}),
 			},
-			feature:             features.VolumeCapacityPriority,
-			wantPreFilterStatus: nil,
+			enableVolumeCapacityPriority: true,
+			wantPreFilterStatus:          nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					setPVCRequestStorage(makePVC("pvc-a", "", waitSC.Name), resource.MustParse("50Gi")),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -586,7 +582,7 @@ func TestVolumeBinding(t *testing.T) {
 					"topology.kubernetes.io/zone":   {"zone-b"},
 				}),
 			},
-			feature: features.VolumeCapacityPriority,
+			enableVolumeCapacityPriority: true,
 			args: &config.VolumeBindingArgs{
 				BindTimeoutSeconds: 300,
 				Shape: []config.UtilizationShapePoint{
@@ -610,7 +606,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					setPVCRequestStorage(makePVC("pvc-a", "", waitSC.Name), resource.MustParse("50Gi")),
 				},
-				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -633,8 +629,15 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			if item.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, item.feature, true)()
+			fts := feature.Features{
+				EnableCSIMigration:           true,
+				EnableCSIMigrationAWS:        false,
+				EnableCSIMigrationGCE:        false,
+				EnableCSIMigrationAzureDisk:  false,
+				EnableCSIMigrationOpenStack:  true,
+				EnableCSIStorageCapacity:     true,
+				EnableGenericEphemeralVolume: true,
+				EnableVolumeCapacityPriority: item.enableVolumeCapacityPriority,
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -655,12 +658,12 @@ func TestVolumeBinding(t *testing.T) {
 				args = &config.VolumeBindingArgs{
 					BindTimeoutSeconds: 300,
 				}
-				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+				if item.enableVolumeCapacityPriority {
 					args.Shape = defaultShapePoint
 				}
 			}
 
-			pl, err := New(args, fh)
+			pl, err := New(args, fh, fts)
 			if err != nil {
 				t.Fatal(err)
 			}

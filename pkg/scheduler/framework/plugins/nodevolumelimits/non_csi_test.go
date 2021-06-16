@@ -28,6 +28,7 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -357,10 +358,18 @@ func TestAzureDiskLimits(t *testing.T) {
 		},
 	}
 
+	fts := feature.Features{
+		EnableCSIMigration:          true,
+		EnableCSIMigrationAWS:       false,
+		EnableCSIMigrationGCE:       false,
+		EnableCSIMigrationAzureDisk: false,
+		EnableCSIMigrationOpenStack: true,
+	}
+
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), fts).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -424,10 +433,18 @@ func TestCinderLimits(t *testing.T) {
 		},
 	}
 
+	fts := feature.Features{
+		EnableCSIMigration:          true,
+		EnableCSIMigrationAWS:       false,
+		EnableCSIMigrationGCE:       false,
+		EnableCSIMigrationAzureDisk: false,
+		EnableCSIMigrationOpenStack: true,
+	}
+
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), fts).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -831,10 +848,18 @@ func TestEBSLimits(t *testing.T) {
 		},
 	}
 
+	fts := feature.Features{
+		EnableCSIMigration:          true,
+		EnableCSIMigrationAWS:       false,
+		EnableCSIMigrationGCE:       false,
+		EnableCSIMigrationAzureDisk: false,
+		EnableCSIMigrationOpenStack: true,
+	}
+
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), fts).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -1169,10 +1194,18 @@ func TestGCEPDLimits(t *testing.T) {
 		},
 	}
 
+	fts := feature.Features{
+		EnableCSIMigration:          true,
+		EnableCSIMigrationAWS:       false,
+		EnableCSIMigrationGCE:       false,
+		EnableCSIMigrationAzureDisk: false,
+		EnableCSIMigrationOpenStack: true,
+	}
+
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)).(framework.FilterPlugin)
+			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), fts).(framework.FilterPlugin)
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)

@@ -27,11 +27,12 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	volumeutil "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -54,6 +55,8 @@ type CSILimits struct {
 	randomVolumeIDPrefix string
 
 	translator InTreeToCSITranslator
+
+	fts feature.Features
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
@@ -211,7 +214,7 @@ func (pl *CSILimits) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.Persis
 			return "", ""
 		}
 
-		if !isCSIMigrationOn(csiNode, pluginName) {
+		if !isCSIMigrationOn(csiNode, pluginName, pl.fts) {
 			klog.V(5).InfoS("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
@@ -259,7 +262,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
-		if !isCSIMigrationOn(csiNode, provisioner) {
+		if !isCSIMigrationOn(csiNode, provisioner, pl.fts) {
 			klog.V(5).InfoS("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
 			return "", ""
 		}
@@ -276,7 +279,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 }
 
 // NewCSI initializes a new plugin and returns it.
-func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewCSI(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
@@ -290,6 +293,7 @@ func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error)
 		scLister:             scLister,
 		randomVolumeIDPrefix: rand.String(32),
 		translator:           csitrans.New(),
+		fts:                  fts,
 	}, nil
 }
 

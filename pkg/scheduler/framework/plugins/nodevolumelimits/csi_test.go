@@ -29,14 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	volumeutil "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -450,12 +448,7 @@ func TestCSILimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
 			if test.migrationEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
-			} else {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
 
 			p := &CSILimits{
@@ -465,6 +458,13 @@ func TestCSILimits(t *testing.T) {
 				scLister:             getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csitrans.New(),
+				fts: feature.Features{
+					EnableCSIMigration:          test.migrationEnabled,
+					EnableCSIMigrationAWS:       test.migrationEnabled,
+					EnableCSIMigrationGCE:       false,
+					EnableCSIMigrationAzureDisk: false,
+					EnableCSIMigrationOpenStack: true,
+				},
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

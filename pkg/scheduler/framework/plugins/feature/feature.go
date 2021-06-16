@@ -20,8 +20,19 @@ package feature
 // This struct allows us to break the dependency of the plugins on
 // the internal k8s features pkg.
 type Features struct {
-	EnablePodAffinityNamespaceSelector bool
-	EnablePodDisruptionBudget          bool
-	EnablePodOverhead                  bool
-	EnableReadWriteOncePod             bool
+	EnableCSIMigration                  bool // Default: true
+	EnableCSIMigrationAWS               bool
+	EnableCSIMigrationGCE               bool
+	EnableCSIMigrationAzureDisk         bool
+	EnableCSIMigrationOpenStack         bool // Default: true
+	EnableCSIStorageCapacity            bool // Default: true
+	EnableDefaultPodTopologySpread      bool // Default: true
+	EnableGenericEphemeralVolume        bool // Default: true
+	EnableLocalStorageCapacityIsolation bool // Default: true
+	EnablePodAffinityNamespaceSelector  bool // Default: true
+	EnablePodDisruptionBudget           bool // Default: true
+	EnablePodOverhead                   bool // Default: true
+	EnableReadWriteOncePod              bool
+	EnableStorageObjectInUseProtection  bool // Default: true
+	EnableVolumeCapacityPriority        bool
 }

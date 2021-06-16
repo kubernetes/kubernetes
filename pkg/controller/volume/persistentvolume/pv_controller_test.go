@@ -35,10 +35,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
+	pvtesting "k8s.io/component-helpers/storage/volume/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -522,7 +523,7 @@ func TestDelayBindingMode(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		shouldDelay, err := pvutil.IsDelayBindingMode(test.pvc, ctrl.classLister)
+		shouldDelay, err := storagehelpers.IsDelayBindingMode(test.pvc, ctrl.classLister)
 		if err != nil && !test.shouldFail {
 			t.Errorf("Test %q returned error: %v", name, err)
 		}

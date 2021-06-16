@@ -19,44 +19,43 @@ package nodevolumelimits
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	v1helper "k8s.io/api/core/v1/helper"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
 // the CSI migration has been enabled for a particular storage plugin.
-func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
+func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string, fts feature.Features) bool {
 	if csiNode == nil || len(pluginName) == 0 {
 		return false
 	}
 
 	// In-tree storage to CSI driver migration feature should be enabled,
 	// along with the plugin-specific one
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if !fts.EnableCSIMigration {
 		return false
 	}
 
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS) {
+		if !fts.EnableCSIMigrationAWS {
 			return false
 		}
 	case csilibplugins.GCEPDInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE) {
+		if !fts.EnableCSIMigrationGCE {
 			return false
 		}
 	case csilibplugins.AzureDiskInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk) {
+		if !fts.EnableCSIMigrationAzureDisk {
 			return false
 		}
 	case csilibplugins.CinderInTreePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack) {
+		if !fts.EnableCSIMigrationOpenStack {
 			return false
 		}
 	default:

@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	volumeutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
@@ -119,7 +120,7 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: volumeLimitSmall,
+		volumeutil.GCEVolumeLimitKey: volumeLimitSmall,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -149,16 +150,16 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 	smallMachineTypes := []string{"f1-micro", "g1-small", "e2-micro", "e2-small", "e2-medium"}
 	for _, small := range smallMachineTypes {
 		if instanceType == small {
-			volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
+			volumeLimits[volumeutil.GCEVolumeLimitKey] = volumeLimitSmall
 			return volumeLimits, nil
 		}
 	}
-	volumeLimits[util.GCEVolumeLimitKey] = volumeLimitBig
+	volumeLimits[volumeutil.GCEVolumeLimitKey] = volumeLimitBig
 	return volumeLimits, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.GCEVolumeLimitKey
+	return volumeutil.GCEVolumeLimitKey
 }
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

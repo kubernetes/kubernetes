@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -85,14 +87,14 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	// not only the exact matching modes but also potential matches (the GCEPD
 	// example above).
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
-
+	enableStorageObjectInUseProtection := utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection)
 	for _, modes := range allPossibleModes {
 		volumes, err := pvIndex.listByAccessModes(modes)
 		if err != nil {
 			return nil, err
 		}
 
-		bestVol, err := pvutil.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding)
+		bestVol, err := storagehelpers.FindMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding, enableStorageObjectInUseProtection)
 		if err != nil {
 			return nil, err
 		}

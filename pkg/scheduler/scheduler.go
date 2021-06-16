@@ -241,7 +241,9 @@ func New(client clientset.Interface,
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
-	registry := frameworkplugins.NewInTreeRegistry()
+	fts := GetPluginFeatures()
+
+	registry := frameworkplugins.NewInTreeRegistry(fts)
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
 	}
@@ -296,7 +298,7 @@ func New(client clientset.Interface,
 		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
 		// which would have set extenders in the above instantiation of Configurator from CC options)
 		configurator.extenders = policy.Extenders
-		sc, err := configurator.createFromPolicy(*policy)
+		sc, err := configurator.createFromPolicy(*policy, fts)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}

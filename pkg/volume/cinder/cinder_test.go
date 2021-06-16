@@ -30,9 +30,9 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/mount-utils"
 
+	util "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/openstack"
 )
 

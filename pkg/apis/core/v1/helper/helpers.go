@@ -21,10 +21,10 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	v1helper "k8s.io/api/core/v1/helper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
@@ -34,29 +34,23 @@ import (
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
-		return false
-	}
-	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
-	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
-		return false
-	}
-	return true
+	// TODO: call v1helper.IsExtendedResourceName directly
+	return v1helper.IsExtendedResourceName(name)
 }
 
 // IsPrefixedNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace.
 func IsPrefixedNativeResource(name v1.ResourceName) bool {
-	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+	// TODO: call v1helper.IsPrefixedNativeResource directly
+	return v1helper.IsPrefixedNativeResource(name)
 }
 
 // IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
 func IsNativeResource(name v1.ResourceName) bool {
-	return !strings.Contains(string(name), "/") ||
-		IsPrefixedNativeResource(name)
+	// TODO: call v1helper.IsNativeResource directly
+	return v1helper.IsNativeResource(name)
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
@@ -131,7 +125,8 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 
 // IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
 func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+	// TODO: call v1helper.IsAttachableVolumeResourceName directly
+	return v1helper.IsAttachableVolumeResourceName(name)
 }
 
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
@@ -240,50 +235,6 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 			}
 		}
 	}
-	return false
-}
-
-// TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct
-// that implements labels.Selector.
-func TopologySelectorRequirementsAsSelector(tsm []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
-	if len(tsm) == 0 {
-		return labels.Nothing(), nil
-	}
-
-	selector := labels.NewSelector()
-	for _, expr := range tsm {
-		r, err := labels.NewRequirement(expr.Key, selection.In, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-
-	return selector, nil
-}
-
-// MatchTopologySelectorTerms checks whether given labels match topology selector terms in ORed;
-// nil or empty term matches no objects; while empty term list matches all objects.
-func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
-	if len(topologySelectorTerms) == 0 {
-		// empty term list matches all objects
-		return true
-	}
-
-	for _, req := range topologySelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchLabelExpressions) == 0 {
-			continue
-		}
-
-		labelSelector, err := TopologySelectorRequirementsAsSelector(req.MatchLabelExpressions)
-		if err != nil || !labelSelector.Matches(lbls) {
-			continue
-		}
-
-		return true
-	}
-
 	return false
 }
 

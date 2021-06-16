@@ -38,9 +38,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
+	util "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
 

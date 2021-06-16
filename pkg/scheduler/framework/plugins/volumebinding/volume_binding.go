@@ -26,14 +26,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -58,7 +56,7 @@ type stateData struct {
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
 	// it's initialized in the PreFilter phase
-	podVolumesByNode map[string]*scheduling.PodVolumes
+	podVolumesByNode map[string]*PodVolumes
 	sync.Mutex
 }
 
@@ -70,10 +68,11 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder                               scheduling.SchedulerVolumeBinder
+	Binder                               SchedulerVolumeBinder
 	PVCLister                            corelisters.PersistentVolumeClaimLister
 	GenericEphemeralVolumeFeatureEnabled bool
 	scorer                               volumeCapacityScorer
+	fts                                  feature.Features
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
@@ -109,7 +108,7 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
 		// We rely on CSI node to translate in-tree PV to CSI.
 		{Resource: framework.CSINode, ActionType: framework.Add | framework.Update},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if pl.fts.EnableCSIStorageCapacity {
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
 		events = append(events, []framework.ClusterEvent{
@@ -179,7 +178,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
 		return status
 	}
-	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*scheduling.PodVolumes)})
+	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
 	return nil
 }
 
@@ -270,7 +269,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, po
 		class := staticBinding.StorageClassName()
 		storageResource := staticBinding.StorageResource()
 		if _, ok := classResources[class]; !ok {
-			classResources[class] = &scheduling.StorageResource{
+			classResources[class] = &StorageResource{
 				Requested: 0,
 				Capacity:  0,
 			}
@@ -353,12 +352,12 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.VolumeBindingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
-	if err := validation.ValidateVolumeBindingArgs(nil, args); err != nil {
+	if err := validation.ValidateVolumeBindingArgsWithFeatures(nil, args, &fts); err != nil {
 		return nil, err
 	}
 	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
@@ -367,18 +366,18 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
-	var capacityCheck *scheduling.CapacityCheck
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		capacityCheck = &scheduling.CapacityCheck{
+	var capacityCheck *CapacityCheck
+	if fts.EnableCSIStorageCapacity {
+		capacityCheck = &CapacityCheck{
 			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
 		}
 	}
-	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second, fts)
 
 	// build score function
 	var scorer volumeCapacityScorer
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+	if fts.EnableVolumeCapacityPriority {
 		shape := make(helper.FunctionShape, 0, len(args.Shape))
 		for _, point := range args.Shape {
 			shape = append(shape, helper.FunctionShapePoint{
@@ -391,7 +390,8 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	return &VolumeBinding{
 		Binder:                               binder,
 		PVCLister:                            pvcInformer.Lister(),
-		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
+		GenericEphemeralVolumeFeatureEnabled: fts.EnableGenericEphemeralVolume,
 		scorer:                               scorer,
+		fts:                                  fts,
 	}, nil
 }

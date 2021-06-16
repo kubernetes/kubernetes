@@ -35,8 +35,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	volumeutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+
 	"k8s.io/legacy-cloud-providers/openstack"
 )
 
@@ -126,7 +128,7 @@ var _ volume.VolumePluginWithAttachLimits = &cinderPlugin{}
 
 func (plugin *cinderPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.CinderVolumeLimitKey: util.DefaultMaxCinderVolumes,
+		volumeutil.CinderVolumeLimitKey: volumeutil.DefaultMaxCinderVolumes,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -144,14 +146,14 @@ func (plugin *cinderPlugin) GetVolumeLimits() (map[string]int64, error) {
 
 	openstackCloud, ok := cloud.(*openstack.OpenStack)
 	if ok && openstackCloud.NodeVolumeAttachLimit() > 0 {
-		volumeLimits[util.CinderVolumeLimitKey] = int64(openstackCloud.NodeVolumeAttachLimit())
+		volumeLimits[volumeutil.CinderVolumeLimitKey] = int64(openstackCloud.NodeVolumeAttachLimit())
 	}
 
 	return volumeLimits, nil
 }
 
 func (plugin *cinderPlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.CinderVolumeLimitKey
+	return volumeutil.CinderVolumeLimitKey
 }
 
 func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {

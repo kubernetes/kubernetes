@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package volumebinding
 
 import (
 	"context"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
@@ -41,12 +40,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pvutil "k8s.io/component-helpers/storage/volume"
+	pvtesting "k8s.io/component-helpers/storage/volume/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/controller"
-	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 var (
@@ -105,11 +102,11 @@ var (
 	topoMismatchClass        = "topoMismatchClass"
 
 	// nodes objects
-	node1         = makeNode("node1", map[string]string{nodeLabelKey: "node1"})
-	node2         = makeNode("node2", map[string]string{nodeLabelKey: "node2"})
-	node1NoLabels = makeNode("node1", nil)
-	node1Zone1    = makeNode("node1", map[string]string{"topology.gke.io/zone": "us-east-1"})
-	node1Zone2    = makeNode("node1", map[string]string{"topology.gke.io/zone": "us-east-2"})
+	node1         = makeNodeWithLabels("node1", map[string]string{nodeLabelKey: "node1"})
+	node2         = makeNodeWithLabels("node2", map[string]string{nodeLabelKey: "node2"})
+	node1NoLabels = makeNodeWithLabels("node1", nil)
+	node1Zone1    = makeNodeWithLabels("node1", map[string]string{"topology.gke.io/zone": "us-east-1"})
+	node1Zone2    = makeNodeWithLabels("node1", map[string]string{"topology.gke.io/zone": "us-east-2"})
 
 	// csiNode objects
 	csiNode1Migrated    = makeCSINode("node1", "kubernetes.io/gce-pd")
@@ -143,7 +140,7 @@ type testEnv struct {
 	internalCSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
-func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...bool) *testEnv {
+func newTestBinder(t *testing.T, stopCh <-chan struct{}, fts feature.Features) *testEnv {
 	client := &fake.Clientset{}
 	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
@@ -156,7 +153,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 		}
 		return true, watch, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
@@ -166,7 +163,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
 	csiStorageCapacityInformer := informerFactory.Storage().V1beta1().CSIStorageCapacities()
 	var capacityCheck *CapacityCheck
-	if len(csiStorageCapacity) > 0 && csiStorageCapacity[0] {
+	if fts.EnableCSIStorageCapacity {
 		capacityCheck = &CapacityCheck{
 			CSIDriverInformer:          csiDriverInformer,
 			CSIStorageCapacityInformer: csiStorageCapacityInformer,
@@ -181,7 +178,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
 		capacityCheck,
-		10*time.Second)
+		10*time.Second,
+		fts)
 
 	// Wait for informers cache sync
 	informerFactory.Start(stopCh)
@@ -712,7 +710,8 @@ func pvRemoveClaimUID(pv *v1.PersistentVolume) *v1.PersistentVolume {
 	return newPV
 }
 
-func makeNode(name string, labels map[string]string) *v1.Node {
+// TODO: same as volume_binding_test.go:makeNode
+func makeNodeWithLabels(name string, labels map[string]string) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -765,7 +764,8 @@ func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr, max
 	return c
 }
 
-func makePod(pvcs []*v1.PersistentVolumeClaim) *v1.Pod {
+// TODO: same as volume_binding_test.go: makePod
+func makePodWithPVC(pvcs []*v1.PersistentVolumeClaim) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
@@ -810,7 +810,7 @@ func makePodWithoutPVC() *v1.Pod {
 }
 
 func makePodWithGenericEphemeral(volumeNames ...string) *v1.Pod {
-	pod := makePod(nil)
+	pod := makePodWithPVC(nil)
 	for _, volumeName := range volumeNames {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
 			Name: volumeName,
@@ -907,7 +907,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 	scenarios := map[string]scenarioType{
 		"no-volumes": {
-			pod: makePod(nil),
+			pod: makePodWithPVC(nil),
 		},
 		"no-pvcs": {
 			pod: makePodWithoutPVC(),
@@ -1031,13 +1031,19 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, scenario.ephemeral)()
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     csiStorageCapacity,
+			EnableGenericEphemeralVolume: scenario.ephemeral,
+		})
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -1051,7 +1057,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePodWithPVC(scenario.podPVCs)
 		}
 
 		// Execute
@@ -1165,7 +1171,15 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     csiStorageCapacity,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -1179,7 +1193,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePodWithPVC(scenario.podPVCs)
 		}
 
 		// Execute
@@ -1272,11 +1286,16 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
-
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        true,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		var node *v1.Node
@@ -1299,7 +1318,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePodWithPVC(scenario.podPVCs)
 		}
 
 		// Execute
@@ -1390,9 +1409,17 @@ func TestAssumePodVolumes(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
-		pod := makePod(scenario.podPVCs)
+		pod := makePodWithPVC(scenario.podPVCs)
 		podVolumes := &PodVolumes{
 			StaticBindings:    scenario.bindings,
 			DynamicProvisions: scenario.provisionedPVCs,
@@ -1443,9 +1470,17 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 	expectedProvisionings := []*v1.PersistentVolumeClaim{selectedNodePVC}
 
 	// Setup
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+		EnableCSIMigration:           true,
+		EnableCSIMigrationAWS:        false,
+		EnableCSIMigrationGCE:        false,
+		EnableCSIMigrationAzureDisk:  false,
+		EnableCSIMigrationOpenStack:  true,
+		EnableCSIStorageCapacity:     false,
+		EnableGenericEphemeralVolume: true,
+	})
 	testEnv.initClaims(podPVCs, podPVCs)
-	pod := makePod(podPVCs)
+	pod := makePodWithPVC(podPVCs)
 	podVolumes := &PodVolumes{
 		StaticBindings:    bindings,
 		DynamicProvisions: provisionedPVCs,
@@ -1561,8 +1596,16 @@ func TestBindAPIUpdate(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
-		pod := makePod(nil)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
+		pod := makePodWithPVC(nil)
 		if scenario.apiPVs == nil {
 			scenario.apiPVs = scenario.cachedPVs
 		}
@@ -1757,8 +1800,16 @@ func TestCheckBindings(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		pod := makePodWithPVC(nil)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes([]*v1.Node{node1})
 		testEnv.initVolumes(scenario.initPVs, nil)
@@ -1882,12 +1933,17 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, scenario.migrationEnabled)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, scenario.migrationEnabled)()
-
 		// Setup
-		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		pod := makePodWithPVC(nil)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           scenario.migrationEnabled,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        scenario.migrationEnabled,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes(scenario.initNodes)
 		testEnv.initCSINodes(scenario.initCSINodes)
@@ -2070,8 +2126,16 @@ func TestBindPodVolumes(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		pod := makePodWithPVC(nil)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     false,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		if scenario.nodes == nil {
 			scenario.nodes = []*v1.Node{node1}
@@ -2147,10 +2211,18 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// Setup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+		EnableCSIMigration:           true,
+		EnableCSIMigrationAWS:        false,
+		EnableCSIMigrationGCE:        false,
+		EnableCSIMigrationAzureDisk:  false,
+		EnableCSIMigrationOpenStack:  true,
+		EnableCSIStorageCapacity:     false,
+		EnableGenericEphemeralVolume: true,
+	})
 	testEnv.initVolumes(pvs, pvs)
 	testEnv.initClaims(podPVCs, podPVCs)
-	pod := makePod(podPVCs)
+	pod := makePodWithPVC(podPVCs)
 
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2298,12 +2370,19 @@ func TestCapacity(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, featureEnabled, optIn bool) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, featureEnabled)()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Setup: the driver has the feature enabled, but the scheduler might not.
-		testEnv := newTestBinder(t, ctx.Done(), featureEnabled)
+		testEnv := newTestBinder(t, ctx.Done(), feature.Features{
+			EnableCSIMigration:           true,
+			EnableCSIMigrationAWS:        false,
+			EnableCSIMigrationGCE:        false,
+			EnableCSIMigrationAzureDisk:  false,
+			EnableCSIMigrationOpenStack:  true,
+			EnableCSIStorageCapacity:     featureEnabled,
+			EnableGenericEphemeralVolume: true,
+		})
 		testEnv.addCSIDriver(makeCSIDriver(provisioner, optIn))
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
@@ -2311,7 +2390,7 @@ func TestCapacity(t *testing.T) {
 		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
 
 		// b. Generate pod with given claims
-		pod := makePod(scenario.pvcs)
+		pod := makePodWithPVC(scenario.pvcs)
 
 		// Execute
 		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)

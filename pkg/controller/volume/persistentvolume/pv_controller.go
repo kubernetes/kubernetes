@@ -292,11 +292,11 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
+	if storagehelpers.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 		return fmt.Errorf("incompatible volumeMode")
 	}
 
-	if !pvutil.CheckAccessModes(claim, volume) {
+	if !storagehelpers.CheckAccessModes(claim, volume) {
 		return fmt.Errorf("incompatible accessMode")
 	}
 
@@ -335,7 +335,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 	// OBSERVATION: pvc is "Pending"
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
-		delayBinding, err := pvutil.IsDelayBindingMode(claim, ctrl.classLister)
+		delayBinding, err := storagehelpers.IsDelayBindingMode(claim, ctrl.classLister)
 		if err != nil {
 			return err
 		}
@@ -433,7 +433,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
 				return nil
-			} else if pvutil.IsVolumeBoundToClaim(volume, claim) {
+			} else if storagehelpers.IsVolumeBoundToClaim(volume, claim) {
 				// User asked for a PV that is claimed by this PVC
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
 				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound, finishing the binding", claimToClaimKey(claim))
@@ -655,7 +655,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
+			if storagehelpers.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
@@ -909,7 +909,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *v1.Pe
 func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", volume.Name, claimToClaimKey(claim))
 
-	volumeClone, dirty, err := pvutil.GetBindVolumeToClaim(volume, claim)
+	volumeClone, dirty, err := storagehelpers.GetBindVolumeToClaim(volume, claim)
 	if err != nil {
 		return nil, err
 	}

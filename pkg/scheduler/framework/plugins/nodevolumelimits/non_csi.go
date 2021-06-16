@@ -32,11 +32,12 @@ import (
 	"k8s.io/client-go/informers"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	volumeutil "k8s.io/component-helpers/storage/volume"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -68,36 +69,36 @@ const (
 const AzureDiskName = names.AzureDiskLimits
 
 // NewAzureDisk returns function that initializes a new plugin and returns it.
-func NewAzureDisk(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewAzureDisk(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(azureDiskVolumeFilterType, informerFactory), nil
+	return newNonCSILimitsWithInformerFactory(azureDiskVolumeFilterType, informerFactory, fts), nil
 }
 
 // CinderName is the name of the plugin used in the plugin registry and configurations.
 const CinderName = names.CinderLimits
 
 // NewCinder returns function that initializes a new plugin and returns it.
-func NewCinder(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewCinder(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(cinderVolumeFilterType, informerFactory), nil
+	return newNonCSILimitsWithInformerFactory(cinderVolumeFilterType, informerFactory, fts), nil
 }
 
 // EBSName is the name of the plugin used in the plugin registry and configurations.
 const EBSName = names.EBSLimits
 
 // NewEBS returns function that initializes a new plugin and returns it.
-func NewEBS(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewEBS(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(ebsVolumeFilterType, informerFactory), nil
+	return newNonCSILimitsWithInformerFactory(ebsVolumeFilterType, informerFactory, fts), nil
 }
 
 // GCEPDName is the name of the plugin used in the plugin registry and configurations.
 const GCEPDName = names.GCEPDLimits
 
 // NewGCEPD returns function that initializes a new plugin and returns it.
-func NewGCEPD(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewGCEPD(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(gcePDVolumeFilterType, informerFactory), nil
+	return newNonCSILimitsWithInformerFactory(gcePDVolumeFilterType, informerFactory, fts), nil
 }
 
 // nonCSILimits contains information to check the max number of volumes for a plugin.
@@ -124,13 +125,14 @@ var _ framework.EnqueueExtensions = &nonCSILimits{}
 func newNonCSILimitsWithInformerFactory(
 	filterName string,
 	informerFactory informers.SharedInformerFactory,
+	fts feature.Features,
 ) framework.Plugin {
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
-	return newNonCSILimits(filterName, csiNodesLister, scLister, pvLister, pvcLister)
+	return newNonCSILimits(filterName, csiNodesLister, scLister, pvLister, pvcLister, fts)
 }
 
 // newNonCSILimits creates a plugin which evaluates whether a pod can fit based on the
@@ -149,6 +151,7 @@ func newNonCSILimits(
 	scLister storagelisters.StorageClassLister,
 	pvLister corelisters.PersistentVolumeLister,
 	pvcLister corelisters.PersistentVolumeClaimLister,
+	fts feature.Features,
 ) framework.Plugin {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
@@ -157,19 +160,19 @@ func newNonCSILimits(
 	switch filterName {
 	case ebsVolumeFilterType:
 		name = EBSName
-		filter = ebsVolumeFilter
+		filter = NewEbsVolumeFilter(fts)
 		volumeLimitKey = v1.ResourceName(volumeutil.EBSVolumeLimitKey)
 	case gcePDVolumeFilterType:
 		name = GCEPDName
-		filter = gcePDVolumeFilter
+		filter = NewGcePDVolumeFilter(fts)
 		volumeLimitKey = v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case azureDiskVolumeFilterType:
 		name = AzureDiskName
-		filter = azureDiskVolumeFilter
+		filter = NewAzureDiskVolumeFilter(fts)
 		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
 	case cinderVolumeFilterType:
 		name = CinderName
-		filter = cinderVolumeFilter
+		filter = NewCinderVolumeFilter(fts)
 		volumeLimitKey = v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		klog.ErrorS(errors.New("wrong filterName"), "Cannot create nonCSILimits plugin", "candidates", fmt.Sprintf("%v %v %v %v", ebsVolumeFilterType, gcePDVolumeFilterType, azureDiskVolumeFilterType, cinderVolumeFilterType))
@@ -367,117 +370,125 @@ type VolumeFilter struct {
 	IsMigrated func(csiNode *storage.CSINode) bool
 }
 
-// ebsVolumeFilter is a VolumeFilter for filtering AWS ElasticBlockStore Volumes.
-var ebsVolumeFilter = VolumeFilter{
-	FilterVolume: func(vol *v1.Volume) (string, bool) {
-		if vol.AWSElasticBlockStore != nil {
-			return vol.AWSElasticBlockStore.VolumeID, true
-		}
-		return "", false
-	},
+// NewEbsVolumeFilter returns a VolumeFilter for filtering AWS ElasticBlockStore Volumes.
+func NewEbsVolumeFilter(fts feature.Features) VolumeFilter {
+	return VolumeFilter{
+		FilterVolume: func(vol *v1.Volume) (string, bool) {
+			if vol.AWSElasticBlockStore != nil {
+				return vol.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
 
-	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-		if pv.Spec.AWSElasticBlockStore != nil {
-			return pv.Spec.AWSElasticBlockStore.VolumeID, true
-		}
-		return "", false
-	},
+		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+			if pv.Spec.AWSElasticBlockStore != nil {
+				return pv.Spec.AWSElasticBlockStore.VolumeID, true
+			}
+			return "", false
+		},
 
-	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.AWSEBSInTreePluginName {
-			return true
-		}
-		return false
-	},
+		MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
+			if sc.Provisioner == csilibplugins.AWSEBSInTreePluginName {
+				return true
+			}
+			return false
+		},
 
-	IsMigrated: func(csiNode *storage.CSINode) bool {
-		return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName)
-	},
+		IsMigrated: func(csiNode *storage.CSINode) bool {
+			return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName, fts)
+		},
+	}
 }
 
-// gcePDVolumeFilter is a VolumeFilter for filtering gce PersistentDisk Volumes.
-var gcePDVolumeFilter = VolumeFilter{
-	FilterVolume: func(vol *v1.Volume) (string, bool) {
-		if vol.GCEPersistentDisk != nil {
-			return vol.GCEPersistentDisk.PDName, true
-		}
-		return "", false
-	},
+// NewGcePDVolumeFilter returns a VolumeFilter for filtering gce PersistentDisk Volumes.
+func NewGcePDVolumeFilter(fts feature.Features) VolumeFilter {
+	return VolumeFilter{
+		FilterVolume: func(vol *v1.Volume) (string, bool) {
+			if vol.GCEPersistentDisk != nil {
+				return vol.GCEPersistentDisk.PDName, true
+			}
+			return "", false
+		},
 
-	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-		if pv.Spec.GCEPersistentDisk != nil {
-			return pv.Spec.GCEPersistentDisk.PDName, true
-		}
-		return "", false
-	},
+		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+			if pv.Spec.GCEPersistentDisk != nil {
+				return pv.Spec.GCEPersistentDisk.PDName, true
+			}
+			return "", false
+		},
 
-	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.GCEPDInTreePluginName {
-			return true
-		}
-		return false
-	},
+		MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
+			if sc.Provisioner == csilibplugins.GCEPDInTreePluginName {
+				return true
+			}
+			return false
+		},
 
-	IsMigrated: func(csiNode *storage.CSINode) bool {
-		return isCSIMigrationOn(csiNode, csilibplugins.GCEPDInTreePluginName)
-	},
+		IsMigrated: func(csiNode *storage.CSINode) bool {
+			return isCSIMigrationOn(csiNode, csilibplugins.GCEPDInTreePluginName, fts)
+		},
+	}
 }
 
-// azureDiskVolumeFilter is a VolumeFilter for filtering azure Disk Volumes.
-var azureDiskVolumeFilter = VolumeFilter{
-	FilterVolume: func(vol *v1.Volume) (string, bool) {
-		if vol.AzureDisk != nil {
-			return vol.AzureDisk.DiskName, true
-		}
-		return "", false
-	},
+// NewAzureDiskVolumeFilter returns a VolumeFilter for filtering azure Disk Volumes.
+func NewAzureDiskVolumeFilter(fts feature.Features) VolumeFilter {
+	return VolumeFilter{
+		FilterVolume: func(vol *v1.Volume) (string, bool) {
+			if vol.AzureDisk != nil {
+				return vol.AzureDisk.DiskName, true
+			}
+			return "", false
+		},
 
-	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-		if pv.Spec.AzureDisk != nil {
-			return pv.Spec.AzureDisk.DiskName, true
-		}
-		return "", false
-	},
+		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+			if pv.Spec.AzureDisk != nil {
+				return pv.Spec.AzureDisk.DiskName, true
+			}
+			return "", false
+		},
 
-	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.AzureDiskInTreePluginName {
-			return true
-		}
-		return false
-	},
+		MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
+			if sc.Provisioner == csilibplugins.AzureDiskInTreePluginName {
+				return true
+			}
+			return false
+		},
 
-	IsMigrated: func(csiNode *storage.CSINode) bool {
-		return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName)
-	},
+		IsMigrated: func(csiNode *storage.CSINode) bool {
+			return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName, fts)
+		},
+	}
 }
 
 // cinderVolumeFilter is a VolumeFilter for filtering cinder Volumes.
 // It will be deprecated once Openstack cloudprovider has been removed from in-tree.
-var cinderVolumeFilter = VolumeFilter{
-	FilterVolume: func(vol *v1.Volume) (string, bool) {
-		if vol.Cinder != nil {
-			return vol.Cinder.VolumeID, true
-		}
-		return "", false
-	},
+func NewCinderVolumeFilter(fts feature.Features) VolumeFilter {
+	return VolumeFilter{
+		FilterVolume: func(vol *v1.Volume) (string, bool) {
+			if vol.Cinder != nil {
+				return vol.Cinder.VolumeID, true
+			}
+			return "", false
+		},
 
-	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-		if pv.Spec.Cinder != nil {
-			return pv.Spec.Cinder.VolumeID, true
-		}
-		return "", false
-	},
+		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+			if pv.Spec.Cinder != nil {
+				return pv.Spec.Cinder.VolumeID, true
+			}
+			return "", false
+		},
 
-	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
-		if sc.Provisioner == csilibplugins.CinderInTreePluginName {
-			return true
-		}
-		return false
-	},
+		MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
+			if sc.Provisioner == csilibplugins.CinderInTreePluginName {
+				return true
+			}
+			return false
+		},
 
-	IsMigrated: func(csiNode *storage.CSINode) bool {
-		return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName)
-	},
+		IsMigrated: func(csiNode *storage.CSINode) bool {
+			return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName, fts)
+		},
+	}
 }
 
 func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {

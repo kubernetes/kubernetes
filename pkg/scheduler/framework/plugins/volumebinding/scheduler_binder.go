@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package volumebinding
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	v1helper "k8s.io/api/core/v1/helper"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/etcd3"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
@@ -44,11 +44,8 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
-	"k8s.io/kubernetes/pkg/features"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -211,6 +208,8 @@ type volumeBinder struct {
 	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
 	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
+
+	fts feature.Features
 }
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
@@ -233,7 +232,8 @@ func NewVolumeBinder(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	capacityCheck *CapacityCheck,
-	bindTimeout time.Duration) SchedulerVolumeBinder {
+	bindTimeout time.Duration,
+	fts feature.Features) SchedulerVolumeBinder {
 	b := &volumeBinder{
 		kubeClient:    kubeClient,
 		podLister:     podInformer.Lister(),
@@ -244,6 +244,7 @@ func NewVolumeBinder(
 		pvCache:       NewPVAssumeCache(pvInformer.Informer()),
 		bindTimeout:   bindTimeout,
 		translator:    csitrans.New(),
+		fts:           fts,
 	}
 
 	if capacityCheck != nil {
@@ -332,7 +333,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 
 		// Filter out claims to provision
 		for _, claim := range claimsToBind {
-			if selectedNode, ok := claim.Annotations[pvutil.AnnSelectedNode]; ok {
+			if selectedNode, ok := claim.Annotations[storagehelpers.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node.
 					unboundVolumesSatisfied = false
@@ -392,7 +393,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 	// Assume PV
 	newBindings := []*BindingInfo{}
 	for _, binding := range podVolumes.StaticBindings {
-		newPV, dirty, err := pvutil.GetBindVolumeToClaim(binding.pv, binding.pvc)
+		newPV, dirty, err := storagehelpers.GetBindVolumeToClaim(binding.pv, binding.pvc)
 		klog.V(5).Infof("AssumePodVolumes: GetBindVolumeToClaim for pod %q, PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
 			podName,
 			binding.pv.Name,
@@ -421,7 +422,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 		// The claims from method args can be pointing to watcher cache. We must not
 		// modify these, therefore create a copy.
 		claimClone := claim.DeepCopy()
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnSelectedNode, nodeName)
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnSelectedNode, nodeName)
 		err = b.pvcCache.Assume(claimClone)
 		if err != nil {
 			b.revertAssumedPVs(newBindings)
@@ -616,7 +617,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
-		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+		if err := storagehelpers.CheckNodeAffinity(pv, node.Labels); err != nil {
 			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 		}
 
@@ -647,7 +648,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 		if pvc.Annotations == nil {
 			return false, fmt.Errorf("selectedNode annotation reset for PVC %q", pvc.Name)
 		}
-		selectedNode := pvc.Annotations[pvutil.AnnSelectedNode]
+		selectedNode := pvc.Annotations[storagehelpers.AnnSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
 			// If provisioner fails to provision a volume, selectedNode
 			// annotation will be removed to signal back to the scheduler to
@@ -674,7 +675,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 				return false, err
 			}
 
-			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+			if err := storagehelpers.CheckNodeAffinity(pv, node.Labels); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 			}
 		}
@@ -697,7 +698,7 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
 	case vol.Ephemeral != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		if !b.fts.EnableGenericEphemeralVolume {
 			return false, nil, fmt.Errorf(
 				"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
 				vol.Name,
@@ -746,7 +747,7 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 }
 
 func (b *volumeBinder) isPVCFullyBound(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, pvutil.AnnBindCompleted)
+	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, storagehelpers.AnnBindCompleted)
 }
 
 // arePodVolumesBound returns true if all volumes are fully bound
@@ -778,7 +779,7 @@ func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		if volumeBound {
 			boundClaims = append(boundClaims, pvc)
 		} else {
-			delayBindingMode, err := pvutil.IsDelayBindingMode(pvc, b.classLister)
+			delayBindingMode, err := storagehelpers.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -818,7 +819,7 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 			return false, true, err
 		}
 
-		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
+		err = storagehelpers.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
 			klog.V(4).Infof("PersistentVolume %q, Node %q mismatch for Pod %q: %v", pvName, node.Name, podName, err)
 			return false, true, nil
@@ -848,7 +849,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 		pvcName := getPVCName(pvc)
 
 		// Find a matching PV
-		pv, err := pvutil.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
+		pv, err := storagehelpers.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true, b.fts.EnableStorageObjectInUseProtection)
 		if err != nil {
 			return false, nil, nil, err
 		}
@@ -893,7 +894,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			return false, false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}
 		provisioner := class.Provisioner
-		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
+		if provisioner == "" || provisioner == storagehelpers.NotSupportedProvisioner {
 			klog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
 			return false, true, nil, nil
 		}
@@ -1030,16 +1031,16 @@ func (a byPVCSize) Less(i, j int) bool {
 }
 
 // isCSIMigrationOnForPlugin checks if CSI migrartion is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string) bool {
+func isCSIMigrationOnForPlugin(pluginName string, fts feature.Features) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		return fts.EnableCSIMigrationAWS
 	case csiplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		return fts.EnableCSIMigrationGCE
 	case csiplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		return fts.EnableCSIMigrationAzureDisk
 	case csiplugins.CinderInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+		return fts.EnableCSIMigrationOpenStack
 	}
 	return false
 }
@@ -1073,7 +1074,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return pv, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if !b.fts.EnableCSIMigration {
 		return pv, nil
 	}
 
@@ -1082,7 +1083,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
 	}
 
-	if !isCSIMigrationOnForPlugin(pluginName) {
+	if !isCSIMigrationOnForPlugin(pluginName, b.fts) {
 		return pv, nil
 	}
 

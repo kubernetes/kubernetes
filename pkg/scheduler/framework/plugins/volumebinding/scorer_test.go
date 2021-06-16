@@ -19,7 +19,6 @@ package volumebinding
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
@@ -53,7 +52,7 @@ func TestScore(t *testing.T) {
 			cases: []scoreCase{
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
@@ -62,7 +61,7 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
@@ -71,7 +70,7 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 50,
 							Capacity:  100,
 						},
@@ -80,7 +79,7 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
@@ -95,11 +94,11 @@ func TestScore(t *testing.T) {
 			cases: []scoreCase{
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
@@ -108,11 +107,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
@@ -121,11 +120,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
@@ -134,11 +133,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 60,
 							Capacity:  100,
 						},
@@ -147,11 +146,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 50,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 50,
 							Capacity:  100,
 						},
@@ -160,11 +159,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 50,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
@@ -173,11 +172,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
@@ -205,11 +204,11 @@ func TestScore(t *testing.T) {
 			cases: []scoreCase{
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
@@ -218,11 +217,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 0,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
@@ -231,11 +230,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
@@ -244,11 +243,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 30,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 60,
 							Capacity:  100,
 						},
@@ -257,11 +256,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 50,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
@@ -270,11 +269,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 90,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 90,
 							Capacity:  100,
 						},
@@ -283,11 +282,11 @@ func TestScore(t *testing.T) {
 				},
 				{
 					classResourceMap{
-						classHDD: &scheduling.StorageResource{
+						classHDD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},
-						classSSD: &scheduling.StorageResource{
+						classSSD: &StorageResource{
 							Requested: 100,
 							Capacity:  100,
 						},

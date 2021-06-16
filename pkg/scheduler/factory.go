@@ -40,6 +40,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -205,9 +206,9 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}, nil
 }
 
-// createFromPolicy creates a scheduler from the legacy policy file.
-func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler, error) {
-	lr := frameworkplugins.NewLegacyRegistry()
+// createFromPolicy creates a scheduler from the legacy policy file
+func (c *Configurator) createFromPolicy(policy schedulerapi.Policy, fts feature.Features) (*Scheduler, error) {
+	lr := frameworkplugins.NewLegacyRegistry(fts)
 	args := &frameworkplugins.ConfigProducerArgs{}
 
 	klog.V(2).InfoS("Creating scheduler from configuration", "policy", policy)

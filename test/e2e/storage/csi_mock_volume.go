@@ -44,7 +44,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cachetools "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
@@ -1883,11 +1882,13 @@ const (
 	pvcAsSourceProtectionFinalizer = "snapshot.storage.kubernetes.io/pvc-as-source-protection"
 	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
 	volumeSnapshotBoundFinalizer   = "snapshot.storage.kubernetes.io/volumesnapshot-bound-protection"
+	// ErrReasonNotEnoughSpace is used when a pod cannot start on a node because not enough storage space is available.
+	ErrReasonNotEnoughSpace = "node(s) did not have enough free storage"
 )
 
 var (
 	errPodCompleted   = fmt.Errorf("pod ran to completion")
-	errNotEnoughSpace = errors.New(scheduling.ErrReasonNotEnoughSpace)
+	errNotEnoughSpace = errors.New(ErrReasonNotEnoughSpace)
 )
 
 func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespace string, when time.Time) wait.ConditionFunc {
@@ -1911,7 +1912,7 @@ func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespac
 		}
 		for _, event := range events.Items {
 			if /* event.CreationTimestamp.After(when) &&
-			 */strings.Contains(event.Message, scheduling.ErrReasonNotEnoughSpace) {
+			 */strings.Contains(event.Message, ErrReasonNotEnoughSpace) {
 				return false, errNotEnoughSpace
 			}
 		}

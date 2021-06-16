@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -135,7 +136,7 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.AzureVolumeLimitKey: defaultAzureVolumeLimit,
+		storagehelpers.AzureVolumeLimitKey: defaultAzureVolumeLimit,
 	}
 
 	az, err := getCloud(plugin.host)
@@ -160,7 +161,7 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	}
 
 	volumeLimits = map[string]int64{
-		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType),
+		storagehelpers.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType),
 	}
 
 	return volumeLimits, nil
@@ -179,7 +180,7 @@ func getMaxDataDiskCount(instanceType string) int64 {
 }
 
 func (plugin *azureDataDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.AzureVolumeLimitKey
+	return storagehelpers.AzureVolumeLimitKey
 }
 
 func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {

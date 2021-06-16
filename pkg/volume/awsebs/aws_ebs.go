@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/aws"
@@ -101,7 +102,7 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 
 func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,
+		storagehelpers.EBSVolumeLimitKey: storagehelpers.DefaultMaxEBSVolumes,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -129,15 +130,15 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 		return volumeLimits, nil
 	}
 
-	if ok, _ := regexp.MatchString(util.EBSNitroLimitRegex, instanceType); ok {
-		volumeLimits[util.EBSVolumeLimitKey] = util.DefaultMaxEBSNitroVolumeLimit
+	if ok, _ := regexp.MatchString(storagehelpers.EBSNitroLimitRegex, instanceType); ok {
+		volumeLimits[storagehelpers.EBSVolumeLimitKey] = storagehelpers.DefaultMaxEBSNitroVolumeLimit
 	}
 
 	return volumeLimits, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.EBSVolumeLimitKey
+	return storagehelpers.EBSVolumeLimitKey
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {

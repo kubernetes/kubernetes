@@ -22,11 +22,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -39,7 +36,7 @@ import (
 )
 
 func TestRegisterConfigProducers(t *testing.T) {
-	registry := NewLegacyRegistry()
+	registry := NewLegacyRegistry(feature.Features{EnableDefaultPodTopologySpread: true})
 	testPredicateName1 := "testPredicate1"
 	testFilterName1 := "testFilter1"
 	registry.registerPredicateConfigProducer(testPredicateName1,
@@ -109,14 +106,15 @@ func TestRegisterConfigProducers(t *testing.T) {
 func TestAppendPriorityConfigs(t *testing.T) {
 	cases := []struct {
 		name             string
-		features         map[featuregate.Feature]bool
+		features         feature.Features
 		keys             map[string]int64
 		args             ConfigProducerArgs
 		wantPlugins      config.Plugins
 		wantPluginConfig []config.PluginConfig
 	}{
 		{
-			name: "default priorities",
+			name:     "default priorities",
+			features: feature.Features{EnableDefaultPodTopologySpread: true},
 			wantPlugins: config.Plugins{
 				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
@@ -158,7 +156,8 @@ func TestAppendPriorityConfigs(t *testing.T) {
 			},
 		},
 		{
-			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority only",
+			name:     "DefaultPodTopologySpread enabled, SelectorSpreadPriority only",
+			features: feature.Features{EnableDefaultPodTopologySpread: true},
 			keys: map[string]int64{
 				SelectorSpreadPriority: 3,
 			},
@@ -184,7 +183,8 @@ func TestAppendPriorityConfigs(t *testing.T) {
 			},
 		},
 		{
-			name: "DefaultPodTopologySpread enabled, EvenPodsSpreadPriority only",
+			name:     "DefaultPodTopologySpread enabled, EvenPodsSpreadPriority only",
+			features: feature.Features{EnableDefaultPodTopologySpread: true},
 			keys: map[string]int64{
 				EvenPodsSpreadPriority: 4,
 			},
@@ -210,10 +210,8 @@ func TestAppendPriorityConfigs(t *testing.T) {
 			},
 		},
 		{
-			name: "DefaultPodTopologySpread disabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
-			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: false,
-			},
+			name:     "DefaultPodTopologySpread disabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
+			features: feature.Features{EnableDefaultPodTopologySpread: false},
 			keys: map[string]int64{
 				SelectorSpreadPriority: 1,
 				EvenPodsSpreadPriority: 2,
@@ -236,11 +234,7 @@ func TestAppendPriorityConfigs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
-			}
-
-			r := NewLegacyRegistry()
+			r := NewLegacyRegistry(tc.features)
 			keys := tc.keys
 			if keys == nil {
 				keys = r.DefaultPriorities

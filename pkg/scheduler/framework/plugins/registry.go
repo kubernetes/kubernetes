@@ -18,12 +18,10 @@ package plugins
 
 import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
-	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -48,14 +46,7 @@ import (
 // NewInTreeRegistry builds the registry with all the in-tree plugins.
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
-func NewInTreeRegistry() runtime.Registry {
-	fts := plfeature.Features{
-		EnablePodAffinityNamespaceSelector: feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
-		EnablePodDisruptionBudget:          feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
-		EnablePodOverhead:                  feature.DefaultFeatureGate.Enabled(features.PodOverhead),
-		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-	}
-
+func NewInTreeRegistry(fts feature.Features) runtime.Registry {
 	return runtime.Registry{
 		selectorspread.Name:      selectorspread.New,
 		imagelocality.Name:       imagelocality.New,
@@ -81,16 +72,28 @@ func NewInTreeRegistry() runtime.Registry {
 		noderesources.RequestedToCapacityRatioName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return noderesources.NewRequestedToCapacityRatio(plArgs, fh, fts)
 		},
-		volumebinding.Name: volumebinding.New,
+		volumebinding.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return volumebinding.New(plArgs, fh, fts)
+		},
 		volumerestrictions.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return volumerestrictions.New(plArgs, fh, fts)
 		},
-		volumezone.Name:                volumezone.New,
-		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
-		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
-		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
-		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
-		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
+		volumezone.Name: volumezone.New,
+		nodevolumelimits.CSIName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return nodevolumelimits.NewCSI(plArgs, fh, fts)
+		},
+		nodevolumelimits.EBSName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return nodevolumelimits.NewEBS(plArgs, fh, fts)
+		},
+		nodevolumelimits.GCEPDName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return nodevolumelimits.NewGCEPD(plArgs, fh, fts)
+		},
+		nodevolumelimits.AzureDiskName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return nodevolumelimits.NewAzureDisk(plArgs, fh, fts)
+		},
+		nodevolumelimits.CinderName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return nodevolumelimits.NewCinder(plArgs, fh, fts)
+		},
 		interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return interpodaffinity.New(plArgs, fh, fts)
 		},
