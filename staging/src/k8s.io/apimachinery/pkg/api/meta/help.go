@@ -152,13 +152,7 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 				return err
 			}
 		default:
-			obj, ok := item.(runtime.Object)
-			if !ok {
-				return fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
-			}
-			if err := fn(obj); err != nil {
-				return err
-			}
+			return fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
 		}
 	}
 	return nil
