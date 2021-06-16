@@ -185,6 +185,16 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_concurrency_in_use",
+			Help:           "Concurrency (number of seats) occupided by the currently executing requests in the API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 	apiserverRequestWaitingSeconds = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -213,6 +223,7 @@ var (
 		apiserverCurrentInqueueRequests,
 		apiserverRequestQueueLength,
 		apiserverRequestConcurrencyLimit,
+		apiserverRequestConcurrencyInUse,
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
@@ -229,6 +240,12 @@ func AddRequestsInQueues(ctx context.Context, priorityLevel, flowSchema string, 
 // AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
 func AddRequestsExecuting(ctx context.Context, priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
+}
+
+// AddRequestConcurrencyInUse adds the given delta to the gauge of concurrency in use by
+// the currently executing requests of the given flowSchema and priorityLevel
+func AddRequestConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
+	apiserverRequestConcurrencyInUse.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
 // UpdateSharedConcurrencyLimit updates the value for the concurrency limit in flow control

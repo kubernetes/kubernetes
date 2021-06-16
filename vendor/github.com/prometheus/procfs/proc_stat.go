@@ -127,10 +127,7 @@ func (p Proc) Stat() (ProcStat, error) {
 	)
 
 	if l < 0 || r < 0 {
-		return ProcStat{}, fmt.Errorf(
-			"unexpected format, couldn't extract comm: %s",
-			data,
-		)
+		return ProcStat{}, fmt.Errorf("unexpected format, couldn't extract comm %q", data)
 	}
 
 	s.Comm = string(data[l+1 : r])

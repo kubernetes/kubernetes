@@ -206,6 +206,14 @@ func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOp
 		moc.skipCheck = true
 		return &moc
 	}
+
+	// TODO: temporarily skip metrics check due to issue #[102893](https://github.com/kubernetes/kubernetes/issues/102893)
+	// Will remove it once the issue is fixed
+	if framework.NodeOSDistroIs("windows") {
+		moc.skipCheck = true
+		return &moc
+	}
+
 	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, pluginName)
 	return &moc
 }

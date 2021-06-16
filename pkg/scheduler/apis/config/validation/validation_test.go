@@ -45,14 +45,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			QPS:                10,
 			Burst:              10,
 		},
-		AlgorithmSource: config.SchedulerAlgorithmSource{
-			Policy: &config.SchedulerPolicySource{
-				ConfigMap: &config.SchedulerPolicyConfigMapSource{
-					Namespace: "name",
-					Name:      "name",
-				},
-			},
-		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 			ResourceLock:      "configmap",
 			LeaderElect:       true,

@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/Azure/go-ansiterm"
+	windows "golang.org/x/sys/windows"
 )
 
 // Windows keyboard constants
@@ -163,11 +164,11 @@ func ensureInRange(n int16, min int16, max int16) int16 {
 func GetStdFile(nFile int) (*os.File, uintptr) {
 	var file *os.File
 	switch nFile {
-	case syscall.STD_INPUT_HANDLE:
+	case syscall.STD_INPUT_HANDLE, windows.STD_INPUT_HANDLE:
 		file = os.Stdin
-	case syscall.STD_OUTPUT_HANDLE:
+	case syscall.STD_OUTPUT_HANDLE, windows.STD_OUTPUT_HANDLE:
 		file = os.Stdout
-	case syscall.STD_ERROR_HANDLE:
+	case syscall.STD_ERROR_HANDLE, windows.STD_ERROR_HANDLE:
 		file = os.Stderr
 	default:
 		panic(fmt.Errorf("Invalid standard handle identifier: %v", nFile))

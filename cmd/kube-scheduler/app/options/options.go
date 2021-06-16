@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -99,10 +98,8 @@ func NewOptions() (*Options, error) {
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
-			UseLegacyPolicyConfig:          false,
-			PolicyConfigMapNamespace:       metav1.NamespaceSystem,
-			SchedulerName:                  corev1.DefaultSchedulerName,
-			HardPodAffinitySymmetricWeight: 1,
+			UseLegacyPolicyConfig:    false,
+			PolicyConfigMapNamespace: metav1.NamespaceSystem,
 		},
 		Metrics: metrics.NewOptions(),
 		Logs:    logs.NewOptions(),
@@ -179,7 +176,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = o.ComponentConfig
 
 		// apply deprecated flags if no config file is loaded (this is the old behaviour).
-		o.Deprecated.ApplyTo(&c.ComponentConfig)
+		o.Deprecated.ApplyTo(c)
 		if err := o.CombinedInsecureServing.ApplyTo(c, &c.ComponentConfig); err != nil {
 			return err
 		}
@@ -195,11 +192,11 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = *cfg
 
 		// apply any deprecated Policy flags, if applicable
-		o.Deprecated.ApplyAlgorithmSourceTo(&c.ComponentConfig)
+		o.Deprecated.ApplyTo(c)
 
 		// if the user has set CC profiles and is trying to use a Policy config, error out
 		// these configs are no longer merged and they should not be used simultaneously
-		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.ComponentConfig.AlgorithmSource.Policy != nil {
+		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.LegacyPolicySource != nil {
 			return fmt.Errorf("cannot set a Plugin config and Policy config")
 		}
 

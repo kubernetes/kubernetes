@@ -40,7 +40,6 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 func newV1beta1DefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
@@ -330,7 +329,6 @@ profiles:
 		defer os.Setenv("KUBERNETES_SERVICE_HOST", originalHost)
 	}
 
-	defaultSource := "DefaultProvider"
 	defaultPodInitialBackoffSeconds := int64(1)
 	defaultPodMaxBackoffSeconds := int64(10)
 	defaultPercentageOfNodesToScore := int32(0)
@@ -386,7 +384,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -459,7 +456,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -560,7 +556,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -629,7 +624,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -672,7 +666,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -750,7 +743,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -829,7 +821,6 @@ profiles:
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -895,7 +886,6 @@ profiles:
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
 				Parallelism:        16,
-				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -955,119 +945,6 @@ profiles:
 				Logs: logs.NewOptions(),
 			},
 			expectedError: "no configuration has been provided",
-		},
-		{
-			name: "Deprecated HardPodAffinitySymmetricWeight",
-			options: &Options{
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
-					cfg.ClientConnection.Kubeconfig = flagKubeconfig
-					return *cfg
-				}(),
-				Deprecated: &DeprecatedOptions{
-					HardPodAffinitySymmetricWeight: 5,
-				},
-				Logs: logs.NewOptions(),
-			},
-			expectedUsername: "flag",
-			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: v1beta2.SchemeGroupVersion.String(),
-				},
-				Parallelism:     16,
-				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           true,
-					EnableContentionProfiling: true,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       true,
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					Kubeconfig:  flagKubeconfig,
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
-				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
-				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{
-						SchedulerName: "default-scheduler",
-						PluginConfig: []kubeschedulerconfig.PluginConfig{
-							{
-								Name: "InterPodAffinity",
-								Args: &kubeschedulerconfig.InterPodAffinityArgs{HardPodAffinityWeight: 5},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "Deprecated SchedulerName flag",
-			options: &Options{
-				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
-					cfg.ClientConnection.Kubeconfig = flagKubeconfig
-					return *cfg
-				}(),
-				Deprecated: &DeprecatedOptions{
-					SchedulerName:                  "my-nice-scheduler",
-					HardPodAffinitySymmetricWeight: 1,
-				},
-				Logs: logs.NewOptions(),
-			},
-			expectedUsername: "flag",
-			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: v1beta2.SchemeGroupVersion.String(),
-				},
-				Parallelism:     16,
-				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           true,
-					EnableContentionProfiling: true,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       true,
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					Kubeconfig:  flagKubeconfig,
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
-				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
-				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{
-						SchedulerName: "my-nice-scheduler",
-						PluginConfig: []kubeschedulerconfig.PluginConfig{
-							{
-								Name: interpodaffinity.Name,
-								Args: &kubeschedulerconfig.InterPodAffinityArgs{
-									HardPodAffinityWeight: 1,
-								},
-							},
-						},
-					},
-				},
-			},
 		},
 		{
 			name: "Attempting to set Component Config Profiles and Policy config",

@@ -29,6 +29,7 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodePreferAvoidPods is a plugin that priorities nodes according to the node annotation
@@ -40,7 +41,7 @@ type NodePreferAvoidPods struct {
 var _ framework.ScorePlugin = &NodePreferAvoidPods{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodePreferAvoidPods"
+const Name = names.NodePreferAvoidPods
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodePreferAvoidPods) Name() string {

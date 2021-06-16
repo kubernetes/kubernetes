@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/transport"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"

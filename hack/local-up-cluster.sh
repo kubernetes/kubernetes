@@ -544,6 +544,24 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
+    if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
+      cat <<EOF > /tmp/kube_egress_selector_configuration.yaml
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: Direct
+- name: controlplane
+  connection:
+    proxyProtocol: Direct
+- name: etcd
+  connection:
+    proxyProtocol: Direct
+EOF
+      EGRESS_SELECTOR_CONFIG_FILE="/tmp/kube_egress_selector_configuration.yaml"
+    fi
+
     if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
       cat <<EOF > /tmp/kube-audit-policy-file
 # Log all requests at the Metadata level.
@@ -568,6 +586,7 @@ EOF
       --authorization-webhook-config-file="${AUTHORIZATION_WEBHOOK_CONFIG_FILE}" \
       --authentication-token-webhook-config-file="${AUTHENTICATION_WEBHOOK_CONFIG_FILE}" \
       --cert-dir="${CERT_DIR}" \
+      --egress-selector-config-file="${EGRESS_SELECTOR_CONFIG_FILE:-}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \

@@ -593,6 +593,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, width uint, flo
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += req.Seats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.Seats())
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(5).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
@@ -627,6 +628,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
 	request.NoteQueued(false)
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.Seats())
 	qs.obsPair.RequestsWaiting.Add(-1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(6).Enabled() {
@@ -672,8 +674,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
 		if queue.requests.Length() != 0 {
-
-			currentVirtualFinish := queue.GetVirtualFinish(0, qs.estimatedServiceTime)
+			currentVirtualFinish := queue.GetNextFinish(qs.estimatedServiceTime)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
 				minQueue = queue
@@ -727,6 +728,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	qs.totRequestsExecuting--
 	qs.totSeatsInUse -= r.Seats()
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
 	qs.obsPair.RequestsExecuting.Add(-1)
 
 	if r.queue == nil {
@@ -739,8 +741,8 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	S := now.Sub(r.startTime).Seconds()
 
 	// When a request finishes being served, and the actual service time was S,
-	// the queue’s virtual start time is decremented by G - S.
-	r.queue.virtualStart -= (qs.estimatedServiceTime * float64(r.Seats())) - S
+	// the queue’s virtual start time is decremented by (G - S)*width.
+	r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
 
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--

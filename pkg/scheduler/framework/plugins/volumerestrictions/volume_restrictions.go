@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
@@ -32,7 +33,7 @@ var _ framework.FilterPlugin = &VolumeRestrictions{}
 var _ framework.EnqueueExtensions = &VolumeRestrictions{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "VolumeRestrictions"
+const Name = names.VolumeRestrictions
 
 const (
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.

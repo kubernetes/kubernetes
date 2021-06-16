@@ -75,15 +75,15 @@ func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server
 	return setupWithResources(t, groupVersions, nil)
 }
 
-func setupWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
 }
 
 func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	return setupWithResourcesWithOptions(t, &framework.MasterConfigOptions{}, groupVersions, resources)
+	return setupWithResourcesWithOptions(t, &framework.ControlPlaneConfigOptions{}, groupVersions, resources)
 }
 
-func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithResourcesWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
@@ -224,12 +224,12 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 }
 
 func TestCacheControl(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.MasterConfigOptions{})
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
 	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	master, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", master.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -331,7 +331,7 @@ func TestListOptions(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
 			ns := framework.CreateTestingNamespace("list-options", s, t)
@@ -563,7 +563,7 @@ func TestListResourceVersion0(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
 			ns := framework.CreateTestingNamespace("list-paging", s, t)

@@ -209,29 +209,30 @@ func TestStoreList(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ctx := testContext
-		if item.context != nil {
-			ctx = item.context
-		}
-		destroyFunc, registry := NewTestGenericStoreRegistry(t)
-
-		if item.in != nil {
-			if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
-				t.Errorf("Unexpected error %v", err)
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext
+			if item.context != nil {
+				ctx = item.context
 			}
-		}
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
 
-		list, err := registry.ListPredicate(ctx, item.m, nil)
-		if err != nil {
-			t.Errorf("Unexpected error %v", err)
-			continue
-		}
+			if item.in != nil {
+				if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
+					t.Fatalf("Unexpected error %v", err)
+				}
+			}
 
-		// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
-		if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
-			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
-		}
-		destroyFunc()
+			list, err := registry.ListPredicate(ctx, item.m, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error %v", err)
+			}
+
+			// DeepDerivative e,a is needed here b/c the storage layer sets ResourceVersion
+			if e, a := item.out, list; !apiequality.Semantic.DeepDerivative(e, a) {
+				t.Fatalf("%v: Expected %#v, got %#v", name, e, a)
+			}
+		})
 	}
 }
 
@@ -2142,37 +2143,39 @@ func TestStoreWatch(t *testing.T) {
 	}
 
 	for name, m := range table {
-		ctx := testContext
-		if m.context != nil {
-			ctx = m.context
-		}
-		podA := &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "test",
-			},
-			Spec: example.PodSpec{NodeName: "machine"},
-		}
+		t.Run(name, func(t *testing.T) {
+			ctx := testContext
+			if m.context != nil {
+				ctx = m.context
+			}
+			podA := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "test",
+				},
+				Spec: example.PodSpec{NodeName: "machine"},
+			}
 
-		destroyFunc, registry := NewTestGenericStoreRegistry(t)
-		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		} else {
-			obj, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+			wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 			if err != nil {
-				got, open := <-wi.ResultChan()
-				if !open {
-					t.Errorf("%v: unexpected channel close", name)
-				} else {
-					if e, a := obj, got.Object; !reflect.DeepEqual(e, a) {
-						t.Errorf("Expected %#v, got %#v", e, a)
+				t.Errorf("%v: unexpected error: %v", name, err)
+			} else {
+				obj, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if err != nil {
+					got, open := <-wi.ResultChan()
+					if !open {
+						t.Errorf("%v: unexpected channel close", name)
+					} else {
+						if e, a := obj, got.Object; !reflect.DeepEqual(e, a) {
+							t.Errorf("Expected %#v, got %#v", e, a)
+						}
 					}
 				}
+				wi.Stop()
 			}
-			wi.Stop()
-		}
-		destroyFunc()
+		})
 	}
 }
 

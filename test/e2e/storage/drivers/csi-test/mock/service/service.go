@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -247,7 +247,7 @@ func (s *service) findVolByID(
 
 func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) cache.Snapshot {
 
-	ptime := ptypes.TimestampNow()
+	ptime := timestamppb.Now()
 	return cache.Snapshot{
 		Name:       name,
 		Parameters: parameters,

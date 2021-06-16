@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"sigs.k8s.io/yaml"
 

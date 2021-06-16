@@ -93,6 +93,10 @@ func makePod(name string, criticalPod bool, terminationGracePeriod *int64) *v1.P
 }
 
 func TestManager(t *testing.T) {
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
 	normalPodNoGracePeriod := makePod("normal-pod-nil-grace-period", false /* criticalPod */, nil /* terminationGracePeriod */)
 	criticalPodNoGracePeriod := makePod("critical-pod-nil-grace-period", true /* criticalPod */, nil /* terminationGracePeriod */)
 
@@ -303,5 +307,54 @@ func TestFeatureEnabled(t *testing.T) {
 
 			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
 		})
+	}
+}
+
+func TestRestart(t *testing.T) {
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	shutdownGracePeriodRequested := 30 * time.Second
+	shutdownGracePeriodCriticalPods := 10 * time.Second
+	systemInhibitDelay := 40 * time.Second
+	overrideSystemInhibitDelay := 40 * time.Second
+	activePodsFunc := func() []*v1.Pod {
+		return nil
+	}
+	killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+		return nil
+	}
+	syncNodeStatus := func() {}
+
+	var shutdownChan chan bool
+	var connChan = make(chan struct{}, 1)
+
+	systemDbus = func() (dbusInhibiter, error) {
+		defer func() {
+			connChan <- struct{}{}
+		}()
+
+		shutdownChan = make(chan bool)
+		dbus := &fakeDbus{currentInhibitDelay: systemInhibitDelay, shutdownChan: shutdownChan, overrideSystemInhibitDelay: overrideSystemInhibitDelay}
+		return dbus, nil
+	}
+
+	manager, _ := NewManager(activePodsFunc, killPodsFunc, syncNodeStatus, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods)
+	err := manager.Start()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	for i := 0; i != 5; i++ {
+		select {
+		case <-time.After(dbusReconnectPeriod * 5):
+			t.Fatal("wait dbus connect timeout")
+		case <-connChan:
+		}
+
+		time.Sleep(time.Second)
+		close(shutdownChan)
 	}
 }

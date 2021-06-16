@@ -15,21 +15,21 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/fvbommel/sortorder v1.0.1
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.5
 	github.com/googleapis/gnostic v0.5.1
-	github.com/jonboulle/clockwork v0.1.0
+	github.com/jonboulle/clockwork v0.2.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.0
-	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
+	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
-	github.com/spf13/cobra v1.1.1
+	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
+	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

@@ -286,7 +286,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 			)
@@ -960,7 +960,6 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rand.Seed(4)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]framework.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -992,7 +991,13 @@ func TestDryRunPreemption(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
-			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
+			var objs []runtime.Object
+			for _, p := range append(tt.testPods, tt.initPods...) {
+				objs = append(objs, p)
+			}
+			for _, n := range nodes {
+				objs = append(objs, n)
+			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			if tt.disableParallelism {
@@ -1003,7 +1008,7 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			fwk, err := st.NewFramework(
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
@@ -1030,6 +1035,10 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			pl := &DefaultPreemption{args: *tt.args}
 
+			// Using 4 as a seed source to test getOffsetAndNumCandidates() deterministically.
+			// However, we need to do it after informerFactory.WaitforCacheSync() which might
+			// set a seed.
+			rand.Seed(4)
 			var prevNumFilterCalled int32
 			for cycle, pod := range tt.testPods {
 				state := framework.NewCycleState()
@@ -1222,6 +1231,14 @@ func TestSelectBestCandidate(t *testing.T) {
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 			}
+
+			var objs []runtime.Object
+			objs = append(objs, tt.pod)
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			cs := clientsetfake.NewSimpleClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
@@ -1230,7 +1247,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
 			if err != nil {
@@ -1635,7 +1652,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 			)

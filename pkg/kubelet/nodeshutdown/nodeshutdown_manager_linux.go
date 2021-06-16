@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -40,14 +39,11 @@ const (
 	nodeShutdownReason          = "Shutdown"
 	nodeShutdownMessage         = "Node is shutting, evicting pods"
 	nodeShutdownNotAdmitMessage = "Node is in progress of shutting down, not admitting any new pods"
+	dbusReconnectPeriod         = 1 * time.Second
 )
 
 var systemDbus = func() (dbusInhibiter, error) {
-	bus, err := dbus.SystemBus()
-	if err != nil {
-		return nil, err
-	}
-	return &systemd.DBusCon{SystemBus: bus}, nil
+	return systemd.NewDBusCon()
 }
 
 type dbusInhibiter interface {
@@ -109,55 +105,77 @@ func (m *Manager) Start() error {
 	if !m.isFeatureEnabled() {
 		return nil
 	}
-
-	systemBus, err := systemDbus()
+	stop, err := m.start()
 	if err != nil {
 		return err
+	}
+	go func() {
+		for {
+			if stop != nil {
+				<-stop
+			}
+
+			time.Sleep(dbusReconnectPeriod)
+			klog.V(1).InfoS("Restarting watch for node shutdown events")
+			stop, err = m.start()
+			if err != nil {
+				klog.ErrorS(err, "Unable to watch the node for shutdown events")
+			}
+		}
+	}()
+	return nil
+}
+
+func (m *Manager) start() (chan struct{}, error) {
+	systemBus, err := systemDbus()
+	if err != nil {
+		return nil, err
 	}
 	m.dbusCon = systemBus
 
 	currentInhibitDelay, err := m.dbusCon.CurrentInhibitDelay()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// If the logind's InhibitDelayMaxUSec as configured in (logind.conf) is less than shutdownGracePeriodRequested, attempt to update the value to shutdownGracePeriodRequested.
 	if m.shutdownGracePeriodRequested > currentInhibitDelay {
 		err := m.dbusCon.OverrideInhibitDelay(m.shutdownGracePeriodRequested)
 		if err != nil {
-			return fmt.Errorf("unable to override inhibit delay by shutdown manager: %w", err)
+			return nil, fmt.Errorf("unable to override inhibit delay by shutdown manager: %v", err)
 		}
 
 		err = m.dbusCon.ReloadLogindConf()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Read the current inhibitDelay again, if the override was successful, currentInhibitDelay will be equal to shutdownGracePeriodRequested.
 		updatedInhibitDelay, err := m.dbusCon.CurrentInhibitDelay()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if updatedInhibitDelay != m.shutdownGracePeriodRequested {
-			return fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", m.shutdownGracePeriodRequested, updatedInhibitDelay)
+			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", m.shutdownGracePeriodRequested, updatedInhibitDelay)
 		}
 	}
 
 	err = m.aquireInhibitLock()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	events, err := m.dbusCon.MonitorShutdown()
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {
-			return fmt.Errorf("failed releasing inhibitLock: %v and failed monitoring shutdown: %w", releaseErr, err)
+			return nil, fmt.Errorf("failed releasing inhibitLock: %v and failed monitoring shutdown: %v", releaseErr, err)
 		}
-		return fmt.Errorf("failed to monitor shutdown: %w", err)
+		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
 	}
 
+	stop := make(chan struct{})
 	go func() {
 		// Monitor for shutdown events. This follows the logind Inhibit Delay pattern described on https://www.freedesktop.org/wiki/Software/systemd/inhibit/
 		// 1. When shutdown manager starts, an inhibit lock is taken.
@@ -165,7 +183,12 @@ func (m *Manager) Start() error {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
-			case isShuttingDown := <-events:
+			case isShuttingDown, ok := <-events:
+				if !ok {
+					klog.ErrorS(err, "Ended to watching the node for shutdown events")
+					close(stop)
+					return
+				}
 				klog.V(1).InfoS("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
 
 				m.nodeShuttingDownMutex.Lock()
@@ -183,7 +206,7 @@ func (m *Manager) Start() error {
 			}
 		}
 	}()
-	return nil
+	return stop, nil
 }
 
 func (m *Manager) aquireInhibitLock() error {

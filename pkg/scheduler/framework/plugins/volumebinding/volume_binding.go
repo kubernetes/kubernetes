@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
@@ -82,7 +83,7 @@ var _ framework.PreBindPlugin = &VolumeBinding{}
 var _ framework.ScorePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
-const Name = "VolumeBinding"
+const Name = names.VolumeBinding
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {

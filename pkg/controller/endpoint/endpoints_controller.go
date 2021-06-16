@@ -529,7 +529,7 @@ func (e *Controller) syncService(key string) error {
 
 	if !endpointsLastChangeTriggerTime.IsZero() {
 		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
-			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
+			endpointsLastChangeTriggerTime.UTC().Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
 	}
