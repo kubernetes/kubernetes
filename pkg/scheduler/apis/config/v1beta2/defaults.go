@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1beta2"
@@ -40,9 +41,70 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+func pluginsNames(p *v1beta2.Plugins) []string {
+	if p == nil {
+		return nil
+	}
+	extensions := []v1beta2.PluginSet{
+		p.PreFilter,
+		p.Filter,
+		p.PostFilter,
+		p.Reserve,
+		p.PreScore,
+		p.Score,
+		p.PreBind,
+		p.Bind,
+		p.PostBind,
+		p.Permit,
+		p.QueueSort,
+	}
+	n := sets.NewString()
+	for _, e := range extensions {
+		for _, pg := range e.Enabled {
+			n.Insert(pg.Name)
+		}
+	}
+	return n.List()
+}
+
+func setDefaults_KubeSchedulerProfile(prof *v1beta2.KubeSchedulerProfile) {
+	// Set default plugins.
+	prof.Plugins = mergePlugins(getDefaultPlugins(), prof.Plugins)
+
+	// Set default plugin configs.
+	scheme := GetPluginArgConversionScheme()
+	existingConfigs := sets.NewString()
+	for j := range prof.PluginConfig {
+		existingConfigs.Insert(prof.PluginConfig[j].Name)
+		args := prof.PluginConfig[j].Args.Object
+		if _, isUnknown := args.(*runtime.Unknown); isUnknown {
+			continue
+		}
+		scheme.Default(args)
+	}
+
+	// Append default configs for plugins that didn't have one explicitly set.
+	for _, name := range pluginsNames(prof.Plugins) {
+		if existingConfigs.Has(name) {
+			continue
+		}
+		gvk := v1beta2.SchemeGroupVersion.WithKind(name + "Args")
+		args, err := scheme.New(gvk)
+		if err != nil {
+			// This plugin is out-of-tree or doesn't require configuration.
+			continue
+		}
+		scheme.Default(args)
+		args.GetObjectKind().SetGroupVersionKind(gvk)
+		prof.PluginConfig = append(prof.PluginConfig, v1beta2.PluginConfig{
+			Name: name,
+			Args: runtime.RawExtension{Object: args},
+		})
+	}
+}
+
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta2.KubeSchedulerConfiguration) {
-
 	if obj.Parallelism == nil {
 		obj.Parallelism = pointer.Int32Ptr(16)
 	}
@@ -54,6 +116,12 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta2.KubeSchedulerConfigurat
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
 		obj.Profiles[0].SchedulerName = pointer.StringPtr(v1.DefaultSchedulerName)
+	}
+
+	// Add the default set of plugins and apply the configuration.
+	for i := range obj.Profiles {
+		prof := &obj.Profiles[i]
+		setDefaults_KubeSchedulerProfile(prof)
 	}
 
 	// For Healthz and Metrics bind addresses, we want to check:

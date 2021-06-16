@@ -39,8 +39,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -108,6 +110,7 @@ type schedulerOptions struct {
 	extenders                  []schedulerapi.Extender
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
+	applyDefaultProfile        bool
 }
 
 // Option configures a Scheduler
@@ -135,6 +138,7 @@ func WithKubeConfig(cfg *restclient.Config) Option {
 func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 	return func(o *schedulerOptions) {
 		o.profiles = p
+		o.applyDefaultProfile = false
 	}
 }
 
@@ -145,7 +149,7 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithPolicySource sets legacy policy config file source.
+// WithLegacyPolicySource sets legacy policy config file source.
 func WithLegacyPolicySource(source *schedulerapi.SchedulerPolicySource) Option {
 	return func(o *schedulerOptions) {
 		o.legacyPolicySource = source
@@ -199,14 +203,15 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 }
 
 var defaultSchedulerOptions = schedulerOptions{
-	profiles: []schedulerapi.KubeSchedulerProfile{
-		// Profiles' default plugins are set from the algorithm provider.
-		{SchedulerName: v1.DefaultSchedulerName},
-	},
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	parallelism:              int32(parallelize.DefaultParallelism),
+	// Ideally we would statically set the default profile here, but we can't because
+	// creating the default profile may require testing feature gates, which may get
+	// set dynamically in tests. Therefore, we delay creating it until New is actually
+	// invoked.
+	applyDefaultProfile: true,
 }
 
 // New returns a Scheduler
@@ -226,6 +231,15 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
+	if options.applyDefaultProfile {
+		var versionedCfg v1beta2.KubeSchedulerConfiguration
+		scheme.Scheme.Default(&versionedCfg)
+		cfg := config.KubeSchedulerConfiguration{}
+		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
+			return nil, err
+		}
+		options.profiles = cfg.Profiles
+	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
 	registry := frameworkplugins.NewInTreeRegistry()
@@ -260,12 +274,12 @@ func New(client clientset.Interface,
 
 	var sched *Scheduler
 	if options.legacyPolicySource == nil {
-		sc, err := configurator.createFromConfig()
+		// Create the config from component config
+		sc, err := configurator.create()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 		}
 		sched = sc
-
 	} else {
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}

@@ -35,7 +35,7 @@ var (
 	initPluginArgConversionScheme sync.Once
 )
 
-func getPluginArgConversionScheme() *runtime.Scheme {
+func GetPluginArgConversionScheme() *runtime.Scheme {
 	initPluginArgConversionScheme.Do(func() {
 		// set up the scheme used for plugin arg conversion
 		pluginArgConversionScheme = runtime.NewScheme()
@@ -55,22 +55,22 @@ func Convert_v1beta2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigura
 // convertToInternalPluginConfigArgs converts PluginConfig#Args into internal
 // types using a scheme, after applying defaults.
 func convertToInternalPluginConfigArgs(out *config.KubeSchedulerConfiguration) error {
-	scheme := getPluginArgConversionScheme()
+	scheme := GetPluginArgConversionScheme()
 	for i := range out.Profiles {
-		for j := range out.Profiles[i].PluginConfig {
-			args := out.Profiles[i].PluginConfig[j].Args
+		prof := &out.Profiles[i]
+		for j := range prof.PluginConfig {
+			args := prof.PluginConfig[j].Args
 			if args == nil {
 				continue
 			}
 			if _, isUnknown := args.(*runtime.Unknown); isUnknown {
 				continue
 			}
-			scheme.Default(args)
 			internalArgs, err := scheme.ConvertToVersion(args, config.SchemeGroupVersion)
 			if err != nil {
 				return fmt.Errorf("converting .Profiles[%d].PluginConfig[%d].Args into internal type: %w", i, j, err)
 			}
-			out.Profiles[i].PluginConfig[j].Args = internalArgs
+			prof.PluginConfig[j].Args = internalArgs
 		}
 	}
 	return nil
@@ -86,7 +86,7 @@ func Convert_config_KubeSchedulerConfiguration_To_v1beta2_KubeSchedulerConfigura
 // convertToExternalPluginConfigArgs converts PluginConfig#Args into
 // external (versioned) types using a scheme.
 func convertToExternalPluginConfigArgs(out *v1beta2.KubeSchedulerConfiguration) error {
-	scheme := getPluginArgConversionScheme()
+	scheme := GetPluginArgConversionScheme()
 	for i := range out.Profiles {
 		for j := range out.Profiles[i].PluginConfig {
 			args := out.Profiles[i].PluginConfig[j].Args

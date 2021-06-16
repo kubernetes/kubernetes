@@ -33,8 +33,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -120,20 +120,30 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// If there are any extended resources found from the Extenders, append them to the pluginConfig for each profile.
-	// This should only have an effect on ComponentConfig v1beta1, where it is possible to configure Extenders and
+	// This should only have an effect on ComponentConfig, where it is possible to configure Extenders and
 	// plugin args (and in which case the extender ignored resources take precedence).
 	// For earlier versions, using both policy and custom plugin config is disallowed, so this should be the only
 	// plugin config for this plugin.
 	if len(ignoredExtendedResources) > 0 {
 		for i := range c.profiles {
 			prof := &c.profiles[i]
-			pc := schedulerapi.PluginConfig{
-				Name: noderesources.FitName,
-				Args: &schedulerapi.NodeResourcesFitArgs{
-					IgnoredResources: ignoredExtendedResources,
-				},
+			var found = false
+			for k := range prof.PluginConfig {
+				if prof.PluginConfig[k].Name == noderesources.FitName {
+					// Update the existing args
+					pc := &prof.PluginConfig[k]
+					args, ok := pc.Args.(*schedulerapi.NodeResourcesFitArgs)
+					if !ok {
+						return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", pc.Args)
+					}
+					args.IgnoredResources = ignoredExtendedResources
+					found = true
+					break
+				}
 			}
-			prof.PluginConfig = append(prof.PluginConfig, pc)
+			if !found {
+				return nil, fmt.Errorf("can't find NodeResourcesFitArgs in plugin config")
+			}
 		}
 	}
 
@@ -195,21 +205,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}, nil
 }
 
-// createFromConfig creates a scheduler from ComonentConfig profiles.
-func (c *Configurator) createFromConfig() (*Scheduler, error) {
-	defaultPlugins := algorithmprovider.GetDefaultConfig()
-
-	for i := range c.profiles {
-		prof := &c.profiles[i]
-		plugins := &schedulerapi.Plugins{}
-		plugins.Append(defaultPlugins)
-		plugins.Apply(prof.Plugins)
-		prof.Plugins = plugins
-	}
-	return c.create()
-}
-
-// createFromPolicy creates a scheduler from the legacy policy file
+// createFromPolicy creates a scheduler from the legacy policy file.
 func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler, error) {
 	lr := frameworkplugins.NewLegacyRegistry()
 	args := &frameworkplugins.ConfigProducerArgs{}
@@ -219,6 +215,12 @@ func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler,
 	// validate the policy configuration
 	if err := validation.ValidatePolicy(policy); err != nil {
 		return nil, err
+	}
+
+	// If profiles is already set, it means the user is using both CC and policy config, error out
+	// since these configs are no longer merged and they should not be used simultaneously.
+	if c.profiles != nil {
+		return nil, fmt.Errorf("profiles and policy config both set, this should not happen")
 	}
 
 	predicateKeys := sets.NewString()
@@ -297,15 +299,57 @@ func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler,
 	if pluginConfig, err = dedupPluginConfigs(pluginConfig); err != nil {
 		return nil, err
 	}
-	for i := range c.profiles {
-		prof := &c.profiles[i]
-		// Plugins and PluginConfig are empty when using Policy; overriding.
-		prof.Plugins = &schedulerapi.Plugins{}
-		prof.Plugins.Append(&plugins)
-		prof.PluginConfig = pluginConfig
+
+	c.profiles = []schedulerapi.KubeSchedulerProfile{
+		{
+			SchedulerName: v1.DefaultSchedulerName,
+			Plugins:       &plugins,
+			PluginConfig:  pluginConfig,
+		},
+	}
+
+	if err := defaultPluginConfigArgs(&c.profiles[0]); err != nil {
+		return nil, err
 	}
 
 	return c.create()
+}
+
+func defaultPluginConfigArgs(prof *schedulerapi.KubeSchedulerProfile) error {
+	scheme := v1beta2.GetPluginArgConversionScheme()
+	existingConfigs := sets.NewString()
+	for j := range prof.PluginConfig {
+		existingConfigs.Insert(prof.PluginConfig[j].Name)
+		// For existing plugin configs, we don't apply any defaulting, the assumption
+		// is that the legacy registry does it already.
+	}
+
+	// Append default configs for plugins that didn't have one explicitly set.
+	for _, name := range prof.Plugins.Names() {
+		if existingConfigs.Has(name) {
+			continue
+		}
+		gvk := v1beta2.SchemeGroupVersion.WithKind(name + "Args")
+		args, err := scheme.New(gvk)
+		if err != nil {
+			if runtime.IsNotRegisteredError(err) {
+				// This plugin is out-of-tree or doesn't require configuration.
+				continue
+			}
+			return err
+		}
+		scheme.Default(args)
+		internalArgs, err := scheme.ConvertToVersion(args, schedulerapi.SchemeGroupVersion)
+		if err != nil {
+			return fmt.Errorf("converting %q into internal type: %w", gvk.Kind, err)
+		}
+		prof.PluginConfig = append(prof.PluginConfig, schedulerapi.PluginConfig{
+			Name: name,
+			Args: internalArgs,
+		})
+	}
+
+	return nil
 }
 
 // dedupPluginConfigs removes duplicates from pluginConfig, ensuring that,
