@@ -142,9 +142,7 @@ replace (
 	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 	cloud.google.com/go => cloud.google.com/go v0.81.0
 	cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.8.0
-	cloud.google.com/go/datastore => cloud.google.com/go/datastore v1.1.0
 	cloud.google.com/go/firestore => cloud.google.com/go/firestore v1.1.0
-	cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.2.0
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.10.0
 	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
@@ -256,7 +254,6 @@ replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
-	github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.3
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
@@ -273,7 +270,6 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.39.2
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
-	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5
 	github.com/google/renameio => github.com/google/renameio v0.1.0
@@ -527,8 +523,6 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
-	rsc.io/quote/v3 => rsc.io/quote/v3 v3.1.0
-	rsc.io/sampler => rsc.io/sampler v1.3.0
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.20
 	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.10
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.12
