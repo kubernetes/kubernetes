@@ -87,7 +87,11 @@ func (cfg *Config) setupLogging() error {
 				var path string
 				if cfg.EnableLogRotation {
 					// append rotate scheme to logs managed by lumberjack log rotation
-					path = fmt.Sprintf("rotate:%s", v)
+					if v[0:1] == "/" {
+						path = fmt.Sprintf("rotate:/%%2F%s", v[1:])
+					} else {
+						path = fmt.Sprintf("rotate:/%s", v)
+					}
 				} else {
 					path = v
 				}
@@ -254,7 +258,7 @@ func setupLogRotation(logOutputs []string, logRotateConfigJSON string) error {
 		}
 	}
 	zap.RegisterSink("rotate", func(u *url.URL) (zap.Sink, error) {
-		logRotationConfig.Filename = u.Path
+		logRotationConfig.Filename = u.Path[1:]
 		return &logRotationConfig, nil
 	})
 	return nil

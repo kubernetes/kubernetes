@@ -258,6 +258,7 @@ struct ltchars {
 #include <linux/watchdog.h>
 
 #include <mtd/ubi-user.h>
+#include <mtd/mtd-user.h>
 #include <net/route.h>
 
 #if defined(__sparc__)
@@ -593,6 +594,9 @@ ccflags="$@"
 		$2 == "HID_MAX_DESCRIPTOR_SIZE" ||
 		$2 ~ /^_?HIDIOC/ ||
 		$2 ~ /^BUS_(USB|HIL|BLUETOOTH|VIRTUAL)$/ ||
+		$2 ~ /^MTD/ ||
+		$2 ~ /^OTP/ ||
+		$2 ~ /^MEM/ ||
 		$2 ~ /^BLK[A-Z]*(GET$|SET$|BUF$|PART$|SIZE)/ {printf("\t%s = C.%s\n", $2, $2)}
 		$2 ~ /^__WCOREFLAG$/ {next}
 		$2 ~ /^__W[A-Z0-9]+$/ {printf("\t%s = C.%s\n", substr($2,3), $2)}

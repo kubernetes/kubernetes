@@ -54,6 +54,7 @@ var (
 	ErrRoleAlreadyExist     = errors.New("auth: role already exists")
 	ErrRoleNotFound         = errors.New("auth: role not found")
 	ErrRoleEmpty            = errors.New("auth: role name is empty")
+	ErrPermissionNotGiven   = errors.New("auth: permission not given")
 	ErrAuthFailed           = errors.New("auth: authentication failed, invalid user ID or password")
 	ErrNoPasswordUser       = errors.New("auth: authentication failed, password was given for no password user")
 	ErrPermissionDenied     = errors.New("auth: permission denied")
@@ -780,6 +781,10 @@ func (perms permSlice) Swap(i, j int) {
 }
 
 func (as *authStore) RoleGrantPermission(r *pb.AuthRoleGrantPermissionRequest) (*pb.AuthRoleGrantPermissionResponse, error) {
+	if r.Perm == nil {
+		return nil, ErrPermissionNotGiven
+	}
+
 	tx := as.be.BatchTx()
 	tx.Lock()
 	defer tx.Unlock()

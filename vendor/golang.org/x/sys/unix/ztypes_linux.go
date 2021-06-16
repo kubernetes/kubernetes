@@ -3742,3 +3742,89 @@ const (
 	NLMSGERR_ATTR_OFFS   = 0x2
 	NLMSGERR_ATTR_COOKIE = 0x3
 )
+
+type (
+	EraseInfo struct {
+		Start  uint32
+		Length uint32
+	}
+	EraseInfo64 struct {
+		Start  uint64
+		Length uint64
+	}
+	MtdOobBuf struct {
+		Start  uint32
+		Length uint32
+		Ptr    *uint8
+	}
+	MtdOobBuf64 struct {
+		Start  uint64
+		Pad    uint32
+		Length uint32
+		Ptr    uint64
+	}
+	MtdWriteReq struct {
+		Start  uint64
+		Len    uint64
+		Ooblen uint64
+		Data   uint64
+		Oob    uint64
+		Mode   uint8
+		_      [7]uint8
+	}
+	MtdInfo struct {
+		Type      uint8
+		Flags     uint32
+		Size      uint32
+		Erasesize uint32
+		Writesize uint32
+		Oobsize   uint32
+		_         uint64
+	}
+	RegionInfo struct {
+		Offset      uint32
+		Erasesize   uint32
+		Numblocks   uint32
+		Regionindex uint32
+	}
+	OtpInfo struct {
+		Start  uint32
+		Length uint32
+		Locked uint32
+	}
+	NandOobinfo struct {
+		Useecc   uint32
+		Eccbytes uint32
+		Oobfree  [8][2]uint32
+		Eccpos   [32]uint32
+	}
+	NandOobfree struct {
+		Offset uint32
+		Length uint32
+	}
+	NandEcclayout struct {
+		Eccbytes uint32
+		Eccpos   [64]uint32
+		Oobavail uint32
+		Oobfree  [8]NandOobfree
+	}
+	MtdEccStats struct {
+		Corrected uint32
+		Failed    uint32
+		Badblocks uint32
+		Bbtblocks uint32
+	}
+)
+
+const (
+	MTD_OPS_PLACE_OOB = 0x0
+	MTD_OPS_AUTO_OOB  = 0x1
+	MTD_OPS_RAW       = 0x2
+)
+
+const (
+	MTD_FILE_MODE_NORMAL      = 0x0
+	MTD_FILE_MODE_OTP_FACTORY = 0x1
+	MTD_FILE_MODE_OTP_USER    = 0x2
+	MTD_FILE_MODE_RAW         = 0x3
+)
