@@ -153,7 +153,14 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testRSLifeCycle(f)
 	})
 
-	ginkgo.It("should list and delete a collection of ReplicaSets", func() {
+	/*
+		Release: v1.22
+		Testname: ReplicaSet, list and delete a collection of ReplicaSets
+		Description: When a ReplicaSet is created it MUST succeed. It
+		MUST succeed when listing ReplicaSets via a label selector. It
+		MUST succeed when deleting the ReplicaSet via deleteCollection.
+	*/
+	framework.ConformanceIt("should list and delete a collection of ReplicaSets", func() {
 		listRSDeleteCollection(f)
 
 	})

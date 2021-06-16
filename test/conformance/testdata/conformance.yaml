@@ -779,6 +779,14 @@
     owner references
   release: v1.13
   file: test/e2e/apps/replica_set.go
+- testname: ReplicaSet, list and delete a collection of ReplicaSets
+  codename: '[sig-apps] ReplicaSet should list and delete a collection of ReplicaSets
+    [Conformance]'
+  description: When a ReplicaSet is created it MUST succeed. It MUST succeed when
+    listing ReplicaSets via a label selector. It MUST succeed when deleting the ReplicaSet
+    via deleteCollection.
+  release: v1.22
+  file: test/e2e/apps/replica_set.go
 - testname: Replica Set, run basic image
   codename: '[sig-apps] ReplicaSet should serve a basic image on each replica with
     a public image  [Conformance]'
