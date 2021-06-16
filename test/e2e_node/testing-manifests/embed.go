@@ -22,7 +22,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
-//go:embed *
+//go:embed *.yaml
 var e2eNodeTestingManifestsFS embed.FS
 
 func GetE2ENodeTestingManifestsFS() e2etestfiles.EmbeddedFileSource {

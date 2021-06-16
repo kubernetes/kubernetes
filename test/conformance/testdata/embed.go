@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
-//go:embed *
+//go:embed conformance.yaml ineligible_endpoints.yaml
 var conformanceTestdataFS embed.FS
 
 func GetConformanceTestdataFS() testfiles.EmbeddedFileSource {

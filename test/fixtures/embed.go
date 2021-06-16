@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
-//go:embed *
+//go:embed doc-yaml/* pkg/*
 var testFixturesFS embed.FS
 
 func GetTestFixturesFS() testfiles.EmbeddedFileSource {
