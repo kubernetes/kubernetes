@@ -84,7 +84,11 @@ func (cs callSet) FindMatch(receiver interface{}, method string, args []interfac
 	for _, call := range exhausted {
 		if err := call.matches(args); err != nil {
 			_, _ = fmt.Fprintf(&callsErrors, "\n%v", err)
+			continue
 		}
+		_, _ = fmt.Fprintf(
+			&callsErrors, "all expected calls for method %q have been exhausted", method,
+		)
 	}
 
 	if len(expected)+len(exhausted) == 0 {

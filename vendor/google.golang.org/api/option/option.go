@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/internal"
+	"google.golang.org/api/internal/impersonate"
 	"google.golang.org/grpc"
 )
 
@@ -268,4 +269,58 @@ type withClientCertSource struct{ s ClientCertSource }
 
 func (w withClientCertSource) Apply(o *internal.DialSettings) {
 	o.ClientCertSource = w.s
+}
+
+// ImpersonateCredentials returns a ClientOption that will impersonate the
+// target service account.
+//
+// In order to impersonate the target service account
+// the base service account must have the Service Account Token Creator role,
+// roles/iam.serviceAccountTokenCreator, on the target service account.
+// See https://cloud.google.com/iam/docs/understanding-service-accounts.
+//
+// Optionally, delegates can be used during impersonation if the base service
+// account lacks the token creator role on the target. When using delegates,
+// each service account must be granted roles/iam.serviceAccountTokenCreator
+// on the next service account in the chain.
+//
+// For example, if a base service account of SA1 is trying to impersonate target
+// service account SA2 while using delegate service accounts DSA1 and DSA2,
+// the following must be true:
+//
+//   1. Base service account SA1 has roles/iam.serviceAccountTokenCreator on
+//      DSA1.
+//   2. DSA1 has roles/iam.serviceAccountTokenCreator on DSA2.
+//   3. DSA2 has roles/iam.serviceAccountTokenCreator on target SA2.
+//
+// The resulting impersonated credential will either have the default scopes of
+// the client being instantiating or the scopes from WithScopes if provided.
+// Scopes are required for creating impersonated credentials, so if this option
+// is used while not using a NewClient/NewService function, WithScopes must also
+// be explicitly passed in as well.
+//
+// If the base credential is an authorized user and not a service account, or if
+// the option WithQuotaProject is set, the target service account must have a
+// role that grants the serviceusage.services.use permission such as
+// roles/serviceusage.serviceUsageConsumer.
+//
+// This is an EXPERIMENTAL API and may be changed or removed in the future.
+func ImpersonateCredentials(target string, delegates ...string) ClientOption {
+	return impersonateServiceAccount{
+		target:    target,
+		delegates: delegates,
+	}
+}
+
+type impersonateServiceAccount struct {
+	target    string
+	delegates []string
+}
+
+func (i impersonateServiceAccount) Apply(o *internal.DialSettings) {
+	o.ImpersonationConfig = &impersonate.Config{
+		Target: i.target,
+	}
+	o.ImpersonationConfig.Delegates = make([]string, len(i.delegates))
+	copy(o.ImpersonationConfig.Delegates, i.delegates)
 }

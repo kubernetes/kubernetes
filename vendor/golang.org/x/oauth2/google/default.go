@@ -21,6 +21,10 @@ import (
 // Credentials holds Google credentials, including "Application Default Credentials".
 // For more details, see:
 // https://developers.google.com/accounts/docs/application-default-credentials
+// Credentials from external accounts (workload identity federation) are used to
+// identify a particular application from an on-prem or non-Google Cloud platform
+// including Amazon Web Services (AWS), Microsoft Azure or any identity provider
+// that supports OpenID Connect (OIDC).
 type Credentials struct {
 	ProjectID   string // may be empty
 	TokenSource oauth2.TokenSource
@@ -65,6 +69,10 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 //
 //   1. A JSON file whose path is specified by the
 //      GOOGLE_APPLICATION_CREDENTIALS environment variable.
+//      For workload identity federation, refer to
+//      https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation on
+//      how to generate the JSON configuration file for on-prem/non-Google cloud
+//      platforms.
 //   2. A JSON file in a location known to the gcloud command-line tool.
 //      On Windows, this is %APPDATA%/gcloud/application_default_credentials.json.
 //      On other systems, $HOME/.config/gcloud/application_default_credentials.json.
@@ -119,8 +127,10 @@ func FindDefaultCredentials(ctx context.Context, scopes ...string) (*Credentials
 
 // CredentialsFromJSON obtains Google credentials from a JSON value. The JSON can
 // represent either a Google Developers Console client_credentials.json file (as in
-// ConfigFromJSON) or a Google Developers service account key file (as in
-// JWTConfigFromJSON).
+// ConfigFromJSON), a Google Developers service account key file (as in
+// JWTConfigFromJSON) or the JSON configuration file for workload identity federation
+// in non-Google cloud platforms (see
+// https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation).
 func CredentialsFromJSON(ctx context.Context, jsonData []byte, scopes ...string) (*Credentials, error) {
 	var f credentialsFile
 	if err := json.Unmarshal(jsonData, &f); err != nil {
