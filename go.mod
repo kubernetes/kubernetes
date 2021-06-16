@@ -41,7 +41,6 @@ require (
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
-	github.com/go-openapi/spec v0.20.3
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.0.4
 	github.com/gogo/protobuf v1.3.2
