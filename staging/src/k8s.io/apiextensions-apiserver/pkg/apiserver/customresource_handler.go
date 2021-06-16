@@ -801,7 +801,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR columns")
 		}
-		table, err := tableconvertor.New(columns)
+		table, err := tableconvertor.New(columns, schema.GroupVersionKind{crd.Spec.Group, v.Name, crd.Spec.Names.Kind})
 		if err != nil {
 			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
 		}
@@ -948,7 +948,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if err != nil {
 			return nil, fmt.Errorf("the server could not properly serve the CR scale subresource columns %w", err)
 		}
-		scaleTable, _ := tableconvertor.New(scaleColumns)
+		scaleTable, _ := tableconvertor.New(scaleColumns, schema.GroupVersionKind{crd.Spec.Group, v.Name, crd.Spec.Names.Kind})
 
 		// override scale subresource values
 		// shallow copy
