@@ -31,6 +31,10 @@ limitations under the License.
 // This would result in the field values to be omitted when API structures are printed with klog.
 // - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
 // a list of phases during kubeadm init/join command execution.
+// - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
+// to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
+// "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
+
 //
 // Migration from old kubeadm config versions
 //
@@ -175,6 +179,7 @@ limitations under the License.
 // 	    v: 4
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
+//    imagePullPolicy: "IfNotPresent"
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443

@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"os"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -815,8 +816,9 @@ func TestImagePullCheck(t *testing.T) {
 	}
 
 	check := ImagePullCheck{
-		runtime:   containerRuntime,
-		imageList: []string{"img1", "img2", "img3"},
+		runtime:         containerRuntime,
+		imageList:       []string{"img1", "img2", "img3"},
+		imagePullPolicy: v1.PullIfNotPresent,
 	}
 	warnings, errors := check.Check()
 	if len(warnings) != 0 {

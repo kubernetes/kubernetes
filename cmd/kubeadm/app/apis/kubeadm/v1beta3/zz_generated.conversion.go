@@ -768,6 +768,7 @@ func autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOpti
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	return nil
 }
 
@@ -782,6 +783,7 @@ func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOpti
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	return nil
 }
 
