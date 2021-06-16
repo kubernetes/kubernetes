@@ -38,6 +38,14 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 
+	ginkgo.AfterEach(func() {
+		if framework.TestContext.PrepullImages {
+			// The test may cause the prepulled images to be evicted,
+			// prepull those images again to ensure this test not affect following tests.
+			PrePullAllImages()
+		}
+	})
+
 	ginkgo.Context("when create a system-node-critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("200Mi")
