@@ -367,3 +367,92 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwapEnabled, true)()
+	_, _, m, err := createTestRuntimeManager()
+	if err != nil {
+		t.Fatalf("error creating test RuntimeManager: %v", err)
+	}
+	m.machineInfo.MemoryCapacity = 1000000
+	containerName := "test"
+
+	for _, tc := range []struct {
+		name        string
+		swapSetting string
+		pod         *v1.Pod
+		expected    int64
+	}{
+		{
+			name: "config unset, memory limit set",
+			// no swap setting
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: containerName,
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+							Requests: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+						},
+					}},
+				},
+			},
+			expected: 1000,
+		},
+		{
+			name: "config unset, no memory limit",
+			// no swap setting
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: containerName},
+					},
+				},
+			},
+			expected: 0,
+		},
+		{
+			// Note: behaviour will be the same as previous two cases
+			name:        "config set to NoSwap, memory limit set",
+			swapSetting: "NoSwap",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: containerName,
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+							Requests: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+						},
+					}},
+				},
+			},
+			expected: 1000,
+		},
+		{
+			name:        "UnlimitedSwap enabled",
+			swapSetting: "UnlimitedSwap",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: containerName},
+					},
+				},
+			},
+			expected: -1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m.memorySwapBehavior = tc.swapSetting
+			actual := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil)
+			assert.Equal(t, tc.expected, actual.Resources.MemorySwapLimitInBytes, "memory swap config for %s", tc.name)
+		})
+	}
+}

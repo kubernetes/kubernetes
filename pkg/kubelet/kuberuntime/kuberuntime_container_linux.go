@@ -89,6 +89,20 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 
 	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwapEnabled) {
+		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
+		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
+		switch m.memorySwapBehavior {
+		case "UnlimitedSwap":
+			// -1 = unlimited swap
+			lc.Resources.MemorySwapLimitInBytes = -1
+		default:
+			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap
+			// Note that if memory limit is 0, memory swap limit is ignored.
+			lc.Resources.MemorySwapLimitInBytes = lc.Resources.MemoryLimitInBytes
+		}
+	}
+
 	return lc
 }
 

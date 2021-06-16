@@ -652,6 +652,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
 		seccompDefault,
+		kubeCfg.MemorySwap.SwapBehavior,
 	)
 	if err != nil {
 		return nil, err
