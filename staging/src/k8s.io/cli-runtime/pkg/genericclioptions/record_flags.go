@@ -93,6 +93,7 @@ func (f *RecordFlags) AddFlags(cmd *cobra.Command) {
 
 	if f.Record != nil {
 		cmd.Flags().BoolVar(f.Record, "record", *f.Record, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+		cmd.Flags().MarkDeprecated("record", "--record will be removed in the future")
 	}
 }
 
