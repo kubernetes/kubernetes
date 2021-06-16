@@ -177,20 +177,11 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if l.driver.GetDriverInfo().Capabilities[storageframework.CapSingleNodeVolume] {
 			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < 2 {
-			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
-		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -270,20 +261,11 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if l.driver.GetDriverInfo().Capabilities[storageframework.CapSingleNodeVolume] {
 			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < 2 {
-			e2eskipper.Skipf("Number of available nodes is less than 2 - skipping")
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
-		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -486,20 +468,12 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 
 		// Check different-node test requirement
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
-		framework.ExpectNoError(err)
-		if len(nodes.Items) < numPods {
-			e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", numPods))
-		}
 		if l.config.ClientNodeSelection.Name != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
-		topologyKeys := dInfo.TopologyKeys
-		if len(topologyKeys) != 0 {
-			if err = ensureTopologyRequirements(&l.config.ClientNodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
+		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
+			framework.Failf("Error setting topology requirements: %v", err)
 		}
 
 		// Create volume
@@ -780,8 +754,21 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 	return topos, topoCount, nil
 }
 
-// ensureTopologyRequirements sets nodeSelection affinity according to given topology keys for drivers that provide them
-func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.NodeList, cs clientset.Interface, topologyKeys []string, minCount int) error {
+// ensureTopologyRequirements check that there are enough nodes in the cluster for a test and
+// sets nodeSelection affinity according to given topology keys for drivers that provide them.
+func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, cs clientset.Interface, driverInfo *storageframework.DriverInfo, minCount int) error {
+	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	framework.ExpectNoError(err)
+	if len(nodes.Items) < minCount {
+		e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", minCount))
+	}
+
+	topologyKeys := driverInfo.TopologyKeys
+	if len(topologyKeys) == 0 {
+		// The driver does not have any topology restrictions
+		return nil
+	}
+
 	topologyList, topologyCount, err := getCurrentTopologiesNumber(cs, nodes, topologyKeys)
 	if err != nil {
 		return err
@@ -797,7 +784,6 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.N
 	}
 	// Take the first suitable topology
 	e2epod.SetNodeAffinityTopologyRequirement(nodeSelection, suitableTopologies[0])
-
 	return nil
 }
 
