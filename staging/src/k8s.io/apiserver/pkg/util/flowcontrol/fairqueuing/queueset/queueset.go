@@ -674,8 +674,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
 		if queue.requests.Length() != 0 {
-
-			currentVirtualFinish := queue.GetVirtualFinish(0, qs.estimatedServiceTime)
+			currentVirtualFinish := queue.GetNextFinish(qs.estimatedServiceTime)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
 				minQueue = queue
@@ -742,8 +741,8 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	S := now.Sub(r.startTime).Seconds()
 
 	// When a request finishes being served, and the actual service time was S,
-	// the queue’s virtual start time is decremented by G - S.
-	r.queue.virtualStart -= (qs.estimatedServiceTime * float64(r.Seats())) - S
+	// the queue’s virtual start time is decremented by (G - S)*width.
+	r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
 
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--
