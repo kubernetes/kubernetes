@@ -87,7 +87,6 @@ func justAfterTheFirstHourYesterdayInZone() time.Time {
 	return inGoodTimeZone(T1)
 }
 
-
 func justAfterMidnightInZone() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T00:01:00-04:00")
 	if err != nil {
