@@ -22,10 +22,9 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/config"
-	json "k8s.io/component-base/logs/json"
+	"k8s.io/klog/v2"
 )
 
 // Supported klog formats
@@ -40,7 +39,6 @@ var LogRegistry = NewLogFormatRegistry()
 func init() {
 	// Text format is default klog format
 	LogRegistry.Register(DefaultLogFormat, nil)
-	LogRegistry.Register(JSONLogFormat, json.JSONLogger)
 }
 
 // List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
