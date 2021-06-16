@@ -29,7 +29,7 @@ require (
 	github.com/containernetworking/cni v0.8.1
 	github.com/coredns/corefile-migration v1.0.12
 	github.com/coreos/go-oidc v2.1.0+incompatible
-	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
