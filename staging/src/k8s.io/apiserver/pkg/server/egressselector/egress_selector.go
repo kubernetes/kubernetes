@@ -134,7 +134,7 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 type proxier interface {
 	// proxy returns a connection to addr.
-	proxy(addr string) (net.Conn, error)
+	proxy(ctx context.Context, addr string) (net.Conn, error)
 }
 
 var _ proxier = &httpConnectProxier{}
@@ -144,7 +144,7 @@ type httpConnectProxier struct {
 	proxyAddress string
 }
 
-func (t *httpConnectProxier) proxy(addr string) (net.Conn, error) {
+func (t *httpConnectProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
 	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
 }
 
@@ -154,14 +154,14 @@ type grpcProxier struct {
 	tunnel client.Tunnel
 }
 
-func (g *grpcProxier) proxy(addr string) (net.Conn, error) {
-	return g.tunnel.Dial("tcp", addr)
+func (g *grpcProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
+	return g.tunnel.DialContext(ctx, "tcp", addr)
 }
 
 type proxyServerConnector interface {
 	// connect establishes connection to the proxy server, and returns a
 	// proxier based on the connection.
-	connect() (proxier, error)
+	connect(context.Context) (proxier, error)
 }
 
 type tcpHTTPConnectConnector struct {
@@ -169,11 +169,12 @@ type tcpHTTPConnectConnector struct {
 	tlsConfig    *tls.Config
 }
 
-func (t *tcpHTTPConnectConnector) connect() (proxier, error) {
-	conn, err := tls.Dial("tcp", t.proxyAddress, t.tlsConfig)
+func (t *tcpHTTPConnectConnector) connect(ctx context.Context) (proxier, error) {
+	conn, err := (&tls.Dialer{NetDialer: &net.Dialer{}, Config: t.tlsConfig}).DialContext(ctx, "tcp", t.proxyAddress)
 	if err != nil {
 		return nil, err
 	}
+	// TODO: tie conn lifetime to ctx lifetime
 	return &httpConnectProxier{conn: conn, proxyAddress: t.proxyAddress}, nil
 }
 
@@ -181,11 +182,12 @@ type udsHTTPConnectConnector struct {
 	udsName string
 }
 
-func (u *udsHTTPConnectConnector) connect() (proxier, error) {
-	conn, err := net.Dial("unix", u.udsName)
+func (u *udsHTTPConnectConnector) connect(ctx context.Context) (proxier, error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", u.udsName)
 	if err != nil {
 		return nil, err
 	}
+	// TODO: tie conn lifetime to ctx lifetime
 	return &httpConnectProxier{conn: conn, proxyAddress: u.udsName}, nil
 }
 
@@ -193,14 +195,14 @@ type udsGRPCConnector struct {
 	udsName string
 }
 
-func (u *udsGRPCConnector) connect() (proxier, error) {
+func (u *udsGRPCConnector) connect(ctx context.Context) (proxier, error) {
 	udsName := u.udsName
 	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-		c, err := net.Dial("unix", udsName)
+		c, err := (&net.Dialer{}).DialContext(ctx, "unix", udsName)
 		if err != nil {
 			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
 		}
-		return c, err
+		return c, fmt.Errorf("uds: %w", err)
 	})
 
 	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
@@ -229,15 +231,15 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		trace := utiltrace.New(fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
 		defer trace.LogIfLong(500 * time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
-		proxier, err := d.connector.connect()
+		proxier, err := d.connector.connect(ctx)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
-			return nil, err
+			return nil, fmt.Errorf("connect: %w", err)
 		}
-		conn, err := proxier.proxy(addr)
+		conn, err := proxier.proxy(ctx, addr)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
-			return nil, err
+			return nil, fmt.Errorf("proxy: %w", err)
 		}
 		egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport)
 		return conn, nil
