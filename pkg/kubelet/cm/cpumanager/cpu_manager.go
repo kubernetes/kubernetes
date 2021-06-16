@@ -78,8 +78,9 @@ type Manager interface {
 	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// GetCPUs implements the podresources.CPUsProvider interface to provide allocated
-	// cpus for the container
-	GetCPUs(podUID, containerName string) cpuset.CPUSet
+	// cpus for the container and also returns a boolean indicative of whether the CPUs
+	// are exclusively allocated or not
+	GetCPUs(podUID, containerName string) (cpuset.CPUSet, bool)
 
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
@@ -487,6 +488,9 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 		})
 }
 
-func (m *manager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
-	return m.state.GetCPUSetOrDefault(podUID, containerName)
+func (m *manager) GetCPUs(podUID, containerName string) (cpuset.CPUSet, bool) {
+	if res, ok := m.state.GetCPUSet(podUID, containerName); ok {
+		return res, true
+	}
+	return m.state.GetDefaultCPUSet(), false
 }

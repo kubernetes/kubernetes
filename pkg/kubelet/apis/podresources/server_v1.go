@@ -24,7 +24,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
-	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // podResourcesServerV1alpha1 implements PodResourcesListerServer
@@ -63,11 +63,13 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		}
 
 		for j, container := range pod.Spec.Containers {
+			cpus, isExclusive := p.cpusProvider.GetCPUs(string(pod.UID), container.Name)
 			pRes.Containers[j] = &v1.ContainerResources{
-				Name:    container.Name,
-				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
-				Memory:  p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+				Name:        container.Name,
+				Devices:     p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:      cpus,
+				Memory:      p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+				IsExclusive: isExclusive,
 			}
 		}
 		podResources[i] = &pRes

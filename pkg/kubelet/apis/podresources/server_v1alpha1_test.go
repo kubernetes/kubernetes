@@ -43,9 +43,9 @@ func (m *mockProvider) GetDevices(podUID, containerName string) []*podresourcesv
 	return args.Get(0).([]*podresourcesv1.ContainerDevices)
 }
 
-func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
+func (m *mockProvider) GetCPUs(podUID, containerName string) ([]int64, bool) {
 	args := m.Called(podUID, containerName)
-	return args.Get(0).([]int64)
+	return args.Get(0).([]int64), false
 }
 
 func (m *mockProvider) GetMemory(podUID, containerName string) []*podresourcesv1.ContainerMemory {

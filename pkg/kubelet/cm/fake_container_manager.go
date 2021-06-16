@@ -202,11 +202,11 @@ func (cm *FakeContainerManager) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
+func (cm *FakeContainerManager) GetCPUs(_, _ string) ([]int64, bool) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
-	return nil
+	return nil, false
 }
 
 func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {

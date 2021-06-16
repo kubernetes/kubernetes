@@ -69,9 +69,9 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
-func (m *fakeManager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
+func (m *fakeManager) GetCPUs(podUID, containerName string) (cpuset.CPUSet, bool) {
 	klog.InfoS("GetCPUs", "podUID", podUID, "containerName", containerName)
-	return cpuset.CPUSet{}
+	return cpuset.CPUSet{}, false
 }
 
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {

@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -70,6 +70,7 @@ func TestListPodResourcesV1(t *testing.T) {
 		devices          []*podresourcesapi.ContainerDevices
 		cpus             []int64
 		memory           []*podresourcesapi.ContainerMemory
+		isExclusive      bool
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
@@ -78,6 +79,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			devices:          []*podresourcesapi.ContainerDevices{},
 			cpus:             []int64{},
 			memory:           []*podresourcesapi.ContainerMemory{},
+			isExclusive:      false,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
 		{
@@ -98,9 +100,10 @@ func TestListPodResourcesV1(t *testing.T) {
 					},
 				},
 			},
-			devices: []*podresourcesapi.ContainerDevices{},
-			cpus:    []int64{},
-			memory:  []*podresourcesapi.ContainerMemory{},
+			devices:     []*podresourcesapi.ContainerDevices{},
+			cpus:        []int64{},
+			memory:      []*podresourcesapi.ContainerMemory{},
+			isExclusive: false,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -108,8 +111,9 @@ func TestListPodResourcesV1(t *testing.T) {
 						Namespace: podNamespace,
 						Containers: []*podresourcesapi.ContainerResources{
 							{
-								Name:    containerName,
-								Devices: []*podresourcesapi.ContainerDevices{},
+								Name:        containerName,
+								Devices:     []*podresourcesapi.ContainerDevices{},
+								IsExclusive: false,
 							},
 						},
 					},
@@ -134,9 +138,10 @@ func TestListPodResourcesV1(t *testing.T) {
 					},
 				},
 			},
-			devices: devs,
-			cpus:    cpus,
-			memory:  memory,
+			devices:     devs,
+			cpus:        cpus,
+			memory:      memory,
+			isExclusive: true,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -144,10 +149,11 @@ func TestListPodResourcesV1(t *testing.T) {
 						Namespace: podNamespace,
 						Containers: []*podresourcesapi.ContainerResources{
 							{
-								Name:    containerName,
-								Devices: devs,
-								CpuIds:  cpus,
-								Memory:  memory,
+								Name:        containerName,
+								Devices:     devs,
+								CpuIds:      cpus,
+								Memory:      memory,
+								IsExclusive: true,
 							},
 						},
 					},
@@ -159,7 +165,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
-			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus)
+			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus, tc.isExclusive)
 			m.On("GetMemory", string(podUID), containerName).Return(tc.memory)
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableCPUs").Return(cpuset.CPUSet{})
@@ -438,7 +444,7 @@ func TestAllocatableResources(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetDevices", "", "").Return([]*podresourcesapi.ContainerDevices{})
-			m.On("GetCPUs", "", "").Return([]int64{})
+			m.On("GetCPUs", "", "").Return([]int64{}, false)
 			m.On("GetMemory", "", "").Return([]*podresourcesapi.ContainerMemory{})
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableDevices").Return(tc.allDevices)

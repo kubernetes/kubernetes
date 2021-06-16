@@ -131,8 +131,8 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
-	return nil
+func (cm *containerManagerStub) GetCPUs(_, _ string) ([]int64, bool) {
+	return nil, false
 }
 
 func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {

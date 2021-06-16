@@ -39,7 +39,7 @@ type PodsProvider interface {
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
 	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) []int64
+	GetCPUs(podUID, containerName string) ([]int64, bool)
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
 	GetAllocatableCPUs() []int64
 }
