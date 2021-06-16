@@ -95,8 +95,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// not fail admission while it should. This issue will be addressed with
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
+	klog.InfoS("pod after removing missing extended resources", "podWithoutMissingExtendedResources", podWithoutMissingExtendedResources)
 
 	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	klog.InfoS("reasons after calling GeneralPredicates", "reasons", reasons)
 	fit := len(reasons) == 0 && err == nil
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
