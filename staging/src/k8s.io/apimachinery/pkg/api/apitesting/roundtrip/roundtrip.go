@@ -85,7 +85,7 @@ func RoundTripProtobufTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzin
 	RoundTripTypes(t, scheme, codecFactory, fuzzer, nil)
 }
 
-var FuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
+var FuzzIters = flag.Int("fuzz-iters", defaultFuzzIters, "How many fuzzing iterations to do.")
 
 // globalNonRoundTrippableTypes are kinds that are effectively reserved across all GroupVersions
 // They don't roundtrip
