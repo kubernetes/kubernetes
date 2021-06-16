@@ -25,7 +25,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
-	github.com/container-storage-interface/spec v1.3.0
+	github.com/container-storage-interface/spec v1.5.0
 	github.com/containernetworking/cni v0.8.1
 	github.com/coredns/corefile-migration v1.0.12
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -198,7 +198,7 @@ replace (
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20200714090401-bf6692d28da5
 	github.com/cockroachdb/errors => github.com/cockroachdb/errors v1.2.4
 	github.com/cockroachdb/logtags => github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f
-	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
+	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/console => github.com/containerd/console v1.0.2
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.4
