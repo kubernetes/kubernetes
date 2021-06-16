@@ -226,6 +226,31 @@ func TestDecode(t *testing.T) {
 				Value: 1,
 			},
 		},
+
+		// Yaml integer can be decoded into a string
+		{
+			data:        []byte("kind: Test\napiVersion: other/blah\nOther: 1"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "1",
+			},
+			yaml: true,
+		},
+
+		// Yaml float can be decoded into a string
+		{
+			data:        []byte("kind: Test\napiVersion: other/blah\nOther: 1.234"),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "1.234",
+			},
+			yaml: true,
+		},
+
 		// Error on invalid number
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","interface":1e1000}`),

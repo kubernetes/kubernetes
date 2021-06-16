@@ -18,6 +18,7 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"unsafe"
@@ -118,6 +119,9 @@ func (cne *customNumberExtension) CreateDecoder(typ reflect2.Type) jsoniter.ValD
 	if typ.String() == "interface {}" {
 		return customNumberDecoder{}
 	}
+	if typ.String() == "string" {
+		return customNumberToStringDecoder{}
+	}
 	return nil
 }
 
@@ -142,6 +146,30 @@ func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 		iter.ReportError("DecodeNumber", err.Error())
 	default:
 		*(*interface{})(ptr) = iter.Read()
+	}
+}
+
+type customNumberToStringDecoder struct {
+}
+
+func (customNumberToStringDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
+	switch iter.WhatIsNext() {
+	case jsoniter.NumberValue:
+		var number jsoniter.Number
+		iter.ReadVal(&number)
+		i64, err := strconv.ParseInt(string(number), 10, 64)
+		if err == nil {
+			*(*string)(ptr) = strconv.FormatInt(i64, 10)
+			return
+		}
+		f64, err := strconv.ParseFloat(string(number), 64)
+		if err == nil {
+			*(*string)(ptr) = fmt.Sprintf("%v", f64)
+			return
+		}
+		iter.ReportError("DecodeNumber", err.Error())
+	default:
+		*(*string)(ptr) = iter.ReadString()
 	}
 }
 
