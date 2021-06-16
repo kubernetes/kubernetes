@@ -245,8 +245,8 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
-		klog.InfoS("will return a node via kubeClient")
 		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			klog.InfoS("will return a node via kubeClient")
 			return n, nil
 		}
 	}

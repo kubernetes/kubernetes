@@ -436,6 +436,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 
 	kl.setNodeStatus(node)
 
+	klog.InfoS("actually returning an initialNode")
 	return node, nil
 }
 
