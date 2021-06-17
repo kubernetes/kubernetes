@@ -22,6 +22,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -76,10 +77,13 @@ func TestCleanerExpired(t *testing.T) {
 	cleaner.evalSecret(secret)
 
 	expected := []core.Action{
-		core.NewDeleteAction(
+		core.NewDeleteActionWithOptions(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			api.NamespaceSystem,
-			secret.ObjectMeta.Name),
+			secret.ObjectMeta.Name,
+			metav1.DeleteOptions{
+				Preconditions: metav1.NewUIDPreconditions(string(secret.UID)),
+			}),
 	}
 
 	verifyActions(t, expected, cl.Actions())
@@ -138,10 +142,13 @@ func TestCleanerExpiredAt(t *testing.T) {
 
 	// secret was eventually deleted
 	expected = []core.Action{
-		core.NewDeleteAction(
+		core.NewDeleteActionWithOptions(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			api.NamespaceSystem,
-			secret.ObjectMeta.Name),
+			secret.ObjectMeta.Name,
+			metav1.DeleteOptions{
+				Preconditions: metav1.NewUIDPreconditions(string(secret.UID)),
+			}),
 	}
 	verifyFunc()
 }
