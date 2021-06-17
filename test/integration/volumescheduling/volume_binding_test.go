@@ -1006,7 +1006,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 	// Set feature gates
 	controllerCh := make(chan struct{})
 
-	testCtx := initTestMaster(t, "reschedule-volume-provision", nil)
+	testCtx := initTestAPIServer(t, "reschedule-volume-provision", nil)
 
 	clientset := testCtx.clientSet
 	ns := testCtx.ns.Name
@@ -1062,7 +1062,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	textCtx := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), resyncPeriod)
+	textCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
 	clientset := textCtx.clientSet
 	ns := textCtx.ns.Name
 

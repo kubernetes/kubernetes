@@ -54,10 +54,10 @@ type testContext struct {
 	cancelFn context.CancelFunc
 }
 
-// initTestMaster initializes a test environment and creates a master with default
+// initTestAPIServer initializes a test environment and creates a master with default
 // configuration. Alpha resources are enabled automatically if the corresponding feature
 // is enabled.
-func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
+func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := testContext{
 		ctx:      ctx,

@@ -81,7 +81,7 @@ func TestServiceAffinityEnqueue(t *testing.T) {
 	// Use zero backoff seconds to bypass backoffQ.
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, "serviceaffinity-enqueue", nil),
+		testutils.InitTestAPIServer(t, "serviceaffinity-enqueue", nil),
 		nil,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPodInitialBackoffSeconds(0),
