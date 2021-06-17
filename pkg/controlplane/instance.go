@@ -120,6 +120,8 @@ const (
 	KubeAPIServer = "kube-apiserver"
 	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
 	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
+	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
+	repairLoopInterval = 3 * time.Minute
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -205,11 +207,15 @@ type ExtraConfig struct {
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
+	// ONLY FOR TESTING Not exposed to the users
+	RepairServicesInterval time.Duration
 }
 
 type completedConfig struct {
 	GenericConfig genericapiserver.CompletedConfig
 	ExtraConfig   *ExtraConfig
+	// ONLY FOR TESTING Not exposed to the users
+	RepairServicesInterval time.Duration
 }
 
 // CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
@@ -280,9 +286,13 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
+	if c.RepairServicesInterval == 0 {
+		c.RepairServicesInterval = repairLoopInterval
+	}
 	cfg := completedConfig{
 		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
 		&c.ExtraConfig,
+		c.RepairServicesInterval,
 	}
 
 	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)

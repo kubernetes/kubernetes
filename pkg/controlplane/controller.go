@@ -44,7 +44,6 @@ import (
 
 const (
 	kubernetesServiceName = "kubernetes"
-	repairLoopInterval    = 3 * time.Minute
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes
@@ -113,11 +112,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
 		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
 
-		ServiceClusterIPInterval: repairLoopInterval,
+		ServiceClusterIPInterval: c.RepairServicesInterval,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: repairLoopInterval,
+		ServiceNodePortInterval: c.RepairServicesInterval,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
