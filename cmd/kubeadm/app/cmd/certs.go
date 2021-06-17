@@ -277,7 +277,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 			// Get a renewal manager for a actual Cluster configuration
 			rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 			if err != nil {
-				return nil
+				return err
 			}
 
 			// Renew certificates

@@ -34,9 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -44,38 +46,44 @@ import (
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 func TestServiceAffinityEnqueue(t *testing.T) {
-	profile := schedapi.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedapi.Plugins{
-			PreFilter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: serviceaffinity.Name},
+	cfg := configtesting.V1beta1ToInternalWithDefaults(t, v1beta1.KubeSchedulerConfiguration{
+		Profiles: []v1beta1.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta1.Plugins{
+				PreFilter: &v1beta1.PluginSet{
+					Enabled: []v1beta1.Plugin{
+						{Name: serviceaffinity.Name},
+					},
+				},
+				Filter: &v1beta1.PluginSet{
+					Enabled: []v1beta1.Plugin{
+						{Name: serviceaffinity.Name},
+					},
 				},
 			},
-			Filter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: serviceaffinity.Name},
+			PluginConfig: []v1beta1.PluginConfig{
+				{
+					Name: serviceaffinity.Name,
+					Args: runtime.RawExtension{
+						Object: &v1beta1.ServiceAffinityArgs{
+							AffinityLabels: []string{"hostname"},
+						},
+					},
 				},
 			},
-		},
-		PluginConfig: []schedapi.PluginConfig{
-			{
-				Name: serviceaffinity.Name,
-				Args: &schedapi.ServiceAffinityArgs{
-					AffinityLabels: []string{"hostname"},
-				},
-			},
-		},
-	}
+		}},
+	})
+
 	// Use zero backoff seconds to bypass backoffQ.
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, "serviceaffinity-enqueue", nil),
+		testutils.InitTestAPIServer(t, "serviceaffinity-enqueue", nil),
 		nil,
-		scheduler.WithProfiles(profile),
+		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
@@ -239,16 +247,17 @@ func TestCustomResourceEnqueue(t *testing.T) {
 			return &fakeCRPlugin{}, nil
 		},
 	}
-	profile := schedapi.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedapi.Plugins{
-			Filter: schedapi.PluginSet{
-				Enabled: []schedapi.Plugin{
-					{Name: "fakeCRPlugin"},
+	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
+		Profiles: []v1beta2.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "fakeCRPlugin"},
+					},
 				},
 			},
-		},
-	}
+		}}})
 
 	testCtx.KubeConfig = server.ClientConfig
 	testCtx.ClientSet = kubernetes.NewForConfigOrDie(server.ClientConfig)
@@ -263,7 +272,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t,
 		testCtx,
 		nil,
-		scheduler.WithProfiles(profile),
+		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),

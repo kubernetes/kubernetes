@@ -243,69 +243,31 @@ const (
 	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
 )
 
-func appendPluginSet(dst PluginSet, src PluginSet) PluginSet {
-	dst.Enabled = append(dst.Enabled, src.Enabled...)
-	dst.Disabled = append(dst.Disabled, src.Disabled...)
-	return dst
-}
-
-// Append appends src Plugins to current Plugins. If a PluginSet is nil, it will
-// be created.
-func (p *Plugins) Append(src *Plugins) {
-	if p == nil || src == nil {
-		return
+// Names returns the list of enabled plugin names.
+func (p *Plugins) Names() []string {
+	if p == nil {
+		return nil
 	}
-	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
-	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
-	p.Filter = appendPluginSet(p.Filter, src.Filter)
-	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
-	p.PreScore = appendPluginSet(p.PreScore, src.PreScore)
-	p.Score = appendPluginSet(p.Score, src.Score)
-	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
-	p.Permit = appendPluginSet(p.Permit, src.Permit)
-	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
-	p.Bind = appendPluginSet(p.Bind, src.Bind)
-	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
-}
-
-// Apply merges the plugin configuration from custom plugins, handling disabled sets.
-func (p *Plugins) Apply(customPlugins *Plugins) {
-	if customPlugins == nil {
-		return
+	extensions := []PluginSet{
+		p.PreFilter,
+		p.Filter,
+		p.PostFilter,
+		p.Reserve,
+		p.PreScore,
+		p.Score,
+		p.PreBind,
+		p.Bind,
+		p.PostBind,
+		p.Permit,
+		p.QueueSort,
 	}
-
-	p.QueueSort = mergePluginSets(p.QueueSort, customPlugins.QueueSort)
-	p.PreFilter = mergePluginSets(p.PreFilter, customPlugins.PreFilter)
-	p.Filter = mergePluginSets(p.Filter, customPlugins.Filter)
-	p.PostFilter = mergePluginSets(p.PostFilter, customPlugins.PostFilter)
-	p.PreScore = mergePluginSets(p.PreScore, customPlugins.PreScore)
-	p.Score = mergePluginSets(p.Score, customPlugins.Score)
-	p.Reserve = mergePluginSets(p.Reserve, customPlugins.Reserve)
-	p.Permit = mergePluginSets(p.Permit, customPlugins.Permit)
-	p.PreBind = mergePluginSets(p.PreBind, customPlugins.PreBind)
-	p.Bind = mergePluginSets(p.Bind, customPlugins.Bind)
-	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
-}
-
-func mergePluginSets(defaultPluginSet, customPluginSet PluginSet) PluginSet {
-	disabledPlugins := sets.NewString()
-	for _, disabledPlugin := range customPluginSet.Disabled {
-		disabledPlugins.Insert(disabledPlugin.Name)
-	}
-
-	var enabledPlugins []Plugin
-	if !disabledPlugins.Has("*") {
-		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
-			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
-				continue
-			}
-
-			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
+	n := sets.NewString()
+	for _, e := range extensions {
+		for _, pg := range e.Enabled {
+			n.Insert(pg.Name)
 		}
 	}
-
-	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
-	return PluginSet{Enabled: enabledPlugins}
+	return n.List()
 }
 
 // Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,

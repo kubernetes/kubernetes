@@ -319,16 +319,16 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 	return err
 }
 
-// InitTestMaster initializes a test environment and creates a master with default
+// InitTestAPIServer initializes a test environment and creates an API server with default
 // configuration.
-func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := TestContext{
 		Ctx:      ctx,
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create control plane
+	// 1. Create API server
 	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized

@@ -48,3 +48,8 @@ func RemoveUsersAndGroups() error {
 func UpdatePathOwnerAndPermissions(path string, uid, gid int64, perms uint32) error {
 	return nil
 }
+
+// UpdatePathOwner is a NO-OP on non-Linux.
+func UpdatePathOwner(dirPath string, uid, gid int64) error {
+	return nil
+}

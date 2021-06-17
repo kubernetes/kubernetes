@@ -22,210 +22,40 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestPluginsAppend(t *testing.T) {
+func TestPluginsNames(t *testing.T) {
 	tests := []struct {
-		name            string
-		customPlugins   *Plugins
-		defaultPlugins  *Plugins
-		expectedPlugins *Plugins
+		name    string
+		plugins *Plugins
+		want    []string
 	}{
 		{
-			name: "AppendPlugin",
-			customPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "CustomPlugin"},
-					},
-				},
-			},
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-						{Name: "CustomPlugin"},
-					},
-				},
-			},
+			name: "empty",
 		},
 		{
-			name:            "AppendNilPlugin",
-			customPlugins:   nil,
-			defaultPlugins:  &Plugins{},
-			expectedPlugins: &Plugins{},
+			name: "with duplicates",
+			plugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "CustomFilter"},
+					},
+				},
+				PreFilter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "CustomFilter"},
+					},
+				},
+				Score: PluginSet{
+					Enabled: []Plugin{
+						{Name: "CustomScore"},
+					},
+				},
+			},
+			want: []string{"CustomFilter", "CustomScore"},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.defaultPlugins.Append(test.customPlugins)
-			if d := cmp.Diff(test.expectedPlugins, test.defaultPlugins); d != "" {
-				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
-			}
-		})
-	}
-}
-
-func TestPluginsApply(t *testing.T) {
-	tests := []struct {
-		name            string
-		customPlugins   *Plugins
-		defaultPlugins  *Plugins
-		expectedPlugins *Plugins
-	}{
-		{
-			name: "AppendCustomPlugin",
-			customPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "CustomPlugin"},
-					},
-				},
-			},
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-						{Name: "CustomPlugin"},
-					},
-				},
-			},
-		},
-		{
-			name: "InsertAfterDefaultPlugins2",
-			customPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "CustomPlugin"},
-						{Name: "DefaultPlugin2"},
-					},
-					Disabled: []Plugin{
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "CustomPlugin"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-		},
-		{
-			name: "InsertBeforeAllPlugins",
-			customPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "CustomPlugin"},
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-					Disabled: []Plugin{
-						{Name: "*"},
-					},
-				},
-			},
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "CustomPlugin"},
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-		},
-		{
-			name: "ReorderDefaultPlugins",
-			customPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin2"},
-						{Name: "DefaultPlugin1"},
-					},
-					Disabled: []Plugin{
-						{Name: "*"},
-					},
-				},
-			},
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin2"},
-						{Name: "DefaultPlugin1"},
-					},
-				},
-			},
-		},
-		{
-			name:          "ApplyNilCustomPlugin",
-			customPlugins: nil,
-			defaultPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-			expectedPlugins: &Plugins{
-				Filter: PluginSet{
-					Enabled: []Plugin{
-						{Name: "DefaultPlugin1"},
-						{Name: "DefaultPlugin2"},
-					},
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			test.defaultPlugins.Apply(test.customPlugins)
-			if d := cmp.Diff(test.expectedPlugins, test.defaultPlugins); d != "" {
+			if d := cmp.Diff(test.want, test.plugins.Names()); d != "" {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
 			}
 		})

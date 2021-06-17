@@ -810,6 +810,13 @@
     the Pod is running. Pod SHOULD send a valid response when queried.
   release: v1.9
   file: test/e2e/apps/replica_set.go
+- testname: ReplicaSet, status sub-resource
+  codename: '[sig-apps] ReplicaSet should validate Replicaset Status endpoints [Conformance]'
+  description: Create a ReplicaSet resource which MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
+  file: test/e2e/apps/replica_set.go
 - testname: Replication Controller, adopt matching pods
   codename: '[sig-apps] ReplicationController should adopt matching pods on creation
     [Conformance]'

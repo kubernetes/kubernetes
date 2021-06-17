@@ -132,35 +132,83 @@ func TestSchedulerCreation(t *testing.T) {
 		wantProfiles []string
 	}{
 		{
-			name:         "default scheduler",
+			name: "valid out-of-tree registry",
+			opts: []Option{
+				WithFrameworkOutOfTreeRegistry(validRegistry),
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "default-scheduler",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				)},
 			wantProfiles: []string{"default-scheduler"},
 		},
 		{
-			name:         "valid out-of-tree registry",
-			opts:         []Option{WithFrameworkOutOfTreeRegistry(validRegistry)},
-			wantProfiles: []string{"default-scheduler"},
-		},
-		{
-			name:         "repeated plugin name in out-of-tree plugin",
-			opts:         []Option{WithFrameworkOutOfTreeRegistry(invalidRegistry)},
+			name: "repeated plugin name in out-of-tree plugin",
+			opts: []Option{
+				WithFrameworkOutOfTreeRegistry(invalidRegistry),
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "default-scheduler",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				)},
 			wantProfiles: []string{"default-scheduler"},
 			wantErr:      "a plugin named DefaultBinder already exists",
 		},
 		{
 			name: "multiple profiles",
-			opts: []Option{WithProfiles(
-				schedulerapi.KubeSchedulerProfile{SchedulerName: "foo"},
-				schedulerapi.KubeSchedulerProfile{SchedulerName: "bar"},
-			)},
+			opts: []Option{
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "foo",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "bar",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				)},
 			wantProfiles: []string{"bar", "foo"},
 		},
 		{
 			name: "Repeated profiles",
-			opts: []Option{WithProfiles(
-				schedulerapi.KubeSchedulerProfile{SchedulerName: "foo"},
-				schedulerapi.KubeSchedulerProfile{SchedulerName: "bar"},
-				schedulerapi.KubeSchedulerProfile{SchedulerName: "foo"},
-			)},
+			opts: []Option{
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "foo",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "bar",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "foo",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				)},
 			wantErr: "duplicate profile with scheduler name \"foo\"",
 		},
 	}
@@ -463,12 +511,13 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
 				Plugins: &schedulerapi.Plugins{
-					Filter: schedulerapi.PluginSet{
-						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
-						Disabled: []schedulerapi.Plugin{{Name: "*"}},
-					}},
+					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
+					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+				},
 				PluginConfig: []schedulerapi.PluginConfig{
-					{Name: "FakeNodeSelector",
+					{
+						Name: "FakeNodeSelector",
 						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine2"}`)},
 					},
 				},
@@ -476,12 +525,13 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 			schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "match-machine3",
 				Plugins: &schedulerapi.Plugins{
-					Filter: schedulerapi.PluginSet{
-						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
-						Disabled: []schedulerapi.Plugin{{Name: "*"}},
-					}},
+					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
+					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+				},
 				PluginConfig: []schedulerapi.PluginConfig{
-					{Name: "FakeNodeSelector",
+					{
+						Name: "FakeNodeSelector",
 						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine3"}`)},
 					},
 				},

@@ -55,6 +55,10 @@ const (
 
 	// LogDebug tells a logger to log all LogDebug, LogInfo, LogWarning, LogError, LogPanic and LogFatal entries passed to it.
 	LogDebug
+
+	// LogAuth is a special case of LogDebug, it tells a logger to also log the body of an authentication request and response.
+	// NOTE: this can disclose sensitive information, use with care.
+	LogAuth
 )
 
 const (
@@ -65,6 +69,7 @@ const (
 	logWarning = "WARNING"
 	logInfo    = "INFO"
 	logDebug   = "DEBUG"
+	logAuth    = "AUTH"
 	logUnknown = "UNKNOWN"
 )
 
@@ -83,6 +88,8 @@ func ParseLevel(s string) (lt LevelType, err error) {
 		lt = LogInfo
 	case logDebug:
 		lt = LogDebug
+	case logAuth:
+		lt = LogAuth
 	default:
 		err = fmt.Errorf("bad log level '%s'", s)
 	}
@@ -106,6 +113,8 @@ func (lt LevelType) String() string {
 		return logInfo
 	case LogDebug:
 		return logDebug
+	case LogAuth:
+		return logAuth
 	default:
 		return logUnknown
 	}

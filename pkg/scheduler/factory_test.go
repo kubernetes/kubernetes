@@ -64,7 +64,7 @@ func TestCreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, stopCh)
-	if _, err := factory.createFromConfig(); err != nil {
+	if _, err := factory.create(); err != nil {
 		t.Error(err)
 	}
 }
@@ -402,6 +402,7 @@ func TestCreateFromConfig(t *testing.T) {
 				informerFactory,
 				recorderFactory,
 				make(chan struct{}),
+				WithProfiles([]schedulerapi.KubeSchedulerProfile(nil)...),
 				WithLegacyPolicySource(createPolicySource(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {
 					if p.SchedulerName != v1.DefaultSchedulerName {
@@ -641,7 +642,13 @@ func newConfigFactoryWithFrameworkRegistry(
 		StopEverything:           stopCh,
 		registry:                 registry,
 		profiles: []schedulerapi.KubeSchedulerProfile{
-			{SchedulerName: testSchedulerName},
+			{
+				SchedulerName: testSchedulerName,
+				Plugins: &schedulerapi.Plugins{
+					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+				},
+			},
 		},
 		recorderFactory:  recorderFactory,
 		nodeInfoSnapshot: snapshot,

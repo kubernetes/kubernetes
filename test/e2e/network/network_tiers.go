@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = common.SIGDescribe("Services [Slow]", func() {
+var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
