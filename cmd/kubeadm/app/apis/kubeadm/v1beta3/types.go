@@ -17,8 +17,9 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -35,7 +36,7 @@ type InitConfiguration struct {
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
 	// +optional
-	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
+	BootstrapTokens []bootstraptokenv1.BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	// +optional
@@ -216,7 +217,7 @@ type NodeRegistrationOptions struct {
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
 	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
 	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
-	Taints []v1.Taint `json:"taints"`
+	Taints []corev1.Taint `json:"taints"`
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
@@ -234,7 +235,7 @@ type NodeRegistrationOptions struct {
 	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	// +optional
-	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration
@@ -248,33 +249,6 @@ type Networking struct {
 	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
 	// +optional
 	DNSDomain string `json:"dnsDomain,omitempty"`
-}
-
-// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
-type BootstrapToken struct {
-	// Token is used for establishing bidirectional trust between nodes and control-planes.
-	// Used for joining nodes in the cluster.
-	Token *BootstrapTokenString `json:"token" datapolicy:"token"`
-	// Description sets a human-friendly message why this token exists and what it's used
-	// for, so other administrators can know its purpose.
-	// +optional
-	Description string `json:"description,omitempty"`
-	// TTL defines the time to live for this token. Defaults to 24h.
-	// Expires and TTL are mutually exclusive.
-	// +optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
-	// Expires specifies the timestamp when this token expires. Defaults to being set
-	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
-	// +optional
-	Expires *metav1.Time `json:"expires,omitempty"`
-	// Usages describes the ways in which this token can be used. Can by default be used
-	// for establishing bidirectional trust, but that can be changed here.
-	// +optional
-	Usages []string `json:"usages,omitempty"`
-	// Groups specifies the extra groups that this token will authenticate as when/if
-	// used for authentication
-	// +optional
-	Groups []string `json:"groups,omitempty"`
 }
 
 // Etcd contains elements describing Etcd configuration.
@@ -453,7 +427,7 @@ type HostPathMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
 	// +optional
-	PathType v1.HostPathType `json:"pathType,omitempty"`
+	PathType corev1.HostPathType `json:"pathType,omitempty"`
 }
 
 // Patches contains options related to applying patches to components deployed by kubeadm.
