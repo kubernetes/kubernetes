@@ -846,17 +846,46 @@ func reportSortingDeletionAgeRatioMetric(filteredPods []*v1.Pod, diff int) {
 // active pods in relatedPods that are colocated on the same node with the pod.
 // relatedPods generally should be a superset of podsToRank.
 func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) controller.ActivePodsWithRanks {
-	podsOnNode := make(map[string]int)
-	for _, pod := range relatedPods {
+	podsOnNodes := make(map[string][]*v1.Pod)
+	// Firstly split podsToRank into nodes
+	for _, pod := range podsToRank {
 		if controller.IsPodActive(pod) {
-			podsOnNode[pod.Spec.NodeName]++
+			podsOnNodes[pod.Spec.NodeName] = append(podsOnNodes[pod.Spec.NodeName], pod)
 		}
+	}
+	// Sort pods on the same node with active and timestamp
+	for _, podsOnNode := range podsOnNodes {
+		sort.Sort(controller.ActivePods(podsOnNode))
+	}
+	// Then put related pods in other replicasets into pod-node map
+	for _, pod := range relatedPods {
+		if containsPod(pod, podsToRank) || !controller.IsPodActive(pod) {
+			continue
+		}
+		podsOnNodes[pod.Spec.NodeName] = append(podsOnNodes[pod.Spec.NodeName], pod)
 	}
 	ranks := make([]int, len(podsToRank))
 	for i, pod := range podsToRank {
-		ranks[i] = podsOnNode[pod.Spec.NodeName]
+		podsOnNode := podsOnNodes[pod.Spec.NodeName]
+		for j, podOnNode := range podsOnNode {
+			if podOnNode.Name == pod.Name {
+				// for one pod on the node, its rank defaults to 0
+				// for multiple pods on the same node (e.g. 3), their ranks will be the sorted index (e.g. 2,1,0)
+				ranks[i] = len(podsOnNode) - (j + 1)
+				break
+			}
+		}
 	}
 	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
+}
+
+func containsPod(target *v1.Pod, podList []*v1.Pod) bool {
+	for _, pod := range podList {
+		if pod.Name == target.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func getPodKeys(pods []*v1.Pod) []string {

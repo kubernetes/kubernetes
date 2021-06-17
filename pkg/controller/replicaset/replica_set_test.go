@@ -1956,17 +1956,17 @@ func TestGetPodsToDelete(t *testing.T) {
 		{
 			name: "ready and colocated with another ready pod vs not colocated, diff < len(pods)",
 			pods: []*v1.Pod{
-				scheduledRunningReadyPodOnNode1,
-				scheduledRunningReadyPodOnNode2,
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
 			},
 			related: []*v1.Pod{
-				scheduledRunningReadyPodOnNode1,
-				scheduledRunningReadyPodOnNode2,
-				scheduledRunningReadyPodOnNode2,
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "b"),
 			},
 			diff: 1,
 			expectedPodsToDelete: []*v1.Pod{
-				scheduledRunningReadyPodOnNode2,
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
 			},
 		},
 		{
@@ -1996,6 +1996,29 @@ func TestGetPodsToDelete(t *testing.T) {
 				scheduledRunningNotReadyPod,
 			},
 		},
+		{
+			name: "multiple colocated pods and nodes, diff < len(pods)",
+			pods: []*v1.Pod{
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "b"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "c"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "b"),
+			},
+			related: []*v1.Pod{
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "b"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "c"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "b"),
+			},
+			diff: 3,
+			expectedPodsToDelete: []*v1.Pod{
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "a"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode1, "b"),
+				withPodNameSuffix(scheduledRunningReadyPodOnNode2, "a"),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -2009,6 +2032,97 @@ func TestGetPodsToDelete(t *testing.T) {
 		}
 		if !reflect.DeepEqual(podsToDelete, test.expectedPodsToDelete) {
 			t.Errorf("%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
+		}
+	}
+}
+
+func withPodNameSuffix(pod *v1.Pod, suffix string) *v1.Pod {
+	newPod := pod.DeepCopy()
+	newPod.Name = fmt.Sprintf("%s-%s", pod.Name, suffix)
+	return newPod
+}
+
+func TestComparingSameNodeSpreadOnDeletion(t *testing.T) {
+	labelMap := map[string]string{"name": "foo"}
+	rs := newReplicaSet(6, labelMap)
+
+	tests := []struct {
+		name           string
+		rankFunc       func(podsToRank, relatedPods []*v1.Pod) controller.ActivePodsWithRanks
+		expectedSpread bool
+	}{
+		{
+			name: "sort with the old getPodsRankedByRelatedPodsOnSameNode",
+			rankFunc: func(podsToRank, relatedPods []*v1.Pod) controller.ActivePodsWithRanks {
+				podsOnNode := make(map[string]int)
+				for _, pod := range relatedPods {
+					if controller.IsPodActive(pod) {
+						podsOnNode[pod.Spec.NodeName]++
+					}
+				}
+				ranks := make([]int, len(podsToRank))
+				for i, pod := range podsToRank {
+					ranks[i] = podsOnNode[pod.Spec.NodeName]
+				}
+				return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
+			},
+			expectedSpread: false,
+		},
+		{
+			name: "sort without extra ranks (just rely on the random timestamp sort)",
+			rankFunc: func(podsToRank, relatedPods []*v1.Pod) controller.ActivePodsWithRanks {
+				return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: make([]int, len(podsToRank)), Now: metav1.Now()}
+			},
+			expectedSpread: false,
+		},
+		{
+			name:           "sort with the new getPodsRankedByRelatedPodsOnSameNode",
+			rankFunc:       getPodsRankedByRelatedPodsOnSameNode,
+			expectedSpread: true,
+		},
+	}
+
+	// base time is a month ago, all pods are mocked to create in last month
+	baseTime := time.Now().Add(-time.Hour * 24 * 7 * 30)
+	for _, test := range tests {
+		// In consequence of random sort, each test will run 1000 times.
+		// If 800 times (80%) succeed, we suppose it matches expectation.
+		var succeedCount int
+		for i := 0; i < 1000; i++ {
+			// scheduled, running, ready pods on fake-node-1
+			podAOnNode1 := newPod("pod-a-on-node-1", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podBOnNode1 := newPod("pod-b-on-node-1", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podAOnNode1.Spec.NodeName, podBOnNode1.Spec.NodeName = "fake-node-1", "fake-node-1"
+
+			// scheduled, running, ready pods on fake-node-2
+			podAOnNode2 := newPod("pod-a-on-node-2", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podBOnNode2 := newPod("pod-b-on-node-2", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podCOnNode2 := newPod("pod-c-on-node-2", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podAOnNode2.Spec.NodeName, podBOnNode2.Spec.NodeName, podCOnNode2.Spec.NodeName = "fake-node-2", "fake-node-2", "fake-node-2"
+
+			// scheduled, running, ready pods on fake-node-3
+			podAOnNode3 := newPod("pod-a-on-node-3", rs, v1.PodRunning, &metav1.Time{Time: baseTime.Add(time.Hour * time.Duration(rand.Intn(24*7*30)))}, true)
+			podAOnNode3.Spec.NodeName = "fake-node-3"
+
+			// current state: node1(a,b), node2(a,b,c), node3(a)
+			// when this rs scales to 3, we expect to get one pod left on each node, which should be a balanced state and best for fault tolerance.
+
+			pods := []*v1.Pod{podAOnNode1, podBOnNode1, podAOnNode2, podBOnNode2, podCOnNode2, podAOnNode3}
+			sort.Sort(test.rankFunc(pods, pods))
+			// remove the first 3 pods (to delete)
+			leftPods := pods[3:]
+
+			nodesForLeftPods := sets.NewString()
+			for _, p := range leftPods {
+				nodesForLeftPods.Insert(p.Spec.NodeName)
+			}
+			if nodesForLeftPods.Len() == 3 {
+				succeedCount++
+			}
+		}
+		matchSpread := succeedCount >= 800
+		if matchSpread != test.expectedSpread {
+			t.Errorf("%s expected spread %v, but got succeed count %v", test.name, test.expectedSpread, succeedCount)
 		}
 	}
 }
