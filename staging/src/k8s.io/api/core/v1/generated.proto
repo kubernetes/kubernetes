@@ -522,6 +522,7 @@ message ConfigMapList {
 }
 
 // ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+// This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 message ConfigMapNodeConfigSource {
   // Namespace is the metadata.namespace of the referenced ConfigMap.
   // This field is required in all cases.
@@ -2231,6 +2232,7 @@ message NodeCondition {
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+// This API is deprecated since 1.22
 message NodeConfigSource {
   // ConfigMap is a reference to a Node's ConfigMap
   optional ConfigMapNodeConfigSource configMap = 2;
@@ -2386,8 +2388,9 @@ message NodeSpec {
   // +optional
   repeated Taint taints = 5;
 
-  // If specified, the source to get node configuration from
-  // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+  // Deprecated. If specified, the source of the node's configuration.
+  // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field.
+  // This field is deprecated as of 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
   // +optional
   optional NodeConfigSource configSource = 6;
 
