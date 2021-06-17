@@ -191,6 +191,9 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			if isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != int(podReq.cpuRequest) {
 				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
 			}
+			if !isIntegral(podReq.cpuRequest) && len(cntInfo.CpuIds) != 0 {
+				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
+			}
 		}
 		if podReq.resourceName != "" && podReq.resourceAmount > 0 {
 			dev := findContainerDeviceByName(cntInfo.GetDevices(), podReq.resourceName)
@@ -457,6 +460,38 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	expectedPostDelete := filterOutDesc(expected, "pod-01")
 	expectPodResources(1, cli, expectedPostDelete)
 	tpd.deletePodsForTest(f)
+
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when pods request non integral CPUs")
+	if sd != nil {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: 1500,
+			},
+			{
+				podName:        "pod-01",
+				cntName:        "cnt-00",
+				resourceName:   sd.resourceName,
+				resourceAmount: 1,
+				cpuRequest:     1500,
+			},
+		}
+	} else {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: 1500,
+			},
+		}
+
+	}
+	tpd.createPodsForTest(f, expected)
+	expectPodResources(1, cli, expected)
+	tpd.deletePodsForTest(f)
+
 }
 
 func podresourcesGetAllocatableResourcesTests(f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
