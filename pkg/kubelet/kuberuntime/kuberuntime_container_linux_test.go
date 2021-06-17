@@ -33,6 +33,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
@@ -417,8 +418,8 @@ func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
 		},
 		{
 			// Note: behaviour will be the same as previous two cases
-			name:        "config set to NoSwap, memory limit set",
-			swapSetting: "NoSwap",
+			name:        "config set to LimitedSwap, memory limit set",
+			swapSetting: kubelettypes.LimitedSwap,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -438,7 +439,7 @@ func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
 		},
 		{
 			name:        "UnlimitedSwap enabled",
-			swapSetting: "UnlimitedSwap",
+			swapSetting: kubelettypes.UnlimitedSwap,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{

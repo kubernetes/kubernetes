@@ -326,7 +326,7 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
-	// Configure swap memory available to container workloads.
+	// memorySwap configures swap memory available to container workloads.
 	// +featureGate=NodeSwapEnabled
 	// +optional
 	MemorySwap MemorySwapConfiguration
@@ -574,8 +574,10 @@ type MemoryReservation struct {
 }
 
 type MemorySwapConfiguration struct {
-	// Configure swap memory available to container workloads. May be one of
-	// "", "NoSwap": workloads cannot use swap
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
 	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwapEnabled
+	// +optional
 	SwapBehavior string
 }

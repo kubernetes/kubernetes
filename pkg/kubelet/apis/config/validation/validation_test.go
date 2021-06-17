@@ -24,6 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
@@ -145,7 +146,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.NoneTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
-		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
+		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,

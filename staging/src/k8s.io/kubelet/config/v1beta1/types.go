@@ -752,7 +752,7 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
-	// Configure swap memory available to container workloads.
+	// memorySwap configures swap memory available to container workloads.
 	// +featureGate=NodeSwapEnabled
 	// +optional
 	MemorySwap MemorySwapConfiguration `json:"memorySwap,omitempty"`
@@ -1040,9 +1040,11 @@ type MemoryReservation struct {
 	Limits   v1.ResourceList `json:"limits"`
 }
 
-// Configure swap memory available to container workloads. May be one of
-// "", "NoSwap": workloads cannot use swap
-// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
 type MemorySwapConfiguration struct {
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwapEnabled
+	// +optional
 	SwapBehavior string `json:"swapBehavior,omitempty"`
 }
