@@ -185,11 +185,18 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 
 		cpuRequest := getCpuRequest(podReq.cpuRequest)
 		if cpuRequest > 0 && cpuRequest == float32(int(cpuRequest)) {
+			if !cntInfo.IsExclusive {
+				return fmt.Errorf("pod %q container %q requested %f expected to be allocated exclusive CPUs %v", podReq.podName, podReq.cntName, cpuRequest, cntInfo.CpuIds)
+			}
 			if len(cntInfo.CpuIds) != int(cpuRequest) {
 				return fmt.Errorf("pod %q container %q expected %f cpus got %v", podReq.podName, podReq.cntName, cpuRequest, cntInfo.CpuIds)
 			}
 		}
-
+		if cpuRequest > 0 && cpuRequest != float32(int(cpuRequest)) {
+			if cntInfo.IsExclusive {
+				return fmt.Errorf("pod %q container %q requested %f expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, cpuRequest, cntInfo.CpuIds)
+			}
+		}
 		if podReq.resourceName != "" && podReq.resourceAmount > 0 {
 			dev := findContainerDeviceByName(cntInfo.GetDevices(), podReq.resourceName)
 			if dev == nil {
@@ -449,6 +456,38 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	expectedPostDelete := filterOutDesc(expected, "pod-01")
 	expectPodResources(1, cli, expectedPostDelete)
 	tpd.deletePodsForTest(f)
+
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when pods request non integral CPUs")
+	if sd != nil {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "1500m",
+			},
+			{
+				podName:        "pod-01",
+				cntName:        "cnt-00",
+				resourceName:   sd.resourceName,
+				resourceAmount: 1,
+				cpuRequest:     "1500m",
+			},
+		}
+	} else {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "cnt-00",
+				cpuRequest: "1500m",
+			},
+		}
+
+	}
+	tpd.createPodsForTest(f, expected)
+	expectPodResources(1, cli, expected)
+	tpd.deletePodsForTest(f)
+
 }
 
 func podresourcesGetAllocatableResourcesTests(f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
