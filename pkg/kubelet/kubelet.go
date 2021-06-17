@@ -254,7 +254,7 @@ type DockerOptions struct {
 
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
-func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*config.PodConfig, error) {
+func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) *config.PodConfig {
 	manifestURLHeader := make(http.Header)
 	if len(kubeCfg.StaticPodURLHeader) > 0 {
 		for k, v := range kubeCfg.StaticPodURLHeader {
@@ -283,7 +283,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 		klog.InfoS("Adding apiserver pod source")
 		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(kubetypes.ApiserverSource))
 	}
-	return cfg, nil
+	return cfg
 }
 
 // PreInitRuntimeService will init runtime service before RunKubelet.
@@ -416,10 +416,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	if kubeDeps.PodConfig == nil {
-		var err error
-		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName, nodeHasSynced)
-		if err != nil {
-			return nil, err
+		podConfig := makePodSourceConfig(kubeCfg, kubeDeps, nodeName, nodeHasSynced)
+		if podConfig != nil {
+			kubeDeps.PodConfig = podConfig
+		} else {
+			return nil, fmt.Errorf("failed to create kubelet, pod source config was nil")
 		}
 	}
 
