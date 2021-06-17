@@ -370,7 +370,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	}
 
 	scope := CleanScope(requestInfo)
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 	resource := requestInfo.Resource
 	subresource := requestInfo.Subresource
 	group := requestInfo.APIGroup
@@ -393,7 +393,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
@@ -415,7 +415,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
@@ -434,7 +434,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
@@ -526,7 +526,9 @@ func CleanScope(requestInfo *request.RequestInfo) string {
 	return ""
 }
 
-func canonicalVerb(verb string, scope string) string {
+// CanonicalVerb distinguishes LISTs from GETs (and HEADs). It assumes verb is
+// UPPERCASE.
+func CanonicalVerb(verb string, scope string) string {
 	switch verb {
 	case "GET", "HEAD":
 		if scope != "resource" && scope != "" {
@@ -538,7 +540,9 @@ func canonicalVerb(verb string, scope string) string {
 	}
 }
 
-func cleanVerb(verb string, request *http.Request) string {
+// CleanVerb returns a normalized verb, so that it is easy to tell WATCH from
+// LIST and APPLY from PATCH.
+func CleanVerb(verb string, request *http.Request) string {
 	reportedVerb := verb
 	if verb == "LIST" {
 		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
@@ -555,6 +559,12 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
+	return reportedVerb
+}
+
+// cleanVerb additionally ensures that unknown verbs don't clog up the metrics.
+func cleanVerb(verb string, request *http.Request) string {
+	reportedVerb := CleanVerb(verb, request)
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb
 	}
