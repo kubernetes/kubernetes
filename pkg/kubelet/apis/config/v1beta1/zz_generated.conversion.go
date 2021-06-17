@@ -387,6 +387,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.SeccompDefault, &out.SeccompDefault, s); err != nil {
 		return err
 	}
+	out.MemoryThrottlingFactor = (*float64)(unsafe.Pointer(in.MemoryThrottlingFactor))
 	return nil
 }
 
@@ -554,6 +555,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_bool_To_Pointer_bool(&in.SeccompDefault, &out.SeccompDefault, s); err != nil {
 		return err
 	}
+	out.MemoryThrottlingFactor = (*float64)(unsafe.Pointer(in.MemoryThrottlingFactor))
 	return nil
 }
 

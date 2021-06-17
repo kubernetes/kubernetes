@@ -147,6 +147,12 @@ type kubeGenericRuntimeManager struct {
 
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
+
+	//Function to get node allocatable resources
+	getNodeAllocatable func() v1.ResourceList
+
+	// Memory throttling factor for MemoryQoS
+	memoryThrottlingFactor float64
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -190,27 +196,31 @@ func NewKubeGenericRuntimeManager(
 	runtimeClassManager *runtimeclass.Manager,
 	seccompDefault bool,
 	memorySwapBehavior string,
+	getNodeAllocatable func() v1.ResourceList,
+	memoryThrottlingFactor float64,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
-		seccompProfileRoot:  seccompProfileRoot,
-		livenessManager:     livenessManager,
-		readinessManager:    readinessManager,
-		startupManager:      startupManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      newInstrumentedRuntimeService(runtimeService),
-		imageService:        newInstrumentedImageManagerService(imageService),
-		internalLifecycle:   internalLifecycle,
-		legacyLogProvider:   legacyLogProvider,
-		logManager:          logManager,
-		runtimeClassManager: runtimeClassManager,
-		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
-		seccompDefault:      seccompDefault,
-		memorySwapBehavior:  memorySwapBehavior,
+		recorder:               recorder,
+		cpuCFSQuota:            cpuCFSQuota,
+		cpuCFSQuotaPeriod:      cpuCFSQuotaPeriod,
+		seccompProfileRoot:     seccompProfileRoot,
+		livenessManager:        livenessManager,
+		readinessManager:       readinessManager,
+		startupManager:         startupManager,
+		machineInfo:            machineInfo,
+		osInterface:            osInterface,
+		runtimeHelper:          runtimeHelper,
+		runtimeService:         newInstrumentedRuntimeService(runtimeService),
+		imageService:           newInstrumentedImageManagerService(imageService),
+		internalLifecycle:      internalLifecycle,
+		legacyLogProvider:      legacyLogProvider,
+		logManager:             logManager,
+		runtimeClassManager:    runtimeClassManager,
+		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
+		seccompDefault:         seccompDefault,
+		memorySwapBehavior:     memorySwapBehavior,
+		getNodeAllocatable:     getNodeAllocatable,
+		memoryThrottlingFactor: memoryThrottlingFactor,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()

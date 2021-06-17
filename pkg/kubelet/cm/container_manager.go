@@ -112,6 +112,9 @@ type ContainerManager interface {
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
 	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
 
+	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+	GetNodeAllocatableAbsolute() v1.ResourceList
+
 	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider

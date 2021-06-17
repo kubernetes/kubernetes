@@ -522,6 +522,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
+	// Warn if MemoryQoS enabled with cgroups v1
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
+		!isCgroup2UnifiedMode() {
+		klog.InfoS("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
+	}
 	// Obtain Kubelet Lock File
 	if s.ExitOnLockContention && s.LockFilePath == "" {
 		return errors.New("cannot exit on lock file contention: no lock file specified")

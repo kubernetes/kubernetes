@@ -947,6 +947,15 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	SeccompDefault *bool `json:"seccompDefault,omitempty"`
+	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
+	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
+	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
+	// while increasing will put less reclaim pressure.
+	// See http://kep.k8s.io/2570 for more details.
+	// Default: 0.8
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
 }
 
 type KubeletAuthorizationMode string
