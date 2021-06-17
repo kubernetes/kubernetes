@@ -196,7 +196,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 
 	// Run "prefilter" plugins.
 	preFilterStatus := g.framework.RunPreFilterPlugins(pluginContext, pod)
-	if !preFilterStatus.IsSuccess() {
+	if preFilterStatus == nil || !preFilterStatus.IsSuccess() {
 		return result, preFilterStatus.AsError()
 	}
 
@@ -218,7 +218,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 
 	// Run "postfilter" plugins.
 	postfilterStatus := g.framework.RunPostFilterPlugins(pluginContext, pod, filteredNodes, filteredNodesStatuses)
-	if !postfilterStatus.IsSuccess() {
+	if postfilterStatus == nil || !postfilterStatus.IsSuccess() {
 		return result, postfilterStatus.AsError()
 	}
 
