@@ -62,6 +62,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
 		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
+		policy.Resource("podsecuritypolicies").WithVersion("v1beta1"),
 	}
 
 	return &StorageFactoryConfig{
