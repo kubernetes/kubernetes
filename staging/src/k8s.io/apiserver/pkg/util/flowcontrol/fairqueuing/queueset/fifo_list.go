@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"container/list"
+	"sync"
 )
 
 // removeFromFIFOFunc removes a designated element from the list.
@@ -48,6 +49,10 @@ type fifo interface {
 	// Length returns the number of requests in the list.
 	Length() int
 
+	// Width returns the total width (number of sets) of requests
+	// in this list.
+	Width() int
+
 	// Walk iterates through the list in order of oldest -> newest
 	// and executes the specified walkFunc for each request in that order.
 	//
@@ -60,6 +65,9 @@ type fifo interface {
 // goroutines without additional locking or coordination.
 type requestFIFO struct {
 	*list.List
+
+	lock  sync.Mutex
+	width int
 }
 
 func newRequestFIFO() fifo {
@@ -72,10 +80,29 @@ func (l *requestFIFO) Length() int {
 	return l.Len()
 }
 
+func (l *requestFIFO) Width() int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return l.width
+}
+
 func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	e := l.PushBack(req)
+	l.width += req.Seats()
+	deleted := false
+
 	return func() *request {
+		l.lock.Lock()
+		defer l.lock.Unlock()
+
 		l.Remove(e)
+		if !deleted {
+			l.width -= req.Seats()
+			deleted = true
+		}
 		return req
 	}
 }
@@ -85,9 +112,16 @@ func (l *requestFIFO) Dequeue() (*request, bool) {
 	if e == nil {
 		return nil, false
 	}
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	defer l.Remove(e)
 
 	request, ok := e.Value.(*request)
+	if ok {
+		l.width -= request.Seats()
+	}
 	return request, ok
 }
 

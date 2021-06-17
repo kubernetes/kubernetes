@@ -148,6 +148,41 @@ func TestFIFOWithRemoveIsIdempotent(t *testing.T) {
 	verifyOrder(t, orderExpected, remainingRequests)
 }
 
+func TestFIFOWidth(t *testing.T) {
+	list := newRequestFIFO()
+
+	newRequest := func(width uint) *request{
+		return &request{width: width}
+	}
+	arrival := []*request{newRequest(1), newRequest(2), newRequest(3)}
+	removeFn := make([]removeFromFIFOFunc, 0)
+
+	width := 0
+	for i := range arrival {
+		removeFn = append(removeFn, list.Enqueue(arrival[i]))
+
+		width += i + 1
+		if list.Width() != width {
+			t.Errorf("Expected width: %d, but got: %d", width, list.Width())
+		}
+	}
+
+	for i := range removeFn {
+		removeFn[i]()
+
+		width -= i + 1
+		if list.Width() != width {
+			t.Errorf("Expected width: %d, but got: %d", width, list.Width())
+		}
+
+		// check idempotency
+		removeFn[i]()
+		if list.Width() != width {
+			t.Errorf("Expected width: %d, but got: %d", width, list.Width())
+		}
+	}
+}
+
 func TestFIFOWithWalk(t *testing.T) {
 	list := newRequestFIFO()
 
