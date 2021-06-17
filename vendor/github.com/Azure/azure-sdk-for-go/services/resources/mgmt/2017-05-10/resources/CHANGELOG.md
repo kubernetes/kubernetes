@@ -1,18 +1,11 @@
-Generated from https://github.com/Azure/azure-rest-api-specs/tree/3c764635e7d442b3e74caf593029fcd440b3ef82//specification/resources/resource-manager/readme.md tag: `package-resources-2017-05`
+# Change History
 
-Code generator @microsoft.azure/autorest.go@2.1.178
-
+## Additive Changes
 
 ### New Funcs
 
-1. *CreateOrUpdateByIDFuture.UnmarshalJSON([]byte) error
-1. *CreateOrUpdateFuture.UnmarshalJSON([]byte) error
-1. *DeleteByIDFuture.UnmarshalJSON([]byte) error
-1. *DeleteFuture.UnmarshalJSON([]byte) error
-1. *DeploymentsCreateOrUpdateFuture.UnmarshalJSON([]byte) error
-1. *DeploymentsDeleteFuture.UnmarshalJSON([]byte) error
-1. *GroupsDeleteFuture.UnmarshalJSON([]byte) error
-1. *MoveResourcesFuture.UnmarshalJSON([]byte) error
-1. *UpdateByIDFuture.UnmarshalJSON([]byte) error
-1. *UpdateFuture.UnmarshalJSON([]byte) error
-1. *ValidateMoveResourcesFuture.UnmarshalJSON([]byte) error
+1. DeploymentOperationProperties.MarshalJSON() ([]byte, error)
+1. ErrorAdditionalInfo.MarshalJSON() ([]byte, error)
+1. ErrorResponse.MarshalJSON() ([]byte, error)
+1. GroupProperties.MarshalJSON() ([]byte, error)
+1. ManagementErrorWithDetails.MarshalJSON() ([]byte, error)

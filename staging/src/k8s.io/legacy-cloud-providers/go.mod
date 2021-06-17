@@ -6,11 +6,11 @@ go 1.16
 
 require (
 	cloud.google.com/go v0.54.0
-	github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.17
-	github.com/Azure/go-autorest/autorest/adal v0.9.10
+	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.18
+	github.com/Azure/go-autorest/autorest/adal v0.9.13
 	github.com/Azure/go-autorest/autorest/mocks v0.4.1
-	github.com/Azure/go-autorest/autorest/to v0.2.0
+	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
 	github.com/aws/aws-sdk-go v1.35.24
