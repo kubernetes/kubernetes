@@ -892,6 +892,68 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
 		})
 
+		ginkgo.It("should list, patch and delete a collection of StatefulSets", func() {
+
+			ssPatchReplicas := int32(2)
+			ssPatchImage := imageutils.GetE2EImage(imageutils.Pause)
+			one := int64(1)
+			ssName := "test-ss"
+
+			// Define StatefulSet Labels
+			ssPodLabels := map[string]string{
+				"name": "sample-pod",
+				"pod":  WebserverImageName,
+			}
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
+			setHTTPProbe(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			waitForStatus(c, ss)
+
+			ginkgo.By("patching the StatefulSet")
+			ssPatch, err := json.Marshal(map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]string{"test-ss": "patched"},
+				},
+				"spec": map[string]interface{}{
+					"replicas": ssPatchReplicas,
+					"template": map[string]interface{}{
+						"spec": map[string]interface{}{
+							"TerminationGracePeriodSeconds": &one,
+							"containers": [1]map[string]interface{}{{
+								"name":  ssName,
+								"image": ssPatchImage,
+							}},
+						},
+					},
+				},
+			})
+			framework.ExpectNoError(err, "failed to Marshal StatefulSet JSON patch")
+			_, err = f.ClientSet.AppsV1().StatefulSets(ns).Patch(context.TODO(), ssName, types.StrategicMergePatchType, []byte(ssPatch), metav1.PatchOptions{})
+			framework.ExpectNoError(err, "failed to patch Set")
+			ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
+			framework.ExpectEqual(*(ss.Spec.Replicas), ssPatchReplicas, "statefulset should have 2 replicas")
+			framework.ExpectEqual(ss.Spec.Template.Spec.Containers[0].Image, ssPatchImage, "statefulset not using ssPatchImage. Is using %v", ss.Spec.Template.Spec.Containers[0].Image)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			waitForStatus(c, ss)
+
+			ginkgo.By("Listing all StatefulSets")
+			ssList, err := c.AppsV1().StatefulSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-ss=patched"})
+			framework.ExpectNoError(err, "failed to list StatefulSets")
+			framework.ExpectEqual(len(ssList.Items), 1, "filtered list wasn't found")
+
+			ginkgo.By("Delete all of the StatefulSets")
+			err = c.AppsV1().StatefulSets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "test-ss=patched"})
+			framework.ExpectNoError(err, "failed to delete StatefulSets")
+
+			ginkgo.By("Verify that StatefulSets have been deleted")
+			ssList, err = c.AppsV1().StatefulSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-ss=patched"})
+			framework.ExpectNoError(err, "failed to list StatefulSets")
+			framework.ExpectEqual(len(ssList.Items), 0, "filtered list should have no Statefulsets")
+		})
+
 		ginkgo.It("should validate Statefulset Status endpoints", func() {
 			ssClient := c.AppsV1().StatefulSets(ns)
 			labelSelector := "e2e=testing"
