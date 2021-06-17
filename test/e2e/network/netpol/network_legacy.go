@@ -59,7 +59,7 @@ type protocolPort struct {
 	protocol v1.Protocol
 }
 
-var _ = common.SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
+var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
