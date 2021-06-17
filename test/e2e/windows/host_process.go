@@ -23,7 +23,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -50,6 +49,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 
 		trueVar := true
 		podName := "host-process-test-pod"
+		user := "NT AUTHORITY\\Local service"
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -57,7 +57,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 			Spec: v1.PodSpec{
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
-						HostProcess: &trueVar,
+						HostProcess:   &trueVar,
+						RunAsUserName: &user,
 					},
 				},
 				HostNetwork: true,
@@ -90,7 +91,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 })
 
 func SkipUnlessWindowsHostProcessContainersEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+	if !framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] {
 		e2eskipper.Skipf("Skipping test because feature 'WindowsHostProcessContainers' is not enabled")
 	}
 }
