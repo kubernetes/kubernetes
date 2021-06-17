@@ -36,6 +36,8 @@ limitations under the License.
 // "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
 // - Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
 // the user to configure a directory from which to take patches for components deployed by kubeadm.
+// - Move the BootstrapToken* API and related utilities out of the "kubeadm" API group to a new group
+// "bootstraptoken". The kubeadm API version v1beta3 no longer contains the BootstrapToken* structures.
 //
 // Migration from old kubeadm config versions
 //
