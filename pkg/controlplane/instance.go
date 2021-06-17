@@ -120,6 +120,8 @@ const (
 	KubeAPIServer = "kube-apiserver"
 	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
 	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
+	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
+	repairLoopInterval = 3 * time.Minute
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -199,6 +201,10 @@ type ExtraConfig struct {
 
 	IdentityLeaseDurationSeconds      int
 	IdentityLeaseRenewIntervalSeconds int
+
+	// RepairServicesInterval interval used by the repair loops for
+	// the Services NodePort and ClusterIP resources
+	RepairServicesInterval time.Duration
 }
 
 // Config defines configuration for the master
@@ -320,6 +326,10 @@ func (c *Config) Complete() CompletedConfig {
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
 		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
+	}
+
+	if cfg.ExtraConfig.RepairServicesInterval == 0 {
+		cfg.ExtraConfig.RepairServicesInterval = repairLoopInterval
 	}
 
 	return CompletedConfig{&cfg}
