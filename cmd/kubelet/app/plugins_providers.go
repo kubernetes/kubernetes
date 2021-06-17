@@ -20,9 +20,7 @@ package app
 
 import (
 	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/register"
 
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"

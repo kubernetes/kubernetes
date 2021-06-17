@@ -54,9 +54,9 @@ var (
 	acrRE                 = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
 )
 
-// init registers the various means by which credentials may
+// Register registers the various means by which credentials may
 // be resolved on Azure.
-func init() {
+func Register() {
 	credentialprovider.RegisterCredentialProvider(
 		"azure",
 		NewACRProvider(flagConfigFile),

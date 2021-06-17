@@ -57,9 +57,9 @@ var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
 }
 
-// init registers the various means by which credentials may
+// Register registers the various means by which credentials may
 // be resolved on GCP.
-func init() {
+func Register() {
 	tr := utilnet.SetTransportDefaults(&http.Transport{})
 	metadataHTTPClientTimeout := time.Second * 10
 	httpClient := &http.Client{
