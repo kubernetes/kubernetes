@@ -31,7 +31,8 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-type pathOwerAndPermissionsUpdaterFunc func(path string, uid, gid int64, perms uint32) error
+type pathOwnerAndPermissionsUpdaterFunc func(path string, uid, gid int64, perms uint32) error
+type pathOwnerUpdaterFunc func(path string, uid, gid int64) error
 
 // RunComponentAsNonRoot updates the pod manifest and the hostVolume permissions to run as non root.
 func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *users.UsersAndGroups, cfg *kubeadmapi.ClusterConfiguration) error {
@@ -61,12 +62,21 @@ func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *us
 			usersAndGroups.Groups.ID(kubeadmconstants.KubeControllerManagerUserName),
 			users.UpdatePathOwnerAndPermissions,
 		)
+	case kubeadmconstants.Etcd:
+		return runEtcdAsNonRoot(
+			pod,
+			usersAndGroups.Users.ID(kubeadmconstants.EtcdUserName),
+			usersAndGroups.Groups.ID(kubeadmconstants.EtcdUserName),
+			users.UpdatePathOwnerAndPermissions,
+			users.UpdatePathOwner,
+			cfg,
+		)
 	}
 	return errors.New(fmt.Sprintf("component name %q is not valid", componentName))
 }
 
 // runKubeAPIServerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-apiserver as non root.
-func runKubeAPIServerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
+func runKubeAPIServerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
 	saPublicKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName)
 	if err := updatePathOwnerAndPermissions(saPublicKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
 		return err
@@ -110,7 +120,7 @@ func runKubeAPIServerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalG
 }
 
 // runKubeControllerManagerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-controller-manager as non root.
-func runKubeControllerManagerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
+func runKubeControllerManagerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0600); err != nil {
 		return err
@@ -140,9 +150,34 @@ func runKubeControllerManagerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, suppl
 }
 
 // runKubeSchedulerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-scheduler as non root.
-func runKubeSchedulerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup *int64, updatePathOwnerAndPermissions pathOwerAndPermissionsUpdaterFunc) error {
+func runKubeSchedulerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc) error {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0600); err != nil {
+		return err
+	}
+	pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		// We drop all capabilities that are added by default.
+		Capabilities: &v1.Capabilities{
+			Drop: []v1.Capability{"ALL"},
+		},
+	}
+	pod.Spec.SecurityContext.RunAsUser = runAsUser
+	pod.Spec.SecurityContext.RunAsGroup = runAsGroup
+	return nil
+}
+
+// runEtcdAsNonRoot updates the pod manifest and the hostVolume permissions to run etcd as non root.
+func runEtcdAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc, updatePathOwner pathOwnerUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
+	if err := updatePathOwner(cfg.Etcd.Local.DataDir, *runAsUser, *runAsGroup); err != nil {
+		return err
+	}
+	etcdServerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName)
+	if err := updatePathOwnerAndPermissions(etcdServerKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+		return err
+	}
+	etcdPeerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName)
+	if err := updatePathOwnerAndPermissions(etcdPeerKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
 		return err
 	}
 	pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
