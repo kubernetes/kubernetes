@@ -730,10 +730,7 @@ func podAffinityNamespaceSelectorInUse(podSpec *api.PodSpec) bool {
 }
 
 func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.EphemeralContainers) > 0
+	return podSpec != nil && len(podSpec.EphemeralContainers) > 0
 }
 
 func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
@@ -769,13 +766,7 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
 func overheadInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Overhead != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.Overhead != nil
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -904,13 +895,7 @@ func ephemeralInUse(podSpec *api.PodSpec) bool {
 
 // podPriorityInUse returns true if status is not nil and number of PodIPs is greater than one
 func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
-	if podStatus == nil {
-		return false
-	}
-	if len(podStatus.PodIPs) > 1 {
-		return true
-	}
-	return false
+	return podStatus != nil && len(podStatus.PodIPs) > 1
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
