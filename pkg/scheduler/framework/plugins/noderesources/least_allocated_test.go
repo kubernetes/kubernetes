@@ -333,7 +333,8 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			}
 
 			for i := range test.nodes {
-				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)
+				state := framework.NewCycleState()
+				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, test.nodes[i].Name)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

@@ -58,7 +58,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	// Detail: score = (1 - variance(cpuFraction,memoryFraction,volumeFraction)) * MaxNodeScore. The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced
 	// Resource Utilization"
-	return ba.score(pod, nodeInfo)
+	return ba.score(pod, nodeInfo, state)
 }
 
 // ScoreExtensions of the Score plugin.

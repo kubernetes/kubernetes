@@ -58,7 +58,7 @@ func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState
 	//
 	// Details:
 	// (cpu((capacity-sum(requested))*MaxNodeScore/capacity) + memory((capacity-sum(requested))*MaxNodeScore/capacity))/weightSum
-	return la.score(pod, nodeInfo)
+	return la.score(pod, nodeInfo, state)
 }
 
 // ScoreExtensions of the Score plugin.

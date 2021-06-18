@@ -17,6 +17,8 @@ limitations under the License.
 package noderesources
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -42,10 +44,22 @@ type resourceAllocationScorer struct {
 // resourceToValueMap contains resource name and score.
 type resourceToValueMap map[v1.ResourceName]int64
 
+type resourceAllocatableRequest struct {
+	allocatable int64
+	requested   int64
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *resourceAllocatableRequest) Clone() framework.StateData {
+	return s
+}
+
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+	nodeInfo *framework.NodeInfo,
+	state *framework.CycleState) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
@@ -56,8 +70,23 @@ func (r *resourceAllocationScorer) score(
 	requested := make(resourceToValueMap, len(r.resourceToWeightMap))
 	allocatable := make(resourceToValueMap, len(r.resourceToWeightMap))
 	for resource := range r.resourceToWeightMap {
-		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
+		stateKey := framework.StateKey(fmt.Sprintf("%v-%v-%v", nodeInfo.Node().Name, pod.UID, resource))
+		// ErrNotFound is expected if the resource allocatable or the reqeusted have not been calculated before.
+		val, error := state.Read(stateKey)
+		if error == nil {
+			s, ok := val.(*resourceAllocatableRequest)
+			if ok {
+				allocatable[resource] = (*s).allocatable
+				requested[resource] = (*s).requested
+			} else {
+				return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to resourceAllocatableRequest error", val))
+			}
+		} else {
+			allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
+			state.Write(stateKey, &resourceAllocatableRequest{allocatable[resource], requested[resource]})
+		}
 	}
+
 	var score int64
 
 	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.

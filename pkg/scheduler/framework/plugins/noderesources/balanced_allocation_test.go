@@ -394,7 +394,8 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			p, _ := NewBalancedAllocation(nil, fh, feature.Features{EnablePodOverhead: true, EnableBalanceAttachedNodeVolumes: true})
 
 			for i := range test.nodes {
-				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)
+				state := framework.NewCycleState()
+				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, test.nodes[i].Name)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}

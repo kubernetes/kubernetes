@@ -56,7 +56,7 @@ func (ma *MostAllocated) Score(ctx context.Context, state *framework.CycleState,
 	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 	// based on the maximum of the average of the fraction of requested to capacity.
 	// Details: (cpu(MaxNodeScore * sum(requested) / capacity) + memory(MaxNodeScore * sum(requested) / capacity)) / weightSum
-	return ma.score(pod, nodeInfo)
+	return ma.score(pod, nodeInfo, state)
 }
 
 // ScoreExtensions of the Score plugin.

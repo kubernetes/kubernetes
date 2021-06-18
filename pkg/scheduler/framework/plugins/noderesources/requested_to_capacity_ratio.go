@@ -101,12 +101,12 @@ func (pl *RequestedToCapacityRatio) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *RequestedToCapacityRatio) Score(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *RequestedToCapacityRatio) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
-	return pl.score(pod, nodeInfo)
+	return pl.score(pod, nodeInfo, state)
 }
 
 // ScoreExtensions of the Score plugin.
