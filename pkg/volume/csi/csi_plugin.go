@@ -339,9 +339,6 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		return false
-	}
 	if p.csiDriverLister == nil {
 		return false
 	}
