@@ -80,7 +80,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 	return dc
 }
 
-// initTest initializes a test environment and creates master and scheduler with default
+// initTest initializes a test environment and creates API server and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
 	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil, opts...)
@@ -89,7 +89,7 @@ func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutil
 	return testCtx
 }
 
-// initTestDisablePreemption initializes a test environment and creates master and scheduler with default
+// initTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
 	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{

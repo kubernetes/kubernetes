@@ -54,7 +54,7 @@ type testContext struct {
 	cancelFn context.CancelFunc
 }
 
-// initTestAPIServer initializes a test environment and creates a master with default
+// initTestAPIServer initializes a test environment and creates an API server with default
 // configuration. Alpha resources are enabled automatically if the corresponding feature
 // is enabled.
 func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {

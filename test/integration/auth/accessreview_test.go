@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// Inject into master an authorizer that uses user info.
+// Inject into control plane an authorizer that uses user info.
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 

@@ -709,7 +709,7 @@ func TestServiceAlloc(t *testing.T) {
 }
 
 // TestUpdateNodeObjects represents a simple version of the behavior of node checkins at steady
-// state. This test allows for easy profiling of a realistic master scenario for baseline CPU
+// state. This test allows for easy profiling of a realistic primary scenario for baseline CPU
 // in very large clusters. It is disabled by default - start a kube-apiserver and pass
 // UPDATE_NODE_APISERVER as the host value.
 func TestUpdateNodeObjects(t *testing.T) {
