@@ -1,8 +1,3 @@
-cluster/images/etcd/migrate
-vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
-vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation
-vendor/k8s.io/apiserver/pkg/endpoints/filters
-vendor/k8s.io/apiserver/pkg/endpoints/metrics
 vendor/k8s.io/apiserver/pkg/server/dynamiccertificates
 vendor/k8s.io/apiserver/pkg/server/filters
 vendor/k8s.io/apiserver/pkg/server/routes

@@ -126,6 +126,7 @@ func ParseEtcdVersionPair(s string) (*EtcdVersionPair, error) {
 
 // MustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
 // or panics if the parse fails.
+//lint:ignore U1000 Keep unused but exported MustParseEtcdVersionPair until deprecated package is being removed
 func MustParseEtcdVersionPair(s string) *EtcdVersionPair {
 	pair, err := ParseEtcdVersionPair(s)
 	if err != nil {
@@ -188,6 +189,7 @@ func ParseSupportedVersions(list []string) (SupportedVersions, error) {
 }
 
 // MustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
+//lint:ignore U1000 Keep unused but exported MustParseSupportedVersions until deprecated package is being removed
 func MustParseSupportedVersions(list []string) SupportedVersions {
 	versions, err := ParseSupportedVersions(list)
 	if err != nil {

@@ -469,6 +469,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
 
+		//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 		_, cn := response.ResponseWriter.(http.CloseNotifier)
 		_, fl := response.ResponseWriter.(http.Flusher)
 		_, hj := response.ResponseWriter.(http.Hijacker)
