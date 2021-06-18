@@ -923,7 +923,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
-# github.com/openshift/api v0.0.0-20210521075222-e273a339932a => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
+# github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 ## explicit
 # github.com/openshift/api => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 github.com/openshift/api/apiserver/v1
@@ -947,7 +947,7 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/template/v1
 github.com/openshift/api/user/v1
-# github.com/openshift/apiserver-library-go v0.0.0-20210521113822-91c23a9a7ddf => github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
+# github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7 => github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
 ## explicit
 # github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
@@ -969,7 +969,7 @@ github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
 # github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
-# github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142 => github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
+# github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535 => github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 ## explicit
 # github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 github.com/openshift/client-go/apiserver/clientset/versioned/scheme
@@ -1078,7 +1078,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20210521084623-7392ea9b02ca => github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
+# github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427 => github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
 ## explicit
 # github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
