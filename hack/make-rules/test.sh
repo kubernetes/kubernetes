@@ -253,7 +253,7 @@ runTests() {
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running tests without code coverage"
+    kube::log::status "Running tests without code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
     go test "${goflags[@]:+${goflags[@]}}" \
      "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
@@ -262,6 +262,8 @@ runTests() {
     produceJUnitXMLReport "${junit_filename_prefix}"
     return ${rc}
   fi
+
+  kube::log::status "Running tests with code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
 
   # Create coverage report directories.
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
