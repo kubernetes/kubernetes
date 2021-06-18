@@ -39,7 +39,7 @@ Running this command will execute the following operations on your cluster:
 4. **Delete Service:** This will delete the Service object. Verify with `kubectl get services`.
 
 Each step is separated by an interactive prompt. You must hit the
-<kbd>Return</kbd> key to proceed to the next step. You can use these prompts as
+<kbd>Enter</kbd> key to proceed to the next step. You can use these prompts as
 a break to take time to run `kubectl` and inspect the result of the operations
 executed.
 
@@ -48,15 +48,15 @@ You should see an output like the following:
 ```
 Creating Service...
 Created service "demo-service".
--> Press Return key to continue.
+-> Press Enter key to continue.
 
 Updating Service...
 Updated service...
--> Press Return key to continue.
+-> Press Enter key to continue.
 
 Listing services in namespace "default":
  * demo-services (NodePort)
--> Press Return key to continue.
+-> Press Enter key to continue.
 
 Deleting service...
 Deleted service.
