@@ -18,11 +18,13 @@ package logs
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/config"
 )
 
 func TestFlags(t *testing.T) {
@@ -48,7 +50,7 @@ func TestOptions(t *testing.T) {
 		name string
 		args []string
 		want *Options
-		errs []error
+		errs field.ErrorList
 	}{
 		{
 			name: "Default log format",
@@ -63,24 +65,35 @@ func TestOptions(t *testing.T) {
 			name: "JSON log format",
 			args: []string{"--logging-format=json"},
 			want: &Options{
-				LogFormat: JSONLogFormat,
+				Config: config.LoggingConfiguration{
+					Format: JSONLogFormat,
+				},
 			},
 		},
 		{
 			name: "log sanitization",
 			args: []string{"--experimental-logging-sanitization"},
 			want: &Options{
-				LogFormat:       DefaultLogFormat,
-				LogSanitization: true,
+				Config: config.LoggingConfiguration{
+					Format:       DefaultLogFormat,
+					Sanitization: true,
+				},
 			},
 		},
 		{
 			name: "Unsupported log format",
 			args: []string{"--logging-format=test"},
 			want: &Options{
-				LogFormat: "test",
+				Config: config.LoggingConfiguration{
+					Format: "test",
+				},
 			},
-			errs: []error{fmt.Errorf("unsupported log format: test")},
+			errs: field.ErrorList{&field.Error{
+				Type:     "FieldValueInvalid",
+				Field:    "format",
+				BadValue: "test",
+				Detail:   "Unsupported log format",
+			}},
 		},
 	}
 
@@ -95,7 +108,8 @@ func TestOptions(t *testing.T) {
 			}
 			errs := o.Validate()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
-				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.errs, errs)
+				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
+
 			}
 		})
 	}

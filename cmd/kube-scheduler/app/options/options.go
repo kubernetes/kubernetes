@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -175,8 +176,8 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		c.ComponentConfig = o.ComponentConfig
 
-		// apply deprecated flags if no config file is loaded (this is the old behaviour).
 		o.Deprecated.ApplyTo(c)
+
 		if err := o.CombinedInsecureServing.ApplyTo(c, &c.ComponentConfig); err != nil {
 			return err
 		}
@@ -194,16 +195,16 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		// apply any deprecated Policy flags, if applicable
 		o.Deprecated.ApplyTo(c)
 
-		// if the user has set CC profiles and is trying to use a Policy config, error out
-		// these configs are no longer merged and they should not be used simultaneously
-		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.LegacyPolicySource != nil {
-			return fmt.Errorf("cannot set a Plugin config and Policy config")
-		}
-
 		// use the loaded config file only, with the exception of --address and --port.
 		if err := o.CombinedInsecureServing.ApplyToFromLoadedConfig(c, &c.ComponentConfig); err != nil {
 			return err
 		}
+	}
+
+	// If the user is using the legacy policy config, clear the profiles, they will be set
+	// on scheduler instantiation based on the configurations in the policy file.
+	if c.LegacyPolicySource != nil {
+		c.ComponentConfig.Profiles = nil
 	}
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
@@ -220,15 +221,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	o.Metrics.Apply()
 	o.Logs.Apply()
 	return nil
-}
-
-// emptySchedulerProfileConfig returns true if the list of profiles passed to it contains only
-// the "default-scheduler" profile with no plugins or pluginconfigs registered
-// (this is the default empty profile initialized by defaults.go)
-func emptySchedulerProfileConfig(profiles []kubeschedulerconfig.KubeSchedulerProfile) bool {
-	return len(profiles) == 1 &&
-		len(profiles[0].PluginConfig) == 0 &&
-		profiles[0].Plugins == nil
 }
 
 // Validate validates all the required options.
@@ -280,7 +272,11 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
 	if c.ComponentConfig.LeaderElection.LeaderElect {
 		// Use the scheduler name in the first profile to record leader election.
-		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(c.ComponentConfig.Profiles[0].SchedulerName)
+		schedulerName := corev1.DefaultSchedulerName
+		if len(c.ComponentConfig.Profiles) != 0 {
+			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
+		}
+		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err

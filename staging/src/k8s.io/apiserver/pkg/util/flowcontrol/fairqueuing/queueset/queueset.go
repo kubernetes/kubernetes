@@ -245,9 +245,9 @@ func (qs *queueSet) StartRequest(ctx context.Context, width uint, hashValue uint
 	// Step 0:
 	// Apply only concurrency limit, if zero queues desired
 	if qs.qCfg.DesiredNumQueues < 1 {
-		if qs.totSeatsInUse >= qs.dCfg.ConcurrencyLimit {
-			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d seats are in use (%d are executing) and the limit is %d",
-				qs.qCfg.Name, fsName, descr1, descr2, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
+		if !qs.canAccommodateSeatsLocked(int(width)) {
+			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d seats are asked for, %d seats are in use (%d are executing) and the limit is %d",
+				qs.qCfg.Name, fsName, descr1, descr2, width, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
 			metrics.AddReject(ctx, qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
@@ -662,6 +662,33 @@ func (qs *queueSet) cancelWait(req *request) {
 	qs.obsPair.RequestsWaiting.Add(-1)
 }
 
+// canAccommodateSeatsLocked returns true if this queueSet has enough
+// seats available to accommodate a request with the given number of seats,
+// otherwise it returns false.
+func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
+	switch {
+	case seats > qs.dCfg.ConcurrencyLimit:
+		// we have picked the queue with the minimum virtual finish time, but
+		// the number of seats this request asks for exceeds the concurrency limit.
+		// TODO: this is a quick fix for now, once we have borrowing in place we will not need it
+		if qs.totRequestsExecuting == 0 {
+			// TODO: apply additional lateny associated with this request, as described in the KEP
+			return true
+		}
+		// wait for all "currently" executing requests in this queueSet
+		// to finish before we can execute this request.
+		if klog.V(4).Enabled() {
+			klog.Infof("QS(%s): seats (%d) asked for exceeds concurrency limit, waiting for currently executing requests to complete, %d seats are in use (%d are executing) and the limit is %d",
+				qs.qCfg.Name, seats, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
+		}
+		return false
+	case qs.totSeatsInUse+seats > qs.dCfg.ConcurrencyLimit:
+		return false
+	}
+
+	return true
+}
+
 // selectQueueLocked examines the queues in round robin order and
 // returns the first one of those for which the virtual finish time of
 // the oldest waiting request is minimal.
@@ -674,7 +701,24 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
 		if queue.requests.Length() != 0 {
-			currentVirtualFinish := queue.GetNextFinish(qs.estimatedServiceTime)
+			// the virtual finish time of the oldest request is:
+			//   virtual start time + G
+			// we are not taking the width of the request into account when
+			// we calculate the virtual finish time of the request because
+			// it can starve requests with smaller wdith in other queues.
+			//
+			// so let's draw an example of the starving scenario:
+			//  - G=60 (estimated service time in seconds)
+			//  - concurrency limit=2
+			//  - we have two queues, q1 and q2
+			//  - q1 has an infinite supply of requests with width W=1
+			//  - q2 has one request waiting in the queue with width W=2
+			//  - virtual start time for both q1 and q2 are at t0
+			//  - requests complete really fast, S=1ms on q1
+			// in this scenario we will execute roughly 60,000 requests
+			// from q1 before we pick the request from q2.
+			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceTime
+
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
 				minQueue = queue
@@ -682,6 +726,19 @@ func (qs *queueSet) selectQueueLocked() *queue {
 			}
 		}
 	}
+
+	// TODO: add a method to fifo that lets us peek at the oldest request
+	var oldestReqFromMinQueue *request
+	minQueue.requests.Walk(func(r *request) bool {
+		oldestReqFromMinQueue = r
+		return false
+	})
+	if oldestReqFromMinQueue == nil || !qs.canAccommodateSeatsLocked(oldestReqFromMinQueue.Seats()) {
+		// since we have not picked the queue with the minimum virtual finish
+		// time, we are not going to advance the round robin index here.
+		return nil
+	}
+
 	// we set the round robin indexing to start at the chose queue
 	// for the next round.  This way the non-selected queues
 	// win in the case that the virtual finish times are the same

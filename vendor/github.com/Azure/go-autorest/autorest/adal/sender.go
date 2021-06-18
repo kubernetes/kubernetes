@@ -28,6 +28,7 @@ const (
 	mimeTypeFormPost = "application/x-www-form-urlencoded"
 )
 
+// DO NOT ACCESS THIS DIRECTLY.  go through sender()
 var defaultSender Sender
 var defaultSenderInit = &sync.Once{}
 

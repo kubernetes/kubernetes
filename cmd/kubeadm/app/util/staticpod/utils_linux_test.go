@@ -133,3 +133,34 @@ func TestRunKubeSchedulerAsNonRoot(t *testing.T) {
 	}
 	verifyFilePermissions(t, updatedFiles, wantUpdateFiles)
 }
+
+func TestRunEtcdAsNonRoot(t *testing.T) {
+	cfg := &kubeadm.ClusterConfiguration{
+		Etcd: kubeadm.Etcd{
+			Local: &kubeadm.LocalEtcd{
+				DataDir: "/var/lib/etcd/data",
+			},
+		},
+	}
+	pod := ComponentPod(v1.Container{Name: "etcd"}, nil, nil)
+	var runAsUser, runAsGroup int64 = 1000, 1001
+	updatedFiles := map[string]ownerAndPermissions{}
+	if err := runEtcdAsNonRoot(&pod, &runAsUser, &runAsGroup, func(path string, uid, gid int64, perms uint32) error {
+		updatedFiles[path] = ownerAndPermissions{uid: uid, gid: gid, permissions: perms}
+		return nil
+	},
+		func(path string, uid, gid int64) error {
+			updatedFiles[path] = ownerAndPermissions{uid: uid, gid: gid, permissions: 0700}
+			return nil
+		}, cfg); err != nil {
+		t.Fatal(err)
+	}
+	verifyPodSecurityContext(t, &pod, runAsUser, runAsGroup, nil)
+	verifyContainerSecurityContext(t, pod.Spec.Containers[0], nil, []v1.Capability{"ALL"}, pointer.Bool(false))
+	wantUpdateFiles := map[string]ownerAndPermissions{
+		cfg.Etcd.Local.DataDir: {uid: runAsUser, gid: runAsGroup, permissions: 0700},
+		filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName): {uid: runAsUser, gid: runAsGroup, permissions: 0600},
+		filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName):   {uid: runAsUser, gid: runAsGroup, permissions: 0600},
+	}
+	verifyFilePermissions(t, updatedFiles, wantUpdateFiles)
+}

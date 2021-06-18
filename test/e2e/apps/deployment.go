@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -40,12 +41,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -480,6 +483,140 @@ var _ = SIGDescribe("Deployment", func() {
 			return false, nil
 		})
 		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
+	})
+
+	ginkgo.It("should validate Deployment Status endpoints", func() {
+		dClient := c.AppsV1().Deployments(ns)
+		dName := "test-deployment-" + utilrand.String(5)
+		labelSelector := "e2e=testing"
+
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labelSelector
+				return dClient.Watch(context.TODO(), options)
+			},
+		}
+		dList, err := c.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list Deployments")
+
+		ginkgo.By("creating a Deployment")
+
+		podLabels := map[string]string{"name": WebserverImageName, "e2e": "testing"}
+		replicas := int32(1)
+		framework.Logf("Creating simple deployment %s", dName)
+		d := e2edeployment.NewDeployment(dName, replicas, podLabels, WebserverImageName, WebserverImage, appsv1.RollingUpdateDeploymentStrategyType)
+		deploy, err := c.AppsV1().Deployments(ns).Create(context.TODO(), d, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// Wait for it to be updated to revision 1
+		err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, dName, "1", WebserverImage)
+		framework.ExpectNoError(err)
+
+		err = e2edeployment.WaitForDeploymentComplete(c, deploy)
+		framework.ExpectNoError(err)
+
+		testDeployment, err := dClient.Get(context.TODO(), dName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting /status")
+		dResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+		dStatusUnstructured, err := f.DynamicClient.Resource(dResource).Namespace(ns).Get(context.TODO(), dName, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to fetch the status of deployment %s in namespace %s", dName, ns)
+		dStatusBytes, err := json.Marshal(dStatusUnstructured)
+		framework.ExpectNoError(err, "Failed to marshal unstructured response. %v", err)
+
+		var dStatus appsv1.Deployment
+		err = json.Unmarshal(dStatusBytes, &dStatus)
+		framework.ExpectNoError(err, "Failed to unmarshal JSON bytes to a deployment object type")
+		framework.Logf("Deployment %s has Conditions: %v", dName, dStatus.Status.Conditions)
+
+		ginkgo.By("updating Deployment Status")
+		var statusToUpdate, updatedStatus *appsv1.Deployment
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			statusToUpdate, err = dClient.Get(context.TODO(), dName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to retrieve deployment %s", dName)
+
+			statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, appsv1.DeploymentCondition{
+				Type:    "StatusUpdate",
+				Status:  "True",
+				Reason:  "E2E",
+				Message: "Set from e2e test",
+			})
+
+			updatedStatus, err = dClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "Failed to update status. %v", err)
+		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+		ginkgo.By("watching for the Deployment status to be updated")
+		ctx, cancel := context.WithTimeout(context.Background(), dRetryTimeout)
+		defer cancel()
+
+		_, err = watchtools.Until(ctx, dList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if d, ok := event.Object.(*appsv1.Deployment); ok {
+				found := d.ObjectMeta.Name == testDeployment.ObjectMeta.Name &&
+					d.ObjectMeta.Namespace == testDeployment.ObjectMeta.Namespace &&
+					d.Labels["e2e"] == "testing"
+
+				if !found {
+					framework.Logf("Observed Deployment %v in namespace %v with annotations: %v & Conditions: %v\n", d.ObjectMeta.Name, d.ObjectMeta.Namespace, d.Annotations, d.Status.Conditions)
+					return false, nil
+				}
+				for _, cond := range d.Status.Conditions {
+					if cond.Type == "StatusUpdate" &&
+						cond.Reason == "E2E" &&
+						cond.Message == "Set from e2e test" {
+						framework.Logf("Found Deployment %v in namespace %v with labels: %v annotations: %v & Conditions: %v", d.ObjectMeta.Name, d.ObjectMeta.Namespace, d.ObjectMeta.Labels, d.Annotations, cond)
+						return found, nil
+					}
+					framework.Logf("Observed Deployment %v in namespace %v with annotations: %v & Conditions: %v", d.ObjectMeta.Name, d.ObjectMeta.Namespace, d.Annotations, cond)
+				}
+			}
+			object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+			framework.Logf("Observed %v event: %+v", object, event.Type)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to locate Deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
+		framework.Logf("Deployment %s has an updated status", dName)
+
+		ginkgo.By("patching the Statefulset Status")
+		payload := []byte(`{"status":{"conditions":[{"type":"StatusPatched","status":"True"}]}}`)
+		framework.Logf("Patch payload: %v", string(payload))
+
+		patchedDeployment, err := dClient.Patch(context.TODO(), dName, types.MergePatchType, payload, metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to patch status. %v", err)
+		framework.Logf("Patched status conditions: %#v", patchedDeployment.Status.Conditions)
+
+		ginkgo.By("watching for the Deployment status to be patched")
+		ctx, cancel = context.WithTimeout(context.Background(), dRetryTimeout)
+		defer cancel()
+
+		_, err = watchtools.Until(ctx, dList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+
+			if e, ok := event.Object.(*appsv1.Deployment); ok {
+				found := e.ObjectMeta.Name == testDeployment.ObjectMeta.Name &&
+					e.ObjectMeta.Namespace == testDeployment.ObjectMeta.Namespace &&
+					e.ObjectMeta.Labels["e2e"] == testDeployment.ObjectMeta.Labels["e2e"]
+				if !found {
+					framework.Logf("Observed deployment %v in namespace %v with annotations: %v & Conditions: %v", testDeployment.ObjectMeta.Name, testDeployment.ObjectMeta.Namespace, testDeployment.Annotations, testDeployment.Status.Conditions)
+					return false, nil
+				}
+				for _, cond := range e.Status.Conditions {
+					if cond.Type == "StatusPatched" {
+						framework.Logf("Found deployment %v in namespace %v with labels: %v annotations: %v & Conditions: %v", testDeployment.ObjectMeta.Name, testDeployment.ObjectMeta.Namespace, testDeployment.ObjectMeta.Labels, testDeployment.Annotations, cond)
+						return found, nil
+					}
+					framework.Logf("Observed deployment %v in namespace %v with annotations: %v & Conditions: %v", testDeployment.ObjectMeta.Name, testDeployment.ObjectMeta.Namespace, testDeployment.Annotations, cond)
+				}
+			}
+			object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+			framework.Logf("Observed %v event: %+v", object, event.Type)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to locate deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
+		framework.Logf("Deployment %s has a patched status", dName)
 	})
 })
 

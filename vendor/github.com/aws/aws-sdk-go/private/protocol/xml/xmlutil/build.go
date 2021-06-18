@@ -308,6 +308,8 @@ func (b *xmlBuilder) buildScalar(value reflect.Value, current *XMLNode, tag refl
 	if tag.Get("xmlAttribute") != "" { // put into current node's attribute list
 		attr := xml.Attr{Name: xname, Value: str}
 		current.Attr = append(current.Attr, attr)
+	} else if len(xname.Local) == 0 {
+		current.Text = str
 	} else { // regular text node
 		current.AddChild(&XMLNode{Name: xname, Text: str})
 	}

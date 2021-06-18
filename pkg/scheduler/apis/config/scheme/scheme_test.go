@@ -27,6 +27,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
@@ -102,6 +103,7 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1beta1,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
@@ -199,12 +201,13 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
+					Plugins:       defaults.PluginsV1beta1,
+					PluginConfig: append([]config.PluginConfig{
 						{
 							Name: "NodeLabel",
 							Args: &config.NodeLabelArgs{PresentLabels: []string{"bars"}},
 						},
-					},
+					}, defaults.PluginConfigs...),
 				},
 			},
 		},
@@ -269,7 +272,8 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
+					Plugins:       defaults.PluginsV1beta1,
+					PluginConfig: append([]config.PluginConfig{
 						{
 							Name: "OutOfTreePlugin",
 							Args: &runtime.Unknown{
@@ -277,7 +281,7 @@ profiles:
 								Raw:         []byte(`{"foo":"bar"}`),
 							},
 						},
-					},
+					}, defaults.PluginConfigs...),
 				},
 			},
 		},
@@ -307,6 +311,7 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1beta1,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
@@ -411,6 +416,7 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1beta2,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
@@ -498,10 +504,43 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1beta2,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
 							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "InterPodAffinity",
+							Args: &config.InterPodAffinityArgs{
+								HardPodAffinityWeight: 1,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesFit",
+							Args: &config.NodeResourcesFitArgs{},
+						},
+						{
+							Name: "NodeResourcesLeastAllocated",
+							Args: &config.NodeResourcesLeastAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultingType: config.SystemDefaulting,
+							},
+						},
+						{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 600,
+							},
 						},
 					},
 				},
@@ -568,7 +607,8 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
+					Plugins:       defaults.PluginsV1beta2,
+					PluginConfig: append([]config.PluginConfig{
 						{
 							Name: "OutOfTreePlugin",
 							Args: &runtime.Unknown{
@@ -576,7 +616,7 @@ profiles:
 								Raw:         []byte(`{"foo":"bar"}`),
 							},
 						},
-					},
+					}, defaults.PluginConfigs...),
 				},
 			},
 		},
@@ -606,6 +646,7 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1beta2,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",

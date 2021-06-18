@@ -34,25 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
-
-func newV1beta1DefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := v1beta1.KubeSchedulerConfiguration{}
-	versionedCfg.DebuggingConfiguration = *v1alpha1.NewRecommendedDebuggingConfiguration()
-
-	scheme.Scheme.Default(&versionedCfg)
-	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
-	if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
 
 func TestSchedulerOptions(t *testing.T) {
 	// temp dir
@@ -224,12 +213,12 @@ profiles:
       - name: foo
       - name: bar
       disabled:
-      - name: baz
+      - name: VolumeBinding
     preBind:
       enabled:
       - name: foo
       disabled:
-      - name: baz
+      - name: VolumeBinding
   pluginConfig:
   - name: InterPodAffinity
     args:
@@ -255,12 +244,12 @@ profiles:
       - name: foo
       - name: bar
       disabled:
-      - name: baz
+      - name: VolumeBinding
     preBind:
       enabled:
       - name: foo
       disabled:
-      - name: baz
+      - name: VolumeBinding
   pluginConfig:
   - name: ServiceAffinity
     args:
@@ -286,11 +275,14 @@ profiles:
     reserve:
       enabled:
       - name: foo
+      - name: VolumeBinding
+      disabled:
+      - name: VolumeBinding
 - schedulerName: "bar-profile"
   plugins:
     preBind:
       disabled:
-      - name: baz
+      - name: VolumeBinding
   pluginConfig:
   - name: foo
 `, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -310,11 +302,14 @@ profiles:
     reserve:
       enabled:
       - name: foo
+      - name: VolumeBinding
+      disabled:
+      - name: VolumeBinding
 - schedulerName: "bar-profile"
   plugins:
     preBind:
       disabled:
-      - name: baz
+      - name: VolumeBinding
   pluginConfig:
   - name: foo
 `, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -409,7 +404,11 @@ profiles:
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{SchedulerName: "default-scheduler"},
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1beta2,
+						PluginConfig:  defaults.PluginConfigs,
+					},
 				},
 			},
 		},
@@ -418,10 +417,7 @@ profiles:
 			options: &Options{
 				ConfigFile: v1beta1VersionConfig,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, err := newV1beta1DefaultComponentConfig()
-					if err != nil {
-						t.Fatal(err)
-					}
+					cfg := configtesting.V1beta1ToInternalWithDefaults(t, v1beta1.KubeSchedulerConfiguration{})
 					return *cfg
 				}(),
 				SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -481,7 +477,11 @@ profiles:
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{SchedulerName: "default-scheduler"},
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1beta1,
+						PluginConfig:  defaults.PluginConfigs,
+					},
 				},
 			},
 		},
@@ -581,7 +581,11 @@ profiles:
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{SchedulerName: "default-scheduler"},
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1beta2,
+						PluginConfig:  defaults.PluginConfigs,
+					},
 				},
 			},
 		},
@@ -649,7 +653,11 @@ profiles:
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{SchedulerName: "default-scheduler"},
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1beta2,
+						PluginConfig:  defaults.PluginConfigs,
+					},
 				},
 			},
 			expectedUsername: "none, http",
@@ -694,23 +702,24 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							QueueSort:  defaults.PluginsV1beta2.QueueSort,
+							PreFilter:  defaults.PluginsV1beta2.PreFilter,
+							Filter:     defaults.PluginsV1beta2.Filter,
+							PostFilter: defaults.PluginsV1beta2.PostFilter,
+							PreScore:   defaults.PluginsV1beta2.PreScore,
+							Score:      defaults.PluginsV1beta2.Score,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 									{Name: "bar"},
-								},
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
 								},
 							},
 							PreBind: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 								},
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
-								},
 							},
+							Bind: defaults.PluginsV1beta2.Bind,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
@@ -724,6 +733,39 @@ profiles:
 								Args: &runtime.Unknown{
 									Raw:         []byte(`{"bar":"baz"}`),
 									ContentType: "application/json",
+								},
+							},
+							{
+								Name: "DefaultPreemption",
+								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
+									MinCandidateNodesPercentage: 10,
+									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "NodeAffinity",
+								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+							},
+							{
+								Name: "NodeResourcesLeastAllocated",
+								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &kubeschedulerconfig.PodTopologySpreadArgs{
+									DefaultingType: kubeschedulerconfig.SystemDefaulting,
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: &kubeschedulerconfig.VolumeBindingArgs{
+									BindTimeoutSeconds: 600,
 								},
 							},
 						},
@@ -771,23 +813,24 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							QueueSort:  defaults.PluginsV1beta1.QueueSort,
+							PreFilter:  defaults.PluginsV1beta1.PreFilter,
+							Filter:     defaults.PluginsV1beta1.Filter,
+							PostFilter: defaults.PluginsV1beta1.PostFilter,
+							PreScore:   defaults.PluginsV1beta1.PreScore,
+							Score:      defaults.PluginsV1beta1.Score,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 									{Name: "bar"},
-								},
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
 								},
 							},
 							PreBind: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 								},
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
-								},
 							},
+							Bind: defaults.PluginsV1beta1.Bind,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
@@ -802,6 +845,45 @@ profiles:
 								Args: &runtime.Unknown{
 									Raw:         []byte(`{"bar":"baz"}`),
 									ContentType: "application/json",
+								},
+							},
+							{
+								Name: "DefaultPreemption",
+								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
+									MinCandidateNodesPercentage: 10,
+									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "InterPodAffinity",
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{
+									HardPodAffinityWeight: 1,
+								},
+							},
+							{
+								Name: "NodeAffinity",
+								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+							},
+							{
+								Name: "NodeResourcesLeastAllocated",
+								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &kubeschedulerconfig.PodTopologySpreadArgs{
+									DefaultingType: kubeschedulerconfig.SystemDefaulting,
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: &kubeschedulerconfig.VolumeBindingArgs{
+									BindTimeoutSeconds: 600,
 								},
 							},
 						},
@@ -849,25 +931,77 @@ profiles:
 					{
 						SchedulerName: "foo-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
+							QueueSort:  defaults.PluginsV1beta2.QueueSort,
+							PreFilter:  defaults.PluginsV1beta2.PreFilter,
+							Filter:     defaults.PluginsV1beta2.Filter,
+							PostFilter: defaults.PluginsV1beta2.PostFilter,
+							PreScore:   defaults.PluginsV1beta2.PreScore,
+							Score:      defaults.PluginsV1beta2.Score,
+							Bind:       defaults.PluginsV1beta2.Bind,
+							PreBind:    defaults.PluginsV1beta2.PreBind,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
+									{Name: names.VolumeBinding},
 								},
 							},
 						},
+						PluginConfig: defaults.PluginConfigs,
 					},
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							PreBind: kubeschedulerconfig.PluginSet{
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
-								},
-							},
+							QueueSort:  defaults.PluginsV1beta2.QueueSort,
+							PreFilter:  defaults.PluginsV1beta2.PreFilter,
+							Filter:     defaults.PluginsV1beta2.Filter,
+							PostFilter: defaults.PluginsV1beta2.PostFilter,
+							PreScore:   defaults.PluginsV1beta2.PreScore,
+							Score:      defaults.PluginsV1beta2.Score,
+							Bind:       defaults.PluginsV1beta2.Bind,
+							Reserve:    defaults.PluginsV1beta2.Reserve,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
 								Name: "foo",
+							},
+							{
+								Name: "DefaultPreemption",
+								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
+									MinCandidateNodesPercentage: 10,
+									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "InterPodAffinity",
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{
+									HardPodAffinityWeight: 1,
+								},
+							},
+							{
+								Name: "NodeAffinity",
+								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+							},
+							{
+								Name: "NodeResourcesLeastAllocated",
+								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &kubeschedulerconfig.PodTopologySpreadArgs{
+									DefaultingType: kubeschedulerconfig.SystemDefaulting,
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: &kubeschedulerconfig.VolumeBindingArgs{
+									BindTimeoutSeconds: 600,
+								},
 							},
 						},
 					},
@@ -914,37 +1048,82 @@ profiles:
 					{
 						SchedulerName: "foo-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
+							QueueSort:  defaults.PluginsV1beta1.QueueSort,
+							PreFilter:  defaults.PluginsV1beta1.PreFilter,
+							Filter:     defaults.PluginsV1beta1.Filter,
+							PostFilter: defaults.PluginsV1beta1.PostFilter,
+							PreScore:   defaults.PluginsV1beta1.PreScore,
+							Score:      defaults.PluginsV1beta1.Score,
+							Bind:       defaults.PluginsV1beta1.Bind,
+							PreBind:    defaults.PluginsV1beta1.PreBind,
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
+									{Name: names.VolumeBinding},
 								},
 							},
 						},
+						PluginConfig: defaults.PluginConfigs,
 					},
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							PreBind: kubeschedulerconfig.PluginSet{
-								Disabled: []kubeschedulerconfig.Plugin{
-									{Name: "baz"},
-								},
-							},
+							QueueSort:  defaults.PluginsV1beta1.QueueSort,
+							PreFilter:  defaults.PluginsV1beta1.PreFilter,
+							Filter:     defaults.PluginsV1beta1.Filter,
+							PostFilter: defaults.PluginsV1beta1.PostFilter,
+							PreScore:   defaults.PluginsV1beta1.PreScore,
+							Score:      defaults.PluginsV1beta1.Score,
+							Bind:       defaults.PluginsV1beta1.Bind,
+							Reserve:    defaults.PluginsV1beta1.Reserve,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
 								Name: "foo",
 							},
+							{
+								Name: "DefaultPreemption",
+								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
+									MinCandidateNodesPercentage: 10,
+									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "InterPodAffinity",
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{
+									HardPodAffinityWeight: 1,
+								},
+							},
+							{
+								Name: "NodeAffinity",
+								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+							},
+							{
+								Name: "NodeResourcesLeastAllocated",
+								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &kubeschedulerconfig.PodTopologySpreadArgs{
+									DefaultingType: kubeschedulerconfig.SystemDefaulting,
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: &kubeschedulerconfig.VolumeBindingArgs{
+									BindTimeoutSeconds: 600,
+								},
+							},
 						},
 					},
 				},
 			},
-		},
-		{
-			name: "no config",
-			options: &Options{
-				Logs: logs.NewOptions(),
-			},
-			expectedError: "no configuration has been provided",
 		},
 		{
 			name: "Attempting to set Component Config Profiles and Policy config",
@@ -953,8 +1132,46 @@ profiles:
 				Deprecated: &DeprecatedOptions{
 					PolicyConfigMapName: "bar",
 				},
+				Logs: logs.NewOptions(),
 			},
-			expectedError: "cannot set a Plugin config and Policy config",
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: v1beta2.SchemeGroupVersion.String(),
+				},
+				Parallelism:        16,
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           true,
+					EnableContentionProfiling: true,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       true,
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
+			},
+		},
+		{
+			name: "no config",
+			options: &Options{
+				Logs: logs.NewOptions(),
+			},
+			expectedError: "no configuration has been provided",
 		},
 		{
 			name: "unknown field",

@@ -24,8 +24,6 @@ import (
 )
 
 func getMSIEndpoint(ctx context.Context, sender Sender) (*http.Response, error) {
-	// this cannot fail, the return sig is due to legacy reasons
-	msiEndpoint, _ := GetMSIVMEndpoint()
 	tempCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	// http.NewRequestWithContext() was added in Go 1.13

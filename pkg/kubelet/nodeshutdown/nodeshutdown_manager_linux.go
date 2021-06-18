@@ -36,10 +36,11 @@ import (
 )
 
 const (
-	nodeShutdownReason          = "Shutdown"
-	nodeShutdownMessage         = "Node is shutting, evicting pods"
-	nodeShutdownNotAdmitMessage = "Node is in progress of shutting down, not admitting any new pods"
-	dbusReconnectPeriod         = 1 * time.Second
+	nodeShutdownReason             = "Terminated"
+	nodeShutdownMessage            = "Pod was terminated in response to imminent node shutdown."
+	nodeShutdownNotAdmittedReason  = "NodeShutdown"
+	nodeShutdownNotAdmittedMessage = "Pod was rejected as the node is shutting down."
+	dbusReconnectPeriod            = 1 * time.Second
 )
 
 var systemDbus = func() (dbusInhibiter, error) {
@@ -93,8 +94,8 @@ func (m *Manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	if nodeShuttingDown {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
-			Reason:  nodeShutdownReason,
-			Message: nodeShutdownNotAdmitMessage,
+			Reason:  nodeShutdownNotAdmittedReason,
+			Message: nodeShutdownNotAdmittedMessage,
 		}
 	}
 	return lifecycle.PodAdmitResult{Admit: true}
@@ -270,8 +271,8 @@ func (m *Manager) processShutdownEvent() error {
 
 			status := v1.PodStatus{
 				Phase:   v1.PodFailed,
-				Message: nodeShutdownMessage,
 				Reason:  nodeShutdownReason,
+				Message: nodeShutdownMessage,
 			}
 
 			err := m.killPod(pod, status, &gracePeriodOverride)

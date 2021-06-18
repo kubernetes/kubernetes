@@ -101,29 +101,6 @@ func (q *queue) Dequeue() (*request, bool) {
 	return request, ok
 }
 
-// GetNextFinish returns the expected virtual finish time of the
-// oldest request in the queue with estimated duration G
-func (q *queue) GetNextFinish(G float64) float64 {
-	// TODO: if we decide to generalize this function to return virtual finish time
-	//  for the Nth oldest request waiting in the queue, we need to carefully
-	//  evaluate and potentially improve the performance here.
-	var oldestReq *request
-	q.requests.Walk(func(r *request) bool {
-		oldestReq = r
-		return false
-	})
-	if oldestReq == nil {
-		// we should never be here, since the caller should ensure
-		// that this queue has request(s) waiting to be served before
-		// calling this function.
-		return q.virtualStart
-	}
-
-	// the estimated service time of the oldest request is (G * request width)
-	estimatedServiceTime := float64(G) * float64(oldestReq.Seats())
-	return q.virtualStart + estimatedServiceTime
-}
-
 func (q *queue) dump(includeDetails bool) debug.QueueDump {
 	digest := make([]debug.RequestDump, q.requests.Length())
 	i := 0

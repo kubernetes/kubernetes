@@ -228,8 +228,8 @@ github.com/google/go-cmp v0.5.1/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.4 h1:L8R9j+yAqZuZjsqh/z+F1NCffTKKLShY6zXTItVIZ8M=
 github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
-github.com/google/go-flow-levee v0.1.5-0.20210422150831-99e72693f5c8 h1:D1Se3y8Tj9y30iIKlbGcGHyeyn/Hc3G/iOhXJFWLZVA=
-github.com/google/go-flow-levee v0.1.5-0.20210422150831-99e72693f5c8/go.mod h1:Uiz/03u4gZX0ldjN5Tj5+fyZN1v6VK22uKRcpQCDsyE=
+github.com/google/go-flow-levee v0.1.5 h1:AA7PBp4jrb1JIpqgSHxShqogsAZyI4VoTuJ0pNKHBVw=
+github.com/google/go-flow-levee v0.1.5/go.mod h1:Uiz/03u4gZX0ldjN5Tj5+fyZN1v6VK22uKRcpQCDsyE=
 github.com/google/go-github/v33 v33.0.0 h1:qAf9yP0qc54ufQxzwv+u9H0tiVOnPJxo0lI/JXqw3ZM=
 github.com/google/go-github/v33 v33.0.0/go.mod h1:GMdDnVZY/2TsWgp/lkYnpSAh6TrzhANBBwm6k6TTEXg=
 github.com/google/go-querystring v1.0.0 h1:Xkwi/a1rcvNg1PPYe5vI8GbeBY/jrVuDX5ASuANWTrk=
