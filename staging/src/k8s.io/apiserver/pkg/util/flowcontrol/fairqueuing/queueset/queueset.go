@@ -707,7 +707,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		if queue.requests.Length() != 0 {
 			sMin = math.Min(sMin, queue.virtualStart)
 			sMax = math.Max(sMax, queue.virtualStart)
-			estimatedWorkInProgress := qs.estimatedServiceTime * float64(queue.requestsExecuting)
+			estimatedWorkInProgress := qs.estimatedServiceTime * float64(queue.seatsInUse)
 			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
 			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
 			// the virtual finish time of the oldest request is:
