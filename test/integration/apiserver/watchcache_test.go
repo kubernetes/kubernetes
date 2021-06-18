@@ -58,10 +58,10 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	// Switch off endpoints reconciler to avoid unnecessary operations.
 	controlPlaneConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
-	_, s, stopMaster := framework.RunAnAPIServer(controlPlaneConfig)
+	_, s, stopAPIServer := framework.RunAnAPIServer(controlPlaneConfig)
 
 	closeFn := func() {
-		stopMaster()
+		stopAPIServer()
 		stopEtcd1()
 		stopEtcd0()
 	}

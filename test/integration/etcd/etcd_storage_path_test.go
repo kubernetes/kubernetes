@@ -70,14 +70,14 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
+	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 	})
-	defer master.Cleanup()
-	defer dumpEtcdKVOnFailure(t, master.KV)
+	defer apiServer.Cleanup()
+	defer dumpEtcdKVOnFailure(t, apiServer.KV)
 
-	client := &allClient{dynamicClient: master.Dynamic}
+	client := &allClient{dynamicClient: apiServer.Dynamic}
 
-	if _, err := master.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := apiServer.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,7 +88,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	etcdSeen := map[schema.GroupVersionResource]empty{}
 	cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
 
-	for _, resourceToPersist := range master.Resources {
+	for _, resourceToPersist := range apiServer.Resources {
 		t.Run(resourceToPersist.Mapping.Resource.String(), func(t *testing.T) {
 			mapping := resourceToPersist.Mapping
 			gvk := resourceToPersist.Mapping.GroupVersionKind
@@ -136,7 +136,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 			}()
 
-			if err := client.createPrerequisites(master.Mapper, testNamespace, testData.Prerequisites, all); err != nil {
+			if err := client.createPrerequisites(apiServer.Mapper, testNamespace, testData.Prerequisites, all); err != nil {
 				t.Fatalf("failed to create prerequisites for %s: %#v", gvResource, err)
 			}
 
@@ -146,7 +146,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 			}
 
-			output, err := getFromEtcd(master.KV, testData.ExpectedEtcdPath)
+			output, err := getFromEtcd(apiServer.KV, testData.ExpectedEtcdPath)
 			if err != nil {
 				t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
 			}

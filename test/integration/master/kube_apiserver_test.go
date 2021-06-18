@@ -434,7 +434,7 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 	return reflect.DeepEqual(listenAddresses, ips)
 }
 
-func testReconcilersMasterLease(t *testing.T, leaseCount int, apiServerCount int) {
+func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount int) {
 	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
 	var apiServerCountServers = make([]*kubeapiservertesting.TestServer, apiServerCount)
 	etcd := framework.SharedEtcd()
@@ -463,7 +463,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, apiServerCount int
 	}
 	wg.Wait()
 
-	// 2. verify master count servers have registered
+	// 2. verify API Server count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
 		client, err := kubernetes.NewForConfig(apiServerCountServers[0].ClientConfig)
 		if err != nil {
@@ -477,7 +477,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, apiServerCount int
 		}
 		return verifyEndpointsWithIPs(apiServerCountServers, getEndpointIPs(endpoints)), nil
 	}); err != nil {
-		t.Fatalf("master count endpoints failed to register: %v", err)
+		t.Fatalf("API Server count endpoints failed to register: %v", err)
 	}
 
 	// 3. start lease api servers
@@ -525,19 +525,19 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, apiServerCount int
 	}
 }
 
-func TestReconcilerMasterLeaseCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 1, 2)
+func TestReconcilerAPIServerLeaseCombined(t *testing.T) {
+	testReconcilersAPIServerLease(t, 1, 2)
 }
 
-func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 1)
+func TestReconcilerAPIServerLeaseMultiMoreAPIServers(t *testing.T) {
+	testReconcilersAPIServerLease(t, 2, 1)
 }
 
-func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 2)
+func TestReconcilerAPIServerLeaseMultiCombined(t *testing.T) {
+	testReconcilersAPIServerLease(t, 2, 2)
 }
 
-func TestMultiMasterNodePortAllocation(t *testing.T) {
+func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	var kubeAPIServers []*kubeapiservertesting.TestServer
 	var clientAPIServers []*kubernetes.Clientset
 	etcd := framework.SharedEtcd()
