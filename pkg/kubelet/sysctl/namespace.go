@@ -43,6 +43,7 @@ var prefixNamespaces = map[string]Namespace{
 	"kernel.msg": ipcNamespace,
 	"fs.mqueue.": ipcNamespace,
 	"net.":       netNamespace,
+	"fs.file-max": ipcNamespace,
 }
 
 // NamespacedBy returns the namespace of the Linux kernel for a sysctl, or
