@@ -45,7 +45,7 @@ func TestServicesFinalizers(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	cfg.RepairServicesInterval = 5 * time.Second
+	cfg.ExtraConfig.RepairServicesInterval = 5 * time.Second
 	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
@@ -101,7 +101,7 @@ func TestServicesFinalizers(t *testing.T) {
 	t.Logf("Deleted service: %s", svcNodePort.Name)
 
 	// wait for the repair loop to recover the deleted resources
-	time.Sleep(cfg.RepairServicesInterval)
+	time.Sleep(cfg.ExtraConfig.RepairServicesInterval)
 
 	// Check that the service was not deleted and the IP is already allocated
 	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svcNodePort.Name, metav1.GetOptions{})

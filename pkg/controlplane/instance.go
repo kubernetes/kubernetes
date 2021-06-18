@@ -201,21 +201,21 @@ type ExtraConfig struct {
 
 	IdentityLeaseDurationSeconds      int
 	IdentityLeaseRenewIntervalSeconds int
+
+	// RepairServicesInterval interval used by the repair loops for
+	// the Services NodePort and ClusterIP resources
+	RepairServicesInterval time.Duration
 }
 
 // Config defines configuration for the master
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
-	// ONLY FOR TESTING Not exposed to the users
-	RepairServicesInterval time.Duration
 }
 
 type completedConfig struct {
 	GenericConfig genericapiserver.CompletedConfig
 	ExtraConfig   *ExtraConfig
-	// ONLY FOR TESTING Not exposed to the users
-	RepairServicesInterval time.Duration
 }
 
 // CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
@@ -286,13 +286,9 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
-	if c.RepairServicesInterval == 0 {
-		c.RepairServicesInterval = repairLoopInterval
-	}
 	cfg := completedConfig{
 		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
 		&c.ExtraConfig,
-		c.RepairServicesInterval,
 	}
 
 	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
@@ -330,6 +326,10 @@ func (c *Config) Complete() CompletedConfig {
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
 		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
+	}
+
+	if cfg.ExtraConfig.RepairServicesInterval == 0 {
+		cfg.ExtraConfig.RepairServicesInterval = repairLoopInterval
 	}
 
 	return CompletedConfig{&cfg}

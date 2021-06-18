@@ -112,11 +112,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
 		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
 
-		ServiceClusterIPInterval: c.RepairServicesInterval,
+		ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: c.RepairServicesInterval,
+		ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
