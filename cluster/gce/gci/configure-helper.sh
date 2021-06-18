@@ -199,6 +199,10 @@ function create-dirs {
   echo "Creating required directories"
   mkdir -p /var/lib/kubelet
   mkdir -p /etc/kubernetes/manifests
+  # Contains the dynamically generated apiserver auth certs and keys.
+  mkdir -p /etc/srv/kubernetes
+  # Directory for kube-apiserver to store SSH key (if necessary).
+  mkdir -p /etc/srv/sshproxy
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     mkdir -p /var/lib/kube-proxy
   fi
@@ -566,8 +570,7 @@ function find-master-pd {
   MASTER_PD_DEVICE="/dev/disk/by-id/${relative_path}"
 }
 
-# Mounts a persistent disk (formatting if needed) to store the persistent data
-# on the master -- etcd's data, a few settings, and security certs/keys/tokens.
+# Mounts a persistent disk (formatting if needed) to store etcd data.
 # safe-format-and-mount only formats an unformatted disk, and mkdir -p will
 # leave a directory be if it already exists.
 function mount-master-pd {
@@ -585,23 +588,14 @@ function mount-master-pd {
   safe-format-and-mount "${pd_path}" "${mount_point}"
   echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
 
-  # NOTE: These locations on the PD store persistent data, so to maintain
-  # upgradeability, these locations should not change.  If they do, take care
-  # to maintain a migration path from these locations to whatever new
-  # locations.
-
   # Contains all the data stored in etcd.
+  # NOTE: This location on the PD store persistent data, so to maintain
+  # upgradeability, it should not change. If it does, take care
+  # to maintain a migration path from this location to whatever new
+  # location.
   mkdir -p "${mount_point}/var/etcd"
   chmod 700 "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
-  mkdir -p /etc/srv
-  # Contains the dynamically generated apiserver auth certs and keys.
-  mkdir -p "${mount_point}/srv/kubernetes"
-  ln -s -f "${mount_point}/srv/kubernetes" /etc/srv/kubernetes
-  # Directory for kube-apiserver to store SSH key (if necessary).
-  mkdir -p "${mount_point}/srv/sshproxy"
-  ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
-
   chown -R etcd "${mount_point}/var/etcd"
   chgrp -R etcd "${mount_point}/var/etcd"
 }
@@ -724,15 +718,12 @@ function create-master-pki {
   fi
 }
 
-# After the first boot and on upgrade, these files exist on the master-pd
-# and should never be touched again (except perhaps an additional service
-# account, see NB below.) One exception is if METADATA_CLOBBERS_CONFIG is
-# enabled.
+# Master auth files are stateless, and are created on every master VM bootstrap.
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+  if [[ -e "${known_tokens_csv}" ]]; then
     rm "${known_tokens_csv}"
   fi
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
