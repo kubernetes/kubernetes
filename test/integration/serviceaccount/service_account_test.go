@@ -16,7 +16,7 @@ limitations under the License.
 
 package serviceaccount
 
-// This file tests authentication and (soon) authorization of HTTP requests to a master object.
+// This file tests authentication and (soon) authorization of HTTP requests to an API server object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
 // to work for any client of the HTTP interface.
 

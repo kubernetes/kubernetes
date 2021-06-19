@@ -41,7 +41,7 @@ func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 }
 
 // Requests to try.  Each one should be forbidden or not forbidden
-// depending on the authentication and authorization setup of the master.
+// depending on the authentication and authorization setup of the API server.
 var (
 	Code200 = map[int]bool{200: true}
 	Code201 = map[int]bool{201: true}

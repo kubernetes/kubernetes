@@ -16,7 +16,7 @@ limitations under the License.
 
 package auth
 
-// This file tests authentication and (soon) authorization of HTTP requests to a master object.
+// This file tests authentication and (soon) authorization of HTTP requests to an API server object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
 // to work for any client of the HTTP interface.
 
@@ -569,7 +569,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	}
 }
 
-// Inject into master an authorizer that uses user info.
+// Inject into control plane an authorizer that uses user info.
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type allowAliceAuthorizer struct{}
 
@@ -1203,7 +1203,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	}
 }
 
-// TestWebhookTokenAuthenticator tests that a master can use the webhook token
+// TestWebhookTokenAuthenticator tests that a control plane can use the webhook token
 // authenticator to call out to a remote web server for authentication
 // decisions.
 func TestWebhookTokenAuthenticator(t *testing.T) {
