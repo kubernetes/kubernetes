@@ -5,6 +5,7 @@ module k8s.io/component-base
 go 1.16
 
 require (
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-cmp v0.5.5
@@ -18,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.17.0
-	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	gotest.tools/v3 v3.0.3 // indirect
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
