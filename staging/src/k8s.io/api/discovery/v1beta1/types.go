@@ -114,7 +114,7 @@ type Endpoint struct {
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
 	// hints contains information associated with how an endpoint should be
 	// consumed.
-	// +featureGate=TopologyAwareHints
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=TopologyAwareHints
 	// +optional
 	Hints *EndpointHints `json:"hints,omitempty" protobuf:"bytes,7,opt,name=hints"`
 }
@@ -134,6 +134,7 @@ type EndpointConditions struct {
 	// a ready endpoint that is terminating. If nil, consumers should defer to
 	// the ready condition. This field can be enabled with the
 	// EndpointSliceTerminatingCondition feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=EndpointSliceTerminatingCondition
 	// +optional
 	Serving *bool `json:"serving,omitempty" protobuf:"bytes,2,name=serving"`
 
@@ -141,6 +142,7 @@ type EndpointConditions struct {
 	// indicates an unknown state. Consumers should interpret this unknown state
 	// to mean that the endpoint is not terminating. This field can be enabled
 	// with the EndpointSliceTerminatingCondition feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=EndpointSliceTerminatingCondition
 	// +optional
 	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
 }

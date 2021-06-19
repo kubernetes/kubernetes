@@ -338,8 +338,8 @@ type IngressClassParametersReference struct {
 	// Scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
 	// Field can be enabled with IngressClassNamespacedParams feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=IngressClassNamespacedParams
 	// +optional
-	// +featureGate=IngressClassNamespacedParams
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 	// Namespace is the namespace of the resource being referenced. This field is
 	// required when scope is set to "Namespace" and must be unset when scope is set to

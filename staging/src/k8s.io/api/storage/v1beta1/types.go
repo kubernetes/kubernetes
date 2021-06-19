@@ -186,6 +186,7 @@ type VolumeAttachmentSource struct {
 	// translated fields from a pod's inline VolumeSource to a
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.17,status=beta,featureGate=CSIMigration
 	// +optional
 	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
 }
@@ -344,6 +345,7 @@ type CSIDriverSpec struct {
 	//
 	// This field is immutable.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.16,status=beta,featureGate=CSIInlineVolume
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 
@@ -367,8 +369,8 @@ type CSIDriverSpec struct {
 	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=CSIStorageCapacity
 	// +optional
-	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and
@@ -383,6 +385,7 @@ type CSIDriverSpec struct {
 	// to determine if Kubernetes should modify ownership and permissions of the volume.
 	// With the default policy the defined fsGroup will only be applied
 	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=beta,featureGate=CSIVolumeFSGroupPolicy
 	// +optional
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 

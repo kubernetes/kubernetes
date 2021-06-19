@@ -143,8 +143,9 @@ type JobSpec struct {
 	// guarantees (e.g. finalizers) will be honored. If this field is unset,
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
-	// This field is alpha-level and is only honored by servers that enable the
+	// This field is beta-level and is only honored by servers that enable the
 	// TTLAfterFinished feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.22,status=beta,featureGate=TTLAfterFinished
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
@@ -169,6 +170,7 @@ type JobSpec struct {
 	// This field is beta-level. More completion modes can be added in the future.
 	// If the Job controller observes a mode that it doesn't recognize, the
 	// controller skips updates for the Job.
+	// +lifecycle:component=kubernetes,minVersion=v1.22,status=beta,featureGate=IndexedJob
 	// +optional
 	CompletionMode *CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
 
@@ -181,6 +183,7 @@ type JobSpec struct {
 	// resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
 	// requires the SuspendJob feature gate to be enabled; otherwise this field
 	// may not be set to true. Defaults to false.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=SuspendJob
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
 }

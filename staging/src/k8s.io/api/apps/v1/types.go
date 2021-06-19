@@ -180,6 +180,7 @@ type StatefulSetSpec struct {
 	// without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.22,status=alpha,featureGate=StatefulSetMinReadySeconds
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,9,opt,name=minReadySeconds"`
 }
@@ -543,6 +544,7 @@ type RollingUpdateDaemonSet struct {
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
 	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.22,status=beta,featureGate=DaemonSetUpdateSurge
 	// +optional
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }

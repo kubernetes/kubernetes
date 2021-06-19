@@ -4032,6 +4032,7 @@ type LoadBalancerIngress struct {
 
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=MixedProtocolLBService
 	// +listType=atomic
 	// +optional
 	Ports []PortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
@@ -4256,6 +4257,7 @@ type ServiceSpec struct {
 	// either order).  These families must correspond to the values of the
 	// clusterIPs field, if specified. Both clusterIPs and ipFamilies are
 	// governed by the ipFamilyPolicy field.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=IPv6DualStack
 	// +listType=atomic
 	// +optional
 	IPFamilies []IPFamily `json:"ipFamilies,omitempty" protobuf:"bytes,19,opt,name=ipFamilies,casttype=IPFamily"`
@@ -4269,6 +4271,7 @@ type ServiceSpec struct {
 	// dual-stack configured clusters, otherwise fail). The ipFamilies and
 	// clusterIPs fields depend on the value of this field.  This field will be
 	// wiped when updating a service to type ExternalName.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=IPv6DualStack
 	// +optional
 	IPFamilyPolicy *IPFamilyPolicyType `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicyType"`
 
@@ -4278,6 +4281,7 @@ type ServiceSpec struct {
 	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
 	// and will be cleared if the type is changed to any other type.
 	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=ServiceLBNodePortControl
 	// +optional
 	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerNodePorts"`
 
@@ -4291,7 +4295,7 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=ServiceLoadBalancerClass
 	// +optional
 	LoadBalancerClass *string `json:"loadBalancerClass,omitempty" protobuf:"bytes,21,opt,name=loadBalancerClass"`
 
@@ -4301,7 +4305,7 @@ type ServiceSpec struct {
 	// "Local" routes traffic to node-local endpoints only, traffic is
 	// dropped if no node-local endpoints are ready.
 	// The default value is "Cluster".
-	// +featureGate=ServiceInternalTrafficPolicy
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
 }
@@ -4606,6 +4610,7 @@ type NodeSpec struct {
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
 	// If specified, the source to get node configuration from
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +lifecycle:component=kubernetes,minVersion=v1.11,status=beta,featureGate=DynamicKubeletConfig
 	// +optional
 	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
 
@@ -4799,6 +4804,7 @@ type NodeStatus struct {
 	// +optional
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.11,status=beta,featureGate=DynamicKubeletConfig
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 }
