@@ -66,16 +66,12 @@ runTests() {
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
-  # export KUBE_RACE
-  #
-  # Enable the Go race detector.
-  export KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TEST_ARGS="--alsologtostderr=true ${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE}" \
-      KUBE_RACE="" \
-      KUBE_TIMEOUT="${KUBE_TIMEOUT}"
+      KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
+      KUBE_RACE=""
 
   cleanup
 }

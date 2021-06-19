@@ -71,7 +71,10 @@ KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
 # How many 'go test' instances to run simultaneously when running tests in
 # coverage mode.
 KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
-KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
+# use KUBE_RACE="" to disable the race detector
+# this is defaulted to "-race" in make test as well
+# NOTE: DO NOT ADD A COLON HERE. KUBE_RACE="" is meaningful!
+KUBE_RACE=${KUBE_RACE-"-race"}
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # once we have multiple group supports
@@ -250,7 +253,7 @@ runTests() {
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running tests without code coverage"
+    kube::log::status "Running tests without code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
     go test "${goflags[@]:+${goflags[@]}}" \
      "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
@@ -259,6 +262,8 @@ runTests() {
     produceJUnitXMLReport "${junit_filename_prefix}"
     return ${rc}
   fi
+
+  kube::log::status "Running tests with code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
 
   # Create coverage report directories.
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
