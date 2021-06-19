@@ -57,13 +57,24 @@ var zapConfig = zap.Config{
 	Sampling:    nil,
 	Encoding:    "json",
 	EncoderConfig: zapcore.EncoderConfig{
-		MessageKey:     "msg",
+		MessageKey: "msg",
+
+		CallerKey:      "caller",
 		TimeKey:        "ts",
-		EncodeTime:     zapcore.EpochMillisTimeEncoder,
+		EncodeTime:     epochMillisTimeEncoder,
 		EncodeDuration: zapcore.StringDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	},
 	OutputPaths:      []string{"stdout"},
 	ErrorOutputPaths: []string{"stderr"},
+}
+
+// this has the same implementation as zapcore.EpochMillisTimeEncoder but
+// uses timeNow() which is stubbed out for testing purposes.
+func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
+	nanos := timeNow().UnixNano()
+	millis := float64(nanos) / float64(time.Millisecond)
+	enc.AppendFloat64(millis)
 }
 
 // zapLogger is a logr.Logger that uses Zap to record log.
@@ -84,25 +95,17 @@ func (l *zapLogger) Enabled() bool {
 
 // Info write message to error level log
 func (l *zapLogger) Info(msg string, keysAndVals ...interface{}) {
-	entry := zapcore.Entry{
-		Time:    timeNow(),
-		Message: msg,
+	if checkedEntry := l.l.Check(zapcore.InfoLevel, msg); checkedEntry != nil {
+		checkedEntry.Write(l.handleFields(keysAndVals)...)
 	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(l.handleFields(keysAndVals)...)
 }
 
-// dPanic write message to DPanicLevel level log
-// we need implement this because unit test case need stub time.Now
-// otherwise the ts field always changed
+// dPanic write message to DPanicLevel level log we need implement this because we need
+// to have the "v" field as well.
 func (l *zapLogger) dPanic(msg string) {
-	entry := zapcore.Entry{
-		Level:   zapcore.DPanicLevel,
-		Time:    timeNow(),
-		Message: msg,
+	if checkedEntry := l.l.Check(zapcore.DPanicLevel, msg); checkedEntry != nil {
+		checkedEntry.Write(zap.Int("v", l.lvl))
 	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(zap.Int("v", l.lvl))
 }
 
 // handleFields converts a bunch of arbitrary key-value pairs into Zap fields.  It takes
@@ -146,13 +149,9 @@ func (l *zapLogger) handleFields(args []interface{}, additional ...zap.Field) []
 
 // Error write log message to error level
 func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
-	entry := zapcore.Entry{
-		Level:   zapcore.ErrorLevel,
-		Time:    timeNow(),
-		Message: msg,
+	if checkedEntry := l.l.Check(zap.ErrorLevel, msg); checkedEntry != nil {
+		checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
 	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
 }
 
 func handleError(err error) zap.Field {
@@ -178,3 +177,18 @@ func (l *zapLogger) WithName(name string) logr.Logger {
 	l.l = l.l.Named(name)
 	return l
 }
+
+func (l *zapLogger) WithCallDepth(depth int) logr.Logger {
+	return l.newLoggerWithExtraSkip(depth)
+}
+
+// newLoggerWithExtraSkip allows creation of loggers with variable levels of callstack skipping
+func (l *zapLogger) newLoggerWithExtraSkip(callerSkip int) logr.Logger {
+	log := l.l.WithOptions(zap.AddCallerSkip(callerSkip))
+	return &zapLogger{
+		l:   log,
+		lvl: l.lvl,
+	}
+}
+
+var _ logr.CallDepthLogger = &zapLogger{}

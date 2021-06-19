@@ -32,6 +32,9 @@ import (
 )
 
 func TestKlogIntegration(t *testing.T) {
+	timeNow = func() time.Time {
+		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
+	}
 	fs := flag.FlagSet{}
 	klog.InitFlags(&fs)
 	err := fs.Set("v", fmt.Sprintf("%d", 1))
@@ -48,126 +51,126 @@ func TestKlogIntegration(t *testing.T) {
 			fun: func() {
 				klog.Info("test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "V(1).Info",
 			fun: func() {
 				klog.V(1).Info("test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
 		},
 		{
 			name: "Infof",
 			fun: func() {
 				klog.Infof("test %d", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "V(1).Infof",
 			fun: func() {
 				klog.V(1).Infof("test %d", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
 		},
 		{
 			name: "Infoln",
 			fun: func() {
 				klog.Infoln("test", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "V(1).Infoln",
 			fun: func() {
 				klog.V(1).Infoln("test", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
 		},
 		{
 			name: "InfoDepth",
 			fun: func() {
 				klog.InfoDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "InfoS",
 			fun: func() {
 				klog.InfoS("test", "count", 1)
 			},
-			format: `{"ts":%f,"msg":"test","v":0,"count":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1}`,
 		},
 		{
 			name: "V(1).InfoS",
 			fun: func() {
 				klog.V(1).InfoS("test", "count", 1)
 			},
-			format: `{"ts":%f,"msg":"test","v":1,"count":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":1,"count":1}`,
 		},
 		{
 			name: "InfoSDepth",
 			fun: func() {
 				klog.InfoSDepth(1, "test", "count", 1)
 			},
-			format: `{"ts":%f,"msg":"test","v":0,"count":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1}`,
 		},
 		{
 			name: "Warning",
 			fun: func() {
 				klog.Warning("test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "WarningDepth",
 			fun: func() {
 				klog.WarningDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "Warningln",
 			fun: func() {
 				klog.Warningln("test", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "Warningf",
 			fun: func() {
 				klog.Warningf("test %d", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "Error",
 			fun: func() {
 				klog.Error("test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "ErrorDepth",
 			fun: func() {
 				klog.ErrorDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "Errorln",
 			fun: func() {
 				klog.Errorln("test", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "Errorf",
 			fun: func() {
 				klog.Errorf("test %d", 1)
 			},
-			format: `{"ts":%f,"msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
 		},
 		{
 			name: "ErrorS",
@@ -175,7 +178,7 @@ func TestKlogIntegration(t *testing.T) {
 				err := errors.New("fail")
 				klog.ErrorS(err, "test", "count", 1)
 			},
-			format: `{"ts":%f,"msg":"test","v":0,"count":1,"err":"fail"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1,"err":"fail"}`,
 		},
 		{
 			name: "ErrorSDepth",
@@ -183,7 +186,7 @@ func TestKlogIntegration(t *testing.T) {
 				err := errors.New("fail")
 				klog.ErrorSDepth(1, err, "test", "count", 1)
 			},
-			format: `{"ts":%f,"msg":"test","v":0,"count":1,"err":"fail"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1,"err":"fail"}`,
 		},
 	}
 	for _, tc := range tcs {
@@ -195,12 +198,13 @@ func TestKlogIntegration(t *testing.T) {
 
 			tc.fun()
 			var ts float64
+			var lineNo int
 			logString := strings.TrimSuffix(buffer.String(), "\n")
-			n, err := fmt.Sscanf(logString, tc.format, &ts)
-			if n != 1 || err != nil {
+			n, err := fmt.Sscanf(logString, tc.format, &ts, &lineNo)
+			if n != 2 || err != nil {
 				t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logString)
 			}
-			expect := fmt.Sprintf(tc.format, ts)
+			expect := fmt.Sprintf(tc.format, ts, lineNo)
 			if !assert.Equal(t, expect, logString) {
 				t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logString)
 			}
@@ -219,7 +223,12 @@ func TestKlogV(t *testing.T) {
 	klog.InitFlags(&fs)
 	totalLogsWritten := 0
 
-	defer fs.Set("v", "0")
+	defer func() {
+		err := fs.Set("v", "0")
+		if err != nil {
+			t.Fatalf("Failed to reset verbosity to 0")
+		}
+	}()
 
 	for i := 0; i < 11; i++ {
 		err := fs.Set("v", fmt.Sprintf("%d", i))
