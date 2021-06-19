@@ -83,6 +83,7 @@ func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	for _, nodeDriver := range oldCSINodeObj.Spec.Drivers {
 		if validation.CSINodeLongerID(nodeDriver.NodeID) {
 			allowLongNodeID = true
+			break
 		}
 	}
 	validateOptions := validation.CSINodeValidationOptions{
