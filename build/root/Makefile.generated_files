@@ -554,6 +554,9 @@ APIEXTENSIONS_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/p
 CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/examples/apiserver/openapi
 SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/generated/openapi
 
+KUBE_FEATURE_GATES_FILENAME := pkg/features/kube_features.go staging/src/k8s.io/apiserver/pkg/features/kube_features.go staging/src/k8s.io/controller-manager/pkg/features/kube_features.go
+APIEXTENSIONS_FEATURE_GATES_FILENAME := staging/src/k8s.io/apiextensions-apiserver/pkg/features/kube_features.go
+
 OPENAPI_TARGETS := KUBE AGGREGATOR APIEXTENSIONS CODEGEN SAMPLEAPISERVER
 
 # Find all the directories that request openapi generation.
@@ -616,6 +619,7 @@ $$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENA
 	    -O $(OPENAPI_BASENAME)                                                                 \
 	    -h $(BOILERPLATE_FILENAME)                                                             \
 	    -r $$($(prefix)_REPORT_FILENAME)                                                       \
+           $(foreach file, $(addprefix -f ,$($(prefix)_FEATURE_GATES_FILENAME)), "$(file)")       \
 	    "$$$$@"
 	test -f $($(prefix)_KNOWN_VIOLATION_FILENAME) || touch $($(prefix)_KNOWN_VIOLATION_FILENAME)
 	diff $$($(prefix)_REPORT_FILENAME) $($(prefix)_KNOWN_VIOLATION_FILENAME) || \
