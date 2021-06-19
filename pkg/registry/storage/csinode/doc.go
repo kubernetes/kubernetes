@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package csinode provides Registry interface and its REST
 // implementation for storing csinode api objects.
-package csinode
+package csinode // import "k8s.io/kubernetes/pkg/registry/storage/csinode"

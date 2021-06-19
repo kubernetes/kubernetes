@@ -154,7 +154,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	// register csidrivers
 	csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
 	if err != nil {
-		return storage, err
+		return nil, err
 	}
 	storage["csidrivers"] = csiDriverStorage.CSIDriver
 

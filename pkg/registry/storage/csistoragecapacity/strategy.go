@@ -49,9 +49,7 @@ func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Obje
 	csiStorageCapacity := obj.(*storage.CSIStorageCapacity)
 
 	errs := validation.ValidateCSIStorageCapacity(csiStorageCapacity)
-	errs = append(errs, validation.ValidateCSIStorageCapacity(csiStorageCapacity)...)
-
-	return errs
+	return append(errs, validation.ValidateCSIStorageCapacity(csiStorageCapacity)...)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package csistoragecapacity provides Registry interface and its REST
 // implementation for storing csistoragecapacity api objects.
-package csistoragecapacity
+package csistoragecapacity // import "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity"

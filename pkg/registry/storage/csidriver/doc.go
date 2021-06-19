@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package csidriver provides Registry interface and its REST
 // implementation for storing csidriver api objects.
-package csidriver
+package csidriver // import "k8s.io/kubernetes/pkg/registry/storage/csidriver"

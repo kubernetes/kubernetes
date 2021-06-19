@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package volumeattachment provides Registry interface and its REST
 // implementation for storing volumeattachment api objects.
-package volumeattachment
+package volumeattachment // import "k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
