@@ -240,6 +240,7 @@ type MetricSpec struct {
 	// current scale target (e.g. CPU or memory). Such metrics are built in to
 	// Kubernetes, and have special scaling options on top of those available
 	// to normal per-pod metrics using the "pods" source.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=HPAContainerMetrics
 	// +optional
 	ContainerResource *ContainerResourceMetricSource
 	// External refers to a global metric that is not associated

@@ -3556,6 +3556,7 @@ type LoadBalancerIngress struct {
 
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=MixedProtocolLBService
 	// +optional
 	Ports []PortStatus
 }
@@ -3652,6 +3653,7 @@ type ServiceSpec struct {
 	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
 	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
 	// but it does not allow changing the primary IPFamily of the service.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=IPv6DualStack
 	// +optional
 	IPFamilies []IPFamily
 
@@ -3663,6 +3665,7 @@ type ServiceSpec struct {
 	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
 	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
 	// respectively.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=IPv6DualStack
 	// +optional
 	IPFamilyPolicy *IPFamilyPolicyType
 
@@ -3733,6 +3736,7 @@ type ServiceSpec struct {
 	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
 	// and will be cleared if the type is changed to any other type.
 	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=ServiceLBNodePortControl
 	// +optional
 	AllocateLoadBalancerNodePorts *bool
 
@@ -3746,7 +3750,7 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=ServiceLoadBalancerClass
 	// +optional
 	LoadBalancerClass *string
 
@@ -3756,7 +3760,7 @@ type ServiceSpec struct {
 	// "Local" routes traffic to node-local endpoints only, traffic is
 	// dropped if no node-local endpoints are ready.
 	// The default value is "Cluster".
-	// +featureGate=ServiceInternalTrafficPolicy
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
 }
@@ -3966,6 +3970,7 @@ type NodeSpec struct {
 
 	// If specified, the source to get node configuration from
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +lifecycle:component=kubernetes,minVersion=v1.11,status=beta,featureGate=DynamicKubeletConfig
 	// +optional
 	ConfigSource *NodeConfigSource
 
@@ -4132,6 +4137,7 @@ type NodeStatus struct {
 	// +optional
 	VolumesAttached []AttachedVolume
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.11,status=beta,featureGate=DynamicKubeletConfig
 	// +optional
 	Config *NodeConfigStatus
 }

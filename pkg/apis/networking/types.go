@@ -151,6 +151,7 @@ type NetworkPolicyPort struct {
 	// The endPort must be equal or greater than port.
 	// This feature is in Alpha state and should be enabled using the Feature Gate
 	// "NetworkPolicyEndPort".
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=NetworkPolicyEndPort
 	// +optional
 	EndPort *int32
 }
@@ -340,8 +341,8 @@ type IngressClassParametersReference struct {
 	// Scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
 	// Field can be enabled with IngressClassNamespacedParams feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=IngressClassNamespacedParams
 	// +optional
-	// +featureGate=IngressClassNamespacedParams
 	Scope *string
 	// Namespace is the namespace of the resource being referenced. This field is
 	// required when scope is set to "Namespace" and must be unset when scope is set to

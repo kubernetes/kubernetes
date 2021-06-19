@@ -160,6 +160,7 @@ type VolumeAttachmentSource struct {
 	// translated fields from a pod's inline VolumeSource to a
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
+	// +lifecycle:component=kubernetes,minVersion=v1.17,status=beta,featureGate=CSIMigration
 	// +optional
 	InlineVolumeSpec *api.PersistentVolumeSpec
 }
@@ -292,6 +293,7 @@ type CSIDriverSpec struct {
 	// to determine if Kubernetes should modify ownership and permissions of the volume.
 	// With the default policy the defined fsGroup will only be applied
 	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=beta,featureGate=CSIVolumeFSGroupPolicy
 	// +optional
 	FSGroupPolicy *FSGroupPolicy
 
@@ -340,6 +342,7 @@ type CSIDriverSpec struct {
 	//
 	// This field is immutable.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.16,status=beta,featureGate=CSIInlineVolume
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode
 
@@ -362,6 +365,7 @@ type CSIDriverSpec struct {
 	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=CSIStorageCapacity
 	// +optional
 	StorageCapacity *bool
 
@@ -384,6 +388,7 @@ type CSIDriverSpec struct {
 	// This is a beta feature and only available when the
 	// CSIServiceAccountToken feature is enabled.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=CSIServiceAccountToken
 	// +optional
 	// +listType=atomic
 	TokenRequests []TokenRequest
@@ -399,6 +404,7 @@ type CSIDriverSpec struct {
 	// This is a beta feature and only available when the
 	// CSIServiceAccountToken feature is enabled.
 	//
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=beta,featureGate=CSIServiceAccountToken
 	// +optional
 	RequiresRepublish *bool
 }

@@ -215,6 +215,7 @@ type PodSecurityPolicySpec struct {
 	// AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
 	// This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.16,status=beta,featureGate=CSIInlineVolume
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver
 	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
@@ -238,6 +239,7 @@ type PodSecurityPolicySpec struct {
 	ForbiddenSysctls []string
 	// AllowedProcMountTypes is an allowlist of ProcMountTypes.
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// +lifecycle:component=kubernetes,minVersion=v1.12,status=alpha,featureGate=ProcMountType
 	// +optional
 	AllowedProcMountTypes []api.ProcMountType
 	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.

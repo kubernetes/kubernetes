@@ -102,7 +102,7 @@ type Endpoint struct {
 	Zone *string
 	// hints contains information associated with how an endpoint should be
 	// consumed.
-	// +featureGate=TopologyAwareHints
+	// +lifecycle:component=kubernetes,minVersion=v1.21,status=alpha,featureGate=TopologyAwareHints
 	// +optional
 	Hints *EndpointHints
 }
@@ -121,6 +121,7 @@ type EndpointConditions struct {
 	// a ready endpoint that is terminating. If nil, consumers should defer to
 	// the ready condition. This field can be enabled with the
 	// EndpointSliceTerminatingCondition feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=EndpointSliceTerminatingCondition
 	// +optional
 	Serving *bool
 
@@ -128,6 +129,7 @@ type EndpointConditions struct {
 	// indicates an unknown state. Consumers should interpret this unknown state
 	// to mean that the endpoint is not terminating. This field can be enabled
 	// with the EndpointSliceTerminatingCondition feature gate.
+	// +lifecycle:component=kubernetes,minVersion=v1.20,status=alpha,featureGate=EndpointSliceTerminatingCondition
 	// +optional
 	Terminating *bool
 }
