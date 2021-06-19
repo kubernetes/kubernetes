@@ -144,6 +144,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
 		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(c.parallellism)),
+		frameworkruntime.WithExtenders(extenders),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
