@@ -24,6 +24,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -533,6 +534,45 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 		},
 	}
 	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+// CreateCPUHorizontalPodAutoscalerV2 create a horizontalPodAutoscaler with CPU target
+// for consuming resources.
+func CreateCPUHorizontalPodAutoscalerV2(rc *ResourceConsumer, cpu, stabilizationPeriod, minReplicas, maxRepl int32) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rc.name,
+			Namespace: rc.nsName,
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				APIVersion: rc.kind.GroupVersion().String(),
+				Kind:       rc.kind.Kind,
+				Name:       rc.name,
+			},
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxRepl,
+			Metrics: []autoscalingv2.MetricSpec{{
+				Type: "Resource",
+				Resource: &autoscalingv2.ResourceMetricSource{
+					Name: "cpu",
+					Target: autoscalingv2.MetricTarget{
+						Type:               "Utilization",
+						AverageUtilization: &cpu,
+					},
+				}},
+			},
+			Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationPeriod,
+				},
+			},
+		},
+	}
+
+	hpa, errHPA := rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
 }

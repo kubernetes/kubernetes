@@ -91,7 +91,71 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 			scaleTest.run("rc-light", e2eautoscaling.KindRC, f)
 		})
 	})
+
+	// TODO: scaleDown is pending
+	ginkgo.Describe("HPA v2beta2 Behavior", func() {
+		ginkgo.It("Should scale up from 1 to 2 after 5m [Slow]", func() {
+			scaleUpAfterStabilizationWindowSeconds("rc-behavior", e2eautoscaling.KindReplicaSet, f)
+		})
+	})
 })
+
+// HPAV2ScaleTest is used by the run function.
+type HPAV2ScaleTest struct {
+	initPods                    int
+	totalInitialCPUUsage        int
+	perPodCPURequest            int64
+	targetCPUUtilizationPercent int32
+	minPods                     int32
+	maxPods                     int32
+	firstScale                  int
+	cpuBurst                    int
+	secondScale                 int32
+	stabilizationPeriod         int32
+	scaleDown                   bool
+	scaleUp                     bool
+}
+
+func scaleUpAfterStabilizationWindowSeconds(name string, kind schema.GroupVersionKind, f *framework.Framework) {
+	periodSeconds := 300
+	scaleTest := &HPAV2ScaleTest{
+		initPods:                    2,
+		totalInitialCPUUsage:        50,
+		perPodCPURequest:            200,
+		targetCPUUtilizationPercent: 50,
+		cpuBurst:                    100,
+		minPods:                     1,
+		maxPods:                     2,
+		firstScale:                  1,
+		secondScale:                 2,
+		stabilizationPeriod:         int32(periodSeconds),
+	}
+	scaleTest.run(name, e2eautoscaling.KindRC, f)
+}
+
+// run is a method which runs an HPA lifecycle, from a starting state, to an expected
+// The initial state is defined by the initPods parameter.
+// The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
+// The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
+// TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
+func (scaleTest *HPAV2ScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
+	const timeToWait = 15 * time.Minute
+	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
+	defer rc.CleanUp()
+	hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerV2(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.stabilizationPeriod, scaleTest.minPods, scaleTest.maxPods)
+	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
+
+	// ensure no scaleUp happens until stabilizationPeriod while targets are hit
+	if scaleTest.stabilizationPeriod > 0 {
+		rc.ConsumeCPU(scaleTest.cpuBurst)
+		rc.EnsureDesiredReplicasInRange(scaleTest.firstScale, scaleTest.firstScale, time.Duration(scaleTest.stabilizationPeriod), hpa.Name)
+	}
+
+	// ensure scale up happens after stabilizationPeriod
+	if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
+		rc.WaitForReplicas(int(scaleTest.secondScale), timeToWait)
+	}
+}
 
 // HPAScaleTest struct is used by the scale(...) function.
 type HPAScaleTest struct {
