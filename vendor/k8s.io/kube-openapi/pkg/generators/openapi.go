@@ -451,28 +451,33 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 	}
 
 	// TODO(seans3): Validate struct extensions here.
-	g.emitExtensions(extensions, unions)
+	g.emitExtensions(extensions, unions, nil)
 	return nil
 }
 
 func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *types.Type) error {
-	extensions, parseErrors := parseExtensions(m.CommentLines)
-	validationErrors := validateMemberExtensions(extensions, m)
-	errors := append(parseErrors, validationErrors...)
-	// Initially, we will only log member extension errors.
+	extensions, extensionParseErrors := parseExtensions(m.CommentLines)
+	extensionValidationErrors := validateMemberExtensions(extensions, m)
+	errors := append(extensionParseErrors, extensionValidationErrors...)
+
+	apiLifecycle, apiLifecycleParseErrors := parseAPILifecycle(m.CommentLines)
+	apiLifecycleValidationErrors := validateAPILifecycleTags(apiLifecycle)
+	apiLifecycleErrors := append(apiLifecycleParseErrors, apiLifecycleValidationErrors...)
+
+	errors = append(errors, apiLifecycleErrors...)
 	if len(errors) > 0 {
 		errorPrefix := fmt.Sprintf("[%s] %s:", parent.String(), m.String())
 		for _, e := range errors {
 			klog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
-	g.emitExtensions(extensions, nil)
+	g.emitExtensions(extensions, nil, apiLifecycle)
 	return nil
 }
 
-func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union) {
+func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union, apiLifecycle map[string]string) {
 	// If any extensions exist, then emit code to create them.
-	if len(extensions) == 0 && len(unions) == 0 {
+	if len(extensions) == 0 && len(unions) == 0 && len(apiLifecycle) == 0 {
 		return
 	}
 	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
@@ -493,6 +498,11 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union
 		for _, u := range unions {
 			u.emit(g)
 		}
+		g.Do("},\n", nil)
+	}
+	if len(apiLifecycle) > 0 {
+		g.Do("\"$.$\": map[string]interface{}{\n", apiLifecycleExtension)
+		emitAPILifecycle(apiLifecycle, g)
 		g.Do("},\n", nil)
 	}
 	g.Do("},\n},\n", nil)
@@ -548,7 +558,7 @@ func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
 }
 
 func (g openAPITypeWriter) generateDefault(comments []string, t *types.Type, omitEmpty bool) error {
-	t = resolveAliasType(t)
+	t = resolveAliasAndEmbeddedType(t)
 	def, err := defaultFromComments(comments)
 	if err != nil {
 		return err
@@ -674,12 +684,17 @@ func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
 }
 
-func resolveAliasType(t *types.Type) *types.Type {
+func resolveAliasAndEmbeddedType(t *types.Type) *types.Type {
 	var prev *types.Type
 	for prev != t {
 		prev = t
 		if t.Kind == types.Alias {
 			t = t.Underlying
+		}
+		if t.Kind == types.Struct {
+			if len(t.Members) == 1 && t.Members[0].Embedded {
+				t = t.Members[0].Type
+			}
 		}
 	}
 	return t

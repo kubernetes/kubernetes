@@ -13,7 +13,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.9.0
-	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
+	k8s.io/kube-openapi v0.0.0-20210619182437-8f86f150b3e8
 )
 
 replace (
@@ -23,5 +23,6 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	k8s.io/kube-openapi => github.com/nikhita/kube-openapi v0.0.0-20210619182437-8f86f150b3e8
 	k8s.io/sample-apiserver => ../sample-apiserver
 )

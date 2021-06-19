@@ -30,6 +30,10 @@ type CustomArgs struct {
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
 	ReportFilename string
+	// FeatureGateFileNames is the list of files containing information
+	// about feature gates. If specified, the incorrect_lifecycle_tag linter
+	// will this to validate the featureGate name.
+	FeatureGateFileNames []string
 }
 
 // NewDefaults returns default arguments for the generator. Returning the arguments instead
@@ -55,6 +59,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 // AddFlags add the generator flags to the flag set.
 func (c *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&c.ReportFilename, "report-filename", "r", c.ReportFilename, "Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
+	fs.StringArrayVarP(&c.FeatureGateFileNames, "featuregate-filenames", "f", c.FeatureGateFileNames, "Path to files containing feature gate information. The API linter uses this information to print API violations for lifecycle comment tags.")
 }
 
 // Validate checks the given arguments.
@@ -65,6 +70,9 @@ func Validate(genericArgs *args.GeneratorArgs) error {
 	}
 	if len(c.ReportFilename) == 0 {
 		return fmt.Errorf("report filename cannot be empty. specify a valid filename or use \"-\" for stdout")
+	}
+	if c.FeatureGateFileNames != nil && len(c.FeatureGateFileNames) == 0 {
+		return fmt.Errorf("feature gate filenames cannot be empty")
 	}
 	if len(genericArgs.OutputFileBaseName) == 0 {
 		return fmt.Errorf("output file base name cannot be empty")

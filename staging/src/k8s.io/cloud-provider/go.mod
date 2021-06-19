@@ -27,4 +27,5 @@ replace (
 	k8s.io/cloud-provider => ../cloud-provider
 	k8s.io/component-base => ../component-base
 	k8s.io/controller-manager => ../controller-manager
+	k8s.io/kube-openapi => github.com/nikhita/kube-openapi v0.0.0-20210619182437-8f86f150b3e8
 )

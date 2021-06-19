@@ -64,8 +64,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 `)...)
 
 	reportPath := "-"
+	var featureGateFileNames []string
 	if customArgs, ok := arguments.CustomArgs.(*generatorargs.CustomArgs); ok {
 		reportPath = customArgs.ReportFilename
+
+		if customArgs.FeatureGateFileNames != nil {
+			featureGateFileNames = customArgs.FeatureGateFileNames
+		}
 	}
 	context.FileTypes[apiViolationFileType] = apiViolationFile{
 		unmangledPath: reportPath,
@@ -82,7 +87,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						arguments.OutputFileBaseName,
 						arguments.OutputPackagePath,
 					),
-					newAPIViolationGen(),
+					newAPIViolationGen(featureGateFileNames),
 				}
 			},
 			FilterFunc: apiTypeFilterFunc,

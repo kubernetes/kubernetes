@@ -88,9 +88,9 @@ func (a apiViolationFile) VerifyFile(f *generator.File, path string) error {
 	return fmt.Errorf("output for %q differs; first existing/expected diff: \n  %q\n  %q", path, string(eDiff), string(fDiff))
 }
 
-func newAPIViolationGen() *apiViolationGen {
+func newAPIViolationGen(featureGateFileNames []string) *apiViolationGen {
 	return &apiViolationGen{
-		linter: newAPILinter(),
+		linter: newAPILinter(featureGateFileNames),
 	}
 }
 
@@ -134,12 +134,17 @@ type apiLinter struct {
 
 // newAPILinter creates an apiLinter object with API rules in package rules. Please
 // add APIRule here when new API rule is implemented.
-func newAPILinter() *apiLinter {
+func newAPILinter(featureGateFileNames []string) *apiLinter {
+	featureGateMap, _ := rules.ParseFeatureGateFiles(featureGateFileNames)
+
 	return &apiLinter{
 		rules: []APIRule{
 			&rules.NamesMatch{},
 			&rules.OmitEmptyMatchCase{},
 			&rules.ListTypeMissing{},
+			&rules.APILifecyleTag{
+				FeatureGateMap: featureGateMap,
+			},
 		},
 	}
 }
