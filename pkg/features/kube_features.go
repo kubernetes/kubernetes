@@ -133,13 +133,13 @@ const (
 	// owner: @sjenning
 	// alpha: v1.4
 	// beta: v1.11
-	// ga: v1.21
+	// stable: v1.21
 	//
 	// Enable pods to set sysctls on a pod
 	Sysctls featuregate.Feature = "Sysctls"
 
 	// owner: @pospispa
-	// GA: v1.11
+	// stable: v1.11
 	//
 	// Postpone deletion of a PV or a PVC when they are being used
 	StorageObjectInUseProtection featuregate.Feature = "StorageObjectInUseProtection"
@@ -147,7 +147,7 @@ const (
 	// owner: @dims, @derekwaynecarr
 	// alpha: v1.10
 	// beta: v1.14
-	// GA: v1.20
+	// stable: v1.20
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit featuregate.Feature = "SupportPodPidsLimit"
@@ -155,7 +155,7 @@ const (
 	// owner: @mikedanese
 	// alpha: v1.13
 	// beta: v1.21
-	// ga: v1.22
+	// stable: v1.22
 	//
 	// Migrate ServiceAccount volumes to use a projected volume consisting of a
 	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
@@ -174,14 +174,14 @@ const (
 	ServiceAccountIssuerDiscovery featuregate.Feature = "ServiceAccountIssuerDiscovery"
 
 	// owner: @krmayankk
-	// beta:  v1.14
-	// ga:    v1.21
+	// beta: v1.14
+	// stable: v1.21
 	//
 	// Enables control over the primary group ID of containers' init processes.
 	RunAsGroup featuregate.Feature = "RunAsGroup"
 
 	// owner: @saad-ali
-	// ga: 	  v1.10
+	// stable: v1.10
 	//
 	// Allow mounting a subpath of a volume in a container
 	// Do not remove this feature gate even though it's GA
@@ -236,16 +236,16 @@ const (
 
 	// owner: @tallclair
 	// alpha: v1.12
-	// beta:  v1.14
-	// GA: v1.20
+	// beta: v1.14
+	// stable: v1.20
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass featuregate.Feature = "RuntimeClass"
 
 	// owner: @mtaufen
 	// alpha: v1.12
-	// beta:  v1.14
-	// GA: v1.17
+	// beta: v1.14
+	// stable: v1.17
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
@@ -266,6 +266,7 @@ const (
 
 	// owner: @janetkuo
 	// alpha: v1.12
+	// beta: v1.22
 	//
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished featuregate.Feature = "TTLAfterFinished"
@@ -384,7 +385,7 @@ const (
 
 	// owner: @RobertKrawitz, @derekwaynecarr
 	// beta: v1.15
-	// GA: v1.20
+	// stable: v1.20
 	//
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
@@ -422,7 +423,7 @@ const (
 	// kep: http://kep.k8s.io/752
 	// alpha: v1.16
 	// beta: v1.18
-	// ga: v1.21
+	// stable: v1.21
 	//
 	// Enable Endpoint Slices for more scalable Service endpoints.
 	EndpointSlice featuregate.Feature = "EndpointSlice"
@@ -446,14 +447,14 @@ const (
 	// owner: @matthyx
 	// alpha: v1.16
 	// beta: v1.18
-	// GA: v1.20
+	// stable: v1.20
 	//
 	// Enables the startupProbe in kubelet worker.
 	StartupProbe featuregate.Feature = "StartupProbe"
 
 	// owner: @deads2k
 	// beta: v1.17
-	// GA: v1.21
+	// stable: v1.21
 	//
 	// Enables the users to skip TLS verification of kubelets on pod logs requests
 	AllowInsecureBackendProxy featuregate.Feature = "AllowInsecureBackendProxy"
@@ -468,7 +469,7 @@ const (
 	// owner: @alaypatel07, @soltysh
 	// alpha: v1.20
 	// beta: v1.21
-	// GA: v1.22
+	// stable: v1.22
 	//
 	// CronJobControllerV2 controls whether the controller manager starts old cronjob
 	// controller or new one which is implemented with informers and delaying queue
@@ -484,7 +485,7 @@ const (
 	// kep: http://kep.k8s.io/1507
 	// alpha: v1.18
 	// beta:  v1.19
-	// ga:    v1.20
+	// stable:    v1.20
 	//
 	// Enables AppProtocol field for Services and Endpoints.
 	ServiceAppProtocol featuregate.Feature = "ServiceAppProtocol"
@@ -492,7 +493,7 @@ const (
 	// owner: @wojtek-t
 	// alpha: v1.18
 	// beta:  v1.19
-	// ga:    v1.21
+	// stable: v1.21
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
@@ -523,7 +524,7 @@ const (
 	// kep: http://kep.k8s.io/1797
 	// alpha: v1.19
 	// beta: v1.20
-	// GA: v1.22
+	// stable: v1.22
 	//
 	// Allow setting the Fully Qualified Domain Name (FQDN) in the hostname of a Pod. If a Pod does not
 	// have FQDN, this feature has no effect.
@@ -578,7 +579,7 @@ const (
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
 	// owner: @andrewsykim @SergeyKanzhelev
-	// GA: v1.20
+	// stable: v1.20
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
 	// may depend on old behavior where exec probe timeouts were ignored.
@@ -664,7 +665,7 @@ const (
 	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
 
 	// owner: @damemi
-	// aplpha: v1.21
+	// alpha: v1.21
 	//
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
@@ -698,7 +699,7 @@ const (
 	// owner: @jayunit100 @abhiraut @rikatz
 	// kep: http://kep.k8s.io/2161
 	// beta: v1.21
-	// ga: v1.22
+	// stable: v1.22
 	//
 	// Labels all namespaces with a default label "kubernetes.io/metadata.name: <namespaceName>"
 	NamespaceDefaultLabelName featuregate.Feature = "NamespaceDefaultLabelName"

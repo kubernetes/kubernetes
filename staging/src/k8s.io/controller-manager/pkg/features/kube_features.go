@@ -29,6 +29,7 @@ const (
 
 	// owner: @khenidak
 	// alpha: v1.15
+	// beta: v1.21
 	//
 	// Enables ipv6 dual stack
 	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go

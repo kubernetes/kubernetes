@@ -53,7 +53,7 @@ const (
 	// owner: @tallclair
 	// alpha: v1.7
 	// beta: v1.8
-	// GA: v1.12
+	// stable: v1.12
 	//
 	// AdvancedAuditing enables a much more general API auditing pipeline, which includes support for
 	// pluggable output backends and an audit policy specifying how different requests should be
@@ -118,7 +118,7 @@ const (
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
-	// GA: v1.17
+	// stable: v1.17
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
@@ -140,14 +140,14 @@ const (
 	// owner: @shaloulcy, @wojtek-t
 	// alpha: v1.18
 	// beta: v1.19
-	// GA: v1.20
+	// stable: v1.20
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
 
 	// owner: @liggitt
 	// beta: v1.19
-	// GA: v1.22
+	// stable: v1.22
 	//
 	// Allows sending warning headers in API responses.
 	WarningHeaders featuregate.Feature = "WarningHeaders"
