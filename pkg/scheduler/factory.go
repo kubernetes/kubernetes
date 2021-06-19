@@ -139,6 +139,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
+		frameworkruntime.WithExtenders(extenders),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
