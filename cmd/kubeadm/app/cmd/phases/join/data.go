@@ -37,4 +37,9 @@ type JoinData interface {
 	IgnorePreflightErrors() sets.String
 	OutputWriter() io.Writer
 	PatchesDir() string
+	DryRun() bool
+	KubeConfigDir() string
+	KubeletDir() string
+	ManifestDir() string
+	CertificateWriteDir() string
 }

@@ -40,3 +40,8 @@ func (j *testJoinData) ClientSet() (*clientset.Clientset, error)        { return
 func (j *testJoinData) IgnorePreflightErrors() sets.String              { return nil }
 func (j *testJoinData) OutputWriter() io.Writer                         { return nil }
 func (j *testJoinData) PatchesDir() string                              { return "" }
+func (t *testJoinData) DryRun() bool                                    { return false }
+func (t *testJoinData) KubeConfigDir() string                           { return "" }
+func (t *testJoinData) KubeletDir() string                              { return "" }
+func (t *testJoinData) ManifestDir() string                             { return "" }
+func (t *testJoinData) CertificateWriteDir() string                     { return "" }
