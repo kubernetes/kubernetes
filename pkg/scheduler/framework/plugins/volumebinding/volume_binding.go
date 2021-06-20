@@ -221,20 +221,6 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	return nil
 }
 
-var (
-	// TODO (for alpha) make it configurable in config.VolumeBindingArgs
-	defaultShapePoint = []config.UtilizationShapePoint{
-		{
-			Utilization: 0,
-			Score:       0,
-		},
-		{
-			Utilization: 100,
-			Score:       int32(config.MaxCustomPriorityScore),
-		},
-	}
-)
-
 // Score invoked at the score extension point.
 func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	if pl.scorer == nil {
@@ -363,8 +349,8 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	// build score function
 	var scorer volumeCapacityScorer
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		shape := make(helper.FunctionShape, 0, len(defaultShapePoint))
-		for _, point := range defaultShapePoint {
+		shape := make(helper.FunctionShape, 0, len(args.Shape))
+		for _, point := range args.Shape {
 			shape = append(shape, helper.FunctionShapePoint{
 				Utilization: int64(point.Utilization),
 				Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),

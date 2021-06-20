@@ -916,6 +916,7 @@ func autoConvert_v1beta1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1bet
 	if err := v1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
+	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
@@ -928,6 +929,7 @@ func autoConvert_config_VolumeBindingArgs_To_v1beta1_VolumeBindingArgs(in *confi
 	if err := v1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
+	out.Shape = *(*[]v1beta1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 

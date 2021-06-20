@@ -970,6 +970,11 @@ func (in *UtilizationShapePoint) DeepCopy() *UtilizationShapePoint {
 func (in *VolumeBindingArgs) DeepCopyInto(out *VolumeBindingArgs) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Shape != nil {
+		in, out := &in.Shape, &out.Shape
+		*out = make([]UtilizationShapePoint, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
