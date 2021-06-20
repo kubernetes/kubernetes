@@ -49,7 +49,7 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // ExtractCertificateSigningRequest extracts the applied configuration owned by fieldManager from
 // certificateSigningRequest. If no managedFields are found in certificateSigningRequest for fieldManager, a
 // CertificateSigningRequestApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // certificateSigningRequest must be a unmodified CertificateSigningRequest API object that was retrieved from the Kubernetes API.

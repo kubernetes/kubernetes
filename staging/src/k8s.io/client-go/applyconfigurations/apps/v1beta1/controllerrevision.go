@@ -51,7 +51,7 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // ExtractControllerRevision extracts the applied configuration owned by fieldManager from
 // controllerRevision. If no managedFields are found in controllerRevision for fieldManager, a
 // ControllerRevisionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // controllerRevision must be a unmodified ControllerRevision API object that was retrieved from the Kubernetes API.
