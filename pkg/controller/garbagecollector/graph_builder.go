@@ -683,6 +683,8 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 			gb.addUnblockedOwnersToDeleteQueue(removed, changed)
 			// update the node itself
 			existingNode.owners = accessor.GetOwnerReferences()
+			// Make sure the API version stored in memory is up to date.
+			existingNode.identity.APIVersion = event.gvk.GroupVersion().String()
 			// Add the node to its new owners' dependent lists.
 			gb.addDependentToOwners(existingNode, added)
 			// remove the node from the dependent list of node that are no longer in
