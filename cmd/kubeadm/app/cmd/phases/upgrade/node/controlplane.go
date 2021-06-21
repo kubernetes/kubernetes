@@ -40,6 +40,8 @@ func NewControlPlane() workflow.Phase {
 			options.CertificateRenewal,
 			options.EtcdUpgrade,
 			options.Patches,
+			// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
+			options.ExperimentalPatches,
 		},
 	}
 	return phase
