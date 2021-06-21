@@ -211,7 +211,7 @@ func TestManager(t *testing.T) {
 				GracePeriod int64
 			}
 
-			podKillChan := make(chan PodKillInfo)
+			podKillChan := make(chan PodKillInfo, 1)
 			killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 				var gracePeriod int64
 				if gracePeriodOverride != nil {
