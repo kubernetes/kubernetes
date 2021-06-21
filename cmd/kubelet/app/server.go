@@ -546,14 +546,14 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// if in standalone mode, indicate as much by setting all clients to nil
-	switch {
-	case standaloneMode:
+	if standaloneMode {
 		kubeDeps.KubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
 		klog.InfoS("Standalone mode, no API client")
-
-	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
+	} else if kubeDeps.KubeClient == nil ||
+		kubeDeps.EventClient == nil ||
+		kubeDeps.HeartbeatClient == nil {
 		clientConfig, closeAllConns, err := buildKubeletClientConfig(ctx, s, nodeName)
 		if err != nil {
 			return err
@@ -563,33 +563,39 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		kubeDeps.OnHeartbeatFailure = closeAllConns
 
-		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet client: %w", err)
+		if kubeDeps.KubeClient == nil {
+			kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
+			if err != nil {
+				return fmt.Errorf("failed to initialize kubelet client: %w", err)
+			}
 		}
 
-		// make a separate client for events
-		eventClientConfig := *clientConfig
-		eventClientConfig.QPS = float32(s.EventRecordQPS)
-		eventClientConfig.Burst = int(s.EventBurst)
-		kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet event client: %w", err)
+		if kubeDeps.EventClient == nil {
+			// make a separate client for events
+			eventClientConfig := *clientConfig
+			eventClientConfig.QPS = float32(s.EventRecordQPS)
+			eventClientConfig.Burst = int(s.EventBurst)
+			kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
+			if err != nil {
+				return fmt.Errorf("failed to initialize kubelet event client: %w", err)
+			}
 		}
 
-		// make a separate client for heartbeat with throttling disabled and a timeout attached
-		heartbeatClientConfig := *clientConfig
-		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-		// The timeout is the minimum of the lease duration and status update frequency
-		leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
-		if heartbeatClientConfig.Timeout > leaseTimeout {
-			heartbeatClientConfig.Timeout = leaseTimeout
-		}
+		if kubeDeps.HeartbeatClient == nil {
+			// make a separate client for heartbeat with throttling disabled and a timeout attached
+			heartbeatClientConfig := *clientConfig
+			heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
+			// The timeout is the minimum of the lease duration and status update frequency
+			leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
+			if heartbeatClientConfig.Timeout > leaseTimeout {
+				heartbeatClientConfig.Timeout = leaseTimeout
+			}
 
-		heartbeatClientConfig.QPS = float32(-1)
-		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet heartbeat client: %w", err)
+			heartbeatClientConfig.QPS = float32(-1)
+			kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
+			if err != nil {
+				return fmt.Errorf("failed to initialize kubelet heartbeat client: %w", err)
+			}
 		}
 	}
 
