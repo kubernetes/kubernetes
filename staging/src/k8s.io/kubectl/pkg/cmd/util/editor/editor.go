@@ -151,8 +151,6 @@ func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, stri
 		os.Remove(path)
 		return nil, path, err
 	}
-	// This file descriptor needs to close so the next process (Launch) can claim it.
-	f.Close()
 	if err := e.Launch(path); err != nil {
 		return nil, path, err
 	}
