@@ -62,6 +62,10 @@ type InitConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm init --help" command.
 	// The flag "--skip-phases" takes precedence over this field.
 	SkipPhases []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm init".
+	Patches *Patches
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -334,6 +338,10 @@ type JoinConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm join --help" command.
 	// The flag "--skip-phases" takes precedence over this field.
 	SkipPhases []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm join".
+	Patches *Patches
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -430,6 +438,18 @@ type HostPathMount struct {
 	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
+}
+
+// Patches contains options related to applying patches to components deployed by kubeadm.
+type Patches struct {
+	// Directory is a path to a directory that contains files named "target[suffix][+patchtype].extension".
+	// For example, "kube-apiserver0+merge.yaml" or just "etcd.json". "target" can be one of
+	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd". "patchtype" can be one
+	// of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
+	// The default "patchtype" is "strategic". "extension" must be either "json" or "yaml".
+	// "suffix" is an optional string that can be used to determine which patches are applied
+	// first alpha-numerically.
+	Directory string
 }
 
 // DocumentMap is a convenient way to describe a map between a YAML document and its GVK type

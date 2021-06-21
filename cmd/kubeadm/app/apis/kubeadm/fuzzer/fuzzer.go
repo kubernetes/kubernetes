@@ -58,6 +58,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = ""
+	obj.Patches = nil
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -120,6 +121,7 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = ""
+	obj.Patches = nil
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

@@ -556,7 +556,14 @@ func (d *initData) Tokens() []string {
 
 // PatchesDir returns the folder where patches for components are stored
 func (d *initData) PatchesDir() string {
-	return d.patchesDir
+	// If provided, make the flag value override the one in config.
+	if len(d.patchesDir) > 0 {
+		return d.patchesDir
+	}
+	if d.cfg.Patches != nil {
+		return d.cfg.Patches.Directory
+	}
+	return ""
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
