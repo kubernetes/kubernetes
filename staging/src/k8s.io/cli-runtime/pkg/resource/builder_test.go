@@ -617,6 +617,28 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
+func TestFilePatternBuilderWhenPatternYieldsNoResult(t *testing.T) {
+	const pathPattern = "../../artifacts/_does_not_exist_/*.yaml"
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err == nil {
+		t.Fatalf("unexpected response: error is nil")
+	}
+	const expectedErrorMsg = "pattern did not yield any results"
+	if !strings.Contains(err.Error(), expectedErrorMsg) {
+		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
+	}
+	if !strings.Contains(err.Error(), pathPattern) {
+		t.Fatalf("expected %s but got %s", pathPattern, err.Error())
+	}
+}
+
 func TestFilePatternBuilder(t *testing.T) {
 	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-*.yaml"}}).
