@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 

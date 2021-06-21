@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	pvutil "k8s.io/component-helpers/storage/volume"
 )
 
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {

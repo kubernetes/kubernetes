@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/utils/pointer"
 )
 

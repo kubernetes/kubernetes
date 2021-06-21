@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -1374,132 +1374,6 @@ func TestBestMatchDelayed(t *testing.T) {
 	}
 	if volume != nil {
 		t.Errorf("Unexpected match with %q", volume.UID)
-	}
-}
-
-func TestFindMatchVolumeWithNode(t *testing.T) {
-	volumes := createTestVolumes()
-	node1 := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{"key1": "value1"},
-		},
-	}
-	node2 := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{"key1": "value2"},
-		},
-	}
-	node3 := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{"key1": "value3"},
-		},
-	}
-	node4 := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{"key1": "value4"},
-		},
-	}
-
-	scenarios := map[string]struct {
-		expectedMatch   string
-		claim           *v1.PersistentVolumeClaim
-		node            *v1.Node
-		excludedVolumes map[string]*v1.PersistentVolume
-	}{
-		"success-match": {
-			expectedMatch: "affinity-pv",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-			}),
-			node: node1,
-		},
-		"success-prebound": {
-			expectedMatch: "affinity-prebound",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-				pvc.Name = "claim02"
-			}),
-			node: node1,
-		},
-		"success-exclusion": {
-			expectedMatch: "affinity-pv2",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-			}),
-			node:            node1,
-			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil},
-		},
-		"fail-exclusion": {
-			expectedMatch: "",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-			}),
-			node:            node1,
-			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil, "affinity002": nil},
-		},
-		"fail-accessmode": {
-			expectedMatch: "",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
-				pvc.Spec.StorageClassName = &classWait
-			}),
-			node: node1,
-		},
-		"fail-nodeaffinity": {
-			expectedMatch: "",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-			}),
-			node: node2,
-		},
-		"fail-prebound-node-affinity": {
-			expectedMatch: "",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-				pvc.Name = "claim02"
-			}),
-			node: node3,
-		},
-		"fail-nonavaliable": {
-			expectedMatch: "",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-				pvc.Name = "claim04"
-			}),
-			node: node4,
-		},
-		"success-bad-and-good-node-affinity": {
-			expectedMatch: "affinity-pv3",
-			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-				pvc.Spec.StorageClassName = &classWait
-				pvc.Name = "claim03"
-			}),
-			node: node3,
-		},
-	}
-
-	for name, scenario := range scenarios {
-		volume, err := pvutil.FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true)
-		if err != nil {
-			t.Errorf("Unexpected error matching volume by claim: %v", err)
-		}
-		if len(scenario.expectedMatch) != 0 && volume == nil {
-			t.Errorf("Expected match but received nil volume for scenario: %s", name)
-		}
-		if len(scenario.expectedMatch) != 0 && volume != nil && string(volume.UID) != scenario.expectedMatch {
-			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
-		}
-		if len(scenario.expectedMatch) == 0 && volume != nil {
-			t.Errorf("Unexpected match for scenario: %s, matched with %s instead", name, volume.UID)
-		}
 	}
 }
 
