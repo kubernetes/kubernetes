@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/tools/cache"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -37,8 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -54,6 +59,8 @@ import (
 
 const (
 	aggregatorServicePort = 7443
+
+	apiServiceRetryTimeout = 2 * time.Minute
 )
 
 var _ = SIGDescribe("Aggregator", func() {
@@ -67,6 +74,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// of NewDefaultFramework.
 	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
+		cleanBetaTest(c, aggrclient, ns)
 	})
 
 	f := framework.NewDefaultFramework("aggregator")
@@ -101,6 +109,10 @@ var _ = SIGDescribe("Aggregator", func() {
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 
+	ginkgo.It("Should be able to replace APIServiceStatus and delete a collection of APIServices", func() {
+		// Testing a 1.17 version of the sample-apiserver
+		TestAPIService(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
+	})
 })
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
@@ -115,6 +127,20 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":auth-delegator", metav1.DeleteOptions{})
 	_ = client.RbacV1().ClusterRoles().Delete(context.TODO(), "sample-apiserver-reader", metav1.DeleteOptions{})
 	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":sample-apiserver-reader", metav1.DeleteOptions{})
+}
+
+func cleanBetaTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
+	// delete the APIService first to avoid causing discovery errors
+	_ = aggrclient.ApiregistrationV1().APIServices().Delete(context.TODO(), "v1beta1.wardle.example.com", metav1.DeleteOptions{})
+
+	_ = client.AppsV1().Deployments(namespace).Delete(context.TODO(), "beta-sample-apiserver-deployment", metav1.DeleteOptions{})
+	_ = client.CoreV1().Secrets(namespace).Delete(context.TODO(), "beta-sample-apiserver-secret", metav1.DeleteOptions{})
+	_ = client.CoreV1().Services(namespace).Delete(context.TODO(), "beta-sample-api", metav1.DeleteOptions{})
+	_ = client.CoreV1().ServiceAccounts(namespace).Delete(context.TODO(), "beta-sample-apiserver", metav1.DeleteOptions{})
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), "beta-wardler-auth-reader", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "beta-wardler:"+namespace+":auth-delegator", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoles().Delete(context.TODO(), "beta-sample-apiserver-reader", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "beta-wardler:"+namespace+":sample-apiserver-reader", metav1.DeleteOptions{})
 }
 
 // TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
@@ -548,6 +574,368 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}
 
 	cleanTest(client, aggrclient, namespace)
+}
+
+// TestAPIService uses the sample-apiserver
+// (v1beta1.wardle.example.com) to test replace
+// status and deleteCollection APIService endpoints
+func TestAPIService(f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
+	ginkgo.By("Registering the sample API server.")
+	client := f.ClientSet
+	restClient := client.Discovery().RESTClient()
+
+	namespace := f.Namespace.Name
+	certCtx := setupServerCert(namespace, "beta-sample-api")
+
+	// kubectl create -f namespace.yaml
+	// NOTE: aggregated apis should generally be set up in their own namespace. As the test framework is setting up a new namespace, we are just using that.
+
+	// kubectl create -f secret.yaml
+	secretName := "beta-sample-apiserver-secret"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"tls.crt": certCtx.cert,
+			"tls.key": certCtx.key,
+		},
+	}
+	_, err := client.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
+
+	// kubectl create -f clusterrole.yaml
+	_, err = client.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
+
+		ObjectMeta: metav1.ObjectMeta{Name: "beta-sample-apiserver-reader"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
+
+	_, err = client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "beta-wardler:" + namespace + ":sample-apiserver-reader",
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "sample-apiserver-reader",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup:  "",
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":sample-apiserver-reader")
+
+	// kubectl create -f authDelegator.yaml
+	_, err = client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "beta-wardler:" + namespace + ":auth-delegator",
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:auth-delegator",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup:  "",
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":auth-delegator")
+
+	// kubectl create -f deploy.yaml
+	deploymentName := "beta-sample-apiserver-deployment"
+	etcdImage := imageutils.GetE2EImage(imageutils.Etcd)
+	podLabels := map[string]string{"app": "beta-sample-apiserver", "apiserver": "true"}
+	replicas := int32(1)
+	zero := int64(0)
+	etcdLocalhostAddress := "127.0.0.1"
+	if framework.TestContext.ClusterIsIPv6() {
+		etcdLocalhostAddress = "::1"
+	}
+	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))
+
+	mounts := []v1.VolumeMount{
+		{
+			Name:      "beta-apiserver-certs",
+			ReadOnly:  true,
+			MountPath: "/apiserver.local.config/certificates",
+		},
+	}
+	volumes := []v1.Volume{
+		{
+			Name: "beta-apiserver-certs",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{SecretName: secretName},
+			},
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:         "beta-sample-apiserver",
+			VolumeMounts: mounts,
+			Args: []string{
+				fmt.Sprintf("--etcd-servers=%s", etcdURL),
+				"--tls-cert-file=/apiserver.local.config/certificates/tls.crt",
+				"--tls-private-key-file=/apiserver.local.config/certificates/tls.key",
+				"--audit-log-path=-",
+				"--audit-log-maxage=0",
+				"--audit-log-maxbackup=0",
+			},
+			Image: image,
+		},
+		{
+			Name:  "etcd",
+			Image: etcdImage,
+			Command: []string{
+				"/usr/local/bin/etcd",
+				"--listen-client-urls",
+				etcdURL,
+				"--advertise-client-urls",
+				etcdURL,
+			},
+		},
+	}
+	d := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   deploymentName,
+			Labels: podLabels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabels,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers:                    containers,
+					Volumes:                       volumes,
+				},
+			},
+		},
+	}
+	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
+
+	err = e2edeployment.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
+	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
+
+	err = e2edeployment.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
+	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", etcdImage, deploymentName, namespace)
+
+	// kubectl create -f service.yaml
+	serviceLabels := map[string]string{"apiserver": "true"}
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "beta-sample-api",
+			Labels:    map[string]string{"test": "aggregator"},
+		},
+		Spec: v1.ServiceSpec{
+			Selector: serviceLabels,
+			Ports: []v1.ServicePort{
+				{
+					Protocol:   "TCP",
+					Port:       aggregatorServicePort,
+					TargetPort: intstr.FromInt(443),
+				},
+			},
+		},
+	}
+	_, err = client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating service %s in namespace %s", "sample-apiserver", namespace)
+
+	// kubectl create -f serviceAccount.yaml
+	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "beta-sample-apiserver"}}
+	_, err = client.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), sa, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating service account %s in namespace %s", "beta-sample-apiserver", namespace)
+
+	// kubectl create -f auth-reader.yaml
+	_, err = client.RbacV1().RoleBindings("kube-system").Create(context.TODO(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "beta-wardler-auth-reader",
+			Annotations: map[string]string{
+				rbacv1.AutoUpdateAnnotationKey: "true",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "",
+			Kind:     "Role",
+			Name:     "extension-apiserver-authentication-reader",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating role binding %s:beta-sample-apiserver to access configMap", namespace)
+
+	// Wait for the extension apiserver to be up and healthy
+	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
+	// NOTE: aggregated apis should generally be set up in their own namespace (<aggregated-api-namespace>). As the test framework
+	// is setting up a new namespace, we are just using that.
+	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
+	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
+
+	// kubectl create -f apiservice.yaml
+	label := map[string]string{"apiservice": "created"}
+	_, err = aggrclient.ApiregistrationV1().APIServices().Create(context.TODO(), &apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1beta1.wardle.example.com", Labels: label},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
+				Namespace: namespace,
+				Name:      "beta-sample-api",
+				Port:      pointer.Int32Ptr(aggregatorServicePort),
+			},
+			Group:                "wardle.example.com",
+			Version:              "v1beta1",
+			CABundle:             certCtx.signingCert,
+			GroupPriorityMinimum: 2000,
+			VersionPriority:      200,
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1beta1.wardle.example.com", namespace)
+
+	var (
+		currentAPIService *apiregistrationv1.APIService
+		currentPods       *v1.PodList
+	)
+
+	err = pollTimed(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+
+		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get(context.TODO(), "v1beta1.wardle.example.com", metav1.GetOptions{})
+		currentPods, _ = client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+
+		request := restClient.Get().AbsPath("/apis/wardle.example.com/v1beta1/namespaces/default/flunders")
+		request.SetHeader("Accept", "application/json")
+		_, err := request.DoRaw(context.TODO())
+		if err != nil {
+			status, ok := err.(*apierrors.StatusError)
+			if !ok {
+				return false, err
+			}
+			if status.Status().Code == 403 || status.Status().Code == 503 {
+				return false, nil
+			}
+			if status.Status().Code == 404 && strings.HasPrefix(err.Error(), "the server could not find the requested resource") {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
+	if err != nil {
+		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
+		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
+
+		currentPodsJSON, _ := json.Marshal(currentPods)
+		framework.Logf("current pods: %s", string(currentPodsJSON))
+
+		if currentPods != nil {
+			for _, pod := range currentPods.Items {
+				for _, container := range pod.Spec.Containers {
+					logs, err := e2epod.GetPodLogs(client, namespace, pod.Name, container.Name)
+					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+				}
+			}
+		}
+	}
+	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
+
+	ginkgo.By("updating the APIService Status")
+	var statusToUpdate, updatedStatus *apiregistrationv1.APIService
+	apiServiceName := "v1beta1.wardle.example.com"
+	apiServiceClient := aggrclient.ApiregistrationV1().APIServices()
+
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = "apiservice=created"
+			return apiServiceClient.Watch(context.TODO(), options)
+		},
+	}
+
+	apiServiceList, err := apiServiceClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "apiservice=created"})
+	framework.ExpectNoError(err, "failed to list API Services")
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		statusToUpdate, err = apiServiceClient.Get(context.TODO(), apiServiceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Unable to retrieve api service %s", apiServiceName)
+
+		statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, apiregistrationv1.APIServiceCondition{
+			Type:    "StatusUpdate",
+			Status:  "True",
+			Reason:  "E2E",
+			Message: "Set from e2e test",
+		})
+
+		updatedStatus, err = apiServiceClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+		return err
+	})
+	framework.ExpectNoError(err, "Failed to update status. %v", err)
+	framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+	ginkgo.By("watching for the APIService to be updated")
+	ctx, cancel := context.WithTimeout(context.Background(), apiServiceRetryTimeout)
+	defer cancel()
+	_, err = watchtools.Until(ctx, apiServiceList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if resource, ok := event.Object.(*apiregistrationv1.APIService); ok {
+			found := resource.ObjectMeta.Name == apiServiceName &&
+				resource.Labels["apiservice"] == "created"
+			if !found {
+				framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", resource.ObjectMeta.Name, resource.Labels, resource.Status.Conditions)
+				return false, nil
+			}
+			for _, cond := range resource.Status.Conditions {
+				if cond.Type == "StatusUpdate" &&
+					cond.Reason == "E2E" &&
+					cond.Message == "Set from e2e test" {
+					framework.Logf("Found APIService %v with Labels: %v & Conditions: %v", resource.ObjectMeta.Name, resource.Labels, cond)
+					return found, nil
+				} else {
+					framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", resource.ObjectMeta.Name, resource.Labels, cond)
+				}
+			}
+			return false, nil
+		}
+		framework.Logf("Observed event: %+v", event.Object)
+		return false, nil
+	})
+	framework.ExpectNoError(err, "failed to locate APIService %v with conditions: %v", apiServiceName, updatedStatus.Status.Conditions)
+	framework.Logf("APIService Status for %s has been updated", apiServiceName)
+
+	ginkgo.By("Delete a collection of APIServices")
+	one := int64(1)
+	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(context.TODO(),
+		metav1.DeleteOptions{GracePeriodSeconds: &one},
+		metav1.ListOptions{LabelSelector: "apiservice=created"})
+	framework.ExpectNoError(err, "Unable to delete apiservice %s", apiServiceName)
+	framework.Logf("APIService %s has been deleted.", apiServiceName)
+
+	cleanBetaTest(client, aggrclient, namespace)
 }
 
 // pollTimed will call Poll but time how long Poll actually took.
