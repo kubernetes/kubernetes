@@ -94,13 +94,13 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 
 	// This is only generated on the pod level.  Containers inherit the pod's profile.  If the
 	// container has a specific profile set then it will be caught in the validation step.
-	seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod.Annotations, pod)
+	seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod.GetAnnotations(), pod)
 	if err != nil {
 		return err
 	}
 	if seccompProfile != "" {
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
+		if pod.GetAnnotations() == nil {
+			pod.SetAnnotations(map[string]string{})
 		}
 		pod.Annotations[api.SeccompPodAnnotationKey] = seccompProfile
 	}
@@ -156,7 +156,7 @@ func (s *simpleProvider) mutateContainer(pod *api.Pod, container *api.Container)
 		sc.SetSELinuxOptions(seLinux)
 	}
 
-	annotations, err := s.strategies.AppArmorStrategy.Generate(pod.Annotations, container)
+	annotations, err := s.strategies.AppArmorStrategy.Generate(pod.GetAnnotations(), container)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (s *simpleProvider) mutateContainer(pod *api.Pod, container *api.Container)
 		sc.SetAllowPrivilegeEscalation(s.psp.Spec.AllowPrivilegeEscalation)
 	}
 
-	pod.Annotations = annotations
+	pod.SetAnnotations(annotations)
 	container.SecurityContext = sc.ContainerSecurityContext()
 
 	return nil
