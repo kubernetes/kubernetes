@@ -41,14 +41,16 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
 
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		framework.ExpectNotEqual(len(nodeList.Items), 0)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, 1)
+		framework.ExpectNoError(err)
 
-		pickedNode := nodeList.Items[0]
-		nodeIPs = e2enode.GetAddresses(&pickedNode, v1.NodeExternalIP)
-		// The pods running in the cluster can see the internal addresses.
-		nodeIPs = append(nodeIPs, e2enode.GetAddresses(&pickedNode, v1.NodeInternalIP)...)
+		family := v1.IPv4Protocol
+		if framework.TestContext.ClusterIsIPv6() {
+			family = v1.IPv6Protocol
+		}
+
+		nodeIPs := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(nodeIPs), 0)
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
 		saName := "default"
