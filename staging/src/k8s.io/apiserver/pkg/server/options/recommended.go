@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -126,6 +128,10 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	}
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 		if config.ClientConfig != nil {
+			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
+				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
+
+			}
 			config.FlowControl = utilflowcontrol.New(
 				config.SharedInformerFactory,
 				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta1(),
