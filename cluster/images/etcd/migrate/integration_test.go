@@ -42,7 +42,7 @@ import (
 )
 
 var (
-	testSupportedVersions = MustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
+	testSupportedVersions = mustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
 	testVersionPrevious   = &EtcdVersion{semver.MustParse("3.0.17")}
 	testVersionLatest     = &EtcdVersion{semver.MustParse("3.1.12")}
 )
@@ -79,8 +79,8 @@ func TestMigrate(t *testing.T) {
 
 	for _, m := range migrations {
 		t.Run(m.title, func(t *testing.T) {
-			start := MustParseEtcdVersionPair(m.startVersion)
-			end := MustParseEtcdVersionPair(m.endVersion)
+			start := mustParseEtcdVersionPair(m.startVersion)
+			end := mustParseEtcdVersionPair(m.endVersion)
 
 			testCfgs := clusterConfig(t, m.title, m.memberCount, m.protocol, m.clientListenUrls)
 
@@ -362,4 +362,23 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+// mustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
+// or panics if the parse fails.
+func mustParseEtcdVersionPair(s string) *EtcdVersionPair {
+	pair, err := ParseEtcdVersionPair(s)
+	if err != nil {
+		panic(err)
+	}
+	return pair
+}
+
+// mustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
+func mustParseSupportedVersions(list []string) SupportedVersions {
+	versions, err := ParseSupportedVersions(list)
+	if err != nil {
+		panic(err)
+	}
+	return versions
 }
