@@ -1,4 +1,8 @@
 // This is a generated file. Do not edit directly.
+// Ensure you've carefully read
+// https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
+// Run hack/pin-dependency.sh to change pinned dependency versions.
+// Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 
 module k8s.io/legacy-cloud-providers
 
@@ -25,17 +29,17 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.20.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
-	k8s.io/client-go v0.0.0
+	k8s.io/api v0.20.6
+	k8s.io/apimachinery v0.20.6
+	k8s.io/apiserver v0.20.6
+	k8s.io/client-go v0.20.6
 	k8s.io/cloud-provider v0.0.0
-	k8s.io/component-base v0.0.0
+	k8s.io/component-base v0.20.6
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/mount-utils v0.0.0

@@ -1,10 +1,15 @@
 // This is a generated file. Do not edit directly.
+// Ensure you've carefully read
+// https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
+// Run hack/pin-dependency.sh to change pinned dependency versions.
+// Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 
 module k8s.io/kubectl
 
 go 1.16
 
 require (
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/davecgh/go-spew v1.1.1
@@ -23,7 +28,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/gomega v1.10.3
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.1.3
@@ -31,11 +36,12 @@ require (
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
+	gotest.tools/v3 v3.0.3 // indirect
+	k8s.io/api v0.20.6
+	k8s.io/apimachinery v0.20.6
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.0.0
-	k8s.io/component-base v0.0.0
+	k8s.io/client-go v0.20.6
+	k8s.io/component-base v0.20.6
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e

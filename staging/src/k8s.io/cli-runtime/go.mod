@@ -1,4 +1,8 @@
 // This is a generated file. Do not edit directly.
+// Ensure you've carefully read
+// https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
+// Run hack/pin-dependency.sh to change pinned dependency versions.
+// Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 
 module k8s.io/cli-runtime
 
@@ -10,17 +14,19 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
-	github.com/google/uuid v1.1.2
+	github.com/google/btree v1.0.1 // indirect
+	github.com/google/uuid v1.2.0
 	github.com/googleapis/gnostic v0.5.5
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/text v0.3.6
+	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
+	k8s.io/api v0.20.6
+	k8s.io/apimachinery v0.20.6
+	k8s.io/client-go v0.20.6
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
 	sigs.k8s.io/kustomize/api v0.8.10
 	sigs.k8s.io/yaml v1.2.0

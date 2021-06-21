@@ -1,4 +1,8 @@
 // This is a generated file. Do not edit directly.
+// Ensure you've carefully read
+// https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
+// Run hack/pin-dependency.sh to change pinned dependency versions.
+// Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 
 module k8s.io/code-generator
 
@@ -13,6 +17,7 @@ require (
 	github.com/googleapis/gnostic v0.5.5
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
