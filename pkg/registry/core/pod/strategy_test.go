@@ -42,6 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -266,55 +267,82 @@ func TestGetPodQOS(t *testing.T) {
 func TestCheckGracefulDelete(t *testing.T) {
 	defaultGracePeriod := int64(30)
 	tcs := []struct {
-		in          *api.Pod
-		gracePeriod int64
+		name              string
+		pod               *api.Pod
+		deleteGracePeriod *int64
+		gracePeriod       int64
 	}{
 		{
-			in: &api.Pod{
+			name: "in pending phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-
-			gracePeriod: defaultGracePeriod,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       defaultGracePeriod,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodFailed},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in succeeded phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodSucceeded},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "no phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
+		},
+		{
+			name: "has negative grace period",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName:                      "something",
+					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				},
+				Status: api.PodStatus{},
+			},
+			gracePeriod: 1,
 		},
 	}
 	for _, tc := range tcs {
-		out := &metav1.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
-		Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.in, out)
-		if out.GracePeriodSeconds == nil {
-			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
-		}
-		if *(out.GracePeriodSeconds) != tc.gracePeriod {
-			t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			out := &metav1.DeleteOptions{}
+			if tc.deleteGracePeriod != nil {
+				out.GracePeriodSeconds = utilpointer.Int64(*tc.deleteGracePeriod)
+			}
+			Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.pod, out)
+			if out.GracePeriodSeconds == nil {
+				t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
+			}
+			if *(out.GracePeriodSeconds) != tc.gracePeriod {
+				t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
+			}
+		})
 	}
 }
 
