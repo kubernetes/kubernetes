@@ -292,13 +292,13 @@ func TestUpdatePod(t *testing.T) {
 			expectDelete: true,
 		},
 		{
-			description: "lengthening toleration shouldn't work",
+			description: "allow lengthening toleration",
 			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
 			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
-			expectDelete:    true,
+			expectDelete:    false,
 			additionalSleep: 1500 * time.Millisecond,
 		},
 	}
