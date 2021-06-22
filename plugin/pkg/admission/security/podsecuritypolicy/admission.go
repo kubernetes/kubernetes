@@ -297,6 +297,10 @@ func (p *Plugin) computeSecurityContext(ctx context.Context, a admission.Attribu
 			aggregate = append(aggregate, errs...)
 		}
 	}
+	if len(aggregate) == 0 {
+		// when no errors from PSPs, still try to provide a hint about what's gone wrong
+		aggregate = append(aggregate, field.Invalid(field.NewPath(""), pod, "no PodSecurityPolicy is authorized for Pod"));
+	}
 	return nil, "", aggregate, nil
 }
 
