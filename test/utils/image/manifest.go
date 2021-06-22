@@ -30,19 +30,20 @@ import (
 
 // RegistryList holds public and private image registries
 type RegistryList struct {
-	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
-	E2eRegistry             string `yaml:"e2eRegistry"`
-	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
-	BuildImageRegistry      string `yaml:"buildImageRegistry"`
-	InvalidRegistry         string `yaml:"invalidRegistry"`
-	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
-	GcRegistry              string `yaml:"gcRegistry"`
-	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
-	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
-	PrivateRegistry         string `yaml:"privateRegistry"`
-	SampleRegistry          string `yaml:"sampleRegistry"`
-	MicrosoftRegistry       string `yaml:"microsoftRegistry"`
-	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
+	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
+	E2eRegistry              string `yaml:"e2eRegistry"`
+	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
+	BuildImageRegistry       string `yaml:"buildImageRegistry"`
+	InvalidRegistry          string `yaml:"invalidRegistry"`
+	GcEtcdRegistry           string `yaml:"gcEtcdRegistry"`
+	GcRegistry               string `yaml:"gcRegistry"`
+	SigStorageRegistry       string `yaml:"sigStorageRegistry"`
+	GcrReleaseRegistry       string `yaml:"gcrReleaseRegistry"`
+	PrivateRegistry          string `yaml:"privateRegistry"`
+	SampleRegistry           string `yaml:"sampleRegistry"`
+	MicrosoftRegistry        string `yaml:"microsoftRegistry"`
+	DockerLibraryRegistry    string `yaml:"dockerLibraryRegistry"`
+	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -89,19 +90,20 @@ func initReg() RegistryList {
 
 var (
 	initRegistry = RegistryList{
-		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:      "k8s.gcr.io/build-image",
-		InvalidRegistry:         "invalid.com/invalid",
-		GcEtcdRegistry:          "k8s.gcr.io",
-		GcRegistry:              "k8s.gcr.io",
-		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
-		SampleRegistry:          "gcr.io/google-samples",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
-		MicrosoftRegistry:       "mcr.microsoft.com",
-		DockerLibraryRegistry:   "docker.io/library",
+		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
+		E2eRegistry:              "gcr.io/kubernetes-e2e-test-images",
+		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
+		BuildImageRegistry:       "k8s.gcr.io/build-image",
+		InvalidRegistry:          "invalid.com/invalid",
+		GcEtcdRegistry:           "k8s.gcr.io",
+		GcRegistry:               "k8s.gcr.io",
+		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
+		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
+		SampleRegistry:           "gcr.io/google-samples",
+		GcrReleaseRegistry:       "gcr.io/gke-release",
+		MicrosoftRegistry:        "mcr.microsoft.com",
+		DockerLibraryRegistry:    "docker.io/library",
+		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
 	}
 
 	registry = initReg()
@@ -212,7 +214,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.E2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.0"}
+	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.2"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.3"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
@@ -232,7 +234,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.1"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.4.1"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.5"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{list.GcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{list.GcRegistry, "prometheus-to-sd", "v0.5.0"}
@@ -405,6 +407,8 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.GcAuthenticatedRegistry
 	case initRegistry.DockerLibraryRegistry:
 		registryAndUser = reg.DockerLibraryRegistry
+	case initRegistry.CloudProviderGcpRegistry:
+		registryAndUser = reg.CloudProviderGcpRegistry
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library

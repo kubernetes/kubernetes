@@ -315,6 +315,22 @@ run_kubectl_sort_by_tests() {
   output_message=$(kubectl get pods --sort-by="{metadata.creationTimestamp}")
   kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod1:sorted-pod2:sorted-pod3:"
 
+  # ensure sorting by resource memory request works
+  output_message=$(kubectl get pods --sort-by="{.spec.containers[0].resources.requests.memory}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod3:sorted-pod1:sorted-pod2:"
+
+  # ensure sorting by resource cpu request works
+  output_message=$(kubectl get pods --sort-by="{.spec.containers[0].resources.requests.cpu}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod3:sorted-pod1:sorted-pod2:"
+
+  # ensure sorting by resource memory limit works
+  output_message=$(kubectl get pods --sort-by="{.spec.containers[0].resources.limits.memory}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod3:sorted-pod1:sorted-pod2:"
+
+  # ensure sorting by resource cpu limit works
+   output_message=$(kubectl get pods --sort-by="{.spec.containers[0].resources.limits.cpu}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod3:sorted-pod1:sorted-pod2:"
+
   # ensure sorting using fallback codepath still works
   output_message=$(kubectl get pods --sort-by="{spec.containers[0].name}" --server-print=false --v=8 2>&1)
   kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod2:sorted-pod1:sorted-pod3:"

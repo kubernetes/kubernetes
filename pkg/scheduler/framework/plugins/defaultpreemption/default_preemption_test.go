@@ -30,6 +30,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -96,6 +97,10 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 	dpa := &config.DefaultPreemptionArgs{}
 	configv1beta1.Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(v1beta1dpa, dpa, nil)
 	return dpa
+}
+
+var nodeResourcesFitFunc = func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+	return noderesources.NewFit(plArgs, fh, feature.Features{})
 }
 
 func TestPostFilter(t *testing.T) {
@@ -270,7 +275,7 @@ func TestPostFilter(t *testing.T) {
 			// Register NodeResourceFit as the Filter & PreFilter plugin.
 			registeredPlugins := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			var extenders []framework.Extender
@@ -281,7 +286,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 			)
@@ -382,7 +387,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "a pod that fits on both nodes when lower priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -413,7 +418,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "a pod that would fit on the nodes, but other pods running are higher priority, no preemption would happen",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -429,7 +434,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "medium priority pod is preempted, but lower priority one stays as it is small",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -461,7 +466,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "mixed priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -492,7 +497,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -523,7 +528,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 				st.RegisterPluginAsExtensions(interpodaffinity.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return interpodaffinity.New(plArgs, fh, feature.Features{})
 				}, "Filter", "PreFilter"),
@@ -594,7 +599,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -611,7 +616,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "preemption with violation of same pdb",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1"},
 			testPods: []*v1.Pod{
@@ -646,7 +651,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim doesn't belong to DisruptedPods",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1"},
 			testPods: []*v1.Pod{
@@ -681,7 +686,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim belongs to DisruptedPods",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1"},
 			testPods: []*v1.Pod{
@@ -716,7 +721,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "preemption with violation of the pdb with pod whose eviction was processed, the victim which belongs to DisruptedPods is treated as 'nonViolating'",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1"},
 			testPods: []*v1.Pod{
@@ -754,7 +759,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "all nodes are possible candidates, but DefaultPreemptionArgs limits to 2",
 			args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 40, MinCandidateNodesAbsolute: 1},
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2", "node3", "node4", "node5"},
 			testPods: []*v1.Pod{
@@ -791,7 +796,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "some nodes are not possible candidates, DefaultPreemptionArgs limits to 2",
 			args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 40, MinCandidateNodesAbsolute: 1},
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2", "node3", "node4", "node5"},
 			testPods: []*v1.Pod{
@@ -828,7 +833,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "preemption offset across multiple scheduling cycles and wrap around",
 			args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 40, MinCandidateNodesAbsolute: 1},
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2", "node3", "node4", "node5"},
 			testPods: []*v1.Pod{
@@ -897,7 +902,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "preemption looks past numCandidates until a non-PDB violating node is found",
 			args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 40, MinCandidateNodesAbsolute: 2},
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2", "node3", "node4", "node5"},
 			testPods: []*v1.Pod{
@@ -955,7 +960,6 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rand.Seed(4)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]framework.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -987,7 +991,13 @@ func TestDryRunPreemption(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
-			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
+			var objs []runtime.Object
+			for _, p := range append(tt.testPods, tt.initPods...) {
+				objs = append(objs, p)
+			}
+			for _, n := range nodes {
+				objs = append(objs, n)
+			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			if tt.disableParallelism {
@@ -998,7 +1008,7 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			fwk, err := st.NewFramework(
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
@@ -1025,6 +1035,10 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			pl := &DefaultPreemption{args: *tt.args}
 
+			// Using 4 as a seed source to test getOffsetAndNumCandidates() deterministically.
+			// However, we need to do it after informerFactory.WaitforCacheSync() which might
+			// set a seed.
+			rand.Seed(4)
 			var prevNumFilterCalled int32
 			for cycle, pod := range tt.testPods {
 				state := framework.NewCycleState()
@@ -1067,7 +1081,7 @@ func TestSelectBestCandidate(t *testing.T) {
 	}{
 		{
 			name:           "a pod that fits on both nodes when lower priority pods are preempted",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1078,7 +1092,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "node with min highest priority pod is picked",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1093,7 +1107,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "when highest priorities are the same, minimum sum of priorities is picked",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1108,7 +1122,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "when highest priority and sum are the same, minimum number of pods is picked",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1128,7 +1142,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			// pickOneNodeForPreemption adjusts pod priorities when finding the sum of the victims. This
 			// test ensures that the logic works correctly.
 			name:           "sum of adjusted priorities is considered",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1145,7 +1159,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "non-overlapping lowest high priority, sum priorities, and number of pods",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3", "node4"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(veryHighPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1166,7 +1180,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "same priority, same number of victims, different start time for each node's pod",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1181,7 +1195,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "same priority, same number of victims, different start time for all pods",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1196,7 +1210,7 @@ func TestSelectBestCandidate(t *testing.T) {
 		},
 		{
 			name:           "different priority, same number of victims, different start time for all pods",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1217,6 +1231,14 @@ func TestSelectBestCandidate(t *testing.T) {
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 			}
+
+			var objs []runtime.Object
+			objs = append(objs, tt.pod)
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			cs := clientsetfake.NewSimpleClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
@@ -1225,7 +1247,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
 			if err != nil {
@@ -1339,27 +1361,19 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: sets.NewString(),
 		},
 		{
-			name: "ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
+			name: "ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
 			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
+				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
 			expected: sets.NewString("node1", "node4"),
 		},
 		{
-			name: "pod with both pod affinity and anti-affinity should be tried",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-			},
-			expected: sets.NewString("node1", "node3", "node4"),
-		},
-		{
-			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
+			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
-				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
+				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
 			},
 			expected: sets.NewString("node2", "node3", "node4"),
 		},
@@ -1459,7 +1473,7 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p3.1").UID("p3.1").Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
 			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
@@ -1494,7 +1508,7 @@ func TestPreempt(t *testing.T) {
 				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
 				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
 			},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
@@ -1510,7 +1524,7 @@ func TestPreempt(t *testing.T) {
 			extenders: []*st.FakeExtender{
 				{Predicates: []st.FitPredicate{st.FalsePredicateExtender}},
 			},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "",
 			expectedPods:   []string{},
 		},
@@ -1527,7 +1541,7 @@ func TestPreempt(t *testing.T) {
 				{Predicates: []st.FitPredicate{st.ErrorPredicateExtender}, Ignorable: true},
 				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
 			},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
@@ -1544,7 +1558,7 @@ func TestPreempt(t *testing.T) {
 				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}, UnInterested: true},
 				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
 			},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			//sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
 			expectedNode: "node2",
 			expectedPods: []string{"p2.1"},
@@ -1559,7 +1573,7 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
 			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "",
 			expectedPods:   nil,
 		},
@@ -1573,7 +1587,7 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
 			nodeNames:      []string{"node1", "node2", "node3"},
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
+			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
@@ -1638,7 +1652,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 			)

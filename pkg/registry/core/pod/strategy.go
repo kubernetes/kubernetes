@@ -107,6 +107,11 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return validation.ValidatePodCreate(pod, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return podutil.GetWarningsForPod(ctx, obj.(*api.Pod), nil)
+}
+
 // Canonicalize normalizes the object after validation.
 func (podStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -123,6 +128,13 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	// skip warnings on pod update, since humans don't typically interact directly with pods,
+	// and we don't want to pay the evaluation cost on what might be a high-frequency update path
+	return nil
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -198,6 +210,11 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (podStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type podEphemeralContainersStrategy struct {
 	podStrategy
 }
@@ -229,6 +246,11 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	return validation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

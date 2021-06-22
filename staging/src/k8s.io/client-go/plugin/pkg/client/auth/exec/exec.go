@@ -162,10 +162,10 @@ func (s *sometimes) Do(f func()) {
 
 // GetAuthenticator returns an exec-based plugin for providing client credentials.
 func GetAuthenticator(config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
-	return newAuthenticator(globalCache, config, cluster)
+	return newAuthenticator(globalCache, term.IsTerminal, config, cluster)
 }
 
-func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
+func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
 	key := cacheKey(config, cluster)
 	if a, ok := c.get(key); ok {
 		return a, nil
@@ -196,11 +196,11 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 			clock:     clock.RealClock{},
 		},
 
-		stdin:       os.Stdin,
-		stderr:      os.Stderr,
-		interactive: term.IsTerminal(int(os.Stdin.Fd())),
-		now:         time.Now,
-		environ:     os.Environ,
+		stdin:           os.Stdin,
+		stderr:          os.Stderr,
+		interactiveFunc: func() (bool, error) { return isInteractive(isTerminalFunc, config) },
+		now:             time.Now,
+		environ:         os.Environ,
 
 		defaultDialer: defaultDialer,
 		connTracker:   connTracker,
@@ -211,6 +211,33 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 	}
 
 	return c.put(key, a), nil
+}
+
+func isInteractive(isTerminalFunc func(int) bool, config *api.ExecConfig) (bool, error) {
+	var shouldBeInteractive bool
+	switch config.InteractiveMode {
+	case api.NeverExecInteractiveMode:
+		shouldBeInteractive = false
+	case api.IfAvailableExecInteractiveMode:
+		shouldBeInteractive = !config.StdinUnavailable && isTerminalFunc(int(os.Stdin.Fd()))
+	case api.AlwaysExecInteractiveMode:
+		if !isTerminalFunc(int(os.Stdin.Fd())) {
+			return false, errors.New("standard input is not a terminal")
+		}
+		if config.StdinUnavailable {
+			suffix := ""
+			if len(config.StdinUnavailableMessage) > 0 {
+				// only print extra ": <message>" if the user actually specified a message
+				suffix = fmt.Sprintf(": %s", config.StdinUnavailableMessage)
+			}
+			return false, fmt.Errorf("standard input is unavailable%s", suffix)
+		}
+		shouldBeInteractive = true
+	default:
+		return false, fmt.Errorf("unknown interactiveMode: %q", config.InteractiveMode)
+	}
+
+	return shouldBeInteractive, nil
 }
 
 // Authenticator is a client credential provider that rotates credentials by executing a plugin.
@@ -231,11 +258,11 @@ type Authenticator struct {
 	installHint string
 
 	// Stubbable for testing
-	stdin       io.Reader
-	stderr      io.Writer
-	interactive bool
-	now         func() time.Time
-	environ     func() []string
+	stdin           io.Reader
+	stderr          io.Writer
+	interactiveFunc func() (bool, error)
+	now             func() time.Time
+	environ         func() []string
 
 	// defaultDialer is used for clients which don't specify a custom dialer
 	defaultDialer *connrotation.Dialer
@@ -263,8 +290,9 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	// setting up the transport, as that triggers the exec action if the server is
 	// also configured to allow client certificates for authentication. For requests
 	// like "kubectl get --token (token) pods" we should assume the intention is to
-	// use the provided token for authentication.
-	if c.HasTokenAuth() {
+	// use the provided token for authentication. The same can be said for when the
+	// user specifies basic auth.
+	if c.HasTokenAuth() || c.HasBasicAuth() {
 		return nil
 	}
 
@@ -375,10 +403,15 @@ func (a *Authenticator) maybeRefreshCreds(creds *credentials, r *clientauthentic
 // refreshCredsLocked executes the plugin and reads the credentials from
 // stdout. It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) error {
+	interactive, err := a.interactiveFunc()
+	if err != nil {
+		return fmt.Errorf("exec plugin cannot support interactive mode: %w", err)
+	}
+
 	cred := &clientauthentication.ExecCredential{
 		Spec: clientauthentication.ExecCredentialSpec{
 			Response:    r,
-			Interactive: a.interactive,
+			Interactive: interactive,
 		},
 	}
 	if a.provideClusterInfo {
@@ -397,7 +430,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 	cmd.Env = env
 	cmd.Stderr = a.stderr
 	cmd.Stdout = stdout
-	if a.interactive {
+	if interactive {
 		cmd.Stdin = a.stdin
 	}
 

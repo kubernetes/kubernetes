@@ -74,7 +74,145 @@ EOF
   fi
   # Post-condition: None
 
+  cat > "${TMPDIR:-/tmp}"/valid_exec_plugin.yaml << EOF
+apiVersion: v1
+clusters:
+- cluster:
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: valid_token_user
+  name: test
+current-context: test
+kind: Config
+preferences: {}
+users:
+- name: valid_token_user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: echo
+      args:
+        - '{"apiVersion":"client.authentication.k8s.io/v1beta1","status":{"token":"admin-token"}}'
+EOF
+
+  ### Valid exec plugin should authenticate user properly
+  # Pre-condition: Client certificate authentication enabled on the API server - already checked by positive test above
+
+  # Command
+  output3=$(kubectl "${kube_flags_without_token[@]:?}" --kubeconfig="${TMPDIR:-/tmp}"/valid_exec_plugin.yaml get namespace kube-system -o name 2>&1 || true)
+
+  if [[ "${output3}" == "namespace/kube-system" ]]; then
+    kube::log::status "exec credential plugin triggered and provided valid credentials"
+  else
+    kube::log::status "Unexpected output when using valid exec credential plugin for authentication. Output: ${output3}"
+    exit 1
+  fi
+  # Post-condition: None
+
+  ### Provided --username/--password should take precedence, thus not triggering the (valid) exec credential plugin
+  # Pre-condition: Client certificate authentication enabled on the API server - already checked by positive test above
+
+  # Command
+  output4=$(kubectl "${kube_flags_without_token[@]:?}" --username bad --password wrong --kubeconfig="${TMPDIR:-/tmp}"/valid_exec_plugin.yaml get namespace kube-system -o name 2>&1 || true)
+
+  if [[ "${output4}" =~ "Unauthorized" ]]; then
+    kube::log::status "exec credential plugin not triggered since kubectl was called with provided --username/--password"
+  else
+    kube::log::status "Unexpected output when providing --username/--password for authentication - exec credential plugin likely triggered. Output: ${output4}"
+    exit 1
+  fi
+  # Post-condition: None
+
   rm "${TMPDIR:-/tmp}"/invalid_exec_plugin.yaml
+  rm "${TMPDIR:-/tmp}"/valid_exec_plugin.yaml
+
+  set +o nounset
+  set +o errexit
+}
+
+run_exec_credentials_interactive_tests() {
+  set -o nounset
+  set -o errexit
+
+  kube::log::status "Testing kubectl with configured interactive exec credentials plugin"
+
+  cat > "${TMPDIR:-/tmp}"/always_interactive_exec_plugin.yaml << EOF
+apiVersion: v1
+clusters:
+- cluster:
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: always_interactive_token_user
+  name: test
+current-context: test
+kind: Config
+preferences: {}
+users:
+- name: always_interactive_token_user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: echo
+      args:
+        - '{"apiVersion":"client.authentication.k8s.io/v1beta1","status":{"token":"admin-token"}}'
+      interactiveMode: Always
+EOF
+
+  ### The exec credential plugin should not be run if it kubectl already uses standard input
+  # Pre-condition: The kubectl command requires standard input
+
+  some_resource='{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"some-resource"}}'
+
+  # Declare map from kubectl command to standard input data
+  declare -A kubectl_commands
+  kubectl_commands["apply -f -"]="$some_resource"
+  kubectl_commands["set env deployment/some-deployment -"]="SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL"
+  kubectl_commands["replace -f - --force"]="$some_resource"
+
+  failure=
+  for kubectl_command in "${!kubectl_commands[@]}"; do
+    # Use a separate bash script for the command here so that script(1) will not get confused with kubectl flags
+    script_file="${TMPDIR:-/tmp}/test-cmd-exec-credentials-script-file.sh"
+    cat <<EOF >"$script_file"
+#!/usr/bin/env bash
+set -o errexit
+set -o nounset
+set -o pipefail
+kubectl ${kube_flags_without_token[*]:?} --kubeconfig=${TMPDIR:-/tmp}/always_interactive_exec_plugin.yaml ${kubectl_command} 2>&1 || true
+EOF
+    chmod +x "$script_file"
+
+    # Run kubectl as child of script(1) so kubectl will always run with a PTY
+    # Dynamically build script(1) command so that we can conditionally add flags on Linux
+    script_command="script -q /dev/null"
+    if [[ "$(uname)" == "Linux" ]]; then script_command="${script_command} -c"; fi
+    script_command="${script_command} ${script_file}"
+
+    # Specify SHELL env var when we call script(1) since it is picky about the format of the env var
+    shell="$(which bash)"
+
+    kube::log::status "Running command '$script_command' (kubectl command: '$kubectl_command') with input '${kubectl_commands[$kubectl_command]}'"
+    output=$(echo "${kubectl_commands[$kubectl_command]}" | SHELL="$shell" $script_command)
+
+    if [[ "${output}" =~ "used by stdin resource manifest reader" ]]; then
+      kube::log::status "exec credential plugin not run because kubectl already uses standard input"
+    else
+      kube::log::status "Unexpected output when running kubectl command that uses standard input. Output: ${output}"
+      failure=yup
+    fi
+  done
+
+  if [[ -n "$failure" ]]; then
+    exit 1
+  fi
+
+  # Post-condition: None
+
+  rm "${TMPDIR:-/tmp}"/always_interactive_exec_plugin.yaml
 
   set +o nounset
   set +o errexit

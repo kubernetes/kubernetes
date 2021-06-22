@@ -24,9 +24,10 @@ import (
 
 // QueueSetDump is an instant dump of queue-set.
 type QueueSetDump struct {
-	Queues    []QueueDump
-	Waiting   int
-	Executing int
+	Queues     []QueueDump
+	Waiting    int
+	Executing  int
+	SeatsInUse int
 }
 
 // QueueDump is an instant dump of one queue in a queue-set.
@@ -34,6 +35,7 @@ type QueueDump struct {
 	Requests          []RequestDump
 	VirtualStart      float64
 	ExecutingRequests int
+	SeatsInUse        int
 }
 
 // RequestDump is an instant dump of one requests pending in the queue.

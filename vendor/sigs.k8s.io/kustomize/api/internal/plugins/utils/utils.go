@@ -137,7 +137,9 @@ func GetResMapWithIDAnnotation(rm resmap.ResMap) (resmap.ResMap, error) {
 		}
 		annotations := r.GetAnnotations()
 		annotations[idAnnotation] = string(idString)
-		r.SetAnnotations(annotations)
+		if err = r.SetAnnotations(annotations); err != nil {
+			return nil, err
+		}
 	}
 	return inputRM, nil
 }
@@ -158,7 +160,10 @@ func UpdateResMapValues(pluginName string, h *resmap.PluginHelpers, output []byt
 	}
 
 	for _, r := range resources {
-		removeIDAnnotation(r) // stale--not manipulated by plugin transformers
+		// stale--not manipulated by plugin transformers
+		if err = removeIDAnnotation(r); err != nil {
+			return err
+		}
 
 		// Add to the new map, checking for duplicates
 		if err := newMap.Append(r); err != nil {
@@ -175,7 +180,7 @@ func UpdateResMapValues(pluginName string, h *resmap.PluginHelpers, output []byt
 			return err
 		}
 		if oldIdx != -1 {
-			rm.GetByIndex(oldIdx).ResetPrimaryData(r)
+			rm.GetByIndex(oldIdx).ResetRNode(r)
 		} else {
 			if err := rm.Append(r); err != nil {
 				return err
@@ -194,14 +199,11 @@ func UpdateResMapValues(pluginName string, h *resmap.PluginHelpers, output []byt
 	return nil
 }
 
-func removeIDAnnotation(r *resource.Resource) {
+func removeIDAnnotation(r *resource.Resource) error {
 	// remove the annotation set by Kustomize to track the resource
 	annotations := r.GetAnnotations()
 	delete(annotations, idAnnotation)
-	if len(annotations) == 0 {
-		annotations = nil
-	}
-	r.SetAnnotations(annotations)
+	return r.SetAnnotations(annotations)
 }
 
 // UpdateResourceOptions updates the generator options for each resource in the
@@ -224,10 +226,9 @@ func UpdateResourceOptions(rm resmap.ResMap) (resmap.ResMap, error) {
 		}
 		delete(annotations, HashAnnotation)
 		delete(annotations, BehaviorAnnotation)
-		if len(annotations) == 0 {
-			annotations = nil
+		if err := r.SetAnnotations(annotations); err != nil {
+			return nil, err
 		}
-		r.SetAnnotations(annotations)
 		r.SetOptions(types.NewGenArgs(
 			&types.GeneratorArgs{
 				Behavior: behavior,

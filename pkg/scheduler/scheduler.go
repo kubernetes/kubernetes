@@ -29,15 +29,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -68,6 +73,8 @@ type Scheduler struct {
 
 	Algorithm core.ScheduleAlgorithm
 
+	Extenders []framework.Extender
+
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -91,8 +98,9 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
+	componentConfigVersion   string
 	kubeConfig               *restclient.Config
-	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
+	legacyPolicySource       *schedulerapi.SchedulerPolicySource
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
@@ -102,10 +110,21 @@ type schedulerOptions struct {
 	extenders                  []schedulerapi.Extender
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
+	applyDefaultProfile        bool
 }
 
 // Option configures a Scheduler
 type Option func(*schedulerOptions)
+
+// WithComponentConfigVersion sets the component config version to the
+// KubeSchedulerConfiguration version used. The string should be the full
+// scheme group/version of the external type we converted from (for example
+// "kubescheduler.config.k8s.io/v1beta2")
+func WithComponentConfigVersion(apiVersion string) Option {
+	return func(o *schedulerOptions) {
+		o.componentConfigVersion = apiVersion
+	}
+}
 
 // WithKubeConfig sets the kube config for Scheduler.
 func WithKubeConfig(cfg *restclient.Config) Option {
@@ -119,6 +138,7 @@ func WithKubeConfig(cfg *restclient.Config) Option {
 func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 	return func(o *schedulerOptions) {
 		o.profiles = p
+		o.applyDefaultProfile = false
 	}
 }
 
@@ -129,10 +149,10 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithAlgorithmSource sets schedulerAlgorithmSource for Scheduler, the default is a source with DefaultProvider.
-func WithAlgorithmSource(source schedulerapi.SchedulerAlgorithmSource) Option {
+// WithLegacyPolicySource sets legacy policy config file source.
+func WithLegacyPolicySource(source *schedulerapi.SchedulerPolicySource) Option {
 	return func(o *schedulerOptions) {
-		o.schedulerAlgorithmSource = source
+		o.legacyPolicySource = source
 	}
 }
 
@@ -183,17 +203,15 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 }
 
 var defaultSchedulerOptions = schedulerOptions{
-	profiles: []schedulerapi.KubeSchedulerProfile{
-		// Profiles' default plugins are set from the algorithm provider.
-		{SchedulerName: v1.DefaultSchedulerName},
-	},
-	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
-		Provider: defaultAlgorithmSourceProviderName(),
-	},
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	parallelism:              int32(parallelize.DefaultParallelism),
+	// Ideally we would statically set the default profile here, but we can't because
+	// creating the default profile may require testing feature gates, which may get
+	// set dynamically in tests. Therefore, we delay creating it until New is actually
+	// invoked.
+	applyDefaultProfile: true,
 }
 
 // New returns a Scheduler
@@ -213,6 +231,15 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
+	if options.applyDefaultProfile {
+		var versionedCfg v1beta2.KubeSchedulerConfiguration
+		scheme.Scheme.Default(&versionedCfg)
+		cfg := config.KubeSchedulerConfiguration{}
+		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
+			return nil, err
+		}
+		options.profiles = cfg.Profiles
+	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
 	registry := frameworkplugins.NewInTreeRegistry()
@@ -221,8 +248,10 @@ func New(client clientset.Interface,
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()
+	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
 	configurator := &Configurator{
+		componentConfigVersion:   options.componentConfigVersion,
 		client:                   client,
 		kubeConfig:               options.kubeConfig,
 		recorderFactory:          recorderFactory,
@@ -238,30 +267,29 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 		parallellism:             options.parallelism,
+		clusterEventMap:          clusterEventMap,
 	}
 
 	metrics.Register()
 
 	var sched *Scheduler
-	source := options.schedulerAlgorithmSource
-	switch {
-	case source.Provider != nil:
-		// Create the config from a named algorithm provider.
-		sc, err := configurator.createFromProvider(*source.Provider)
+	if options.legacyPolicySource == nil {
+		// Create the config from component config
+		sc, err := configurator.create()
 		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
+			return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 		}
 		sched = sc
-	case source.Policy != nil:
+	} else {
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
 		switch {
-		case source.Policy.File != nil:
-			if err := initPolicyFromFile(source.Policy.File.Path, policy); err != nil {
+		case options.legacyPolicySource.File != nil:
+			if err := initPolicyFromFile(options.legacyPolicySource.File.Path, policy); err != nil {
 				return nil, err
 			}
-		case source.Policy.ConfigMap != nil:
-			if err := initPolicyFromConfigMap(client, source.Policy.ConfigMap, policy); err != nil {
+		case options.legacyPolicySource.ConfigMap != nil:
+			if err := initPolicyFromConfigMap(client, options.legacyPolicySource.ConfigMap, policy); err != nil {
 				return nil, err
 			}
 		}
@@ -269,20 +297,39 @@ func New(client clientset.Interface,
 		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
 		// which would have set extenders in the above instantiation of Configurator from CC options)
 		configurator.extenders = policy.Extenders
-		sc, err := configurator.createFromConfig(*policy)
+		sc, err := configurator.createFromPolicy(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
 		sched = sc
-	default:
-		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
+
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
 
-	addAllEventHandlers(sched, informerFactory)
+	// Build dynamic client and dynamic informer factory
+	var dynInformerFactory dynamicinformer.DynamicSharedInformerFactory
+	// options.kubeConfig can be nil in tests.
+	if options.kubeConfig != nil {
+		dynClient := dynamic.NewForConfigOrDie(options.kubeConfig)
+		dynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
+	}
+
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 	return sched, nil
+}
+
+func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
+	gvkMap := make(map[framework.GVK]framework.ActionType)
+	for evt := range m {
+		if _, ok := gvkMap[evt.Resource]; ok {
+			gvkMap[evt.Resource] |= evt.ActionType
+		} else {
+			gvkMap[evt.Resource] = evt.ActionType
+		}
+	}
+	return gvkMap
 }
 
 // initPolicyFromFile initialize policy from file
@@ -424,7 +471,7 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 
 // TODO(#87159): Move this to a Plugin.
 func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error) {
-	for _, extender := range sched.Algorithm.Extenders() {
+	for _, extender := range sched.Extenders {
 		if !extender.IsBinder() || !extender.IsInterested(pod) {
 			continue
 		}
@@ -475,7 +522,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, fwk, state, pod)
+	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, sched.Extenders, fwk, state, pod)
 	if err != nil {
 		// Schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
@@ -659,11 +706,6 @@ func (sched *Scheduler) skipPodSchedule(fwk framework.Framework, pod *v1.Pod) bo
 		return false
 	}
 	return isAssumed
-}
-
-func defaultAlgorithmSourceProviderName() *string {
-	provider := schedulerapi.SchedulerDefaultProviderName
-	return &provider
 }
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific

@@ -34,13 +34,14 @@ import (
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 	utilsnet "k8s.io/utils/net"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration, isDryRun bool) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, isDryRun, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
@@ -91,10 +92,23 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, endpoint)
+
+	var usersAndGroups *users.UsersAndGroups
+	var err error
+	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+		if isDryRun {
+			fmt.Printf("[dryrun] Would create users and groups for %+v to run as non-root\n", componentNames)
+		} else {
+			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
+			if err != nil {
+				return errors.Wrap(err, "failed to create users and groups")
+			}
+		}
+	}
 
 	// creates required static pod specs
 	for _, componentName := range componentNames {
@@ -107,6 +121,18 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		// print all volumes that are mounted
 		for _, v := range spec.Spec.Volumes {
 			klog.V(2).Infof("[control-plane] adding volume %q for component %q", v.Name, componentName)
+		}
+
+		if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+			if isDryRun {
+				fmt.Printf("[dryrun] Would update static pod manifest for %q to run run as non-root\n", componentName)
+			} else {
+				if usersAndGroups != nil {
+					if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
+						return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
+					}
+				}
+			}
 		}
 
 		// if patchesDir is defined, patch the static Pod manifest
@@ -133,7 +159,6 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":                localAPIEndpoint.AdvertiseAddress,
-		"insecure-port":                    "0",
 		"enable-admission-plugins":         "NodeRestriction",
 		"service-cluster-ip-range":         cfg.Networking.ServiceSubnet,
 		"service-account-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),

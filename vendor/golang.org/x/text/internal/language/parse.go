@@ -133,14 +133,15 @@ func (s *scanner) resizeRange(oldStart, oldEnd, newSize int) {
 	s.start = oldStart
 	if end := oldStart + newSize; end != oldEnd {
 		diff := end - oldEnd
-		if end < cap(s.b) {
-			b := make([]byte, len(s.b)+diff)
+		var b []byte
+		if n := len(s.b) + diff; n > cap(s.b) {
+			b = make([]byte, n)
 			copy(b, s.b[:oldStart])
-			copy(b[end:], s.b[oldEnd:])
-			s.b = b
 		} else {
-			s.b = append(s.b[end:], s.b[oldEnd:]...)
+			b = s.b[:n]
 		}
+		copy(b[end:], s.b[oldEnd:])
+		s.b = b
 		s.next = end + (s.next - s.end)
 		s.end = end
 	}
@@ -482,7 +483,7 @@ func parseExtensions(scan *scanner) int {
 func parseExtension(scan *scanner) int {
 	start, end := scan.start, scan.end
 	switch scan.token[0] {
-	case 'u':
+	case 'u': // https://www.ietf.org/rfc/rfc6067.txt
 		attrStart := end
 		scan.scan()
 		for last := []byte{}; len(scan.token) > 2; scan.scan() {
@@ -502,27 +503,29 @@ func parseExtension(scan *scanner) int {
 			last = scan.token
 			end = scan.end
 		}
+		// Scan key-type sequences. A key is of length 2 and may be followed
+		// by 0 or more "type" subtags from 3 to the maximum of 8 letters.
 		var last, key []byte
 		for attrEnd := end; len(scan.token) == 2; last = key {
 			key = scan.token
-			keyEnd := scan.end
-			end = scan.acceptMinSize(3)
+			end = scan.end
+			for scan.scan(); end < scan.end && len(scan.token) > 2; scan.scan() {
+				end = scan.end
+			}
 			// TODO: check key value validity
-			if keyEnd == end || bytes.Compare(key, last) != 1 {
+			if bytes.Compare(key, last) != 1 || scan.err != nil {
 				// We have an invalid key or the keys are not sorted.
 				// Start scanning keys from scratch and reorder.
 				p := attrEnd + 1
 				scan.next = p
 				keys := [][]byte{}
 				for scan.scan(); len(scan.token) == 2; {
-					keyStart, keyEnd := scan.start, scan.end
-					end = scan.acceptMinSize(3)
-					if keyEnd != end {
-						keys = append(keys, scan.b[keyStart:end])
-					} else {
-						scan.setError(ErrSyntax)
-						end = keyStart
+					keyStart := scan.start
+					end = scan.end
+					for scan.scan(); end < scan.end && len(scan.token) > 2; scan.scan() {
+						end = scan.end
 					}
+					keys = append(keys, scan.b[keyStart:end])
 				}
 				sort.Stable(bytesSort{keys, 2})
 				if n := len(keys); n > 0 {
@@ -546,7 +549,7 @@ func parseExtension(scan *scanner) int {
 				break
 			}
 		}
-	case 't':
+	case 't': // https://www.ietf.org/rfc/rfc6497.txt
 		scan.scan()
 		if n := len(scan.token); n >= 2 && n <= 3 && isAlpha(scan.token[1]) {
 			_, end = parseTag(scan)

@@ -45,6 +45,8 @@ const (
 // map to the same storage identity.
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -173,6 +175,13 @@ type StatefulSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,8,opt,name=revisionHistoryLimit"`
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// +optional
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,9,opt,name=minReadySeconds"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -215,6 +224,12 @@ type StatefulSetStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,10,rep,name=conditions"`
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// Remove omitempty when graduating to beta
+	// +optional
+	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,11,opt,name=availableReplicas"`
 }
 
 type StatefulSetConditionType string
@@ -241,9 +256,13 @@ type StatefulSetCondition struct {
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items           []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
+
+	// Items is the list of stateful sets.
+	Items []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient
@@ -255,7 +274,8 @@ type StatefulSetList struct {
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata.
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -522,7 +542,7 @@ type RollingUpdateDaemonSet struct {
 	// daemonset on any given node can double if the readiness check fails, and
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
-	// This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
+	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
 	// +optional
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
@@ -693,7 +713,8 @@ type ReplicaSet struct {
 
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
-	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

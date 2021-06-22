@@ -112,9 +112,10 @@ type ContainerManager interface {
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
 	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
 
-	// Implements the podresources Provider API for CPUs and Devices
+	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider
+	podresources.MemoryProvider
 }
 
 type NodeConfig struct {

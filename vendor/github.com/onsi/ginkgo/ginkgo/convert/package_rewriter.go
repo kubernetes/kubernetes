@@ -33,7 +33,8 @@ func RewritePackage(packageName string) {
  */
 func findTestsInPackage(pkg *build.Package) (testfiles []string) {
 	for _, file := range append(pkg.TestGoFiles, pkg.XTestGoFiles...) {
-		testfiles = append(testfiles, filepath.Join(pkg.Dir, file))
+		testfile, _ := filepath.Abs(filepath.Join(pkg.Dir, file))
+		testfiles = append(testfiles, testfile)
 	}
 
 	dirFiles, err := ioutil.ReadDir(pkg.Dir)
@@ -103,10 +104,11 @@ func addGinkgoSuiteForPackage(pkg *build.Package) {
  * Shells out to `go fmt` to format the package
  */
 func goFmtPackage(pkg *build.Package) {
-	output, err := exec.Command("go", "fmt", pkg.ImportPath).Output()
+	path, _ := filepath.Abs(pkg.ImportPath)
+	output, err := exec.Command("go", "fmt", path).CombinedOutput()
 
 	if err != nil {
-		fmt.Printf("Warning: Error running 'go fmt %s'.\nstdout: %s\n%s\n", pkg.ImportPath, output, err.Error())
+		fmt.Printf("Warning: Error running 'go fmt %s'.\nstdout: %s\n%s\n", path, output, err.Error())
 	}
 }
 

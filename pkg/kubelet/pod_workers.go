@@ -193,7 +193,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 	}
 }
 
-// Apply the new setting to the specified pod.
+// UpdatePod apply the new setting to the specified pod.
 // If the options provide an OnCompleteFunc, the function is invoked if the update is accepted.
 // Update requests are ignored if a kill pod request is pending.
 func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
@@ -282,7 +282,8 @@ func (p *podWorkers) checkForUpdates(uid types.UID) {
 		p.podUpdates[uid] <- workUpdate
 		delete(p.lastUndeliveredWorkUpdate, uid)
 	} else {
-		p.isWorking[uid] = false
+		// put this line in removeWorker may cause dead lock, so keep reset it here
+		delete(p.isWorking, uid)
 	}
 }
 

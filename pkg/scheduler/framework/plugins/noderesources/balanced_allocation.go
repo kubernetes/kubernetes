@@ -23,9 +23,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // BalancedAllocation is a score plugin that calculates the difference between the cpu and memory fraction
@@ -38,7 +38,7 @@ type BalancedAllocation struct {
 var _ = framework.ScorePlugin(&BalancedAllocation{})
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
-const BalancedAllocationName = "NodeResourcesBalancedAllocation"
+const BalancedAllocationName = names.NodeResourcesBalancedAllocation
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ba *BalancedAllocation) Name() string {
@@ -67,40 +67,29 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewBalancedAllocation(_ runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			BalancedAllocationName,
-			balancedResourceScorer,
-			defaultRequestedRatioResources,
+			Name:                BalancedAllocationName,
+			scorer:              balancedResourceScorer,
+			resourceToWeightMap: defaultRequestedRatioResources,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
 // todo: use resource weights in the scorer function
-func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
 	cpuFraction := fractionOfCapacity(requested[v1.ResourceCPU], allocable[v1.ResourceCPU])
 	memoryFraction := fractionOfCapacity(requested[v1.ResourceMemory], allocable[v1.ResourceMemory])
-	// This to find a node which has most balanced CPU, memory and volume usage.
-	if cpuFraction >= 1 || memoryFraction >= 1 {
-		// if requested >= capacity, the corresponding host should never be preferred.
-		return 0
+	// fractions might be greater than 1 because pods with no requests get minimum
+	// values.
+	if cpuFraction > 1 {
+		cpuFraction = 1
 	}
-
-	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
-		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
-		if volumeFraction >= 1 {
-			// if requested >= capacity, the corresponding host should never be preferred.
-			return 0
-		}
-		// Compute variance for all the three fractions.
-		mean := (cpuFraction + memoryFraction + volumeFraction) / float64(3)
-		variance := float64((((cpuFraction - mean) * (cpuFraction - mean)) + ((memoryFraction - mean) * (memoryFraction - mean)) + ((volumeFraction - mean) * (volumeFraction - mean))) / float64(3))
-		// Since the variance is between positive fractions, it will be positive fraction. 1-variance lets the
-		// score to be higher for node which has least variance and multiplying it with `MaxNodeScore` provides the scaling
-		// factor needed.
-		return int64((1 - variance) * float64(framework.MaxNodeScore))
+	if memoryFraction > 1 {
+		memoryFraction = 1
 	}
 
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1

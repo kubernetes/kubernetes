@@ -613,6 +613,14 @@
     and deletecollection. CronJob/status MUST support get, update and patch.'
   release: v1.21
   file: test/e2e/apps/cronjob.go
+- testname: DaemonSet, list and delete a collection of DaemonSets
+  codename: '[sig-apps] Daemon set [Serial] should list and delete a collection of
+    DaemonSets [Conformance]'
+  description: When a DaemonSet is created it MUST succeed. It MUST succeed when listing
+    DaemonSets via a label selector. It MUST succeed when deleting the DaemonSet via
+    deleteCollection.
+  release: v1.22
+  file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-FailedPodCreation
   codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
     [Conformance]'
@@ -645,6 +653,14 @@
     and update strategy is RollingUpdate [Conformance]'
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: v1.10
+  file: test/e2e/apps/daemon_set.go
+- testname: DaemonSet, status sub-resource
+  codename: '[sig-apps] Daemon set [Serial] should verify changes to a daemon set
+    status [Conformance]'
+  description: When a DaemonSet is created it MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
   file: test/e2e/apps/daemon_set.go
 - testname: Deployment, completes the scaling of a Deployment subresource
   codename: '[sig-apps] Deployment Deployment should have a working scale subresource
@@ -779,12 +795,27 @@
     owner references
   release: v1.13
   file: test/e2e/apps/replica_set.go
+- testname: ReplicaSet, list and delete a collection of ReplicaSets
+  codename: '[sig-apps] ReplicaSet should list and delete a collection of ReplicaSets
+    [Conformance]'
+  description: When a ReplicaSet is created it MUST succeed. It MUST succeed when
+    listing ReplicaSets via a label selector. It MUST succeed when deleting the ReplicaSet
+    via deleteCollection.
+  release: v1.22
+  file: test/e2e/apps/replica_set.go
 - testname: Replica Set, run basic image
   codename: '[sig-apps] ReplicaSet should serve a basic image on each replica with
     a public image  [Conformance]'
   description: Create a ReplicaSet with a Pod and a single Container. Make sure that
     the Pod is running. Pod SHOULD send a valid response when queried.
   release: v1.9
+  file: test/e2e/apps/replica_set.go
+- testname: ReplicaSet, status sub-resource
+  codename: '[sig-apps] ReplicaSet should validate Replicaset Status endpoints [Conformance]'
+  description: Create a ReplicaSet resource which MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
   file: test/e2e/apps/replica_set.go
 - testname: Replication Controller, adopt matching pods
   codename: '[sig-apps] ReplicationController should adopt matching pods on creation

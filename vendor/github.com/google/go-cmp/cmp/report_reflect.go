@@ -1,6 +1,6 @@
 // Copyright 2019, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
@@ -351,6 +351,8 @@ func formatMapKey(v reflect.Value, disambiguate bool, ptrs *pointerReferences) s
 	opts.PrintAddresses = disambiguate
 	opts.AvoidStringer = disambiguate
 	opts.QualifiedNames = disambiguate
+	opts.VerbosityLevel = maxVerbosityPreset
+	opts.LimitVerbosity = true
 	s := opts.FormatValue(v, reflect.Map, ptrs).String()
 	return strings.TrimSpace(s)
 }

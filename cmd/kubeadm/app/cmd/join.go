@@ -213,7 +213,15 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
+		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
+		if err != nil {
+			return nil, err
+		}
+		// If the flag for skipping phases was empty, use the values from config
+		if len(joinRunner.Options.SkipPhases) == 0 {
+			joinRunner.Options.SkipPhases = data.cfg.SkipPhases
+		}
+		return data, nil
 	})
 
 	// binds the Runner to kubeadm join command by altering

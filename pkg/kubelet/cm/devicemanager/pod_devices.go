@@ -65,6 +65,8 @@ func (pdev *podDevices) size() int {
 }
 
 func (pdev *podDevices) hasPod(podUID string) bool {
+	pdev.RLock()
+	defer pdev.RUnlock()
 	_, podExists := pdev.devs[podUID]
 	return podExists
 }

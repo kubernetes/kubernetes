@@ -43,27 +43,18 @@ func TestEnsureFlowSchema(t *testing.T) {
 	}{
 		// for suggested configurations
 		{
-			name: "suggested flow schema does not exist and we should ensure - the object should be created",
+			name: "suggested flow schema does not exist - the object should always be re-created",
 			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client, true)
+				return NewSuggestedFlowSchemaEnsurer(client)
 			},
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   nil,
 			expected:  newFlowSchema("fs1", "pl1", 100).Object(),
 		},
 		{
-			name: "suggested flow schema does not exist and we should not ensure - the object should not be created",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client, false)
-			},
-			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
-			current:   nil,
-			expected:  nil,
-		},
-		{
 			name: "suggested flow schema exists, auto update is enabled, spec does not match - current object should be updated",
 			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client, true)
+				return NewSuggestedFlowSchemaEnsurer(client)
 			},
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("true").Object(),
@@ -72,7 +63,7 @@ func TestEnsureFlowSchema(t *testing.T) {
 		{
 			name: "suggested flow schema exists, auto update is disabled, spec does not match - current object should not be updated",
 			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client, true)
+				return NewSuggestedFlowSchemaEnsurer(client)
 			},
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
@@ -223,7 +214,7 @@ func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			strategy := newSuggestedEnsureStrategy(&flowSchemaWrapper{}, false)
+			strategy := newSuggestedEnsureStrategy(&flowSchemaWrapper{})
 			newObjectGot, updateGot, err := strategy.ShouldUpdate(test.current, test.bootstrap)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)

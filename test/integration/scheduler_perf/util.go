@@ -67,7 +67,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 }
 
 // mustSetupScheduler starts the following components:
-// - k8s api server (a.k.a. master)
+// - k8s api server
 // - scheduler
 // It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.

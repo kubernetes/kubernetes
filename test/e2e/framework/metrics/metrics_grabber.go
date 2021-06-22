@@ -38,40 +38,48 @@ const (
 	// kubeControllerManagerPort is the default port for the controller manager status server.
 	kubeControllerManagerPort = 10257
 	metricsProxyPod           = "metrics-proxy"
+	// snapshotControllerPort is the port for the snapshot controller
+	snapshotControllerPort = 9102
 )
 
 // Collection is metrics collection of components
 type Collection struct {
-	APIServerMetrics         APIServerMetrics
-	ControllerManagerMetrics ControllerManagerMetrics
-	KubeletMetrics           map[string]KubeletMetrics
-	SchedulerMetrics         SchedulerMetrics
-	ClusterAutoscalerMetrics ClusterAutoscalerMetrics
+	APIServerMetrics          APIServerMetrics
+	ControllerManagerMetrics  ControllerManagerMetrics
+	SnapshotControllerMetrics SnapshotControllerMetrics
+	KubeletMetrics            map[string]KubeletMetrics
+	SchedulerMetrics          SchedulerMetrics
+	ClusterAutoscalerMetrics  ClusterAutoscalerMetrics
 }
 
 // Grabber provides functions which grab metrics from components
 type Grabber struct {
-	client                            clientset.Interface
-	externalClient                    clientset.Interface
-	grabFromAPIServer                 bool
-	grabFromControllerManager         bool
-	grabFromKubelets                  bool
-	grabFromScheduler                 bool
-	grabFromClusterAutoscaler         bool
-	kubeScheduler                     string
-	waitForSchedulerReadyOnce         sync.Once
-	kubeControllerManager             string
-	waitForControllerManagerReadyOnce sync.Once
+	client                             clientset.Interface
+	externalClient                     clientset.Interface
+	grabFromAPIServer                  bool
+	grabFromControllerManager          bool
+	grabFromKubelets                   bool
+	grabFromScheduler                  bool
+	grabFromClusterAutoscaler          bool
+	grabFromSnapshotController         bool
+	kubeScheduler                      string
+	waitForSchedulerReadyOnce          sync.Once
+	kubeControllerManager              string
+	waitForControllerManagerReadyOnce  sync.Once
+	snapshotController                 string
+	waitForSnapshotControllerReadyOnce sync.Once
 }
 
 // NewMetricsGrabber returns new metrics which are initialized.
-func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool) (*Grabber, error) {
+func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
 
 	kubeScheduler := ""
 	kubeControllerManager := ""
+	snapshotControllerManager := ""
 
 	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
 	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
+	regSnapshotController := regexp.MustCompile("volume-snapshot-controller.*")
 
 	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -87,7 +95,10 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 		if regKubeControllerManager.MatchString(pod.Name) {
 			kubeControllerManager = pod.Name
 		}
-		if kubeScheduler != "" && kubeControllerManager != "" {
+		if regSnapshotController.MatchString(pod.Name) {
+			snapshotControllerManager = pod.Name
+		}
+		if kubeScheduler != "" && kubeControllerManager != "" && snapshotControllerManager != "" {
 			break
 		}
 	}
@@ -99,20 +110,26 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 		controllers = false
 		klog.Warningf("Can't find kube-controller-manager pod. Grabbing metrics from kube-controller-manager is disabled.")
 	}
+	if snapshotControllerManager == "" {
+		snapshotController = false
+		klog.Warningf("Can't find snapshot-controller pod. Grabbing metrics from snapshot-controller is disabled.")
+	}
 	if ec == nil {
 		klog.Warningf("Did not receive an external client interface. Grabbing metrics from ClusterAutoscaler is disabled.")
 	}
 
 	return &Grabber{
-		client:                    c,
-		externalClient:            ec,
-		grabFromAPIServer:         apiServer,
-		grabFromControllerManager: controllers,
-		grabFromKubelets:          kubelets,
-		grabFromScheduler:         scheduler,
-		grabFromClusterAutoscaler: clusterAutoscaler,
-		kubeScheduler:             kubeScheduler,
-		kubeControllerManager:     kubeControllerManager,
+		client:                     c,
+		externalClient:             ec,
+		grabFromAPIServer:          apiServer,
+		grabFromControllerManager:  controllers,
+		grabFromKubelets:           kubelets,
+		grabFromScheduler:          scheduler,
+		grabFromClusterAutoscaler:  clusterAutoscaler,
+		grabFromSnapshotController: snapshotController,
+		kubeScheduler:              kubeScheduler,
+		kubeControllerManager:      kubeControllerManager,
+		snapshotController:         snapshotControllerManager,
 	}, nil
 }
 
@@ -220,6 +237,48 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	return parseControllerManagerMetrics(output)
 }
 
+// GrabFromSnapshotController returns metrics from controller manager
+func (g *Grabber) GrabFromSnapshotController(podName string, port int) (SnapshotControllerMetrics, error) {
+	if g.snapshotController == "" {
+		return SnapshotControllerMetrics{}, fmt.Errorf("SnapshotController pod is not registered. Skipping SnapshotController's metrics gathering")
+	}
+
+	// Use overrides if provided via test config flags.
+	// Otherwise, use the default snapshot controller pod name and port.
+	if podName == "" {
+		podName = g.snapshotController
+	}
+	if port == 0 {
+		port = snapshotControllerPort
+	}
+
+	var err error
+	g.waitForSnapshotControllerReadyOnce.Do(func() {
+		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, podName, 0); readyErr != nil {
+			err = fmt.Errorf("error waiting for snapshot controller pod to be ready: %w", readyErr)
+			return
+		}
+
+		var lastMetricsFetchErr error
+		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, port)
+			return lastMetricsFetchErr == nil, nil
+		}); metricsWaitErr != nil {
+			err = fmt.Errorf("error waiting for snapshot controller pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
+			return
+		}
+	})
+	if err != nil {
+		return SnapshotControllerMetrics{}, err
+	}
+
+	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, port)
+	if err != nil {
+		return SnapshotControllerMetrics{}, err
+	}
+	return parseSnapshotControllerMetrics(output)
+}
+
 // GrabFromAPIServer returns metrics from API server
 func (g *Grabber) GrabFromAPIServer() (APIServerMetrics, error) {
 	output, err := g.getMetricsFromAPIServer()
@@ -255,6 +314,14 @@ func (g *Grabber) Grab() (Collection, error) {
 			errs = append(errs, err)
 		} else {
 			result.ControllerManagerMetrics = metrics
+		}
+	}
+	if g.grabFromSnapshotController {
+		metrics, err := g.GrabFromSnapshotController(g.snapshotController, snapshotControllerPort)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			result.SnapshotControllerMetrics = metrics
 		}
 	}
 	if g.grabFromClusterAutoscaler {

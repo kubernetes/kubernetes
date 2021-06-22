@@ -7599,7 +7599,6 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
-	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
 	out.IPFamilyPolicy = (*core.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
@@ -7630,7 +7629,6 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
-	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
 	out.InternalTrafficPolicy = (*v1.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
@@ -8212,6 +8210,7 @@ func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContext
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
+	out.HostProcess = (*bool)(unsafe.Pointer(in.HostProcess))
 	return nil
 }
 
@@ -8224,6 +8223,7 @@ func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContext
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
+	out.HostProcess = (*bool)(unsafe.Pointer(in.HostProcess))
 	return nil
 }
 

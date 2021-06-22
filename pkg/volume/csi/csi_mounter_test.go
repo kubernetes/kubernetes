@@ -34,6 +34,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1050,6 +1051,138 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 			}
 			if diff := cmp.Diff(test.wantVolumeContext, vol.VolumeContext); diff != "" {
 				t.Errorf("podServiceAccountTokenAttrs() = diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
+	type fields struct {
+		plugin              *csiPlugin
+		driverName          csiDriverName
+		volumeLifecycleMode storage.VolumeLifecycleMode
+		fsGroupPolicy       storage.FSGroupPolicy
+		volumeID            string
+		specVolumeID        string
+		readOnly            bool
+		supportsSELinux     bool
+		spec                *volume.Spec
+		pod                 *api.Pod
+		podUID              types.UID
+		publishContext      map[string]string
+		kubeVolHost         volume.KubeletVolumeHost
+		MetricsProvider     volume.MetricsProvider
+	}
+	type args struct {
+		fsType       string
+		fsGroup      *int64
+		driverPolicy storage.FSGroupPolicy
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{
+			name: "empty all",
+			args: args{},
+			want: false,
+		},
+		{
+			name: "driverPolicy is FileFSGroupPolicy",
+			args: args{
+				fsGroup:      new(int64),
+				driverPolicy: storage.FileFSGroupPolicy,
+			},
+			want: true,
+		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy",
+			args: args{
+				fsGroup:      new(int64),
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			want: false,
+		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy with empty Spec",
+			args: args{
+				fsGroup:      new(int64),
+				fsType:       "ext4",
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			fields: fields{
+				spec: &volume.Spec{},
+			},
+			want: false,
+		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy with empty PersistentVolume",
+			args: args{
+				fsGroup:      new(int64),
+				fsType:       "ext4",
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			fields: fields{
+				spec: volume.NewSpecFromPersistentVolume(&corev1.PersistentVolume{}, true),
+			},
+			want: false,
+		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy with empty AccessModes",
+			args: args{
+				fsGroup:      new(int64),
+				fsType:       "ext4",
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			fields: fields{
+				spec: volume.NewSpecFromPersistentVolume(&api.PersistentVolume{
+					Spec: api.PersistentVolumeSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{},
+					},
+				}, true),
+			},
+			want: false,
+		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy with ReadWriteOnce AccessModes",
+			args: args{
+				fsGroup:      new(int64),
+				fsType:       "ext4",
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			fields: fields{
+				spec: volume.NewSpecFromPersistentVolume(&api.PersistentVolume{
+					Spec: api.PersistentVolumeSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					},
+				}, true),
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &csiMountMgr{
+				plugin:              tt.fields.plugin,
+				driverName:          tt.fields.driverName,
+				volumeLifecycleMode: tt.fields.volumeLifecycleMode,
+				fsGroupPolicy:       tt.fields.fsGroupPolicy,
+				volumeID:            tt.fields.volumeID,
+				specVolumeID:        tt.fields.specVolumeID,
+				readOnly:            tt.fields.readOnly,
+				supportsSELinux:     tt.fields.supportsSELinux,
+				spec:                tt.fields.spec,
+				pod:                 tt.fields.pod,
+				podUID:              tt.fields.podUID,
+				publishContext:      tt.fields.publishContext,
+				kubeVolHost:         tt.fields.kubeVolHost,
+				MetricsProvider:     tt.fields.MetricsProvider,
+			}
+			if got := c.supportsFSGroup(tt.args.fsType, tt.args.fsGroup, tt.args.driverPolicy); got != tt.want {
+				t.Errorf("supportsFSGroup() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -26,6 +26,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -37,6 +38,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -45,6 +47,11 @@ const (
 
 	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
 	kubeSchedulerBindAddressArg = "bind-address"
+)
+
+var (
+	usersAndGroups     *users.UsersAndGroups
+	usersAndGroupsOnce sync.Once
 )
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
@@ -377,4 +384,12 @@ func getProbeAddress(addr string) string {
 		return ""
 	}
 	return addr
+}
+
+func GetUsersAndGroups() (*users.UsersAndGroups, error) {
+	var err error
+	usersAndGroupsOnce.Do(func() {
+		usersAndGroups, err = users.AddUsersAndGroups()
+	})
+	return usersAndGroups, err
 }

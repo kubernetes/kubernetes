@@ -20,6 +20,7 @@ import (
 	"context"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -83,6 +84,8 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
 
+	cronJob.Generation = 1
+
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
@@ -93,6 +96,12 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob.Status = oldCronJob.Status
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+
+	// Any changes to the spec increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newCronJob.Spec, oldCronJob.Spec) {
+		newCronJob.Generation = oldCronJob.Generation + 1
+	}
 }
 
 // Validate validates a new scheduled job.
@@ -100,6 +109,12 @@ func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 	return validation.ValidateCronJob(cronJob, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newCronJob := obj.(*batch.CronJob)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -122,6 +137,17 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newCronJob := obj.(*batch.CronJob)
+	oldCronJob := old.(*batch.CronJob)
+	if newCronJob.Generation != oldCronJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	}
+	return warnings
 }
 
 type cronJobStatusStrategy struct {
@@ -152,4 +178,9 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

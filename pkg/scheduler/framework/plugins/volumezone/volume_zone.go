@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -30,6 +31,7 @@ import (
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -44,7 +46,7 @@ var _ framework.EnqueueExtensions = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "VolumeZone"
+	Name = names.VolumeZone
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
@@ -109,39 +111,38 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		}
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		if pvcName == "" {
-			return framework.NewStatus(framework.Error, "PersistentVolumeClaim had no name")
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if err != nil {
-			return framework.AsStatus(err)
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return s
 		}
 
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return framework.NewStatus(framework.Error, "PersistentVolumeClaim had no pv name and storageClass name")
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
-			class, _ := pl.scLister.Get(scName)
-			if class == nil {
-				return framework.NewStatus(framework.Error, fmt.Sprintf("StorageClass %q claimed by PersistentVolumeClaim %q not found", scName, pvcName))
-
+			class, err := pl.scLister.Get(scName)
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return s
 			}
 			if class.VolumeBindingMode == nil {
-				return framework.NewStatus(framework.Error, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
 			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
 				// Skip unbound volumes
 				continue
 			}
 
-			return framework.NewStatus(framework.Error, "PersistentVolume had no name")
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
-		if err != nil {
-			return framework.AsStatus(err)
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return s
 		}
 
 		for k, v := range pv.ObjectMeta.Labels {
@@ -160,6 +161,16 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
 		}
+	}
+	return nil
+}
+
+func getErrorAsStatus(err error) *framework.Status {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		}
+		return framework.AsStatus(err)
 	}
 	return nil
 }

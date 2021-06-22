@@ -622,10 +622,10 @@ message Container {
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string command = 3;
@@ -633,10 +633,10 @@ message Container {
   // Arguments to the entrypoint.
   // The docker image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string args = 4;
@@ -787,6 +787,7 @@ message Container {
 message ContainerImage {
   // Names by which this image is known.
   // e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+  // +optional
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -1153,11 +1154,12 @@ message EnvVar {
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded
-  // using the previous defined environment variables in the container and
+  // using the previously defined environment variables in the container and
   // any service environment variables. If a variable cannot be resolved,
-  // the reference in the input string will be unchanged. The $(VAR_NAME)
-  // syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped
-  // references will never be expanded, regardless of whether the variable
+  // the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+  // "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+  // Escaped references will never be expanded, regardless of whether the variable
   // exists or not.
   // Defaults to "".
   // +optional
@@ -1229,10 +1231,10 @@ message EphemeralContainerCommon {
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string command = 3;
@@ -1240,10 +1242,10 @@ message EphemeralContainerCommon {
   // Arguments to the entrypoint.
   // The docker image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string args = 4;
@@ -3019,7 +3021,7 @@ message PodAffinityTerm {
   // and the ones listed in the namespaces field.
   // null selector and null or empty namespaces list means "this pod's namespace".
   // An empty selector ({}) matches all namespaces.
-  // This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+  // This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
 }
@@ -4939,7 +4941,7 @@ message ServiceSpec {
   // If specified and supported by the platform, this will restrict traffic through the cloud-provider
   // load-balancer will be restricted to the specified client IPs. This field will be ignored if the
   // cloud-provider does not support the feature."
-  // More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
+  // More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
   // +optional
   repeated string loadBalancerSourceRanges = 9;
 
@@ -4985,23 +4987,6 @@ message ServiceSpec {
   // sessionAffinityConfig contains the configurations of session affinity.
   // +optional
   optional SessionAffinityConfig sessionAffinityConfig = 14;
-
-  // topologyKeys is a preference-order list of topology keys which
-  // implementations of services should use to preferentially sort endpoints
-  // when accessing this Service, it can not be used at the same time as
-  // externalTrafficPolicy=Local.
-  // Topology keys must be valid label keys and at most 16 keys may be specified.
-  // Endpoints are chosen based on the first topology key with available backends.
-  // If this field is specified and all entries have no backends that match
-  // the topology of the client, the service has no backends for that client
-  // and connections should fail.
-  // The special value "*" may be used to mean "any topology". This catch-all
-  // value, if used, only makes sense as the last value in the list.
-  // If this is not specified or empty, no topology constraints will be applied.
-  // This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-  // This field is deprecated and will be removed in a future version.
-  // +optional
-  repeated string topologyKeys = 16;
 
   // IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
   // service, and is gated by the "IPv6DualStack" feature gate.  This field
@@ -5629,5 +5614,15 @@ message WindowsSecurityContextOptions {
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
   optional string runAsUserName = 3;
+
+  // HostProcess determines if a container should be run as a 'Host Process' container.
+  // This field is alpha-level and will only be honored by components that enable the
+  // WindowsHostProcessContainers feature flag. Setting this field without the feature
+  // flag will result in errors when validating the Pod. All of a Pod's containers must
+  // have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
+  // containers and non-HostProcess containers).  In addition, if HostProcess is true
+  // then HostNetwork must also be set to true.
+  // +optional
+  optional bool hostProcess = 4;
 }
 

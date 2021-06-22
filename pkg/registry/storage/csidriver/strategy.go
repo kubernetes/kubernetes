@@ -68,6 +68,11 @@ func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidateCSIDriver(csiDriver)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (csiDriverStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -114,6 +119,11 @@ func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
 	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiDriverStrategy) AllowUnconditionalUpdate() bool {

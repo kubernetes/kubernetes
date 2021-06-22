@@ -767,3 +767,24 @@ func findBestHint(hints []topologymanager.TopologyHint) *topologymanager.Topolog
 	}
 	return &bestHint
 }
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (p *staticPolicy) GetAllocatableMemory(s state.State) []state.Block {
+	var allocatableMemory []state.Block
+	machineState := s.GetMachineState()
+	for numaNodeID, numaNodeState := range machineState {
+		for resourceName, memoryTable := range numaNodeState.MemoryMap {
+			if memoryTable.Allocatable == 0 {
+				continue
+			}
+
+			block := state.Block{
+				NUMAAffinity: []int{numaNodeID},
+				Type:         resourceName,
+				Size:         memoryTable.Allocatable,
+			}
+			allocatableMemory = append(allocatableMemory, block)
+		}
+	}
+	return allocatableMemory
+}

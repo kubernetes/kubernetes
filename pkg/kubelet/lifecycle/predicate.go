@@ -20,9 +20,11 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
 	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
@@ -226,7 +228,7 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 	}
 
 	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo) {
+	for _, r := range noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead)) {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,
 			Requested:    r.Requested,

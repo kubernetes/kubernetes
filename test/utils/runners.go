@@ -80,7 +80,7 @@ func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, time
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+	return nil, fmt.Errorf("timed out after %v when waiting for pod %v/%v to start", timeout, namespace, name)
 }
 
 func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
@@ -357,7 +357,7 @@ func (config *DeploymentConfig) create() error {
 	config.applyTo(&deployment.Spec.Template)
 
 	if err := CreateDeploymentWithRetries(config.Client, config.Namespace, deployment); err != nil {
-		return fmt.Errorf("Error creating deployment: %v", err)
+		return fmt.Errorf("error creating deployment: %v", err)
 	}
 	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
 	return nil
@@ -435,7 +435,7 @@ func (config *ReplicaSetConfig) create() error {
 	config.applyTo(&rs.Spec.Template)
 
 	if err := CreateReplicaSetWithRetries(config.Client, config.Namespace, rs); err != nil {
-		return fmt.Errorf("Error creating replica set: %v", err)
+		return fmt.Errorf("error creating replica set: %v", err)
 	}
 	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
 	return nil
@@ -509,7 +509,7 @@ func (config *JobConfig) create() error {
 	config.applyTo(&job.Spec.Template)
 
 	if err := CreateJobWithRetries(config.Client, config.Namespace, job); err != nil {
-		return fmt.Errorf("Error creating job: %v", err)
+		return fmt.Errorf("error creating job: %v", err)
 	}
 	config.RCConfigLog("Created job with name: %v, namespace: %v, parallelism/completions: %v", job.Name, config.Namespace, job.Spec.Parallelism)
 	return nil
@@ -628,7 +628,7 @@ func (config *RCConfig) create() error {
 	config.applyTo(rc.Spec.Template)
 
 	if err := CreateRCWithRetries(config.Client, config.Namespace, rc); err != nil {
-		return fmt.Errorf("Error creating replication controller: %v", err)
+		return fmt.Errorf("error creating replication controller: %v", err)
 	}
 	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
 	return nil
@@ -850,7 +850,7 @@ func (config *RCConfig) start() error {
 		} else {
 			config.RCConfigLog("Can't list pod debug info: %v", err)
 		}
-		return fmt.Errorf("Only %d pods started out of %d", oldRunning, config.Replicas)
+		return fmt.Errorf("only %d pods started out of %d", oldRunning, config.Replicas)
 	}
 	return nil
 }
@@ -880,7 +880,7 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
 		err := WaitForPodsWithLabelRunning(c, namespace, label)
 		if err != nil {
-			return fmt.Errorf("Error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
+			return fmt.Errorf("error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
 		}
 	}
 	return nil
@@ -920,7 +920,7 @@ func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label l
 		break
 	}
 	if !running {
-		return fmt.Errorf("Timeout while waiting for pods with labels %q to be running", label.String())
+		return fmt.Errorf("timeout while waiting for pods with labels %q to be running", label.String())
 	}
 	return nil
 }
@@ -1194,12 +1194,12 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 			break
 		}
 		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("Error while applying patch %v to Node %v: %v", string(patch), node.Name, err)
+			return fmt.Errorf("error while applying patch %v to Node %v: %v", string(patch), node.Name, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		return fmt.Errorf("Too many conflicts when applying patch %v to Node %v: %s", string(patch), node.Name, err)
+		return fmt.Errorf("too many conflicts when applying patch %v to Node %v: %s", string(patch), node.Name, err)
 	}
 
 	for attempt := 0; attempt < retries; attempt++ {
@@ -1207,12 +1207,12 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 			break
 		}
 		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("Error while preparing objects for node %s: %s", node.Name, err)
+			return fmt.Errorf("error while preparing objects for node %s: %s", node.Name, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		return fmt.Errorf("Too many conflicts when creating objects for node %s: %s", node.Name, err)
+		return fmt.Errorf("too many conflicts when creating objects for node %s: %s", node.Name, err)
 	}
 	return nil
 }
@@ -1220,9 +1220,10 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		var node *v1.Node
+		node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
+			return fmt.Errorf("skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
 		if apiequality.Semantic.DeepEqual(node, updatedNode) {
@@ -1232,12 +1233,12 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			break
 		}
 		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("Error when updating Node %v: %v", nodeName, err)
+			return fmt.Errorf("error when updating Node %v: %v", nodeName, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		return fmt.Errorf("Too many conflicts when trying to cleanup Node %v: %s", nodeName, err)
+		return fmt.Errorf("too many conflicts when trying to cleanup Node %v: %s", nodeName, err)
 	}
 
 	for attempt := 0; attempt < retries; attempt++ {
@@ -1246,12 +1247,12 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 			break
 		}
 		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("Error when cleaning up Node %v objects: %v", nodeName, err)
+			return fmt.Errorf("error when cleaning up Node %v objects: %v", nodeName, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		return fmt.Errorf("Too many conflicts when trying to cleanup Node %v objects: %s", nodeName, err)
+		return fmt.Errorf("too many conflicts when trying to cleanup Node %v objects: %s", nodeName, err)
 	}
 	return nil
 }
@@ -1303,7 +1304,7 @@ func MakePodSpec() v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
 			Name:  "pause",
-			Image: "k8s.gcr.io/pause:3.4.1",
+			Image: "k8s.gcr.io/pause:3.5",
 			Ports: []v1.ContainerPort{{ContainerPort: 80}},
 			Resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1321,7 +1322,7 @@ func MakePodSpec() v1.PodSpec {
 
 func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod) error {
 	if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
-		return fmt.Errorf("Error creating pod: %v", err)
+		return fmt.Errorf("error creating pod: %v", err)
 	}
 	return nil
 }
@@ -1450,7 +1451,7 @@ func createController(client clientset.Interface, controllerName, namespace stri
 		},
 	}
 	if err := CreateRCWithRetries(client, namespace, rc); err != nil {
-		return fmt.Errorf("Error creating replication controller: %v", err)
+		return fmt.Errorf("error creating replication controller: %v", err)
 	}
 	return nil
 }
@@ -1557,7 +1558,7 @@ func (config *SecretConfig) Run() error {
 	}
 
 	if err := CreateSecretWithRetries(config.Client, config.Namespace, secret); err != nil {
-		return fmt.Errorf("Error creating secret: %v", err)
+		return fmt.Errorf("error creating secret: %v", err)
 	}
 	config.LogFunc("Created secret %v/%v", config.Namespace, config.Name)
 	return nil
@@ -1565,7 +1566,7 @@ func (config *SecretConfig) Run() error {
 
 func (config *SecretConfig) Stop() error {
 	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
-		return fmt.Errorf("Error deleting secret: %v", err)
+		return fmt.Errorf("error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
 	return nil
@@ -1615,7 +1616,7 @@ func (config *ConfigMapConfig) Run() error {
 	}
 
 	if err := CreateConfigMapWithRetries(config.Client, config.Namespace, configMap); err != nil {
-		return fmt.Errorf("Error creating configmap: %v", err)
+		return fmt.Errorf("error creating configmap: %v", err)
 	}
 	config.LogFunc("Created configmap %v/%v", config.Namespace, config.Name)
 	return nil
@@ -1623,7 +1624,7 @@ func (config *ConfigMapConfig) Run() error {
 
 func (config *ConfigMapConfig) Stop() error {
 	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
-		return fmt.Errorf("Error deleting configmap: %v", err)
+		return fmt.Errorf("error deleting configmap: %v", err)
 	}
 	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)
 	return nil
@@ -1725,7 +1726,7 @@ type DaemonConfig struct {
 
 func (config *DaemonConfig) Run() error {
 	if config.Image == "" {
-		config.Image = "k8s.gcr.io/pause:3.4.1"
+		config.Image = "k8s.gcr.io/pause:3.5"
 	}
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",
@@ -1752,7 +1753,7 @@ func (config *DaemonConfig) Run() error {
 	}
 
 	if err := CreateDaemonSetWithRetries(config.Client, config.Namespace, daemon); err != nil {
-		return fmt.Errorf("Error creating daemonset: %v", err)
+		return fmt.Errorf("error creating daemonset: %v", err)
 	}
 
 	var nodes *v1.NodeList
@@ -1763,7 +1764,7 @@ func (config *DaemonConfig) Run() error {
 		if err == nil {
 			break
 		} else if i+1 == retries {
-			return fmt.Errorf("Error listing Nodes while waiting for DaemonSet %v: %v", config.Name, err)
+			return fmt.Errorf("error listing Nodes while waiting for DaemonSet %v: %v", config.Name, err)
 		}
 	}
 

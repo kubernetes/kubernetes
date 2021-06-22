@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/integration"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/tests/v3/integration"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
 func TestWatch(t *testing.T) {
@@ -223,6 +224,7 @@ func TestWatchFromNoneZero(t *testing.T) {
 
 func TestWatchError(t *testing.T) {
 	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	integration.BeforeTestExternal(t)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
 	invalidStore := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
@@ -313,12 +315,30 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	}
 }
 
+func TestWatchInitializationSignal(t *testing.T) {
+	_, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	initSignal := utilflowcontrol.NewInitializationSignal()
+	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
+
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	initSignal.Wait()
+}
+
 func TestProgressNotify(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	clusterConfig := &integration.ClusterConfig{
 		Size:                        1,
 		WatchProgressNotifyInterval: time.Second,
 	}
+	integration.BeforeTestExternal(t)
 	cluster := integration.NewClusterV3(t, clusterConfig)
 	defer cluster.Terminate(t)
 	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())

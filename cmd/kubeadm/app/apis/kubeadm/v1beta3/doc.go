@@ -25,6 +25,16 @@ limitations under the License.
 // A list of changes since v1beta2:
 // - The deprecated "ClusterConfiguration.useHyperKubeImage" field has been removed.
 // Kubeadm no longer supports the hyperkube image.
+// - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
+// DNS server type by kubeadm.
+// - Include "datapolicy" tags on the fields that hold secrets.
+// This would result in the field values to be omitted when API structures are printed with klog.
+// - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
+// a list of phases during kubeadm init/join command execution.
+// - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
+// to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
+// "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
+
 //
 // Migration from old kubeadm config versions
 //
@@ -114,7 +124,7 @@ limitations under the License.
 // including settings for:
 //
 // - Networking, that holds configuration for the networking topology of the cluster; use it e.g. to customize
-// node subnet or services subnet.
+// pod subnet or services subnet.
 //
 // - Etcd configurations; use it e.g. to customize the local etcd or to configure the API server
 // for using an external etcd cluster.
@@ -169,10 +179,13 @@ limitations under the License.
 // 	    v: 4
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
+//    imagePullPolicy: "IfNotPresent"
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
 //	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
+//  skipPhases:
+//  - addon/kube-proxy
 // 	---
 // 	apiVersion: kubeadm.k8s.io/v1beta3
 // 	kind: ClusterConfiguration
@@ -196,10 +209,10 @@ limitations under the License.
 // 	    # certFile: "/etcd/kubernetes/pki/etcd/etcd.crt"
 // 	    # keyFile: "/etcd/kubernetes/pki/etcd/etcd.key"
 // 	networking:
-// 	  serviceSubnet: "10.96.0.0/12"
-// 	  podSubnet: "10.100.0.1/24"
+// 	  serviceSubnet: "10.96.0.0/16"
+// 	  podSubnet: "10.244.0.0/24"
 // 	  dnsDomain: "cluster.local"
-// 	kubernetesVersion: "v1.12.0"
+// 	kubernetesVersion: "v1.21.0"
 // 	controlPlaneEndpoint: "10.100.0.1:6443"
 // 	apiServer:
 // 	  extraArgs:

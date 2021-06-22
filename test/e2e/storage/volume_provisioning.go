@@ -33,13 +33,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
@@ -342,7 +340,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				},
 			}
 
-			var betaTest *testsuites.StorageClassTest
 			for i, t := range tests {
 				// Beware of closure, use local variables instead of those from
 				// outer scope
@@ -352,9 +349,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
-
-				// Remember the last supported test for subsequent test of beta API
-				betaTest = &test
 
 				ginkgo.By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
@@ -372,31 +366,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}, ns)
 
 				test.TestDynamicProvisioning()
-			}
-
-			// Run the last test with storage.k8s.io/v1beta1 on pvc
-			if betaTest != nil {
-				ginkgo.By("Testing " + betaTest.Name + " with beta volume provisioning")
-				betaClass := newBetaStorageClass(*betaTest, "beta")
-				// create beta class manually
-				betaClass, err := c.StorageV1beta1().StorageClasses().Create(context.TODO(), betaClass, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				defer deleteStorageClass(c, betaClass.Name)
-
-				// fetch V1beta1 StorageClass as V1 object for the test
-				class, err := c.StorageV1().StorageClasses().Get(context.TODO(), betaClass.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-
-				betaTest.Client = c
-				betaTest.Class = class
-				betaTest.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-					ClaimSize:        betaTest.ClaimSize,
-					StorageClassName: &class.Name,
-					VolumeMode:       &betaTest.VolumeMode,
-				}, ns)
-				betaTest.Claim.Spec.StorageClassName = &(class.Name)
-
-				(*betaTest).TestDynamicProvisioning()
 			}
 		})
 
@@ -446,66 +415,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			ginkgo.By(fmt.Sprintf("deleting the PV %q", pv.Name))
 			framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 			framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
-		})
-
-		ginkgo.It("should not provision a volume in an unmanaged GCE zone.", func() {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-
-			ginkgo.By("Discovering an unmanaged zone")
-			allZones := sets.NewString() // all zones in the project
-
-			gceCloud, err := gce.GetGCECloud()
-			framework.ExpectNoError(err)
-
-			// Get all k8s managed zones (same as zones with nodes in them for test)
-			managedZones, err := gceCloud.GetAllZonesFromCloudProvider()
-			framework.ExpectNoError(err)
-
-			// Get a list of all zones in the project
-			zones, err := gceCloud.ComputeServices().GA.Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
-			framework.ExpectNoError(err)
-			for _, z := range zones.Items {
-				allZones.Insert(z.Name)
-			}
-
-			// Get the subset of zones not managed by k8s
-			var unmanagedZone string
-			var popped bool
-			unmanagedZones := allZones.Difference(managedZones)
-			// And select one of them at random.
-			if unmanagedZone, popped = unmanagedZones.PopAny(); !popped {
-				e2eskipper.Skipf("No unmanaged zones found.")
-			}
-
-			ginkgo.By("Creating a StorageClass for the unmanaged zone")
-			test := testsuites.StorageClassTest{
-				Name:        "unmanaged_zone",
-				Provisioner: "kubernetes.io/gce-pd",
-				Timeouts:    f.Timeouts,
-				Parameters:  map[string]string{"zone": unmanagedZone},
-				ClaimSize:   "1Gi",
-			}
-			sc := newStorageClass(test, ns, "unmanaged")
-			sc, err = c.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			defer deleteStorageClass(c, sc.Name)
-
-			ginkgo.By("Creating a claim and expecting it to timeout")
-			pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-				ClaimSize:        test.ClaimSize,
-				StorageClassName: &sc.Name,
-				VolumeMode:       &test.VolumeMode,
-			}, ns)
-			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			defer func() {
-				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
-			}()
-
-			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, timeouts.ClaimProvisionShort)
-			framework.ExpectError(err)
-			framework.Logf(err.Error())
 		})
 
 		ginkgo.It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
@@ -989,29 +898,6 @@ func getStorageClass(
 		Provisioner:       provisioner,
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
-	}
-}
-
-// TODO: remove when storage.k8s.io/v1beta1 is removed.
-func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storagev1beta1.StorageClass {
-	pluginName := t.Provisioner
-
-	if pluginName == "" {
-		pluginName = getDefaultPluginName()
-	}
-	if suffix == "" {
-		suffix = "default"
-	}
-
-	return &storagev1beta1.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: suffix + "-",
-		},
-		Provisioner: pluginName,
-		Parameters:  t.Parameters,
 	}
 }
 

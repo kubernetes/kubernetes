@@ -18,7 +18,6 @@ package validation
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -6562,6 +6561,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		desc          string
 		dnsConfig     *core.PodDNSConfig
 		dnsPolicy     *core.DNSPolicy
+		opts          PodValidationOptions
 		expectedError bool
 	}{
 		{
@@ -6608,7 +6608,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			desc: "valid: 3 nameservers and 6 search paths",
+			desc: "valid: 3 nameservers and 6 search paths(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
 				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local."},
@@ -6616,7 +6616,18 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			desc: "valid: 256 characters in search path list",
+			desc: "valid: 3 nameservers and 32 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 256 characters in search path list(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
 				Searches: []string{
@@ -6627,6 +6638,50 @@ func TestValidatePodDNSConfig(t *testing.T) {
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 				},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 2048 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 2048 - (32 - 1) = 2017 characters in total for 32 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(64),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+				},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: false,
 		},
@@ -6645,9 +6700,19 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			desc: "invalid: 7 search paths",
+			desc: "invalid: 7 search paths(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 33 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: true,
 		},
@@ -6663,6 +6728,50 @@ func TestValidatePodDNSConfig(t *testing.T) {
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 				},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 2049 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 2048 - (32 - 1) = 2017 characters in total for 32 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(65),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+				},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: true,
 		},
@@ -6704,7 +6813,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			tc.dnsPolicy = &testDNSClusterFirst
 		}
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"))
+		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
 		if len(errs) != 0 && !tc.expectedError {
 			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 		} else if len(errs) == 0 && tc.expectedError {
@@ -10143,8 +10252,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 }
 
 func TestValidateServiceCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
-
 	requireDualStack := core.IPFamilyPolicyRequireDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
@@ -11205,67 +11312,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 
-		/* toplogy keys */
-		{
-			name: "valid topology keys",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					"topology.kubernetes.io/zone",
-					"topology.kubernetes.io/region",
-					v1.TopologyKeyAny,
-				}
-			},
-			numErrs: 0,
-		},
-		{
-			name: "invalid topology key",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{"NoUppercaseOrSpecialCharsLike=Equals"}
-			},
-			numErrs: 1,
-		},
-		{
-			name: "too many topology keys",
-			tweakSvc: func(s *core.Service) {
-				for i := 0; i < core.MaxServiceTopologyKeys+1; i++ {
-					s.Spec.TopologyKeys = append(s.Spec.TopologyKeys, fmt.Sprintf("topologykey-%d", i))
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `"Any" was not the last key`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					v1.TopologyKeyAny,
-					"topology.kubernetes.io/zone",
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `duplicate topology key`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					"kubernetes.io/hostname",
-					"topology.kubernetes.io/zone",
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `use topology keys with externalTrafficPolicy=Local`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.ExternalTrafficPolicy = "Local"
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-				}
-			},
-			numErrs: 1,
-		},
 		{
 			name: `valid appProtocol`,
 			tweakSvc: func(s *core.Service) {
@@ -17395,6 +17441,396 @@ func TestValidateNonSpecialIP(t *testing.T) {
 			errs := ValidateNonSpecialIP(tc.ip, fp)
 			if len(errs) == 0 {
 				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+			}
+		})
+	}
+}
+
+func TestValidateWindowsHostProcessPod(t *testing.T) {
+	const containerName = "container"
+	falseVar := false
+	trueVar := true
+
+	testCases := []struct {
+		name            string
+		expectError     bool
+		featureEnabled  bool
+		allowPrivileged bool
+		podSpec         *core.PodSpec
+	}{
+		{
+			name:            "Spec with feature disabled and pod-wide HostProcess=false and should not validate",
+			expectError:     true,
+			featureEnabled:  false,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature disabled and pod-wide HostProcess=nil set should valildate",
+			expectError:     false,
+			featureEnabled:  false,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: nil,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature disabled and container setting HostProcess=true should not valildate",
+			expectError:     true,
+			featureEnabled:  false,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature disabled and init container setting HostProcess=true should not valildate",
+			expectError:     true,
+			featureEnabled:  false,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				InitContainers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=true, and HostNetwork unset should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=ture, and HostNetwork set should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=ture, HostNetwork set, and containers setting HostProcess=true should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=nil, HostNetwork set, and all containers setting HostProcess=true should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Pods with feature enabled, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, some containers setting HostProcess=true, and other leaving HostProcess unset should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and init containers setting HostProcess=false should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: containerName,
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					}, {
+						Name: containerName,
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others leaving HostProcess=nil should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Spec with feature enabled, pod-wide HostProcess=false, some contaienrs setting HostProccess=true should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+				InitContainers: []core.Container{{
+					Name: containerName,
+				}},
+			},
+		},
+		{
+			name:            "Pod's HostProcess set to true but all containers override to false should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "Valid HostProcess pod should spec should not validate if allowPrivileged is not set",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: false,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
+
+			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
+
+			capabilities.SetForTests(capabilities.Capabilities{
+				AllowPrivileged: testCase.allowPrivileged,
+			})
+
+			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"), opts)
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
 	}

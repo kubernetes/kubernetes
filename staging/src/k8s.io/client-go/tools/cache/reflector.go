@@ -216,13 +216,13 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	klog.V(2).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
 	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
 	}, r.backoffManager, true, stopCh)
-	klog.V(2).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
 }
 
 var (

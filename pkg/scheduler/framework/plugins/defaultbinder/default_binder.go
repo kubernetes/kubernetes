@@ -24,10 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // Name of the plugin used in the plugin registry and configurations.
-const Name = "DefaultBinder"
+const Name = names.DefaultBinder
 
 // DefaultBinder binds pods to nodes using a k8s client.
 type DefaultBinder struct {

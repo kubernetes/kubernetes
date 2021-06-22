@@ -56,6 +56,8 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			TTL:    &metav1.Duration{Duration: 1234},
 		},
 	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = ""
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -116,6 +118,8 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		TLSBootstrapToken: "qux",
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = ""
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

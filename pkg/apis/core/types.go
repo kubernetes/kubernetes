@@ -1826,12 +1826,13 @@ type EnvVar struct {
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
-	// using the previous defined environment variables in the container and
+	// using the previously defined environment variables in the container and
 	// any service environment variables.  If a variable cannot be resolved,
-	// the reference in the input string will be unchanged.  The $(VAR_NAME)
-	// syntax can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped
-	// references will never be expanded, regardless of whether the variable
-	// exists or not.
+	// the reference in the input string will be unchanged.  Double $$ are
+	// reduced to a single $, which allows for escaping the $(VAR_NAME)
+	// syntax: i.e. "$$(VAR_NAME)" will produce the string literal
+	// "$(VAR_NAME)".  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	// +optional
 	Value string
 	// Optional: Specifies a source the value of this var should come from.
@@ -2102,16 +2103,18 @@ type Container struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -2580,7 +2583,7 @@ type PodAffinityTerm struct {
 	// and the ones listed in the namespaces field.
 	// null selector and null or empty namespaces list means "this pod's namespace".
 	// An empty selector ({}) matches all namespaces.
-	// This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+	// This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
 }
@@ -3079,16 +3082,18 @@ type EphemeralContainerCommon struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -3555,11 +3560,6 @@ type LoadBalancerIngress struct {
 	Ports []PortStatus
 }
 
-const (
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
-)
-
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
 // to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
@@ -3726,23 +3726,6 @@ type ServiceSpec struct {
 	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
 	PublishNotReadyAddresses bool
-
-	// topologyKeys is a preference-order list of topology keys which
-	// implementations of services should use to preferentially sort endpoints
-	// when accessing this Service, it can not be used at the same time as
-	// externalTrafficPolicy=Local.
-	// Topology keys must be valid label keys and at most 16 keys may be specified.
-	// Endpoints are chosen based on the first topology key with available backends.
-	// If this field is specified and all entries have no backends that match
-	// the topology of the client, the service has no backends for that client
-	// and connections should fail.
-	// The special value "*" may be used to mean "any topology". This catch-all
-	// value, if used, only makes sense as the last value in the list.
-	// If this is not specified or empty, no topology constraints will be applied.
-	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-	// This field is deprecated and will be removed in a future version.
-	// +optional
-	TopologyKeys []string
 
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
 	// allocated for services with type LoadBalancer.  Default is "true". It may be
@@ -4201,6 +4184,7 @@ type PodSignature struct {
 // ContainerImage describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
+	// +optional
 	Names []string
 	// The size of the image in bytes.
 	// +optional
@@ -4256,11 +4240,44 @@ type NodeAddressType string
 
 // These are valid values of node address type
 const (
-	NodeHostName    NodeAddressType = "Hostname"
-	NodeExternalIP  NodeAddressType = "ExternalIP"
-	NodeInternalIP  NodeAddressType = "InternalIP"
-	NodeExternalDNS NodeAddressType = "ExternalDNS"
+	// NodeHostName identifies a name of the node. Although every node can be assumed
+	// to have a NodeAddress of this type, its exact syntax and semantics are not
+	// defined, and are not consistent between different clusters.
+	NodeHostName NodeAddressType = "Hostname"
+
+	// NodeInternalIP identifies an IP address which is assigned to one of the node's
+	// network interfaces. Every node should have at least one address of this type.
+	//
+	// An internal IP is normally expected to be reachable from every other node, but
+	// may not be visible to hosts outside the cluster. By default it is assumed that
+	// kube-apiserver can reach node internal IPs, though it is possible to configure
+	// clusters where this is not the case.
+	//
+	// NodeInternalIP is the default type of node IP, and does not necessarily imply
+	// that the IP is ONLY reachable internally. If a node has multiple internal IPs,
+	// no specific semantics are assigned to the additional IPs.
+	NodeInternalIP NodeAddressType = "InternalIP"
+
+	// NodeExternalIP identifies an IP address which is, in some way, intended to be
+	// more usable from outside the cluster then an internal IP, though no specific
+	// semantics are defined. It may be a globally routable IP, though it is not
+	// required to be.
+	//
+	// External IPs may be assigned directly to an interface on the node, like a
+	// NodeInternalIP, or alternatively, packets sent to the external IP may be NAT'ed
+	// to an internal node IP rather than being delivered directly (making the IP less
+	// efficient for node-to-node traffic than a NodeInternalIP).
+	NodeExternalIP NodeAddressType = "ExternalIP"
+
+	// NodeInternalDNS identifies a DNS name which resolves to an IP address which has
+	// the characteristics of a NodeInternalIP. The IP it resolves to may or may not
+	// be a listed NodeInternalIP address.
 	NodeInternalDNS NodeAddressType = "InternalDNS"
+
+	// NodeExternalDNS identifies a DNS name which resolves to an IP address which has
+	// the characteristics of a NodeExternalIP. The IP it resolves to may or may not
+	// be a listed NodeExternalIP address.
+	NodeExternalDNS NodeAddressType = "ExternalDNS"
 )
 
 // NodeAddress represents node's address
@@ -4887,7 +4904,7 @@ const (
 	// Match all pod objects that have priority class mentioned
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
-	// This is an alpha feature enabled by the PodAffinityNamespaceSelector feature flag.
+	// This is a beta feature enabled by the PodAffinityNamespaceSelector feature flag.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
 )
 
@@ -5351,6 +5368,16 @@ type WindowsSecurityContextOptions struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsUserName *string
+
+	// HostProcess determines if a container should be run as a 'Host Process' container.
+	// This field is alpha-level and will only be honored by components that enable the
+	// WindowsHostProcessContainers feature flag. Setting this field without the feature
+	// flag will result in errors when validating the Pod. All of a Pod's containers must
+	// have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
+	// containers and non-HostProcess containers).  In addition, if HostProcess is true
+	// then HostNetwork must also be set to true.
+	// +optional
+	HostProcess *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

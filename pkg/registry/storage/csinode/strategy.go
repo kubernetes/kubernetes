@@ -59,6 +59,9 @@ func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return errs
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiNodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (csiNodeStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -88,6 +91,11 @@ func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 	errorList := validation.ValidateCSINode(newCSINodeObj, validateOptions)
 	return append(errorList, validation.ValidateCSINodeUpdate(newCSINodeObj, oldCSINodeObj, validateOptions)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiNodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiNodeStrategy) AllowUnconditionalUpdate() bool {

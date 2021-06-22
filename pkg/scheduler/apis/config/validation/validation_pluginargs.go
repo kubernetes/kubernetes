@@ -68,11 +68,11 @@ func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32, p *field
 
 // ValidateInterPodAffinityArgs validates that InterPodAffinityArgs are correct.
 func ValidateInterPodAffinityArgs(path *field.Path, args *config.InterPodAffinityArgs) error {
-	return ValidateHardPodAffinityWeight(path.Child("hardPodAffinityWeight"), args.HardPodAffinityWeight)
+	return validateHardPodAffinityWeight(path.Child("hardPodAffinityWeight"), args.HardPodAffinityWeight)
 }
 
-// ValidateHardPodAffinityWeight validates that weight is within allowed range.
-func ValidateHardPodAffinityWeight(path *field.Path, w int32) error {
+// validateHardPodAffinityWeight validates that weight is within allowed range.
+func validateHardPodAffinityWeight(path *field.Path, w int32) error {
 	const (
 		minHardPodAffinityWeight = 0
 		maxHardPodAffinityWeight = 100

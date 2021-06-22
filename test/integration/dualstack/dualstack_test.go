@@ -53,13 +53,13 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	serviceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -270,13 +270,13 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	serviceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -490,7 +490,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -503,7 +503,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -717,7 +717,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	secondaryServiceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -730,7 +730,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -947,7 +947,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -960,7 +960,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1062,7 +1062,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -1075,7 +1075,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1152,14 +1152,14 @@ func TestConvertToFromExternalName(t *testing.T) {
 func TestExistingServiceDefaulting(t *testing.T) {
 	// Create an IPv4IPv6 dual stack control-plane
 	serviceCIDR := "10.0.0.0/16"
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1235,7 +1235,7 @@ func TestPreferDualStack(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -1248,7 +1248,7 @@ func TestPreferDualStack(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1320,13 +1320,13 @@ func TestServiceUpdate(t *testing.T) {
 	serviceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})

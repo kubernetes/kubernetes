@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -80,7 +81,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 					{Name: "cpu", Weight: 1},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -333,7 +334,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 					{Name: "intel.com/foo", Weight: 1},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -577,7 +578,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 					{Name: "intel.com/bar", Weight: 5},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

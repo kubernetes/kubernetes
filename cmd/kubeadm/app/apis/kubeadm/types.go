@@ -57,6 +57,11 @@ type InitConfiguration struct {
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
 	CertificateKey string
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm init --help" command.
+	// The flag "--skip-phases" takes precedence over this field.
+	SkipPhases []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -126,6 +131,8 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	// TODO: This is temporary and ideally we would like to switch all components to
 	// use ComponentConfig + ConfigMaps.
 	ExtraArgs map[string]string
@@ -146,16 +153,19 @@ type APIServer struct {
 }
 
 // DNSAddOnType defines string identifying DNS add-on types
+// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 type DNSAddOnType string
 
 const (
 	// CoreDNS add-on type
+	// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 	CoreDNS DNSAddOnType = "CoreDNS"
 )
 
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// Type defines the DNS add-on to be used
+	// TODO: Used only in validation over the internal type. Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 	Type DNSAddOnType
 
 	// ImageMeta allows to customize the image used for the DNS component
@@ -174,18 +184,6 @@ type ImageMeta struct {
 	ImageTag string
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
-// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
-type ClusterStatus struct {
-	metav1.TypeMeta
-
-	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
-	// The key of the map is the IP of the host's default interface
-	APIEndpoints map[string]APIEndpoint
 }
 
 // APIEndpoint struct contains elements of API server instance deployed on a node.
@@ -217,10 +215,17 @@ type NodeRegistrationOptions struct {
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	KubeletExtraArgs map[string]string
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
 	IgnorePreflightErrors []string
+
+	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration.
@@ -280,6 +285,8 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
 	ExtraArgs map[string]string
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
@@ -322,6 +329,11 @@ type JoinConfiguration struct {
 	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
 	// If nil, no additional control plane instance will be deployed.
 	ControlPlane *JoinControlPlane
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm join --help" command.
+	// The flag "--skip-phases" takes precedence over this field.
+	SkipPhases []string
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.

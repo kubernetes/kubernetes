@@ -214,3 +214,16 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	defer cm.Unlock()
 	return nil
 }
+
+func (cm *FakeContainerManager) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetMemory")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+	cm.Lock()
+	defer cm.Unlock()
+	return nil
+}

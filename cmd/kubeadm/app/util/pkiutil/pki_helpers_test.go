@@ -358,12 +358,6 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	if err != nil {
-		t.Fatalf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
 	err = WriteCert(tmpdir, "foo", rootCACert)
 	if err != nil {
 		t.Fatalf(

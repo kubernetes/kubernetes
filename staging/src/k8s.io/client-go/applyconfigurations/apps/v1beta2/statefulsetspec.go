@@ -35,6 +35,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	PodManagementPolicy  *v1beta2.PodManagementPolicyType                 `json:"podManagementPolicy,omitempty"`
 	UpdateStrategy       *StatefulSetUpdateStrategyApplyConfiguration     `json:"updateStrategy,omitempty"`
 	RevisionHistoryLimit *int32                                           `json:"revisionHistoryLimit,omitempty"`
+	MinReadySeconds      *int32                                           `json:"minReadySeconds,omitempty"`
 }
 
 // StatefulSetSpecApplyConfiguration constructs an declarative configuration of the StatefulSetSpec type for use with
@@ -109,5 +110,13 @@ func (b *StatefulSetSpecApplyConfiguration) WithUpdateStrategy(value *StatefulSe
 // If called multiple times, the RevisionHistoryLimit field is set to the value of the last call.
 func (b *StatefulSetSpecApplyConfiguration) WithRevisionHistoryLimit(value int32) *StatefulSetSpecApplyConfiguration {
 	b.RevisionHistoryLimit = &value
+	return b
+}
+
+// WithMinReadySeconds sets the MinReadySeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MinReadySeconds field is set to the value of the last call.
+func (b *StatefulSetSpecApplyConfiguration) WithMinReadySeconds(value int32) *StatefulSetSpecApplyConfiguration {
+	b.MinReadySeconds = &value
 	return b
 }

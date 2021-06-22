@@ -151,6 +151,7 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 			p.Annotations = map[string]string{
 				batch.JobCompletionIndexAnnotation: s.Index,
 			}
+			p.Spec.Hostname = fmt.Sprintf("%s-%s", job.Name, s.Index)
 		}
 		podIndexer.Add(p)
 	}
@@ -735,7 +736,7 @@ func TestControllerSyncJob(t *testing.T) {
 				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
 			}
 			if tc.completionMode == batch.IndexedCompletion {
-				checkCompletionIndexesInPods(t, &fakePodControl, tc.expectedCreatedIndexes)
+				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
 			}
 			if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 				t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
@@ -806,7 +807,7 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
-func checkCompletionIndexesInPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int) {
+func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int, jobName string) {
 	t.Helper()
 	gotIndexes := sets.NewInt()
 	for _, p := range control.Templates {
@@ -816,6 +817,10 @@ func checkCompletionIndexesInPods(t *testing.T, control *controller.FakePodContr
 			t.Errorf("Created pod %s didn't have completion index", p.Name)
 		} else {
 			gotIndexes.Insert(ix)
+		}
+		expectedName := fmt.Sprintf("%s-%d", jobName, ix)
+		if diff := cmp.Equal(expectedName, p.Spec.Hostname); !diff {
+			t.Errorf("Got pod hostname %s, want %s", p.Spec.Hostname, expectedName)
 		}
 	}
 	if diff := cmp.Diff(wantIndexes.List(), gotIndexes.List()); diff != "" {

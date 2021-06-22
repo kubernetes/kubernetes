@@ -249,11 +249,7 @@ func defaultCapabilities() *DriverCapabilities {
 // isCmdNotSupportedErr checks if the error corresponds to command not supported by
 // driver.
 func isCmdNotSupportedErr(err error) bool {
-	if err != nil && err.Error() == StatusNotSupported {
-		return true
-	}
-
-	return false
+	return err != nil && err.Error() == StatusNotSupported
 }
 
 // handleCmdResponse processes the command output and returns the appropriate

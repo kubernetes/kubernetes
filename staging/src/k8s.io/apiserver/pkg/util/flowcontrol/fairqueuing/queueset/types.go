@@ -43,6 +43,9 @@ type request struct {
 	// startTime is the real time when the request began executing
 	startTime time.Time
 
+	// width of the request
+	width uint
+
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
 	// is removed from its queue.  The value will be decisionReject,
@@ -80,6 +83,10 @@ type queue struct {
 
 	requestsExecuting int
 	index             int
+
+	// seatsInUse is the total number of "seats" currently occupied
+	// by all the requests that are currently executing in this queue.
+	seatsInUse int
 }
 
 // Enqueue enqueues a request into the queue and
@@ -92,17 +99,6 @@ func (q *queue) Enqueue(request *request) {
 func (q *queue) Dequeue() (*request, bool) {
 	request, ok := q.requests.Dequeue()
 	return request, ok
-}
-
-// GetVirtualFinish returns the expected virtual finish time of the request at
-// index J in the queue with estimated finish time G
-func (q *queue) GetVirtualFinish(J int, G float64) float64 {
-	// The virtual finish time of request number J in the queue
-	// (counting from J=1 for the head) is J * G + (virtual start time).
-
-	// counting from J=1 for the head (eg: queue.requests[0] -> J=1) - J+1
-	jg := float64(J+1) * float64(G)
-	return jg + q.virtualStart
 }
 
 func (q *queue) dump(includeDetails bool) debug.QueueDump {
@@ -129,5 +125,6 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		VirtualStart:      q.virtualStart,
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
+		SeatsInUse:        q.seatsInUse,
 	}
 }

@@ -1481,7 +1481,7 @@ func TestValidateProjectedVolume(t *testing.T) {
 			psp.Spec.Volumes = test.allowedFSTypes
 			errs := provider.ValidatePod(pod)
 			if test.wantAllow {
-				assert.Empty(t, errs, "projected volumes are allowed if secret volumes is allowed and BoundServiceAccountTokenVolume is enabled")
+				assert.Empty(t, errs, "projected volumes are allowed")
 			} else {
 				assert.Contains(t, errs.ToAggregate().Error(), fmt.Sprintf("projected volumes are not allowed to be used"), "did not find the expected error")
 			}

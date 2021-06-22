@@ -81,7 +81,12 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 		return nil, err
 	}
 	klog.V(4).Infof("ensureExternalLoadBalancer(%s): Desired network tier %q.", lbRefStr, netTier)
-	g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
+	// TODO: distinguish between unspecified and specified network tiers annotation properly in forwardingrule creation
+	// Only delete ForwardingRule when network tier annotation is specified, otherwise leave it only to avoid wrongful
+	// deletion against user intention when network tier annotation is not specified.
+	if _, ok := apiService.Annotations[NetworkTierAnnotationKey]; ok {
+		g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
+	}
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := g.forwardingRuleNeedsUpdate(loadBalancerName, g.region, requestedIP, ports)
@@ -447,7 +452,7 @@ func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP
 		netTier := cloud.NetworkTierGCEValueToType(netTierStr)
 		if netTier != desiredNetTier {
 			klog.Errorf("verifyUserRequestedIP: requested static IP %q (name: %s) for LB %s has network tier %s, need %s.", requestedIP, existingAddress.Name, lbRef, netTier, desiredNetTier)
-			return false, fmt.Errorf("requrested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
+			return false, fmt.Errorf("requested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
 		}
 		klog.V(4).Infof("verifyUserRequestedIP: the requested static IP %q (name: %s, tier: %s) for LB %s exists.", requestedIP, existingAddress.Name, netTier, lbRef)
 		return true, nil

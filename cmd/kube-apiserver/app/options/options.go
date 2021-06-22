@@ -75,8 +75,6 @@ type ServerRunOptions struct {
 	APIServerServiceIP net.IP
 
 	ServiceNodePortRange utilnet.PortRange
-	SSHKeyfile           string
-	SSHUser              string
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
@@ -195,16 +193,6 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
 	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
-
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
-		"If non-empty, use secure SSH proxy to the nodes, using this user name")
-	fs.MarkDeprecated("ssh-user", "This flag will be removed in a future version.")
-
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
-		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
-	fs.MarkDeprecated("ssh-keyfile", "This flag will be removed in a future version.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+

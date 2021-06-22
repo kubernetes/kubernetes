@@ -381,7 +381,7 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 			return false, isPrimaryService, nil
 		}
 
-		return false, isPrimaryService, fmt.Errorf("serviceOwnsFrontendIP: wrong parameters")
+		return false, isPrimaryService, nil
 	}
 
 	// for internal secondary service the private IP address on the frontend IP config should be checked

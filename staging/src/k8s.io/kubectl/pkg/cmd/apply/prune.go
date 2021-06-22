@@ -184,7 +184,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Secret", true},
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
-			{"batch", "v1beta1", "CronJob", true},
+			{"batch", "v1", "CronJob", true},
 			{"networking.k8s.io", "v1", "Ingress", true},
 			{"apps", "v1", "DaemonSet", true},
 			{"apps", "v1", "Deployment", true},

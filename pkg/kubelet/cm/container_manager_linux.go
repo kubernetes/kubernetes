@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
+	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -533,12 +534,8 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			return err
 		}
 
-		manager, err := createManager(cm.KubeletCgroupsName)
-		if err != nil {
-			return err
-		}
 		cont.ensureStateFunc = func(_ cgroups.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, manager)
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, cont.manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
@@ -1077,11 +1074,33 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 }
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
-	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+	if cm.cpuManager != nil {
+		return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+	}
+	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
-	return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
+	if cm.cpuManager != nil {
+		return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
+	}
+	return []int64{}
+}
+
+func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory {
+	if cm.memoryManager == nil {
+		return []*podresourcesapi.ContainerMemory{}
+	}
+
+	return containerMemoryFromBlock(cm.memoryManager.GetMemory(podUID, containerName))
+}
+
+func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+	if cm.memoryManager == nil {
+		return []*podresourcesapi.ContainerMemory{}
+	}
+
+	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
@@ -1090,4 +1109,26 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
+}
+
+func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresourcesapi.ContainerMemory {
+	var containerMemories []*podresourcesapi.ContainerMemory
+
+	for _, b := range blocks {
+		containerMemory := podresourcesapi.ContainerMemory{
+			MemoryType: string(b.Type),
+			Size_:      b.Size,
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{},
+			},
+		}
+
+		for _, numaNodeID := range b.NUMAAffinity {
+			containerMemory.Topology.Nodes = append(containerMemory.Topology.Nodes, &podresourcesapi.NUMANode{ID: int64(numaNodeID)})
+		}
+
+		containerMemories = append(containerMemories, &containerMemory)
+	}
+
+	return containerMemories
 }

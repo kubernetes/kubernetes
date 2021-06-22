@@ -56,13 +56,13 @@ type ShutdownFunc func()
 
 // StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
 func StartApiserver() (string, ShutdownFunc) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	_, _, closeFn := framework.RunAnApiserverUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAnAPIServerUsingServer(framework.NewIntegrationTestControlPlaneConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
@@ -91,7 +91,6 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 		ctx.Done(),
 		scheduler.WithKubeConfig(kubeConfig),
 		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithAlgorithmSource(cfg.AlgorithmSource),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
@@ -320,29 +319,29 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 	return err
 }
 
-// InitTestMaster initializes a test environment and creates a master with default
+// InitTestAPIServer initializes a test environment and creates an API server with default
 // configuration.
-func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := TestContext{
 		Ctx:      ctx,
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// 1. Create API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 
 	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
+		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnApiserverUsingServer(masterConfig, s, h)
+	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
@@ -403,7 +402,7 @@ func InitTestSchedulerWithOptions(
 	})
 
 	if policy != nil {
-		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
+		opts = append(opts, scheduler.WithLegacyPolicySource(CreateSchedulerPolicySource(policy, testCtx.ClientSet)))
 	}
 	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
@@ -424,8 +423,8 @@ func InitTestSchedulerWithOptions(
 	return testCtx
 }
 
-// CreateAlgorithmSourceFromPolicy creates the schedulerAlgorithmSource from the policy parameter
-func CreateAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
+// CreateSchedulerPolicySource creates a source from the given policy.
+func CreateSchedulerPolicySource(policy *schedulerapi.Policy, clientSet clientset.Interface) *schedulerapi.SchedulerPolicySource {
 	// Serialize the Policy object into a ConfigMap later.
 	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok {
@@ -441,12 +440,10 @@ func CreateAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clie
 	policyConfigMap.APIVersion = "v1"
 	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
-	return schedulerapi.SchedulerAlgorithmSource{
-		Policy: &schedulerapi.SchedulerPolicySource{
-			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-				Namespace: policyConfigMap.Namespace,
-				Name:      policyConfigMap.Name,
-			},
+	return &schedulerapi.SchedulerPolicySource{
+		ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
+			Namespace: policyConfigMap.Namespace,
+			Name:      policyConfigMap.Name,
 		},
 	}
 }

@@ -46,8 +46,7 @@ var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:Boun
 			}
 			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
 
-			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
-			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
+			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})

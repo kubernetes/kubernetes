@@ -1725,10 +1725,10 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 	}
 }
 
-func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, state, lastTerminationState map[string]v1.ContainerState, message string) {
+func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, expectedState, expectedLastTerminationState map[string]v1.ContainerState, message string) {
 	for _, s := range statuses {
-		assert.Equal(t, s.State, state[s.Name], "%s: state", message)
-		assert.Equal(t, s.LastTerminationState, lastTerminationState[s.Name], "%s: last terminated state", message)
+		assert.Equal(t, expectedState[s.Name], s.State, "%s: state", message)
+		assert.Equal(t, expectedLastTerminationState[s.Name], s.LastTerminationState, "%s: last terminated state", message)
 	}
 }
 

@@ -64,6 +64,7 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
@@ -215,6 +216,9 @@ type Config struct {
 	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
 	MergedResourceConfig *serverstore.ResourceConfig
 
+	// RequestWidthEstimator is used to estimate the "width" of the incoming request(s).
+	RequestWidthEstimator flowcontrolrequest.WidthEstimatorFunc
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -338,6 +342,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc:       genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		RequestWidthEstimator: flowcontrolrequest.DefaultWidthEstimator,
+
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
 	}
@@ -728,7 +734,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	if c.FlowControl != nil {
 		handler = filterlatency.TrackCompleted(handler)
-		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, c.RequestWidthEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
@@ -759,7 +765,6 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyChecker,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
@@ -768,6 +773,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
 	handler = genericfilters.WithHTTPLogging(handler)
+	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithAuditID(handler)

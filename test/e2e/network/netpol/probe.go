@@ -41,13 +41,12 @@ type ProbeJobResults struct {
 
 // ProbePodToPodConnectivity runs a series of probes in kube, and records the results in `testCase.Reachability`
 func ProbePodToPodConnectivity(k8s *kubeManager, model *Model, testCase *TestCase) {
-	numberOfWorkers := 3 // See https://github.com/kubernetes/kubernetes/pull/97690
 	allPods := model.AllPods()
 	size := len(allPods) * len(allPods)
 	jobs := make(chan *ProbeJob, size)
 	results := make(chan *ProbeJobResults, size)
-	for i := 0; i < numberOfWorkers; i++ {
-		go probeWorker(k8s, jobs, results)
+	for i := 0; i < model.GetWorkers(); i++ {
+		go probeWorker(k8s, jobs, results, model.GetProbeTimeoutSeconds())
 	}
 	for _, podFrom := range allPods {
 		for _, podTo := range allPods {
@@ -84,11 +83,11 @@ func ProbePodToPodConnectivity(k8s *kubeManager, model *Model, testCase *TestCas
 
 // probeWorker continues polling a pod connectivity status, until the incoming "jobs" channel is closed, and writes results back out to the "results" channel.
 // it only writes pass/fail status to a channel and has no failure side effects, this is by design since we do not want to fail inside a goroutine.
-func probeWorker(k8s *kubeManager, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults) {
+func probeWorker(k8s *kubeManager, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults, timeoutSeconds int) {
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
 		podFrom := job.PodFrom
-		connected, command, err := k8s.probeConnectivity(podFrom.Namespace, podFrom.Name, podFrom.Containers[0].Name(), job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain), job.Protocol, job.ToPort)
+		connected, command, err := k8s.probeConnectivity(podFrom.Namespace, podFrom.Name, podFrom.Containers[0].Name(), job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain), job.Protocol, job.ToPort, timeoutSeconds)
 		result := &ProbeJobResults{
 			Job:         job,
 			IsConnected: connected,

@@ -72,7 +72,7 @@ func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFl
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, nil, gotResult.TearDownFn, err
 }
 
 func TestComponentSecureServingAndAuth(t *testing.T) {
@@ -166,7 +166,7 @@ users:
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil, true},
 		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}, false},
-		{"kube-scheduler", kubeSchedulerTester{}, nil, false},
+		{"kube-scheduler", kubeSchedulerTester{}, nil, true},
 	}
 
 	for _, tt := range tests {

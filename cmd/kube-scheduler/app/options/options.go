@@ -41,7 +41,7 @@ import (
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
+	configv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -99,10 +99,8 @@ func NewOptions() (*Options, error) {
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
-			UseLegacyPolicyConfig:          false,
-			PolicyConfigMapNamespace:       metav1.NamespaceSystem,
-			SchedulerName:                  corev1.DefaultSchedulerName,
-			HardPodAffinitySymmetricWeight: 1,
+			UseLegacyPolicyConfig:    false,
+			PolicyConfigMapNamespace: metav1.NamespaceSystem,
 		},
 		Metrics: metrics.NewOptions(),
 		Logs:    logs.NewOptions(),
@@ -133,7 +131,7 @@ func splitHostIntPort(s string) (string, int, error) {
 }
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := kubeschedulerconfigv1beta1.KubeSchedulerConfiguration{}
+	versionedCfg := configv1beta2.KubeSchedulerConfiguration{}
 	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
 
 	kubeschedulerscheme.Scheme.Default(&versionedCfg)
@@ -141,6 +139,11 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
 		return nil, err
 	}
+	// We don't set this field in pkg/scheduler/apis/config/{version}/conversion.go
+	// because the field will be cleared later by API machinery during
+	// conversion. See KubeSchedulerConfiguration internal type definition for
+	// more details.
+	cfg.TypeMeta.APIVersion = configv1beta2.SchemeGroupVersion.String()
 	return &cfg, nil
 }
 
@@ -148,7 +151,6 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs := nfs.FlagSet("misc")
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, `The path to the configuration file. The following flags can overwrite fields in this file:
-  --algorithm-provider
   --policy-config-file
   --policy-configmap
   --policy-configmap-namespace`)
@@ -174,8 +176,8 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		c.ComponentConfig = o.ComponentConfig
 
-		// apply deprecated flags if no config file is loaded (this is the old behaviour).
-		o.Deprecated.ApplyTo(&c.ComponentConfig)
+		o.Deprecated.ApplyTo(c)
+
 		if err := o.CombinedInsecureServing.ApplyTo(c, &c.ComponentConfig); err != nil {
 			return err
 		}
@@ -191,18 +193,18 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = *cfg
 
 		// apply any deprecated Policy flags, if applicable
-		o.Deprecated.ApplyAlgorithmSourceTo(&c.ComponentConfig)
-
-		// if the user has set CC profiles and is trying to use a Policy config, error out
-		// these configs are no longer merged and they should not be used simultaneously
-		if !emptySchedulerProfileConfig(c.ComponentConfig.Profiles) && c.ComponentConfig.AlgorithmSource.Policy != nil {
-			return fmt.Errorf("cannot set a Plugin config and Policy config")
-		}
+		o.Deprecated.ApplyTo(c)
 
 		// use the loaded config file only, with the exception of --address and --port.
 		if err := o.CombinedInsecureServing.ApplyToFromLoadedConfig(c, &c.ComponentConfig); err != nil {
 			return err
 		}
+	}
+
+	// If the user is using the legacy policy config, clear the profiles, they will be set
+	// on scheduler instantiation based on the configurations in the policy file.
+	if c.LegacyPolicySource != nil {
+		c.ComponentConfig.Profiles = nil
 	}
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
@@ -219,15 +221,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	o.Metrics.Apply()
 	o.Logs.Apply()
 	return nil
-}
-
-// emptySchedulerProfileConfig returns true if the list of profiles passed to it contains only
-// the "default-scheduler" profile with no plugins or pluginconfigs registered
-// (this is the default empty profile initialized by defaults.go)
-func emptySchedulerProfileConfig(profiles []kubeschedulerconfig.KubeSchedulerProfile) bool {
-	return len(profiles) == 1 &&
-		len(profiles[0].PluginConfig) == 0 &&
-		profiles[0].Plugins == nil
 }
 
 // Validate validates all the required options.
@@ -279,7 +272,11 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
 	if c.ComponentConfig.LeaderElection.LeaderElect {
 		// Use the scheduler name in the first profile to record leader election.
-		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(c.ComponentConfig.Profiles[0].SchedulerName)
+		schedulerName := corev1.DefaultSchedulerName
+		if len(c.ComponentConfig.Profiles) != 0 {
+			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
+		}
+		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err

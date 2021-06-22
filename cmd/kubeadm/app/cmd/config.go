@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,12 +28,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -47,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	utilsexec "k8s.io/utils/exec"
@@ -79,7 +75,6 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 	cmd.AddCommand(newCmdConfigPrint(out))
 	cmd.AddCommand(newCmdConfigMigrate(out))
-	cmd.AddCommand(newCmdConfigView(out, &kubeConfigFile))
 	cmd.AddCommand(newCmdConfigImages(out))
 	return cmd
 }
@@ -274,43 +269,6 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
 	return cmd
-}
-
-// newCmdConfigView returns cobra.Command for "kubeadm config view" command
-func newCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	return &cobra.Command{
-		Use:        "view",
-		Short:      "View the kubeadm configuration stored inside the cluster",
-		Deprecated: "This command is deprecated and will be removed in a future release, please use 'kubectl get cm -o yaml -n kube-system kubeadm-config' to get the kubeadm config directly.",
-		Long: fmt.Sprintf(dedent.Dedent(`
-			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
-
-			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
-			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
-			if err != nil {
-				return err
-			}
-
-			return RunConfigView(out, client)
-		},
-		Args: cobra.NoArgs,
-	}
-}
-
-// RunConfigView gets the configuration persisted in the cluster
-func RunConfigView(out io.Writer, client clientset.Interface) error {
-
-	klog.V(1).Infoln("[config] getting the cluster configuration")
-	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), constants.KubeadmConfigConfigMap, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	// No need to append \n as that already exists in the ConfigMap
-	fmt.Fprintf(out, "%s", cfgConfigMap.Data[constants.ClusterConfigurationConfigMapKey])
-	return nil
 }
 
 // newCmdConfigImages returns the "kubeadm config images" command

@@ -1411,6 +1411,10 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if !storage.serviceNodePorts.Has(30030) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
+}
+
+func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
 
 	// dry run for non dualstack
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
@@ -1436,7 +1440,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 		},
 	}
 
-	_, err = dualstack_storage.Create(ctx, dualstack_svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := dualstack_storage.Create(ctx, dualstack_svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -3662,7 +3666,11 @@ func TestDefaultingValidation(t *testing.T) {
 	}
 
 	fnMakeDualStackStackIPv4IPv6Allocator := func(rest *REST) {
-		// default is v4,v6 rest storage
+		rest.defaultServiceIPFamily = api.IPv4Protocol
+		rest.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{
+			api.IPv6Protocol: rest.serviceIPAllocatorsByFamily[api.IPv6Protocol],
+			api.IPv4Protocol: rest.serviceIPAllocatorsByFamily[api.IPv4Protocol],
+		}
 	}
 
 	fnMakeDualStackStackIPv6IPv4Allocator := func(rest *REST) {
@@ -5091,11 +5099,15 @@ func TestDefaultingValidation(t *testing.T) {
 	// This func only runs when feature gate is on
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
+	storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer server.Terminate(t)
+
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}) // all tests start with dual stack (v4,v6), then modification func takes care of whatever needed
-			defer server.Terminate(t)
 
+			// reset to defaults
+			fnMakeDualStackStackIPv4IPv6Allocator(storage)
+			// optionally apply test-specific changes
 			if testCase.modifyRest != nil {
 				testCase.modifyRest(storage)
 			}

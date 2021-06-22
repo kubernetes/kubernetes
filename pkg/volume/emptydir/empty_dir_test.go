@@ -46,7 +46,7 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	return plug
 }

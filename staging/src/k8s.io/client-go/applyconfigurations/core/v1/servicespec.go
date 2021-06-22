@@ -39,7 +39,6 @@ type ServiceSpecApplyConfiguration struct {
 	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty"`
 	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty"`
 	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
-	TopologyKeys                  []string                                 `json:"topologyKeys,omitempty"`
 	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty"`
 	IPFamilyPolicy                *corev1.IPFamilyPolicyType               `json:"ipFamilyPolicy,omitempty"`
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
@@ -179,16 +178,6 @@ func (b *ServiceSpecApplyConfiguration) WithPublishNotReadyAddresses(value bool)
 // If called multiple times, the SessionAffinityConfig field is set to the value of the last call.
 func (b *ServiceSpecApplyConfiguration) WithSessionAffinityConfig(value *SessionAffinityConfigApplyConfiguration) *ServiceSpecApplyConfiguration {
 	b.SessionAffinityConfig = value
-	return b
-}
-
-// WithTopologyKeys adds the given value to the TopologyKeys field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the TopologyKeys field.
-func (b *ServiceSpecApplyConfiguration) WithTopologyKeys(values ...string) *ServiceSpecApplyConfiguration {
-	for i := range values {
-		b.TopologyKeys = append(b.TopologyKeys, values[i])
-	}
 	return b
 }
 

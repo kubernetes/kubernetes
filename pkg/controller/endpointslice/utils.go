@@ -223,7 +223,7 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	}
 
 	if !triggerTime.IsZero() {
-		endpointSlice.Annotations[corev1.EndpointsLastChangeTriggerTime] = triggerTime.Format(time.RFC3339Nano)
+		endpointSlice.Annotations[corev1.EndpointsLastChangeTriggerTime] = triggerTime.UTC().Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(endpointSlice.Annotations, corev1.EndpointsLastChangeTriggerTime)
 	}

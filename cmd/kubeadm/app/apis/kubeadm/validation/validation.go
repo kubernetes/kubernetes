@@ -493,6 +493,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 }
 
 // ValidateDNS validates the DNS object and collects all encountered errors
+// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	const kubeDNSType = "kube-dns"
@@ -559,17 +560,16 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 func isAllowedFlag(flagName string) bool {
-	knownFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
+	allowedFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
 		kubeadmcmdoptions.DryRun,
 		kubeadmcmdoptions.KubeconfigPath,
 		kubeadmcmdoptions.NodeName,
-		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
 		kubeadmcmdoptions.Patches,
-		"print-join-command", "rootfs", "v")
-	if knownFlags.Has(flagName) {
+		"print-join-command", "rootfs", "v", "log-file")
+	if allowedFlags.Has(flagName) {
 		return true
 	}
 	return strings.HasPrefix(flagName, "skip-")

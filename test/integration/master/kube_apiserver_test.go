@@ -434,9 +434,9 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 	return reflect.DeepEqual(listenAddresses, ips)
 }
 
-func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
+func testReconcilersMasterLease(t *testing.T, leaseCount int, apiServerCount int) {
 	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
-	var masterCountServers = make([]*kubeapiservertesting.TestServer, masterCount)
+	var apiServerCountServers = make([]*kubeapiservertesting.TestServer, apiServerCount)
 	etcd := framework.SharedEtcd()
 
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
@@ -447,25 +447,25 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	defer registry.CleanupStorage()
 
 	wg := sync.WaitGroup{}
-	// 1. start masterCount api servers
-	for i := 0; i < masterCount; i++ {
-		// start master count api server
+	// 1. start apiServerCount api servers
+	for i := 0; i < apiServerCount; i++ {
+		// start count api server
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 				"--endpoint-reconciler-type", "master-count",
 				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-				"--apiserver-count", fmt.Sprintf("%v", masterCount),
+				"--apiserver-count", fmt.Sprintf("%v", apiServerCount),
 			}, etcd)
-			masterCountServers[i] = server
+			apiServerCountServers[i] = server
 		}(i)
 	}
 	wg.Wait()
 
 	// 2. verify master count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
-		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
+		client, err := kubernetes.NewForConfig(apiServerCountServers[0].ClientConfig)
 		if err != nil {
 			t.Logf("error creating client: %v", err)
 			return false, nil
@@ -475,7 +475,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
 		}
-		return verifyEndpointsWithIPs(masterCountServers, getEndpointIPs(endpoints)), nil
+		return verifyEndpointsWithIPs(apiServerCountServers, getEndpointIPs(endpoints)), nil
 	}); err != nil {
 		t.Fatalf("master count endpoints failed to register: %v", err)
 	}
@@ -502,8 +502,8 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 
 	time.Sleep(3 * time.Second)
 
-	// 4. Shutdown the masterCount server
-	for _, server := range masterCountServers {
+	// 4. Shutdown the apiServerCount server
+	for _, server := range apiServerCountServers {
 		server.TearDownFn()
 	}
 

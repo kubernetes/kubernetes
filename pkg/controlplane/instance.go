@@ -75,7 +75,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -90,7 +89,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/controlplane/tunneler"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
@@ -146,10 +144,8 @@ type ExtraConfig struct {
 	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
-	// Used to start and monitor tunneling
-	Tunneler          tunneler.Tunneler
 	EnableLogsSupport bool
-	ProxyTransport    http.RoundTripper
+	ProxyTransport    *http.Transport
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -450,10 +446,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	if c.ExtraConfig.Tunneler != nil {
-		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
-	}
-
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
@@ -549,14 +541,6 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
-}
-
-func (m *Instance) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
-	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-	err := m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
-	if err != nil {
-		klog.Errorf("Failed adding ssh tunnel health check %v\n", err)
-	}
 }
 
 // RESTStorageProvider is a factory type for REST storage.

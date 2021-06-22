@@ -42,6 +42,13 @@ NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS=${KUBE_NODE_LABELS:-}
 WINDOWS_NODE_LABELS=${WINDOWS_NODE_LABELS:-}
 NODE_LOCAL_SSDS_EPHEMERAL=${NODE_LOCAL_SSDS_EPHEMERAL:-}
+# Turning GRPC based Konnectivity testing on id advance of
+# removing the SSHTunnel code.
+export KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE=true
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
 
 # KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
 # Firewalls and node templates are still created.
@@ -205,7 +212,7 @@ HEAPSTER_MACHINE_TYPE=${HEAPSTER_MACHINE_TYPE:-}
 NUM_ADDITIONAL_NODES=${NUM_ADDITIONAL_NODES:-}
 ADDITIONAL_MACHINE_TYPE=${ADDITIONAL_MACHINE_TYPE:-}
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.13-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.0-rc.0-0) if you need
 # non-default version.
 export ETCD_IMAGE=${TEST_ETCD_IMAGE:-}
 export ETCD_DOCKER_REPOSITORY=${TEST_ETCD_DOCKER_REPOSITORY:-}
@@ -565,14 +572,6 @@ CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-}
 # to resolve the partially qualified name.
 export SERVICEACCOUNT_ISSUER='https://kubernetes.default.svc.cluster.local'
 
-# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
-# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
-ENABLE_NODE_TERMINATION_HANDLER=${ENABLE_NODE_TERMINATION_HANDLER:-false}
-# Override default Node Termination Handler Image
-if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
-fi
-
 # Taint Windows nodes by default to prevent Linux workloads from being
 # scheduled onto them.
 WINDOWS_NODE_TAINTS=${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSchedule}
@@ -603,6 +602,11 @@ export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 
 # Enable Windows DSR (Direct Server Return)
 export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
+
+# Install Node Problem Detector (NPD) on Windows nodes.
+# NPD analyzes the host for problems that can disrupt workloads.
+export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
+export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.

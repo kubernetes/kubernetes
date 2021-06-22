@@ -791,9 +791,33 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		nodes = append(nodes, node)
 	}
 
-	// Sort the list of nodes by how many devices they contain.
+	// Sort the list of nodes by:
+	// 1) Nodes contained in the 'hint's affinity set
+	// 2) Nodes not contained in the 'hint's affinity set
+	// 3) The fake NUMANode of -1 (assuming it is included in the list)
+	// Within each of the groups above, sort the nodes by how many devices they contain
 	sort.Slice(nodes, func(i, j int) bool {
-		return perNodeDevices[i].Len() < perNodeDevices[j].Len()
+		// If one or the other of nodes[i] or nodes[j] is in the 'hint's affinity set
+		if hint.NUMANodeAffinity.IsSet(nodes[i]) && hint.NUMANodeAffinity.IsSet(nodes[j]) {
+			return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
+		}
+		if hint.NUMANodeAffinity.IsSet(nodes[i]) {
+			return true
+		}
+		if hint.NUMANodeAffinity.IsSet(nodes[j]) {
+			return false
+		}
+
+		// If one or the other of nodes[i] or nodes[j] is the fake NUMA node -1 (they can't both be)
+		if nodes[i] == nodeWithoutTopology {
+			return false
+		}
+		if nodes[j] == nodeWithoutTopology {
+			return true
+		}
+
+		// Otherwise both nodes[i] and nodes[j] are real NUMA nodes that are not in the 'hint's' affinity list.
+		return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
 	})
 
 	// Generate three sorted lists of devices. Devices in the first list come
@@ -1071,7 +1095,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	m.mutex.Lock()
 	resp := m.allDevices.Clone()
 	m.mutex.Unlock()
-	klog.V(4).InfoS("known devices", "numDevices", len(resp))
+	klog.V(4).InfoS("Known devices", "numDevices", len(resp))
 	return resp
 }
 

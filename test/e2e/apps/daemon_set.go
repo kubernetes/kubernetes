@@ -28,6 +28,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"k8s.io/client-go/tools/cache"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,12 +38,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
@@ -491,7 +497,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	// TODO: This test is expected to be promoted to conformance after the feature is promoted
-	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate [Feature:DaemonSetUpdateSurge]", func() {
+	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating surge daemon set %s", dsName)
@@ -802,6 +808,185 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectEqual(cur.Revision, int64(2))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
+
+	/*
+		Release: v1.22
+		Testname: DaemonSet, list and delete a collection of DaemonSets
+		Description: When a DaemonSet is created it MUST succeed. It
+		MUST succeed when listing DaemonSets via a label selector. It
+		MUST succeed when deleting the DaemonSet via deleteCollection.
+	*/
+	framework.ConformanceIt("should list and delete a collection of DaemonSets", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		dsClient := f.ClientSet.AppsV1().DaemonSets(ns)
+		cs := f.ClientSet
+		one := int64(1)
+
+		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
+		testDaemonset, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSetWithLabel(dsName, image, label), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
+		err = checkDaemonStatus(f, dsName)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("listing all DeamonSets")
+		dsList, err := cs.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list Daemon Sets")
+		framework.ExpectEqual(len(dsList.Items), 1, "filtered list wasn't found")
+
+		ginkgo.By("DeleteCollection of the DaemonSets")
+		err = dsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to delete DaemonSets")
+
+		ginkgo.By("Verify that ReplicaSets have been deleted")
+		dsList, err = c.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list DaemonSets")
+		framework.ExpectEqual(len(dsList.Items), 0, "filtered list should have no daemonset")
+	})
+
+	/*	Release: v1.22
+		Testname: DaemonSet, status sub-resource
+		Description: When a DaemonSet is created it MUST succeed.
+		Attempt to read, update and patch its status sub-resource; all
+		mutating sub-resource operations MUST be visible to subsequent reads.
+	*/
+	framework.ConformanceIt("should verify changes to a daemon set status", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		dsClient := f.ClientSet.AppsV1().DaemonSets(ns)
+		cs := f.ClientSet
+
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labelSelector
+				return dsClient.Watch(context.TODO(), options)
+			},
+		}
+
+		dsList, err := cs.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list Daemon Sets")
+
+		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
+		testDaemonset, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSetWithLabel(dsName, image, label), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
+		err = checkDaemonStatus(f, dsName)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting /status")
+		dsResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}
+		dsStatusUnstructured, err := f.DynamicClient.Resource(dsResource).Namespace(ns).Get(context.TODO(), dsName, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to fetch the status of daemon set %s in namespace %s", dsName, ns)
+		dsStatusBytes, err := json.Marshal(dsStatusUnstructured)
+		framework.ExpectNoError(err, "Failed to marshal unstructured response. %v", err)
+
+		var dsStatus appsv1.DaemonSet
+		err = json.Unmarshal(dsStatusBytes, &dsStatus)
+		framework.ExpectNoError(err, "Failed to unmarshal JSON bytes to a daemon set object type")
+		framework.Logf("Daemon Set %s has Conditions: %v", dsName, dsStatus.Status.Conditions)
+
+		ginkgo.By("updating the DaemonSet Status")
+		var statusToUpdate, updatedStatus *appsv1.DaemonSet
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			statusToUpdate, err = dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to retrieve daemon set %s", dsName)
+
+			statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, appsv1.DaemonSetCondition{
+				Type:    "StatusUpdate",
+				Status:  "True",
+				Reason:  "E2E",
+				Message: "Set from e2e test",
+			})
+
+			updatedStatus, err = dsClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "Failed to update status. %v", err)
+		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+		ginkgo.By("watching for the daemon set status to be updated")
+		ctx, cancel := context.WithTimeout(context.Background(), dsRetryTimeout)
+		defer cancel()
+		_, err = watchtools.Until(ctx, dsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if ds, ok := event.Object.(*appsv1.DaemonSet); ok {
+				found := ds.ObjectMeta.Name == testDaemonset.ObjectMeta.Name &&
+					ds.ObjectMeta.Namespace == testDaemonset.ObjectMeta.Namespace &&
+					ds.Labels[daemonsetNameLabel] == dsName
+				if !found {
+					framework.Logf("Observed daemon set %v in namespace %v with annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.Annotations, ds.Status.Conditions)
+					return false, nil
+				}
+				for _, cond := range ds.Status.Conditions {
+					if cond.Type == "StatusUpdate" &&
+						cond.Reason == "E2E" &&
+						cond.Message == "Set from e2e test" {
+						framework.Logf("Found daemon set %v in namespace %v with labels: %v annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Labels, ds.Annotations, ds.Status.Conditions)
+						return found, nil
+					}
+					framework.Logf("Observed daemon set %v in namespace %v with annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.Annotations, ds.Status.Conditions)
+				}
+			}
+			object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+			framework.Logf("Observed %v event: %+v", object, event.Type)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to locate daemon set %v in namespace %v", testDaemonset.ObjectMeta.Name, ns)
+		framework.Logf("Daemon set %s has an updated status", dsName)
+
+		ginkgo.By("patching the DaemonSet Status")
+		daemonSetStatusPatch := appsv1.DaemonSet{
+			Status: appsv1.DaemonSetStatus{
+				Conditions: []appsv1.DaemonSetCondition{
+					{
+						Type:   "StatusPatched",
+						Status: "True",
+					},
+				},
+			},
+		}
+
+		payload, err := json.Marshal(daemonSetStatusPatch)
+		framework.ExpectNoError(err, "Failed to marshal JSON. %v", err)
+		_, err = dsClient.Patch(context.TODO(), dsName, types.MergePatchType, payload, metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to patch daemon set status", err)
+
+		ginkgo.By("watching for the daemon set status to be patched")
+		ctx, cancel = context.WithTimeout(context.Background(), dsRetryTimeout)
+		defer cancel()
+		_, err = watchtools.Until(ctx, dsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if ds, ok := event.Object.(*appsv1.DaemonSet); ok {
+				found := ds.ObjectMeta.Name == testDaemonset.ObjectMeta.Name &&
+					ds.ObjectMeta.Namespace == testDaemonset.ObjectMeta.Namespace &&
+					ds.Labels[daemonsetNameLabel] == dsName
+				if !found {
+					framework.Logf("Observed daemon set %v in namespace %v with annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.Annotations, ds.Status.Conditions)
+					return false, nil
+				}
+				for _, cond := range ds.Status.Conditions {
+					if cond.Type == "StatusPatched" {
+						framework.Logf("Found daemon set %v in namespace %v with labels: %v annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Labels, ds.Annotations, ds.Status.Conditions)
+						return found, nil
+					}
+					framework.Logf("Observed daemon set %v in namespace %v with annotations: %v & Conditions: %v", ds.ObjectMeta.Name, ds.ObjectMeta.Namespace, ds.Annotations, ds.Status.Conditions)
+				}
+			}
+			object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+			framework.Logf("Observed %v event: %v", object, event.Type)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to locate daemon set %v in namespace %v", testDaemonset.ObjectMeta.Name, ns)
+		framework.Logf("Daemon set %s has a patched status", dsName)
+	})
 })
 
 // randomPod selects a random pod within pods that causes fn to return true, or nil
@@ -826,6 +1011,34 @@ func newDaemonSet(dsName, image string, label map[string]string) *appsv1.DaemonS
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dsName,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: label,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: label,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "app",
+							Image: image,
+							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newDaemonSetWithLabel(dsName, image string, label map[string]string) *appsv1.DaemonSet {
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   dsName,
+			Labels: label,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
