@@ -246,9 +246,11 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
 		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			klog.InfoS("will return a node via kubeClient", "node", n)
 			return n, nil
 		}
 	}
+	klog.InfoS("will return a node via initialNode")
 	return kl.initialNode(context.TODO())
 }
 

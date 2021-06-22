@@ -60,6 +60,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	klog.InfoS("admitting pod", "pod", attrs.Pod)
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
 		klog.ErrorS(err, "Cannot get Node info")
@@ -95,6 +96,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
 	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	klog.InfoS("reasons after calling GeneralPredicates", "reasons", reasons)
 	fit := len(reasons) == 0 && err == nil
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)

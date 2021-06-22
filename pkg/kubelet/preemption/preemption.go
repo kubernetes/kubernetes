@@ -60,6 +60,7 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
 func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []lifecycle.PredicateFailureReason) ([]lifecycle.PredicateFailureReason, error) {
+	klog.InfoS("HandleAdmissionFailure", "admitPod", admitPod, "failureReasons", failureReasons)
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return failureReasons, nil
 	}
@@ -90,6 +91,7 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, f
 // based on requests.  For example, if the only insufficient resource is 200Mb of memory, this function could
 // evict a pod with request=250Mb.
 func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, insufficientResources admissionRequirementList) error {
+	klog.InfoS("evictPodsToFreeRequests", "admitPod", admitPod, "insufficientResources", insufficientResources)
 	podsToPreempt, err := getPodsToPreempt(admitPod, c.getPodsFunc(), insufficientResources)
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)

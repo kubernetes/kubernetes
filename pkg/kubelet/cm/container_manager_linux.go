@@ -609,6 +609,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
+	klog.InfoS("starting containerManager")
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
@@ -645,6 +646,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
 			cm.capacity[rName] = rCap
+			klog.InfoS("successfully updated capacity property", "rName", rName.String(), "rCap", rCap.String())
 		}
 	}
 

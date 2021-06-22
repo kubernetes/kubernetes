@@ -1362,10 +1362,22 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
+	rootfs, err := kl.cadvisor.RootFsInfo()
+	if err != nil {
+		klog.InfoS("confirmed that RootFsInfo is not yet available before cadvisor.Start()", "err", err)
+	} else {
+		klog.InfoS("RootFsInfo is available before cadvisor.Start()", "rootfs", rootfs)
+	}
 	if err := kl.cadvisor.Start(); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.ErrorS(err, "Failed to start cAdvisor")
 		os.Exit(1)
+	}
+	rootfs, err = kl.cadvisor.RootFsInfo()
+	if err != nil {
+		klog.InfoS("confirmed that RootFsInfo is not yet available just after cadvisor.Start()", "err", err)
+	} else {
+		klog.InfoS("RootFsInfo is available just after cadvisor.Start()", "rootfs", rootfs)
 	}
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
