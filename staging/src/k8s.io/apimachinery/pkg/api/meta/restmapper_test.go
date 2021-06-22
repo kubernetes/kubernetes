@@ -450,6 +450,8 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "ImageRepository", Plural: "imagerepositories", Singular: "imagerepository"},
 		// Add "es" when ending with "s"
 		{Kind: "miss", Plural: "misses", Singular: "miss"},
+		// Add "es" when ending with "h"
+		{Kind: "cloth", Plural: "clothes", Singular: "cloth"},
 		// Add "s" otherwise
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
 	}
