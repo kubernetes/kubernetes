@@ -221,6 +221,11 @@ type NodeRegistrationOptions struct {
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
 	IgnorePreflightErrors []string
+
+	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration.
