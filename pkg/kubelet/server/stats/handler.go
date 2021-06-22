@@ -23,7 +23,6 @@ import (
 	restful "github.com/emicklei/go-restful"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
@@ -143,7 +142,7 @@ func (h *handler) handleSummary(request *restful.Request, response *restful.Resp
 	onlyCPUAndMemory := false
 	err := request.Request.ParseForm()
 	if err != nil {
-		handleError(response, "/stats/summary", errors.Wrapf(err, "parse form failed"))
+		handleError(response, "/stats/summary", fmt.Errorf("parse form failed: %w", err))
 		return
 	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&

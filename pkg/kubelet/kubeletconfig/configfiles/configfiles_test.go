@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -165,7 +163,7 @@ foo: bar`),
 			}
 			kc, err := loader.Load()
 
-			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
+			if c.strictErr && !runtime.IsStrictDecodingError(err) {
 				t.Fatalf("got error: %v, want strict decoding error", err)
 			}
 			if utiltest.SkipRest(t, c.desc, err, c.err) {
