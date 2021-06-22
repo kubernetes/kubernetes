@@ -53,7 +53,6 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodAffinityNamespaceSelector: feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
 		EnablePodDisruptionBudget:          feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
 		EnablePodOverhead:                  feature.DefaultFeatureGate.Enabled(features.PodOverhead),
-		EnableBalanceAttachedNodeVolumes:   feature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes),
 	}
 
 	return runtime.Registry{

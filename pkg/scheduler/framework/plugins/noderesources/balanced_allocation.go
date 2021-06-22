@@ -71,18 +71,16 @@ func NewBalancedAllocation(_ runtime.Object, h framework.Handle, fts feature.Fea
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                             BalancedAllocationName,
-			scorer:                           balancedResourceScorer,
-			resourceToWeightMap:              defaultRequestedRatioResources,
-			enablePodOverhead:                fts.EnablePodOverhead,
-			enableBalanceAttachedNodeVolumes: fts.EnableBalanceAttachedNodeVolumes,
+			Name:                BalancedAllocationName,
+			scorer:              balancedResourceScorer,
+			resourceToWeightMap: defaultRequestedRatioResources,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
 // todo: use resource weights in the scorer function
-func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	// This to find a node which has most balanced CPU, memory and volume usage.
+func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
 	cpuFraction := fractionOfCapacity(requested[v1.ResourceCPU], allocable[v1.ResourceCPU])
 	memoryFraction := fractionOfCapacity(requested[v1.ResourceMemory], allocable[v1.ResourceMemory])
 	// fractions might be greater than 1 because pods with no requests get minimum
@@ -92,22 +90,6 @@ func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolu
 	}
 	if memoryFraction > 1 {
 		memoryFraction = 1
-	}
-
-	// includeVolumes is only true when BalanceAttachedNodeVolumes feature gate is enabled (see resource_allocation.go#score())
-	if includeVolumes && allocatableVolumes > 0 {
-		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
-		if volumeFraction >= 1 {
-			// if requested >= capacity, the corresponding host should never be preferred.
-			return 0
-		}
-		// Compute variance for all the three fractions.
-		mean := (cpuFraction + memoryFraction + volumeFraction) / float64(3)
-		variance := float64((((cpuFraction - mean) * (cpuFraction - mean)) + ((memoryFraction - mean) * (memoryFraction - mean)) + ((volumeFraction - mean) * (volumeFraction - mean))) / float64(3))
-		// Since the variance is between positive fractions, it will be positive fraction. 1-variance lets the
-		// score to be higher for node which has least variance and multiplying it with `MaxNodeScore` provides the scaling
-		// factor needed.
-		return int64((1 - variance) * float64(framework.MaxNodeScore))
 	}
 
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1

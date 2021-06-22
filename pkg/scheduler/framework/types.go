@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -388,19 +387,9 @@ type NodeInfo struct {
 	// state information.
 	ImageStates map[string]*ImageStateSummary
 
-	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
-	// scheduling cycle.
-	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
-	TransientInfo *TransientSchedulerInfo
-
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
-}
-
-//initializeNodeTransientInfo initializes transient information pertaining to node.
-func initializeNodeTransientInfo() nodeTransientInfo {
-	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
 }
 
 // nextGeneration: Let's make sure history never forgets the name...
@@ -409,43 +398,6 @@ func initializeNodeTransientInfo() nodeTransientInfo {
 // added back with the same name. See issue#63262.
 func nextGeneration() int64 {
 	return atomic.AddInt64(&generation, 1)
-}
-
-// nodeTransientInfo contains transient node information while scheduling.
-type nodeTransientInfo struct {
-	// AllocatableVolumesCount contains number of volumes that could be attached to node.
-	AllocatableVolumesCount int
-	// Requested number of volumes on a particular node.
-	RequestedVolumes int
-}
-
-// TransientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
-// It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
-// priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
-// on node etc.
-// IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
-// only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
-type TransientSchedulerInfo struct {
-	TransientLock sync.Mutex
-	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
-	TransNodeInfo nodeTransientInfo
-}
-
-// NewTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
-func NewTransientSchedulerInfo() *TransientSchedulerInfo {
-	tsi := &TransientSchedulerInfo{
-		TransNodeInfo: initializeNodeTransientInfo(),
-	}
-	return tsi
-}
-
-// ResetTransientSchedulerInfo resets the TransientSchedulerInfo.
-func (transientSchedInfo *TransientSchedulerInfo) ResetTransientSchedulerInfo() {
-	transientSchedInfo.TransientLock.Lock()
-	defer transientSchedInfo.TransientLock.Unlock()
-	// Reset TransientNodeInfo.
-	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
-	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
 }
 
 // Resource is a collection of compute resource.
@@ -557,7 +509,6 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		Requested:        &Resource{},
 		NonZeroRequested: &Resource{},
 		Allocatable:      &Resource{},
-		TransientInfo:    NewTransientSchedulerInfo(),
 		Generation:       nextGeneration(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
@@ -583,7 +534,6 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Requested:        n.Requested.Clone(),
 		NonZeroRequested: n.NonZeroRequested.Clone(),
 		Allocatable:      n.Allocatable.Clone(),
-		TransientInfo:    n.TransientInfo,
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
 		Generation:       n.Generation,
@@ -803,7 +753,6 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
-	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
 }
 

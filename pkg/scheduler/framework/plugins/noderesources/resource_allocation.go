@@ -32,11 +32,10 @@ var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                string
-	scorer              func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	scorer              func(requested, allocable resourceToValueMap) int64
 	resourceToWeightMap resourceToWeightMap
 
-	enablePodOverhead                bool
-	enableBalanceAttachedNodeVolumes bool
+	enablePodOverhead bool
 }
 
 // resourceToValueMap contains resource name and score.
@@ -60,29 +59,14 @@ func (r *resourceAllocationScorer) score(
 	}
 	var score int64
 
-	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
-	if len(pod.Spec.Volumes) > 0 && r.enableBalanceAttachedNodeVolumes && nodeInfo.TransientInfo != nil {
-		score = r.scorer(requested, allocatable, true, nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount)
-	} else {
-		score = r.scorer(requested, allocatable, false, 0, 0)
-	}
-	if klog.V(10).Enabled() {
-		if len(pod.Spec.Volumes) > 0 && r.enableBalanceAttachedNodeVolumes && nodeInfo.TransientInfo != nil {
-			klog.Infof(
-				"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v , allocatable volumes %d, requested volumes %d, score %d",
-				pod.Name, node.Name, r.Name,
-				allocatable, requested, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount,
-				nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes,
-				score,
-			)
-		} else {
-			klog.Infof(
-				"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
-				pod.Name, node.Name, r.Name,
-				allocatable, requested, score,
-			)
+	score = r.scorer(requested, allocatable)
 
-		}
+	if klog.V(10).Enabled() {
+		klog.Infof(
+			"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
+			pod.Name, node.Name, r.Name,
+			allocatable, requested, score,
+		)
 	}
 
 	return score, nil
