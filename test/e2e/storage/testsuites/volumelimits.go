@@ -234,6 +234,40 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		})
 		framework.ExpectNoError(err)
 	})
+
+	ginkgo.It("should verify that all csinodes have volume limits", func() {
+		driverInfo := driver.GetDriverInfo()
+		if !driverInfo.Capabilities[storageframework.CapVolumeLimits] {
+			ginkgo.Skip(fmt.Sprintf("driver %s does not support volume limits", driverInfo.Name))
+		}
+
+		l.ns = f.Namespace
+		l.cs = f.ClientSet
+
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		defer l.testCleanup()
+
+		nodeNames := []string{}
+		if l.config.ClientNodeSelection.Name != "" {
+			// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
+			// so we check that node instead of checking all of them
+			nodeNames = append(nodeNames, l.config.ClientNodeSelection.Name)
+		} else {
+			nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodeList.Items {
+				nodeNames = append(nodeNames, node.Name)
+			}
+		}
+
+		for _, nodeName := range nodeNames {
+			ginkgo.By("Checking csinode limits")
+			_, err := getNodeLimits(l.cs, l.config, nodeName, driverInfo)
+			if err != nil {
+				framework.Failf("Expected volume limits to be set, error: %v", err)
+			}
+		}
+	})
 }
 
 func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulablePodName string, pvcs []*v1.PersistentVolumeClaim, pvNames sets.String, timeout time.Duration) error {
