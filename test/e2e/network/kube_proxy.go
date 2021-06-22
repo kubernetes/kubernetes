@@ -72,6 +72,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
@@ -80,6 +81,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],

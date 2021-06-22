@@ -113,6 +113,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
@@ -120,6 +121,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,
