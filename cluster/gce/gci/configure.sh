@@ -26,8 +26,8 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v0.9.1'
 DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
-DEFAULT_NPD_VERSION='v0.8.7'
-DEFAULT_NPD_HASH='853576423077bf72e7bd8e96cd782cf272f7391379f8121650c1448531c0d3a0991dfbd0784a1157423976026806ceb14ca8fb35bac1249127dbf00af45b7eea'
+DEFAULT_NPD_VERSION='v0.8.8'
+DEFAULT_NPD_HASH='ba8315a29368bfc33bdc602eb02d325b0b80e295c8739da35616de5b562c372bd297a2553f3ccd4daaecd67698b659b2c7068a2d2a0b9418ad29233fb75ff3f2'
 DEFAULT_CRICTL_VERSION='v1.21.0'
 DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3bc3ea8642613df8542bf716fad903ed4d7528021ecb28b20c6330448cd2bd2b76bd776'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
@@ -245,7 +245,7 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_hash="${DEFAULT_NPD_HASH}"
   fi
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
     echo "${npd_tar} is preloaded."
