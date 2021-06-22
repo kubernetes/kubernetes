@@ -187,14 +187,6 @@ const (
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath featuregate.Feature = "VolumeSubpath"
 
-	// owner: @ravig
-	// alpha: v1.11
-	//
-	// Include volume count on node to be considered for balanced resource allocation while scheduling.
-	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
-	// while making decisions.
-	BalanceAttachedNodeVolumes featuregate.Feature = "BalanceAttachedNodeVolumes"
-
 	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
@@ -774,7 +766,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA},
 	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.Beta},
-	BalanceAttachedNodeVolumes:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.Beta},

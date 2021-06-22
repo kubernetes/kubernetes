@@ -266,9 +266,8 @@ func TestNewNodeInfo(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo: NewTransientSchedulerInfo(),
-		Allocatable:   &Resource{},
-		Generation:    2,
+		Allocatable: &Resource{},
+		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
@@ -359,7 +358,6 @@ func TestNodeInfoClone(t *testing.T) {
 			nodeInfo: &NodeInfo{
 				Requested:        &Resource{},
 				NonZeroRequested: &Resource{},
-				TransientInfo:    NewTransientSchedulerInfo(),
 				Allocatable:      &Resource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
@@ -433,7 +431,6 @@ func TestNodeInfoClone(t *testing.T) {
 			expected: &NodeInfo{
 				Requested:        &Resource{},
 				NonZeroRequested: &Resource{},
-				TransientInfo:    NewTransientSchedulerInfo(),
 				Allocatable:      &Resource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
@@ -644,9 +641,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo: NewTransientSchedulerInfo(),
-		Allocatable:   &Resource{},
-		Generation:    2,
+		Allocatable: &Resource{},
+		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
@@ -824,9 +820,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo: NewTransientSchedulerInfo(),
-				Allocatable:   &Resource{},
-				Generation:    2,
+				Allocatable: &Resource{},
+				Generation:  2,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
@@ -957,9 +952,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo: NewTransientSchedulerInfo(),
-				Allocatable:   &Resource{},
-				Generation:    3,
+				Allocatable: &Resource{},
+				Generation:  3,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 8080}: {},

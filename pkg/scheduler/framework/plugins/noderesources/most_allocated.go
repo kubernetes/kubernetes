@@ -90,8 +90,8 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Fea
 	}, nil
 }
 
-func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
+	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
 		for resource, weight := range resToWeightMap {
 			resourceScore := mostRequestedScore(requested[resource], allocable[resource])
