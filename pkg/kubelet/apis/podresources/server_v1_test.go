@@ -31,6 +31,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 )
 
 func TestListPodResourcesV1(t *testing.T) {
@@ -50,11 +51,25 @@ func TestListPodResourcesV1(t *testing.T) {
 
 	cpus := []int64{12, 23, 30}
 
+	memory := []*podresourcesapi.ContainerMemory{
+		{
+			MemoryType: "memory",
+			Size_:      1073741824,
+			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
+		},
+		{
+			MemoryType: "hugepages-1Gi",
+			Size_:      1073741824,
+			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
+		},
+	}
+
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
 		devices          []*podresourcesapi.ContainerDevices
 		cpus             []int64
+		memory           []*podresourcesapi.ContainerMemory
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
@@ -62,6 +77,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			pods:             []*v1.Pod{},
 			devices:          []*podresourcesapi.ContainerDevices{},
 			cpus:             []int64{},
+			memory:           []*podresourcesapi.ContainerMemory{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
 		{
@@ -84,6 +100,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			},
 			devices: []*podresourcesapi.ContainerDevices{},
 			cpus:    []int64{},
+			memory:  []*podresourcesapi.ContainerMemory{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -119,6 +136,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			},
 			devices: devs,
 			cpus:    cpus,
+			memory:  memory,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -129,6 +147,7 @@ func TestListPodResourcesV1(t *testing.T) {
 								Name:    containerName,
 								Devices: devs,
 								CpuIds:  cpus,
+								Memory:  memory,
 							},
 						},
 					},
@@ -141,10 +160,12 @@ func TestListPodResourcesV1(t *testing.T) {
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
 			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus)
+			m.On("GetMemory", string(podUID), containerName).Return(tc.memory)
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableCPUs").Return(cpuset.CPUSet{})
 			m.On("GetAllocatableDevices").Return(devicemanager.NewResourceDeviceInstances())
-			server := NewV1PodResourcesServer(m, m, m)
+			m.On("GetAllocatableMemory").Return([]state.Block{})
+			server := NewV1PodResourcesServer(m, m, m, m)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
@@ -215,16 +236,65 @@ func TestAllocatableResources(t *testing.T) {
 
 	allCPUs := []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
+	allMemory := []*podresourcesapi.ContainerMemory{
+		{
+			MemoryType: "memory",
+			Size_:      5368709120,
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 0,
+					},
+				},
+			},
+		},
+		{
+			MemoryType: "hugepages-2Mi",
+			Size_:      1073741824,
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 0,
+					},
+				},
+			},
+		},
+		{
+			MemoryType: "memory",
+			Size_:      5368709120,
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 1,
+					},
+				},
+			},
+		},
+		{
+			MemoryType: "hugepages-2Mi",
+			Size_:      1073741824,
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 1,
+					},
+				},
+			},
+		},
+	}
+
 	for _, tc := range []struct {
 		desc                                 string
 		allCPUs                              []int64
 		allDevices                           []*podresourcesapi.ContainerDevices
+		allMemory                            []*podresourcesapi.ContainerMemory
 		expectedAllocatableResourcesResponse *podresourcesapi.AllocatableResourcesResponse
 	}{
 		{
 			desc:                                 "no devices, no CPUs",
 			allCPUs:                              []int64{},
 			allDevices:                           []*podresourcesapi.ContainerDevices{},
+			allMemory:                            []*podresourcesapi.ContainerMemory{},
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{},
 		},
 		{
@@ -233,6 +303,14 @@ func TestAllocatableResources(t *testing.T) {
 			allDevices: []*podresourcesapi.ContainerDevices{},
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
 				CpuIds: allCPUs,
+			},
+		},
+		{
+			desc:       "no devices, no CPUs, all memory",
+			allCPUs:    []int64{},
+			allDevices: []*podresourcesapi.ContainerDevices{},
+			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
+				Memory: allMemory,
 			},
 		},
 		{
@@ -361,10 +439,12 @@ func TestAllocatableResources(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetDevices", "", "").Return([]*podresourcesapi.ContainerDevices{})
 			m.On("GetCPUs", "", "").Return([]int64{})
+			m.On("GetMemory", "", "").Return([]*podresourcesapi.ContainerMemory{})
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableDevices").Return(tc.allDevices)
 			m.On("GetAllocatableCPUs").Return(tc.allCPUs)
-			server := NewV1PodResourcesServer(m, m, m)
+			m.On("GetAllocatableMemory").Return(tc.allMemory)
+			server := NewV1PodResourcesServer(m, m, m, m)
 
 			resp, err := server.GetAllocatableResources(context.TODO(), &podresourcesapi.AllocatableResourcesRequest{})
 			if err != nil {
