@@ -47,7 +47,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -954,7 +953,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolumeBinder, stop <-chan struct{}, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestSchedulerWithVolumeBinding(volumeBinder volumebinding.SchedulerVolumeBinder, stop <-chan struct{}, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
@@ -1009,11 +1008,11 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		expectAssumeCalled bool
 		expectBindCalled   bool
 		eventReason        string
-		volumeBinderConfig *scheduling.FakeVolumeBinderConfig
+		volumeBinderConfig *volumebinding.FakeVolumeBinderConfig
 	}{
 		{
 			name: "all bound",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
 				AllBound: true,
 			},
 			expectAssumeCalled: true,
@@ -1022,32 +1021,32 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "bound/invalid pv affinity",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
 				AllBound:    true,
-				FindReasons: scheduling.ConflictReasons{scheduling.ErrReasonNodeConflict},
+				FindReasons: volumebinding.ConflictReasons{volumebinding.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) had volume node affinity conflict"),
 		},
 		{
 			name: "unbound/no matches",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
-				FindReasons: scheduling.ConflictReasons{scheduling.ErrReasonBindConflict},
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
+				FindReasons: volumebinding.ConflictReasons{volumebinding.ErrReasonBindConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind"),
 		},
 		{
 			name: "bound and unbound unsatisfied",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
-				FindReasons: scheduling.ConflictReasons{scheduling.ErrReasonBindConflict, scheduling.ErrReasonNodeConflict},
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
+				FindReasons: volumebinding.ConflictReasons{volumebinding.ErrReasonBindConflict, volumebinding.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
 			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind, 1 node(s) had volume node affinity conflict"),
 		},
 		{
 			name:               "unbound/found matches/bind succeeds",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{},
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
 			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
@@ -1055,7 +1054,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "predicate error",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
 				FindErr: findErr,
 			},
 			eventReason: "FailedScheduling",
@@ -1063,7 +1062,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "assume error",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
 				AssumeErr: assumeErr,
 			},
 			expectAssumeCalled: true,
@@ -1072,7 +1071,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "bind error",
-			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{
 				BindErr: bindErr,
 			},
 			expectAssumeCalled: true,
@@ -1085,7 +1084,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
 			stop := make(chan struct{})
-			fakeVolumeBinder := scheduling.NewFakeVolumeBinder(item.volumeBinderConfig)
+			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
 			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(fakeVolumeBinder, stop, eventBroadcaster)
 			eventChan := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {

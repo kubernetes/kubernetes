@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package volumebinding
 
 import (
 	"context"
@@ -105,11 +105,11 @@ var (
 	topoMismatchClass        = "topoMismatchClass"
 
 	// nodes objects
-	node1         = makeNode("node1", map[string]string{nodeLabelKey: "node1"})
-	node2         = makeNode("node2", map[string]string{nodeLabelKey: "node2"})
-	node1NoLabels = makeNode("node1", nil)
-	node1Zone1    = makeNode("node1", map[string]string{"topology.gke.io/zone": "us-east-1"})
-	node1Zone2    = makeNode("node1", map[string]string{"topology.gke.io/zone": "us-east-2"})
+	node1         = makeNode("node1").withLabel(nodeLabelKey, "node1").Node
+	node2         = makeNode("node2").withLabel(nodeLabelKey, "node2").Node
+	node1NoLabels = makeNode("node1").Node
+	node1Zone1    = makeNode("node1").withLabel("topology.gke.io/zone", "us-east-1").Node
+	node1Zone2    = makeNode("node1").withLabel("topology.gke.io/zone", "us-east-2").Node
 
 	// csiNode objects
 	csiNode1Migrated    = makeCSINode("node1", "kubernetes.io/gce-pd")
@@ -589,7 +589,11 @@ const (
 )
 
 func makeGenericEphemeralPVC(volumeName string, owned bool) *v1.PersistentVolumeClaim {
-	pod := makePodWithGenericEphemeral()
+	pod := makePod("test-pod").
+		withNamespace("testns").
+		withNodeName("node1").
+		withGenericEphemeralVolume("").Pod
+
 	pvc := makeTestPVC(pod.Name+"-"+volumeName, "1G", "", pvcBound, "pv-bound", "1", &immediateClass)
 	if owned {
 		controller := true
@@ -712,15 +716,6 @@ func pvRemoveClaimUID(pv *v1.PersistentVolume) *v1.PersistentVolume {
 	return newPV
 }
 
-func makeNode(name string, labels map[string]string) *v1.Node {
-	return &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
-		},
-	}
-}
-
 func makeCSINode(name, migratedPlugin string) *storagev1.CSINode {
 	return &storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
@@ -763,63 +758,6 @@ func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr, max
 		c.MaximumVolumeSize = &maximumVolumeSizeQuantity
 	}
 	return c
-}
-
-func makePod(pvcs []*v1.PersistentVolumeClaim) *v1.Pod {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
-			Namespace: "testns",
-		},
-	}
-
-	volumes := []v1.Volume{}
-	for i, pvc := range pvcs {
-		pvcVol := v1.Volume{
-			Name: fmt.Sprintf("vol%v", i),
-			VolumeSource: v1.VolumeSource{
-				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
-				},
-			},
-		}
-		volumes = append(volumes, pvcVol)
-	}
-	pod.Spec.Volumes = volumes
-	pod.Spec.NodeName = "node1"
-	return pod
-}
-
-func makePodWithoutPVC() *v1.Pod {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
-			Namespace: "testns",
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	return pod
-}
-
-func makePodWithGenericEphemeral(volumeNames ...string) *v1.Pod {
-	pod := makePod(nil)
-	for _, volumeName := range volumeNames {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				Ephemeral: &v1.EphemeralVolumeSource{},
-			},
-		})
-	}
-	return pod
 }
 
 func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *BindingInfo {
@@ -907,10 +845,15 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 	scenarios := map[string]scenarioType{
 		"no-volumes": {
-			pod: makePod(nil),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").Pod,
 		},
 		"no-pvcs": {
-			pod: makePodWithoutPVC(),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withEmptyDirVolume().Pod,
 		},
 		"pvc-not-found": {
 			cachePVCs:  []*v1.PersistentVolumeClaim{},
@@ -995,25 +938,37 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			shouldFail: true,
 		},
 		"generic-ephemeral,no-pvc": {
-			pod:        makePodWithGenericEphemeral("no-such-pvc"),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withGenericEphemeralVolume("no-such-pvc").Pod,
 			ephemeral:  true,
 			shouldFail: true,
 		},
 		"generic-ephemeral,with-pvc": {
-			pod:       makePodWithGenericEphemeral("test-volume"),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withGenericEphemeralVolume("test-volume").Pod,
 			cachePVCs: []*v1.PersistentVolumeClaim{correctGenericPVC},
 			pvs:       []*v1.PersistentVolume{pvBoundGeneric},
 			ephemeral: true,
 		},
 		"generic-ephemeral,wrong-pvc": {
-			pod:        makePodWithGenericEphemeral("test-volume"),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withGenericEphemeralVolume("test-volume").Pod,
 			cachePVCs:  []*v1.PersistentVolumeClaim{conflictingGenericPVC},
 			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
 			ephemeral:  true,
 			shouldFail: true,
 		},
 		"generic-ephemeral,disabled": {
-			pod:        makePodWithGenericEphemeral("test-volume"),
+			pod: makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withGenericEphemeralVolume("test-volume").Pod,
 			cachePVCs:  []*v1.PersistentVolumeClaim{correctGenericPVC},
 			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
 			ephemeral:  false,
@@ -1051,7 +1006,10 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withPVCSVolume(scenario.podPVCs).Pod
 		}
 
 		// Execute
@@ -1179,7 +1137,10 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withPVCSVolume(scenario.podPVCs).Pod
 		}
 
 		// Execute
@@ -1299,7 +1260,10 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
-			scenario.pod = makePod(scenario.podPVCs)
+			scenario.pod = makePod("test-pod").
+				withNamespace("testns").
+				withNodeName("node1").
+				withPVCSVolume(scenario.podPVCs).Pod
 		}
 
 		// Execute
@@ -1392,7 +1356,10 @@ func TestAssumePodVolumes(t *testing.T) {
 		// Setup
 		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
-		pod := makePod(scenario.podPVCs)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").
+			withPVCSVolume(scenario.podPVCs).Pod
 		podVolumes := &PodVolumes{
 			StaticBindings:    scenario.bindings,
 			DynamicProvisions: scenario.provisionedPVCs,
@@ -1445,7 +1412,10 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 	// Setup
 	testEnv := newTestBinder(t, ctx.Done())
 	testEnv.initClaims(podPVCs, podPVCs)
-	pod := makePod(podPVCs)
+	pod := makePod("test-pod").
+		withNamespace("testns").
+		withNodeName("node1").
+		withPVCSVolume(podPVCs).Pod
 	podVolumes := &PodVolumes{
 		StaticBindings:    bindings,
 		DynamicProvisions: provisionedPVCs,
@@ -1562,7 +1532,9 @@ func TestBindAPIUpdate(t *testing.T) {
 
 		// Setup
 		testEnv := newTestBinder(t, ctx.Done())
-		pod := makePod(nil)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").Pod
 		if scenario.apiPVs == nil {
 			scenario.apiPVs = scenario.cachedPVs
 		}
@@ -1757,7 +1729,9 @@ func TestCheckBindings(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		pod := makePod(nil)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").Pod
 		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes([]*v1.Node{node1})
@@ -1886,7 +1860,9 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, scenario.migrationEnabled)()
 
 		// Setup
-		pod := makePod(nil)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").Pod
 		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes(scenario.initNodes)
@@ -2070,7 +2046,9 @@ func TestBindPodVolumes(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		pod := makePod(nil)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").Pod
 		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		if scenario.nodes == nil {
@@ -2150,7 +2128,10 @@ func TestFindAssumeVolumes(t *testing.T) {
 	testEnv := newTestBinder(t, ctx.Done())
 	testEnv.initVolumes(pvs, pvs)
 	testEnv.initClaims(podPVCs, podPVCs)
-	pod := makePod(podPVCs)
+	pod := makePod("test-pod").
+		withNamespace("testns").
+		withNodeName("node1").
+		withPVCSVolume(podPVCs).Pod
 
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2311,7 +2292,10 @@ func TestCapacity(t *testing.T) {
 		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
 
 		// b. Generate pod with given claims
-		pod := makePod(scenario.pvcs)
+		pod := makePod("test-pod").
+			withNamespace("testns").
+			withNodeName("node1").
+			withPVCSVolume(scenario.pvcs).Pod
 
 		// Execute
 		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)

@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package volumebinding
 
 import (
 	"fmt"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"strconv"
 	"sync"
 
@@ -27,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 )
 
 // AssumeCache is a cache on top of the informer that allows for updating
