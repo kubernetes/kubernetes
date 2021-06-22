@@ -591,7 +591,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			DevicePath: devicePath,
 		}
 
-		if volumeDeviceMounter != nil && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
+		if volumeDeviceMounter != nil {
 			deviceMountPath, err :=
 				volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
