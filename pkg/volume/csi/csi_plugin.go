@@ -234,6 +234,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 		},
+		csitranslationplugins.PortworxVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+		},
 		csitranslationplugins.RBDVolumePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 		},

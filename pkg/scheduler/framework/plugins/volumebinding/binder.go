@@ -1014,7 +1014,7 @@ func (a byPVCSize) Less(i, j int) bool {
 	return iSize.Cmp(jSize) == -1
 }
 
-// isCSIMigrationOnForPlugin checks if CSI migrartion is enabled for a given plugin.
+// isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
 func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
@@ -1025,6 +1025,8 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 	case csiplugins.CinderInTreePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+	case csiplugins.PortworxVolumePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 	case csiplugins.RBDVolumePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 	}
