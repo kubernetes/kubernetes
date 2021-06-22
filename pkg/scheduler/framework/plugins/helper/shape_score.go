@@ -32,8 +32,7 @@ type FunctionShapePoint struct {
 // Shape[i].Score represents function values at meeting points.
 //
 // function f(p) is defined as:
-//   shape[0].Score for p < f[0].Utilization
-//   shape[i].Score for p == shape[i].Utilization
+//   shape[0].Score for p < shape[0].Utilization
 //   shape[n-1].Score for p > shape[n-1].Utilization
 // and linear between points (p < shape[i].Utilization)
 func BuildBrokenLinearFunction(shape FunctionShape) func(int64) int64 {
