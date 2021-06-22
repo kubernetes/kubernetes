@@ -121,7 +121,7 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 			return rawScoringFunction(maxUtilization)
 		}
 
-		return rawScoringFunction(maxUtilization - (capacity-requested)*maxUtilization/capacity)
+		return rawScoringFunction(requested * maxUtilization / capacity)
 	}
 	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
