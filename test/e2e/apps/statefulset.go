@@ -1124,6 +1124,22 @@ var _ = SIGDescribe("StatefulSet", func() {
 			appTester.run()
 		})
 	})
+	// Make sure minReadySeconds is honored
+	// Don't mark it as conformance yet
+	ginkgo.It("MinReadySeconds should be honored when enabled [Feature:StatefulSetMinReadySeconds] [alpha]", func() {
+		ssName := "test-ss"
+		headlessSvcName := "test"
+		// Define StatefulSet Labels
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+			"pod":  WebserverImageName,
+		}
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
+		setHTTPProbe(ss)
+		ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 1)
+	})
 })
 
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
