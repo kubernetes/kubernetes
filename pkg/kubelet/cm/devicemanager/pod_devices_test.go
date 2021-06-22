@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 )
 

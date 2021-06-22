@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -30,7 +30,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 )
 
@@ -163,7 +163,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			m.On("GetMemory", string(podUID), containerName).Return(tc.memory)
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableCPUs").Return(cpuset.CPUSet{})
-			m.On("GetAllocatableDevices").Return(devicemanager.NewResourceDeviceInstances())
+			m.On("GetAllocatableDevices").Return(device.NewResourceDeviceInstances())
 			m.On("GetAllocatableMemory").Return([]state.Block{})
 			server := NewV1PodResourcesServer(m, m, m, m)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})

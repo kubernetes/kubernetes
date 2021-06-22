@@ -39,6 +39,7 @@ import (
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -623,7 +624,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		activePods:            activePods,
 		sourcesReady:          &sourcesReadyStub{},
 		checkpointManager:     ckm,
-		allDevices:            NewResourceDeviceInstances(),
+		allDevices:            device.NewResourceDeviceInstances(),
 	}
 
 	for _, res := range testRes {
@@ -672,7 +673,7 @@ type TestResource struct {
 
 func TestFilterByAffinity(t *testing.T) {
 	as := require.New(t)
-	allDevices := ResourceDeviceInstances{
+	allDevices := device.ResourceDeviceInstances{
 		"res1": map[string]pluginapi.Device{
 			"dev1": {
 				ID: "dev1",

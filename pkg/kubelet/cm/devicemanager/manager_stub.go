@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/device"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -79,12 +80,12 @@ func (h *ManagerStub) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 }
 
 // GetDevices returns nil
-func (h *ManagerStub) GetDevices(_, _ string) ResourceDeviceInstances {
+func (h *ManagerStub) GetDevices(_, _ string) device.ResourceDeviceInstances {
 	return nil
 }
 
 // GetAllocatableDevices returns nothing
-func (h *ManagerStub) GetAllocatableDevices() ResourceDeviceInstances {
+func (h *ManagerStub) GetAllocatableDevices() device.ResourceDeviceInstances {
 	return nil
 }
 
