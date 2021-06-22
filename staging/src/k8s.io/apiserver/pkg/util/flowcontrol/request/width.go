@@ -17,7 +17,19 @@ limitations under the License.
 package request
 
 import (
+	"fmt"
 	"net/http"
+
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
+)
+
+const (
+	// the minimum number of seats a request must occupy
+	minimumSeats = 1
+
+	// the maximum number of seats a request can occupy
+	maximumSeats = 10
 )
 
 type WorkEstimate struct {
@@ -25,16 +37,18 @@ type WorkEstimate struct {
 	Seats uint
 }
 
-// DefaultWorkEstimator returns estimation with default number of seats
-// of 1.
-//
-// TODO: when we plumb in actual work estimate handling for different
-//  type of request(s) this function will iterate through a chain
-//  of workEstimator instance(s).
-func DefaultWorkEstimator(_ *http.Request) WorkEstimate {
-	return WorkEstimate{
-		Seats: 1,
+// objectCountGetterFunc represents a function that gets the total
+// number of objects for a given resource.
+type objectCountGetterFunc func(string) (int64, error)
+
+// NewWorkEstimator estimates the work that will be done by a given request,
+// if no WorkEstimatorFunc matches the given request then the default
+// work estimate of 1 seat is allocated to the request.
+func NewWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+	estimator := &workEstimator{
+		listWorkEstimator: newListWorkEstimator(countFn),
 	}
+	return estimator.estimate
 }
 
 // WorkEstimatorFunc returns the estimated work of a given request.
@@ -44,4 +58,25 @@ type WorkEstimatorFunc func(*http.Request) WorkEstimate
 
 func (e WorkEstimatorFunc) EstimateWork(r *http.Request) WorkEstimate {
 	return e(r)
+}
+
+type workEstimator struct {
+	// listWorkEstimator estimates work for list request(s)
+	listWorkEstimator WorkEstimatorFunc
+}
+
+func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
+	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
+	if !ok {
+		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
+		// no RequestInfo should never happen, but to be on the safe side let's return maximumSeats
+		return WorkEstimate{Seats: maximumSeats}
+	}
+
+	switch requestInfo.Verb {
+	case "list":
+		return e.listWorkEstimator.EstimateWork(r)
+	}
+
+	return WorkEstimate{Seats: minimumSeats}
 }

@@ -593,6 +593,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
+// NOTICE: Keep in sync with shouldListFromStorage function in
+//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
 func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
