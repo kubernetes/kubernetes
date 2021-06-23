@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -125,6 +126,22 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 		},
+		"pvc-usage-higher-allocated-resource": {
+			pvc: getPVCWithAllocatedResource("5G", "10G"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:        resource.MustParse("10G"),
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+		},
+		"pvc-usage-lower-allocated-resource": {
+			pvc: getPVCWithAllocatedResource("10G", "5G"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:        resource.MustParse("10G"),
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+		},
 	}
 	for testName, testCase := range testCases {
 		actual, err := evaluator.Usage(testCase.pvc)
@@ -135,4 +152,18 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.usage, actual)
 		}
 	}
+}
+
+func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *api.PersistentVolumeClaim {
+	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				core.ResourceStorage: resource.MustParse(pvcSize),
+			},
+		},
+	})
+	validPVCWithAllocatedResources.Status.AllocatedResources = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(allocatedSize),
+	}
+	return validPVCWithAllocatedResources
 }

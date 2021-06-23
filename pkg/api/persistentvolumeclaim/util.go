@@ -45,19 +45,6 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 	}
 }
 
-// SetAllocatedResources sets default value for AllocatedResources in case user decides to
-// expand the volume later on.
-func SetAllocatedResources(pvc, oldPVC *core.PersistentVolumeClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
-		userResources := pvc.Spec.Resources.Requests
-		// for new PVC creation we will simply set it to user requested size
-		// even if user provided one.
-		if oldPVC == nil {
-			pvc.Status.AllocatedResources = userResources
-		}
-	}
-}
-
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 	if oldPVCSpec == nil {
 		return false

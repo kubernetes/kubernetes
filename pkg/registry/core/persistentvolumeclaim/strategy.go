@@ -64,7 +64,6 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
-	pvcutil.SetAllocatedResources(pvc, nil)
 	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 }
 
