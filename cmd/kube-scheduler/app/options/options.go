@@ -38,14 +38,12 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	configv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 )
 
@@ -73,7 +71,7 @@ type Options struct {
 
 // NewOptions returns default scheduler app options.
 func NewOptions() (*Options, error) {
-	cfg, err := newDefaultComponentConfig()
+	cfg, err := latest.Default()
 	if err != nil {
 		return nil, err
 	}
@@ -128,23 +126,6 @@ func splitHostIntPort(s string) (string, int, error) {
 		return "", 0, err
 	}
 	return host, portInt, err
-}
-
-func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := configv1beta2.KubeSchedulerConfiguration{}
-	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
-
-	kubeschedulerscheme.Scheme.Default(&versionedCfg)
-	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
-	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
-		return nil, err
-	}
-	// We don't set this field in pkg/scheduler/apis/config/{version}/conversion.go
-	// because the field will be cleared later by API machinery during
-	// conversion. See KubeSchedulerConfiguration internal type definition for
-	// more details.
-	cfg.TypeMeta.APIVersion = configv1beta2.SchemeGroupVersion.String()
-	return &cfg, nil
 }
 
 // Flags returns flags for a specific scheduler by section name
