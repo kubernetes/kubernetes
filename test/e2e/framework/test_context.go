@@ -229,6 +229,8 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+	// RestartKubelet restarts Kubelet unit when the process is killed.
+	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
 }
