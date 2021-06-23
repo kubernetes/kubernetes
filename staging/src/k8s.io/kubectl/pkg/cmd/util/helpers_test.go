@@ -321,3 +321,40 @@ func TestDumpReaderToFile(t *testing.T) {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }
+
+func TestIsValidSubresource(t *testing.T) {
+	tests := []struct {
+		name        string
+		subresource string
+		isValid     bool
+	}{
+		{
+			name:        "Empty subresource - valid",
+			subresource: "",
+			isValid:     true,
+		},
+		{
+			name:        "Scale subresource - valid",
+			subresource: "scale",
+			isValid:     true,
+		},
+		{
+			name:        "Status subresource - valid",
+			subresource: "status",
+			isValid:     true,
+		},
+		{
+			name:        "invalid subresource - invalid",
+			subresource: "invalid",
+			isValid:     false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := IsValidSubresource(test.subresource)
+			if (actual == nil) != test.isValid {
+				t.Errorf("expected subresoruce validity to be '%v', got '%v'", test.isValid, actual)
+			}
+		})
+	}
+}
