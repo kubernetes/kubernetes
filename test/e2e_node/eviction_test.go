@@ -51,7 +51,7 @@ import (
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute
 	evictionPollInterval              = 2 * time.Second
-	pressureDisappearTimeout          = 1 * time.Minute
+	pressureDisappearTimeout          = 10 * time.Minute
 	// pressure conditions often surface after evictions because the kubelet only updates
 	// node conditions periodically.
 	// we wait this period after evictions to make sure that we wait out this delay
