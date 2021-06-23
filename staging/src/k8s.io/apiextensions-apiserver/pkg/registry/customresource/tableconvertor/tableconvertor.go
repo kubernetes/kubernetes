@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metatable "k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/util/jsonpath"
@@ -107,7 +108,15 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 		cells[0] = name
 		customHeaders := c.headers[1:]
 		for i, column := range c.additionalColumns {
-			results, err := column.FindResults(obj.(runtime.Unstructured).UnstructuredContent())
+			us, ok := obj.(runtime.Unstructured)
+			if !ok {
+				m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+				if err != nil {
+					return nil, err
+				}
+				us = &unstructured.Unstructured{Object: m}
+			}
+			results, err := column.FindResults(us.UnstructuredContent())
 			if err != nil || len(results) == 0 || len(results[0]) == 0 {
 				cells = append(cells, nil)
 				continue

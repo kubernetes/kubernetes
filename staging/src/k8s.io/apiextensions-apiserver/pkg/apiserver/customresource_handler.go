@@ -902,8 +902,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			requestScopes[v.Name] = &reqScope
 		}
 
-		// override scaleSpec subresource values
+		// override scale subresource values
 		// shallow copy
+		scaleColumns, err := getScaleColumnsForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR scale subresource columns")
+		}
+		scaleTable, err := tableconvertor.New(scaleColumns)
+		if err != nil {
+			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+		}
 		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
@@ -915,6 +924,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
+		scaleScope.TableConvertor = scaleTable
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && subresources != nil && subresources.Scale != nil {
 			scaleScope, err = scopeWithFieldManager(
