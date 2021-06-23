@@ -488,6 +488,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	if isIndexedJob(&job) {
 		completionMode = string(batch.IndexedCompletion)
 	}
+	action := metrics.JobSyncActionReconciling
 
 	defer func() {
 		result := "success"
@@ -495,8 +496,8 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 			result = "error"
 		}
 
-		metrics.JobSyncDurationSeconds.WithLabelValues(completionMode, result).Observe(time.Since(startTime).Seconds())
-		metrics.JobSyncNum.WithLabelValues(completionMode, result).Inc()
+		metrics.JobSyncDurationSeconds.WithLabelValues(completionMode, result, action).Observe(time.Since(startTime).Seconds())
+		metrics.JobSyncNum.WithLabelValues(completionMode, result, action).Inc()
 	}()
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
@@ -568,7 +569,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed").Inc()
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
+			active, action, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
 			manageJobCalled = true
 		}
 		completions := succeeded
@@ -762,13 +763,13 @@ func jobSuspended(job *batch.Job) bool {
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
-func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded int32, allPods []*v1.Pod) (int32, error) {
+func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded int32, allPods []*v1.Pod) (int32, string, error) {
 	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
-		return 0, nil
+		return 0, metrics.JobSyncActionTracking, nil
 	}
 
 	if jobSuspended(job) {
@@ -777,7 +778,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
 		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
 		active -= removed
-		return active, err
+		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
 	wantActive := int32(0)
@@ -812,21 +813,15 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", parallelism)
 		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
 		active -= removed
-		if err != nil {
-			return active, err
-		}
+		// While it is possible for a Job to require both pod creations and
+		// deletions at the same time (e.g. indexed Jobs with repeated indexes), we
+		// restrict ourselves to either just pod deletion or pod creation in any
+		// given sync cycle. Of these two, pod deletion takes precedence.
+		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
 	if active < wantActive {
 		diff := wantActive - active
-		if diff < 0 {
-			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
-			diff = 0
-		}
-		if diff == 0 {
-			return active, nil
-		}
-
 		if diff > int32(maxPodCreateDeletePerSync) {
 			diff = int32(maxPodCreateDeletePerSync)
 		}
@@ -909,12 +904,10 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 			}
 			diff -= batchSize
 		}
-		if err := errorFromChannel(errCh); err != nil {
-			return active, err
-		}
+		return active, metrics.JobSyncActionPodsCreated, errorFromChannel(errCh)
 	}
 
-	return active, nil
+	return active, metrics.JobSyncActionTracking, nil
 }
 
 // activePodsForRemoval returns Pods that should be removed because there

@@ -678,6 +678,7 @@ const (
 
 	// owner: @adtac
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Allows jobs to be created in the suspended state.
 	SuspendJob featuregate.Feature = "SuspendJob"
@@ -820,7 +821,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
 	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
-	SuspendJob:                                     {Default: false, PreRelease: featuregate.Alpha},
+	SuspendJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
