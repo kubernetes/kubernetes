@@ -621,6 +621,71 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 	}
 }
 
+func TestClientNodeSupportsStageUnstage(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsStageUnstage(context.Background())
+		},
+		func(stagingCapable bool) *fake.NodeClient {
+			// Creates a staging-capable client
+			return fake.NewNodeClient(stagingCapable)
+		})
+}
+
+func TestClientNodeSupportsNodeExpand(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsNodeExpand(context.Background())
+		},
+		func(expansionCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithExpansion(false /* stageCapable */, expansionCapable)
+		})
+}
+
+func TestClientNodeSupportsVolumeStats(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsVolumeStats(context.Background())
+		},
+		func(volumeStatsCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithVolumeStats(volumeStatsCapable)
+		})
+}
+
+func testClientNodeSupportsCapabilities(
+	t *testing.T,
+	capabilityMethodToTest func(*csiDriverClient) (bool, error),
+	nodeClientGenerator func(bool) *fake.NodeClient) {
+
+	testCases := []struct {
+		name    string
+		capable bool
+	}{
+		{name: "positive", capable: true},
+		{name: "negative", capable: false},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test case: %s", tc.name)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := nodeClientGenerator(tc.capable)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
+		got, _ := capabilityMethodToTest(client)
+
+		if got != tc.capable {
+			t.Errorf("Expected capability support to be %v, got: %v", tc.capable, got)
+		}
+
+		fakeCloser.Check()
+	}
+}
+
 func TestNodeExpandVolume(t *testing.T) {
 	testCases := []struct {
 		name       string

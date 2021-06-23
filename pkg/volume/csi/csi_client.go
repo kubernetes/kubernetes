@@ -454,12 +454,10 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 }
 
 func (c *csiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, error) {
-	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if Node has EXPAND_VOLUME capability"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME)
 }
 
 func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
-	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsStageUnstage"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME)
 }
 
@@ -553,12 +551,10 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 }
 
 func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
-	klog.V(5).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsVolumeStats"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS)
 }
 
 func (c *csiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
-	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsSingleNodeMultiWriterAccessMode"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER)
 }
 
@@ -637,11 +633,11 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 }
 
 func (c *csiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (bool, error) {
-	klog.V(5).Info(log("calling NodeGetCapabilities rpc to determine if nodeSupportsVolumeCondition"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
 }
 
 func (c *csiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if the node service has %s capability", capabilityType))
 	capabilities, err := c.nodeGetCapabilities(ctx)
 	if err != nil {
 		return false, err
