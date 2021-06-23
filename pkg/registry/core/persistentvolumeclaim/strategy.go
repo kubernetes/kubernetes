@@ -140,7 +140,10 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context,
 }
 
 func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
+	newPvc := obj.(*api.PersistentVolumeClaim)
+	oldPvc := old.(*api.PersistentVolumeClaim)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
+	return validation.ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
