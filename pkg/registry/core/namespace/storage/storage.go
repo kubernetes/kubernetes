@@ -318,6 +318,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }

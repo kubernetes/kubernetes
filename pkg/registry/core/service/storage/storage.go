@@ -134,6 +134,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
 
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 // defaultOnRead sets interlinked fields that were not previously set on read.
 // We can't do this in the normal defaulting path because that same logic
 // applies on Get, Create, and Update, but we need to distinguish between them.
