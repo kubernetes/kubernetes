@@ -265,7 +265,8 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
-		[]string{},
+		[]string{}, /* mountOptions */
+		nil,        /* fsGroup */
 	)
 
 	if err != nil {

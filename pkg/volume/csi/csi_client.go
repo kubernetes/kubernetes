@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -43,6 +44,10 @@ type csiClient interface {
 		maxVolumePerNode int64,
 		accessibleTopology map[string]string,
 		err error)
+
+	// The caller is responsible for checking whether the driver supports
+	// applying FSGroup by calling NodeSupportsVolumeMountGroup().
+	// If the driver does not, fsGroup must be set to nil.
 	NodePublishVolume(
 		ctx context.Context,
 		volumeid string,
@@ -55,7 +60,9 @@ type csiClient interface {
 		secrets map[string]string,
 		fsType string,
 		mountOptions []string,
+		fsGroup *int64,
 	) error
+
 	NodeExpandVolume(ctx context.Context, rsOpts csiResizeOptions) (resource.Quantity, error)
 	NodeUnpublishVolume(
 		ctx context.Context,
@@ -83,6 +90,7 @@ type csiClient interface {
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
 	NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error)
+	NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error)
 }
 
 // Strongly typed address
@@ -209,6 +217,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	secrets map[string]string,
 	fsType string,
 	mountOptions []string,
+	fsGroup *int64,
 ) error {
 	klog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
@@ -255,11 +264,15 @@ func (c *csiDriverClient) NodePublishVolume(
 			Block: &csipbv1.VolumeCapability_BlockVolume{},
 		}
 	} else {
+		mountVolume := &csipbv1.VolumeCapability_MountVolume{
+			FsType:     fsType,
+			MountFlags: mountOptions,
+		}
+		if fsGroup != nil {
+			mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
+		}
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
-			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType:     fsType,
-				MountFlags: mountOptions,
-			},
+			Mount: mountVolume,
 		}
 	}
 
@@ -634,6 +647,10 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 func (c *csiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (bool, error) {
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
+}
+
+func (c *csiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP)
 }
 
 func (c *csiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {
