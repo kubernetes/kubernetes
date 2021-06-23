@@ -461,8 +461,8 @@ func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
-func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", usage+fmt.Sprintf(" Must be one of %v. This flag is alpha and may change in the future.", subresourceTypes.List()))
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresoruces sets.String) {
+	cmd.Flags().StringVar(subresource, "subresource", "", usage+fmt.Sprintf(" Must be one of %v. This flag is alpha and may change in the future.", allowedSubresoruces.List()))
 }
 
 type ValidateOptions struct {
@@ -751,14 +751,24 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 	)
 }
 
-var subresourceTypes = sets.NewString("status", "scale")
+var SubresourceTypes = sets.NewString("status", "scale")
+var StatusOnlySubresourceTypes = sets.NewString("status")
 
-func IsValidSubresource(subresource string) error {
+func IsValidSubresource(cmd string, subresource string) error {
 	if len(subresource) == 0 {
 		return nil
 	}
-	if !subresourceTypes.Has(subresource) {
-		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", subresource, subresourceTypes.List())
+	switch cmd {
+	case "get", "patch", "replace":
+		if !SubresourceTypes.Has(subresource) {
+			return fmt.Errorf("invalid subresource value: %q. Must be one of %v", subresource, SubresourceTypes.List())
+		}
+	case "edit":
+		if !StatusOnlySubresourceTypes.Has(subresource) {
+			return fmt.Errorf("invalid subresource value: %q. Must be one of %v", subresource, StatusOnlySubresourceTypes.List())
+		}
+	default:
+		return fmt.Errorf("subresource used with unsupported command '%v'", cmd)
 	}
 	return nil
 }

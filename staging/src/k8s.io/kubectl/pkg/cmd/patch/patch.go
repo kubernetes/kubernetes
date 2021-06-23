@@ -135,7 +135,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
-	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, patch will operate on the subresource of the requested object.")
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, patch will operate on the subresource of the requested object.", cmdutil.SubresourceTypes)
 
 	return cmd
 }
@@ -195,7 +195,7 @@ func (o *PatchOptions) Validate() error {
 			return fmt.Errorf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), o.PatchType)
 		}
 	}
-	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+	if err := cmdutil.IsValidSubresource("patch", o.subresource); err != nil {
 		return err
 	}
 	return nil

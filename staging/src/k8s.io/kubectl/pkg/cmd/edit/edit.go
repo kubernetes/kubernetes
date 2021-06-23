@@ -62,7 +62,10 @@ var (
 		kubectl edit job.v1.batch/myjob -o json
 
 		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:
-		kubectl edit deployment/mydeployment -o yaml --save-config`))
+		kubectl edit deployment/mydeployment -o yaml --save-config
+		
+		# Edit the deployment/mydeployment's status subresource:
+		kubectl patch deployment mydeployment --subresource='status'`))
 )
 
 // NewCmdEdit creates the `edit` command
@@ -78,6 +81,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Example:               editExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -94,5 +98,6 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-edit")
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "This is an 'alpha' flag. If specified, edit will operate on the subresource of the requested object.", cmdutil.StatusOnlySubresourceTypes)
 	return cmd
 }

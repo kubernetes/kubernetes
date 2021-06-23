@@ -133,7 +133,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
-	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, replace will operate on the subresource of the requested object.")
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, replace will operate on the subresource of the requested object.", cmdutil.SubresourceTypes)
 
 	return cmd
 }
@@ -240,7 +240,7 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		}
 	}
 
-	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+	if err := cmdutil.IsValidSubresource("replace", o.subresource); err != nil {
 		return err
 	}
 

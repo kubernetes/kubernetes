@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	jsonpath "github.com/exponent-io/jsonpath"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -198,6 +199,8 @@ func TestPatchSubresource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
+	expectedStatus := corev1.PodRunning
+
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -210,7 +213,7 @@ func TestPatchSubresource(t *testing.T) {
 				// ensure patched object reflects successful
 				// patch edits from the client
 				if m == "PATCH" {
-					obj.Status.Phase = corev1.PodRunning
+					obj.Status.Phase = expectedStatus
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
 			default:
@@ -224,12 +227,16 @@ func TestPatchSubresource(t *testing.T) {
 	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"status":{"phase":"Running"}}`)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", "json")
 	cmd.Flags().Set("subresource", "status")
 	cmd.Run(cmd, []string{"pod/foo"})
 
-	// uses the name from the response
-	if buf.String() != "pod/foo\n" {
-		t.Errorf("unexpected output: %s", buf.String())
+	decoder := jsonpath.NewDecoder(buf)
+	var actualStatus corev1.PodPhase
+	decoder.SeekTo("status", "phase")
+	decoder.Decode(&actualStatus)
+	// check the status.phase value is updated in the response
+	if actualStatus != expectedStatus {
+		t.Errorf("unexpected pod status to be set to %s got: %s", expectedStatus, actualStatus)
 	}
 }

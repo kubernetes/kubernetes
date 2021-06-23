@@ -187,7 +187,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
-	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "This is an 'alpha' flag. If specified, gets the subresource of the requested object.")
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "This is an 'alpha' flag. If specified, gets the subresource of the requested object.", cmdutil.SubresourceTypes)
 	return cmd
 }
 
@@ -322,7 +322,7 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
 	}
-	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+	if err := cmdutil.IsValidSubresource("get", o.subresource); err != nil {
 		return err
 	}
 	return nil

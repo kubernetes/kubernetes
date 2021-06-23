@@ -325,23 +325,33 @@ func TestDumpReaderToFile(t *testing.T) {
 func TestIsValidSubresource(t *testing.T) {
 	tests := []struct {
 		name        string
+		command     string
 		subresource string
 		isValid     bool
 	}{
 		{
 			name:        "Empty subresource - valid",
+			command:     "get",
 			subresource: "",
 			isValid:     true,
 		},
 		{
-			name:        "Scale subresource - valid",
+			name:        "Scale subresource with get - valid",
+			command:     "get",
 			subresource: "scale",
 			isValid:     true,
 		},
 		{
-			name:        "Status subresource - valid",
+			name:        "Status subresource with get - valid",
+			command:     "get",
 			subresource: "status",
 			isValid:     true,
+		},
+		{
+			name:        "Scale subresource with edit - invalid",
+			command:     "edit",
+			subresource: "scale",
+			isValid:     false,
 		},
 		{
 			name:        "invalid subresource - invalid",
@@ -351,7 +361,7 @@ func TestIsValidSubresource(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := IsValidSubresource(test.subresource)
+			actual := IsValidSubresource(test.command, test.subresource)
 			if (actual == nil) != test.isValid {
 				t.Errorf("expected subresoruce validity to be '%v', got '%v'", test.isValid, actual)
 			}
