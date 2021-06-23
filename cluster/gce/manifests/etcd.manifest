@@ -63,6 +63,10 @@
       },
       { "name": "ETCD_HOSTNAME",
         "value": "{{ hostname }}"
+      },
+      {
+        "name": "ETCDCTL_API",
+        "value": "3"
       }
         ],
     "livenessProbe": {
