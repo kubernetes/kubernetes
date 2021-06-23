@@ -209,9 +209,9 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 		}
 	}
 
-	itfs, err := nw.Interfaces()
+	addrs, err := nw.InterfaceAddrs()
 	if err != nil {
-		return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
+		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
 	}
 
 	// Second round of iteration to parse IPs based on cidr.
@@ -221,29 +221,24 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 		}
 
 		_, ipNet, _ := net.ParseCIDR(cidr)
-		for _, itf := range itfs {
-			addrs, err := nw.Addrs(&itf)
-			if err != nil {
-				return nil, fmt.Errorf("error getting address from interface %s, error: %v", itf.Name, err)
+		for _, addr := range addrs {
+			var ip net.IP
+			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
+			switch v := addr.(type) {
+			case *net.IPAddr:
+				ip = v.IP
+			case *net.IPNet:
+				ip = v.IP
+			default:
+				continue
 			}
 
-			for _, addr := range addrs {
-				if addr == nil {
-					continue
+			if ipNet.Contains(ip) {
+				if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
+					uniqueAddressList.Insert(ip.String())
 				}
-
-				ip, _, err := net.ParseCIDR(addr.String())
-				if err != nil {
-					return nil, fmt.Errorf("error parsing CIDR for interface %s, error: %v", itf.Name, err)
-				}
-
-				if ipNet.Contains(ip) {
-					if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
-						uniqueAddressList.Insert(ip.String())
-					}
-					if !utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
-						uniqueAddressList.Insert(ip.String())
-					}
+				if !utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
+					uniqueAddressList.Insert(ip.String())
 				}
 			}
 		}
