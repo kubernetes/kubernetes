@@ -286,6 +286,26 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidateSecretReference can be use to check whether provided SecretReference object is valid.
+// Secret name is provided and is valid
+// Secret namespace is provided and is valid
+func ValidateSecretReference(secretRef *core.SecretReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(secretRef.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range ValidateSecretName(secretRef.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), secretRef.Name, msg))
+		}
+	}
+	if len(secretRef.Namespace) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
+	} else {
+		allErrs = append(allErrs, ValidateDNS1123Label(secretRef.Namespace, fldPath.Child("namespace"))...)
+	}
+	return allErrs
+}
+
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -807,18 +827,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
 	if iscsi.SecretRef != nil {
-		if len(iscsi.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(iscsi.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), iscsi.SecretRef.Name, msg))
-			}
-		}
-		if len(iscsi.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(iscsi.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(iscsi.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	if iscsi.InitiatorName != nil {
 		initiator := *iscsi.InitiatorName
@@ -1272,20 +1281,8 @@ func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldP
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
 	if rbd.SecretRef != nil {
-		if len(rbd.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(rbd.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), rbd.SecretRef.Name, msg))
-			}
-		}
-		if len(rbd.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(rbd.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(rbd.SecretRef, fldPath.Child("secretRef"))...)
 	}
-
 	return allErrs
 }
 
@@ -1308,18 +1305,7 @@ func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource,
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
 	if cd.SecretRef != nil {
-		if len(cd.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(cd.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), cd.SecretRef.Name, msg))
-			}
-		}
-		if len(cd.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(cd.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(cd.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
 }
@@ -1337,20 +1323,8 @@ func validateCephFSPersistentVolumeSource(cephfs *core.CephFSPersistentVolumeSou
 	if len(cephfs.Monitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
-
 	if cephfs.SecretRef != nil {
-		if len(cephfs.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(cephfs.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), cephfs.SecretRef.Name, msg))
-			}
-		}
-		if len(cephfs.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(cephfs.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(cephfs.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
 }
@@ -1395,18 +1369,7 @@ func validateFlexPersistentVolumeSource(fv *core.FlexPersistentVolumeSource, fld
 	}
 
 	if fv.SecretRef != nil {
-		if len(fv.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(fv.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), fv.SecretRef.Name, msg))
-			}
-		}
-		if len(fv.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(fv.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(fv.SecretRef, fldPath.Child("secretRef"))...)
 	}
 
 	return allErrs
@@ -1531,18 +1494,7 @@ func validateScaleIOPersistentVolumeSource(sio *core.ScaleIOPersistentVolumeSour
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	}
 	if sio.SecretRef != nil {
-		if len(sio.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(sio.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), sio.SecretRef.Name, msg))
-			}
-		}
-		if len(sio.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(sio.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(sio.SecretRef, fldPath.Child("secretRed"))...)
 	}
 	return allErrs
 }
@@ -1587,18 +1539,10 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
-		if len(storageos.SecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(storageos.SecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("secretRef", "name"), storageos.SecretRef.Name, msg))
-			}
-		}
-		if len(storageos.SecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(storageos.SecretRef.Namespace, fldPath.Child("secretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(&core.SecretReference{
+			Name: storageos.SecretRef.Name,
+			Namespace: storageos.SecretRef.Namespace,
+		}, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
 }
@@ -1629,52 +1573,18 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
 	}
-
 	if csi.ControllerPublishSecretRef != nil {
-		if len(csi.ControllerPublishSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(csi.ControllerPublishSecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("controllerPublishSecretRef", "name"), csi.ControllerPublishSecretRef.Name, msg))
-			}
-		}
-		if len(csi.ControllerPublishSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Namespace, fldPath.Child("controllerPublishSecretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(csi.ControllerPublishSecretRef, fldPath.Child("controllerPublishSecretRef"))...)
 	}
-
 	if csi.ControllerExpandSecretRef != nil {
-		if len(csi.ControllerExpandSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(csi.ControllerExpandSecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("controllerExpandSecretRef", "name"), csi.ControllerExpandSecretRef.Name, msg))
-			}
-		}
-		if len(csi.ControllerExpandSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Namespace, fldPath.Child("controllerExpandSecretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(csi.ControllerExpandSecretRef, fldPath.Child("controllerExpandSecretRef"))...)
 	}
-
 	if csi.NodePublishSecretRef != nil {
-		if len(csi.NodePublishSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
-		} else {
-			for _, msg := range ValidateSecretName(csi.NodePublishSecretRef.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("nodePublishSecretRef", "name"), csi.NodePublishSecretRef.Name, msg))
-			}
-		}
-		if len(csi.NodePublishSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Namespace, fldPath.Child("nodePublishSecretRef", "namespace"))...)
-		}
+		allErrs = append(allErrs, ValidateSecretReference(csi.NodePublishSecretRef, fldPath.Child("nodePublishSecretRef"))...)
 	}
-
+	if csi.NodeStageSecretRef != nil {
+		allErrs = append(allErrs, ValidateSecretReference(csi.NodeStageSecretRef, fldPath.Child("nodeStageSecretRef"))...)
+	}
 	return allErrs
 }
 
