@@ -213,6 +213,10 @@ type GenericAPIServer struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
+
+
+	//
+	chanFactory channelFactory
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -324,18 +328,23 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		}
 	}
 
+	if s.chanFactory == nil {
+		s.chanFactory = simpleFactory{}
+	}
+
 	return preparedGenericAPIServer{s}
 }
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	delayedStopCh := make(chan struct{})
+	stopSig := s.chanFactory.wrapReadOnly(stopCh)
+	delayedStopCh := s.chanFactory.new("delayedStopCh")
 
 	go func() {
-		defer close(delayedStopCh)
+		defer delayedStopCh.close()
 
-		<-stopCh
+		stopSig.wait()
 
 		// As soon as shutdown is initiated, /readyz should start returning failure.
 		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
@@ -346,23 +355,24 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}()
 
 	// close socket after delayed stopCh
-	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
+	stoppedCh, err := s.NonBlockingRun(delayedStopCh.rawChan())
 	if err != nil {
 		return err
 	}
+	stoppedSig := s.chanFactory.wrapReadOnly(stoppedCh)
 
-	drainedCh := make(chan struct{})
+	drainedCh := s.chanFactory.new("drainedCh")
 	go func() {
-		defer close(drainedCh)
+		defer drainedCh.close()
 
 		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
-		<-delayedStopCh
+	    delayedStopCh.wait()
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 		s.HandlerChainWaitGroup.Wait()
 	}()
 
-	<-stopCh
+	stopSig.wait()
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
 	err = s.RunPreShutdownHooks()
@@ -371,9 +381,9 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}
 
 	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
-	<-drainedCh
+	drainedCh.wait()
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
-	<-stoppedCh
+	stoppedSig.wait()
 
 	return nil
 }
