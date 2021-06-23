@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -149,7 +148,7 @@ func (m *Model) FindPod(ns string, name string) (*Pod, error) {
 			}
 		}
 	}
-	return nil, errors.Errorf("unable to find pod %s/%s", ns, name)
+	return nil, fmt.Errorf("unable to find pod %s/%s", ns, name)
 }
 
 // Namespace is the abstract representation of what matters to network policy
