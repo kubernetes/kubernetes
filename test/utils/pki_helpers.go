@@ -23,11 +23,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math"
 	"math/big"
 	"time"
-
-	"github.com/pkg/errors"
 
 	certutil "k8s.io/client-go/util/cert"
 )
