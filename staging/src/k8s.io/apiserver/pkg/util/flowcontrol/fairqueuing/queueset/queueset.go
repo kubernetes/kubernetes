@@ -23,8 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
@@ -143,7 +141,7 @@ func checkConfig(qCfg fq.QueuingConfig) (*shufflesharding.Dealer, error) {
 	}
 	dealer, err := shufflesharding.NewDealer(qCfg.DesiredNumQueues, qCfg.HandSize)
 	if err != nil {
-		err = errors.Wrap(err, "the QueueSetConfig implies an invalid shuffle sharding config (DesiredNumQueues is deckSize)")
+		err = fmt.Errorf("the QueueSetConfig implies an invalid shuffle sharding config (DesiredNumQueues is deckSize): %w", err)
 	}
 	return dealer, err
 }
