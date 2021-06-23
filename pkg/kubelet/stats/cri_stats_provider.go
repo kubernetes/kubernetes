@@ -678,10 +678,16 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	return result
 }
 
-// getContainerUsageNanoCores gets the cached usageNanoCores.
+// getContainerUsageNanoCores first attempts to get the usage nano cores from the stats reported
+// by the CRI. If it is unable to, it gets the information from the cache instead.
 func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
 	if stats == nil || stats.Attributes == nil {
 		return nil
+	}
+
+	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
+	if stats.Cpu.UsageNanoCores != nil {
+		return &stats.Cpu.UsageNanoCores.Value
 	}
 
 	p.mutex.RLock()
@@ -696,11 +702,19 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 	return &latestUsage
 }
 
-// getContainerUsageNanoCores computes usageNanoCores based on the given and
-// the cached usageCoreNanoSeconds, updates the cache with the computed
-// usageNanoCores, and returns the usageNanoCores.
+// getAndUpdateContainerUsageNanoCores first attempts to get the usage nano cores from the stats reported
+// by the CRI. If it is unable to, it computes usageNanoCores based on the given and the cached usageCoreNanoSeconds,
+// updates the cache with the computed usageNanoCores, and returns the usageNanoCores.
 func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
-	if stats == nil || stats.Attributes == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
+	if stats == nil || stats.Attributes == nil || stats.Cpu == nil {
+		return nil
+	}
+	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
+	if stats.Cpu.UsageNanoCores != nil {
+		return &stats.Cpu.UsageNanoCores.Value
+	}
+	// If there is no UsageNanoCores, nor UsageCoreNanoSeconds, there is no information to use
+	if stats.Cpu.UsageCoreNanoSeconds == nil {
 		return nil
 	}
 	id := stats.Attributes.Id
