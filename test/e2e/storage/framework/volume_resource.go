@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -184,27 +183,27 @@ func (r *VolumeResource) CleanupResource() error {
 						if pvc.Spec.VolumeName != "" {
 							pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 							if err != nil {
-								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+								cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to find PV %v: %w", pvc.Spec.VolumeName, err))
 							}
 						}
 					case apierrors.IsNotFound(err):
 						// Without the PVC, we cannot locate the corresponding PV. Let's
 						// hope that it is gone.
 					default:
-						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PVC %v", r.Pvc.Name))
+						cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to find PVC %v: %w", r.Pvc.Name, err))
 					}
 				}
 
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.Pvc.Name, f.Namespace.Name)
 				if err != nil {
-					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.Pvc.Name))
+					cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete PVC %v: %w", r.Pvc.Name, err))
 				}
 
 				if pv != nil {
 					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
 					if err != nil {
-						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
-							"Persistent Volume %v not deleted by dynamic provisioner", pv.Name))
+						cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
+							"persistent Volume %v not deleted by dynamic provisioner: %w", pv.Name, err))
 					}
 				}
 			}
@@ -216,14 +215,14 @@ func (r *VolumeResource) CleanupResource() error {
 	if r.Sc != nil {
 		ginkgo.By("Deleting sc")
 		if err := storageutils.DeleteStorageClass(f.ClientSet, r.Sc.Name); err != nil {
-			cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete StorageClass %v", r.Sc.Name))
+			cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete StorageClass %v: %w", r.Sc.Name, err))
 		}
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
 	if r.Volume != nil {
 		if err := storageutils.TryFunc(r.Volume.DeleteVolume); err != nil {
-			cleanUpErrs = append(cleanUpErrs, errors.Wrap(err, "Failed to delete Volume"))
+			cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete Volume: %w", err))
 		}
 	}
 	return utilerrors.NewAggregate(cleanUpErrs)
