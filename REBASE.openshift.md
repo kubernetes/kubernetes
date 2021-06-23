@@ -386,13 +386,20 @@ to newer released version using `git merge`. To do that follow these steps:
 
 1. Push appropriate upstream tag you're updating to:
 ```
-git push git@github.com:openshift/kubernetes.git refs/tags/v1.21.1
+git push git@github.com:openshift/kubernetes.git refs/tags/v1.21.2
 ```
-2. Revert any commits that were merged into kubernetes between previous update and current one.
-3. `git merge <new_version>`, example `git merge v1.21.1`.
+2. Verify upstream changes:
+```
+git log v1.21.1..v1.21.2 --ancestry-path --reverse --no-merges
+```
+3. Revert any commits that were merged into kubernetes between previous update and current one.
+4. `git merge <new_version>`, example `git merge v1.21.2`.
    Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
    coming from newer versions. Manually verify them, and in most cases pick the
    newer versions of deps. This will be properly update when re-runing
    `hack/update-vendor.sh` in the next step.
-3. Update openshift dependencies and re-run `hack/update-vendor.sh`.
-4. Run `make update` see [Updating generated files](#updating-generated-files).
+5. Update `go.mod` dependecies to point to correct release versions.
+   NOTE: When editing `go.mod` manually you'll need to run `go mod tidy`.
+6. Update openshift dependencies and re-run `hack/update-vendor.sh`.
+7. Update kubernetes version in `openshift-hack/images/hyperkube/Dockerfile.rhel`.
+8. Run `make update` see [Updating generated files](#updating-generated-files).
