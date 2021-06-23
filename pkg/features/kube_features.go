@@ -369,6 +369,13 @@ const (
 	// a volume in a Pod.
 	ConfigurableFSGroupPolicy featuregate.Feature = "ConfigurableFSGroupPolicy"
 
+	// owner: @gnufied, @verult
+	// alpha: v1.22
+	// If supported by the CSI driver, delegates the role of applying FSGroup to
+	// the driver by passing FSGroup through the NodeStageVolume and
+	// NodePublishVolume calls.
+	DelegateFSGroupToCSIDriver featuregate.Feature = "DelegateFSGroupToCSIDriver"
+
 	// owner: @RobertKrawitz, @derekwaynecarr
 	// beta: v1.15
 	// GA: v1.20
@@ -859,6 +866,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodSecurity:                                    {Default: false, PreRelease: featuregate.Alpha},
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
 	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
+	DelegateFSGroupToCSIDriver:                     {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
