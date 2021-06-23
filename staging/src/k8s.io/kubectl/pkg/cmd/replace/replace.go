@@ -95,6 +95,7 @@ type ReplaceOptions struct {
 	genericclioptions.IOStreams
 
 	fieldManager string
+	subresource  string
 }
 
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
@@ -132,6 +133,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, replace will operate on the subresource of the requested object.")
 
 	return cmd
 }
@@ -238,6 +240,10 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		}
 	}
 
+	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -262,6 +268,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.subresource).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -295,6 +302,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
+			WithSubresource(o.subresource).
 			Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
@@ -330,6 +338,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.subresource).
 		Flatten()
 	if stdinInUse {
 		b = b.StdinInUse()
@@ -369,6 +378,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.subresource).
 		Flatten()
 	if stdinInUse {
 		b = b.StdinInUse()

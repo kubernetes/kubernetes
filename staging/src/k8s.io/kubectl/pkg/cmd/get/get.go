@@ -82,6 +82,7 @@ type GetOptions struct {
 	IgnoreNotFound bool
 
 	genericclioptions.IOStreams
+	subresource string
 }
 
 var (
@@ -130,7 +131,10 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7`))
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		# List status subresource for a single pod.
+		kubectl get pod web-pod-13je7 --subresource status`))
 )
 
 const (
@@ -183,6 +187,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "This is an 'alpha' flag. If specified, gets the subresource of the requested object.")
 	return cmd
 }
 
@@ -316,6 +321,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
+	}
+	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+		return err
 	}
 	return nil
 }
@@ -470,6 +478,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
+		Subresource(o.subresource).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().

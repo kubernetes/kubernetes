@@ -69,6 +69,7 @@ type PatchOptions struct {
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	fieldManager                 string
+	subresource                  string
 
 	genericclioptions.IOStreams
 }
@@ -93,7 +94,10 @@ var (
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
 
 		# Update a container's image using a json patch with positional arrays.
-		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
+		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
+
+		# Update a deployment's replicas through the scale subresource using a merge patch.
+		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
 
 func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
@@ -131,6 +135,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
+	cmdutil.AddSubresourceFlags(cmd, &o.subresource, "If specified, patch will operate on the subresource of the requested object.")
 
 	return cmd
 }
@@ -190,7 +195,9 @@ func (o *PatchOptions) Validate() error {
 			return fmt.Errorf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), o.PatchType)
 		}
 	}
-
+	if err := cmdutil.IsValidSubresource(o.subresource); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -222,6 +229,7 @@ func (o *PatchOptions) RunPatch() error {
 		LocalParam(o.Local).
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		Subresource(o.subresource).
 		ResourceTypeOrNameArgs(false, o.args...).
 		Flatten().
 		Do()
@@ -253,7 +261,8 @@ func (o *PatchOptions) RunPatch() error {
 			helper := resource.
 				NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
-				WithFieldManager(o.fieldManager)
+				WithFieldManager(o.fieldManager).
+				WithSubresource(o.subresource)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				return err
