@@ -304,6 +304,10 @@ func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
 func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
+	if err != nil {
+		return nil, err
+	}
 	endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
