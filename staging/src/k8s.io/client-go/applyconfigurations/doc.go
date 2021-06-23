@@ -104,7 +104,7 @@ representation to be changed to support additional features in the future.
 
 Controller Support
 
-The new client-go support makes it much easier to use Server-side Apply in controllers.
+The new client-go support makes it much easier to use Server-side Apply in controllers, by either of two mechanisms.
 
 When authoring new controllers to use Server-side Apply, a good approach is to have the controller
 recreate the apply configuration for an object each time it reconciles that object.  This ensures
