@@ -35,25 +35,17 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/controller/certificates"
-
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
+	"k8s.io/kubernetes/pkg/controller/certificates"
 )
 
 func TestSigner(t *testing.T) {
-	clock := clock.FakeClock{}
+	fakeClock := clock.FakeClock{}
 
 	s, err := newSigner("kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	currCA, err := s.caProvider.currentCA()
-	if err != nil {
-		t.Fatal(err)
-	}
-	currCA.Now = clock.Now
-	currCA.Backdate = 0
-	s.caProvider.caValue.Store(currCA)
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
@@ -69,7 +61,7 @@ func TestSigner(t *testing.T) {
 		capi.UsageKeyEncipherment,
 		capi.UsageServerAuth,
 		capi.UsageClientAuth,
-	})
+	}, fakeClock.Now)
 	if err != nil {
 		t.Fatalf("failed to sign CSR: %v", err)
 	}
@@ -94,7 +86,8 @@ func TestSigner(t *testing.T) {
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		NotAfter:              clock.Now().Add(1 * time.Hour),
+		NotBefore:             fakeClock.Now().Add(-5 * time.Minute),
+		NotAfter:              fakeClock.Now().Add(1 * time.Hour),
 		PublicKeyAlgorithm:    x509.ECDSA,
 		SignatureAlgorithm:    x509.SHA256WithRSA,
 		MaxPathLen:            -1,
