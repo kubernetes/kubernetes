@@ -191,7 +191,6 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 	extendedResource1 := map[string]int64{
 		"intel.com/foo": 4,
 	}
-
 	extendedResource2 := map[string]int64{
 		"intel.com/foo": 8,
 	}
@@ -231,27 +230,13 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 		name         string
 	}{
 		{
-
-			//  Node1 scores (used resources) on 0-MaxNodeScore scale
-			//  Node1 Score:
-			//  rawScoringFunction(used + requested / available)
-			//  resourceScoringFunction((0+0),8)
-			//      = 0/8 * maxUtilization = 0 = rawScoringFunction(0)
-			//  Node1 Score: 0
-			//  Node2 scores (used resources) on 0-MaxNodeScore scale
-			//  rawScoringFunction(used + requested / available)
-			//  resourceScoringFunction((0+0),4)
-			//      = 0/4 * maxUtilization = 0 = rawScoringFunction(0)
-			//  Node2 Score: 0
-
+			//  Node1 Score = Node2 Score = 0 as the incoming Pod doesn't request extended resource.
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "nothing scheduled, nothing requested",
 		},
-
 		{
-
 			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
@@ -263,7 +248,6 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((0+2),4)
 			//  = 2/4 * maxUtilization = 50 = rawScoringFunction(50)
 			// Node2 Score: 5
-
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
 			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 5}},
@@ -272,9 +256,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 				{Spec: noResources},
 			},
 		},
-
 		{
-
 			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
@@ -286,7 +268,6 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((2+2),4)
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
-
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
 			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 10}},
@@ -295,9 +276,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 				{Spec: machine2Pod},
 			},
 		},
-
 		{
-
 			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
@@ -309,7 +288,6 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((0+4),4)
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
-
 			pod:          &v1.Pod{Spec: extendedResourcePod2},
 			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 10}},

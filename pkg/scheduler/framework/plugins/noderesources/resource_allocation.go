@@ -52,14 +52,17 @@ func (r *resourceAllocationScorer) score(
 	if r.resourceToWeightMap == nil {
 		return 0, framework.NewStatus(framework.Error, "resources not found")
 	}
-	requested := make(resourceToValueMap, len(r.resourceToWeightMap))
-	allocatable := make(resourceToValueMap, len(r.resourceToWeightMap))
+	requested := make(resourceToValueMap)
+	allocatable := make(resourceToValueMap)
 	for resource := range r.resourceToWeightMap {
-		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
+		alloc, req := calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
+		if alloc != 0 {
+			// Only fill the extended resource entry when it's non-zero.
+			allocatable[resource], requested[resource] = alloc, req
+		}
 	}
-	var score int64
 
-	score = r.scorer(requested, allocatable)
+	score := r.scorer(requested, allocatable)
 
 	if klog.V(10).Enabled() {
 		klog.Infof(
@@ -72,15 +75,22 @@ func (r *resourceAllocationScorer) score(
 	return score, nil
 }
 
-// calculateResourceAllocatableRequest returns resources Allocatable and Requested values
+// calculateResourceAllocatableRequest returns 2 parameters:
+// - 1st param: quantity of allocatable resource on the node.
+// - 2nd param: aggregated quantity of requested resource on the node.
+// Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
 func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName, enablePodOverhead bool) (int64, int64) {
 	podRequest := calculatePodResourceRequest(pod, resource, enablePodOverhead)
+	// If it's an extended resource, and the pod doesn't request it. We return (0, 0)
+	// as an implication to bypass scoring on this resource.
+	if podRequest == 0 && schedutil.IsScalarResourceName(resource) {
+		return 0, 0
+	}
 	switch resource {
 	case v1.ResourceCPU:
 		return nodeInfo.Allocatable.MilliCPU, (nodeInfo.NonZeroRequested.MilliCPU + podRequest)
 	case v1.ResourceMemory:
 		return nodeInfo.Allocatable.Memory, (nodeInfo.NonZeroRequested.Memory + podRequest)
-
 	case v1.ResourceEphemeralStorage:
 		return nodeInfo.Allocatable.EphemeralStorage, (nodeInfo.Requested.EphemeralStorage + podRequest)
 	default:
@@ -89,9 +99,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 		}
 	}
 	if klog.V(10).Enabled() {
-		klog.Infof("requested resource %v not considered for node score calculation",
-			resource,
-		)
+		klog.Infof("requested resource %v not considered for node score calculation", resource)
 	}
 	return 0, 0
 }
