@@ -23,7 +23,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"time"
@@ -58,10 +58,10 @@ func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certifi
 		return nil, err
 	}
 	if len(cfg.CommonName) == 0 {
-		return nil, errors.New("must specify a CommonName")
+		return nil, fmt.Errorf("must specify a CommonName")
 	}
 	if len(cfg.Usages) == 0 {
-		return nil, errors.New("must specify at least one ExtKeyUsage")
+		return nil, fmt.Errorf("must specify at least one ExtKeyUsage")
 	}
 
 	certTmpl := x509.Certificate{
