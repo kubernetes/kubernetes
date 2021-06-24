@@ -157,7 +157,7 @@ func (m *Manager) start() (chan struct{}, error) {
 			return nil, err
 		}
 
-		if updatedInhibitDelay != m.shutdownGracePeriodRequested {
+		if m.shutdownGracePeriodRequested > updatedInhibitDelay {
 			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", m.shutdownGracePeriodRequested, updatedInhibitDelay)
 		}
 	}
