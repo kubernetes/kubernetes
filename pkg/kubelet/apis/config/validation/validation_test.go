@@ -150,7 +150,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"GracefulNodeShutdown":    true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
-			Format: "json",
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase3); allErrors != nil {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package register
 
 import (
 	"bytes"
@@ -25,10 +25,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs"
 )
 
-func TestFlags(t *testing.T) {
-	o := NewOptions()
+func TestJSONFlag(t *testing.T) {
+	o := logs.NewOptions()
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	output := bytes.Buffer{}
 	o.AddFlags(fs)
@@ -36,7 +37,7 @@ func TestFlags(t *testing.T) {
 	fs.PrintDefaults()
 	want := `      --experimental-logging-sanitization   [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
                                             Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.
-      --logging-format string               Sets the log format. Permitted formats: "text".
+      --logging-format string               Sets the log format. Permitted formats: "json", "text".
                                             Non-default formats don't honor these flags: --add_dir_header, --alsologtostderr, --log_backtrace_at, --log_dir, --log_file, --log_file_max_size, --logtostderr, --one_output, --skip_headers, --skip_log_headers, --stderrthreshold, --vmodule, --log-flush-frequency.
                                             Non-default choices are currently alpha and subject to change without warning. (default "text")
 `
@@ -45,36 +46,26 @@ func TestFlags(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
+func TestJSONFormatRegister(t *testing.T) {
 	testcases := []struct {
 		name string
 		args []string
-		want *Options
+		want *logs.Options
 		errs field.ErrorList
 	}{
 		{
-			name: "Default log format",
-			want: NewOptions(),
-		},
-		{
-			name: "Text log format",
-			args: []string{"--logging-format=text"},
-			want: NewOptions(),
-		},
-		{
-			name: "log sanitization",
-			args: []string{"--experimental-logging-sanitization"},
-			want: &Options{
+			name: "JSON log format",
+			args: []string{"--logging-format=json"},
+			want: &logs.Options{
 				Config: config.LoggingConfiguration{
-					Format:       DefaultLogFormat,
-					Sanitization: true,
+					Format: logs.JSONLogFormat,
 				},
 			},
 		},
 		{
 			name: "Unsupported log format",
 			args: []string{"--logging-format=test"},
-			want: &Options{
+			want: &logs.Options{
 				Config: config.LoggingConfiguration{
 					Format: "test",
 				},
@@ -90,7 +81,7 @@ func TestOptions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			o := NewOptions()
+			o := logs.NewOptions()
 			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 			o.AddFlags(fs)
 			fs.Parse(tc.args)
