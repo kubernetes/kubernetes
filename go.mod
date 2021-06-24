@@ -232,7 +232,6 @@ replace (
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
 	github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
-	github.com/etcd-io/gofail => github.com/etcd-io/gofail v0.0.0-20190801230047-ad7f989257ca
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
@@ -334,7 +333,7 @@ replace (
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.6
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
-	github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.9
+	github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.7
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 	github.com/miekg/dns => github.com/miekg/dns v1.0.14
 	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
@@ -362,7 +361,7 @@ replace (
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 	github.com/nxadm/tail => github.com/nxadm/tail v1.4.4
-	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
+	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
@@ -426,11 +425,9 @@ replace (
 	go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.0
 	go.etcd.io/etcd/client/v2 => go.etcd.io/etcd/client/v2 v2.305.0
 	go.etcd.io/etcd/client/v3 => go.etcd.io/etcd/client/v3 v3.5.0
-	go.etcd.io/etcd/etcdutl/v3 => go.etcd.io/etcd/etcdutl/v3 v3.5.0
 	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.5.0
 	go.etcd.io/etcd/raft/v3 => go.etcd.io/etcd/raft/v3 v3.5.0
 	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.5.0
-	go.etcd.io/etcd/tests/v3 => go.etcd.io/etcd/tests/v3 v3.5.0
 	go.opencensus.io => go.opencensus.io v0.22.3
 	go.opentelemetry.io/contrib => go.opentelemetry.io/contrib v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
