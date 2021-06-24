@@ -100,6 +100,14 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 		{Name: string(v1.ResourceCPU), Weight: 1},
 		{Name: string(v1.ResourceMemory), Weight: 1},
 	}
+	extendedRes := "abc.com/xyz"
+	extendedResourceLeastAllocatedSet := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+		{Name: extendedRes, Weight: 1},
+	}
+	cpuMemoryAndExtendedRes := *cpuAndMemory.DeepCopy()
+	cpuMemoryAndExtendedRes.Containers[0].Resources.Requests[v1.ResourceName(extendedRes)] = resource.MustParse("2")
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -270,7 +278,7 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			name:         "nothing scheduled, resources requested with different weight on CPU and memory, differently sized machines",
 		},
 		{
-			// resource with negtive weight is not allowed
+			// resource with negative weight is not allowed
 			pod:   &v1.Pod{Spec: cpuAndMemory},
 			nodes: []*v1.Node{makeNode("machine", 4000, 10000)},
 			args:  config.NodeResourcesLeastAllocatedArgs{Resources: []config.ResourceSpec{{Name: "memory", Weight: -1}, {Name: "cpu", Weight: 1}}},
@@ -307,6 +315,40 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 				},
 			}.ToAggregate(),
 			name: "resource weight larger than MaxNodeScore",
+		},
+		{
+			// Bypass extended resource if the pod does not request.
+			// For both nodes: cpuScore and memScore are 50
+			// Given that extended resource score are intentionally bypassed,
+			// the final scores are:
+			// - node1: (50 + 50) / 2 = 50
+			// - node2: (50 + 50) / 2 = 50
+			pod: &v1.Pod{Spec: cpuAndMemory},
+			nodes: []*v1.Node{
+				makeNode("machine1", 6000, 10000),
+				makeNodeWithExtendedResource("machine2", 6000, 10000, map[string]int64{extendedRes: 4}),
+			},
+			args:         config.NodeResourcesLeastAllocatedArgs{Resources: extendedResourceLeastAllocatedSet},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 50}},
+			name:         "bypass extended resource if the pod does not request",
+		},
+		{
+			// Honor extended resource if the pod requests.
+			// For both nodes: cpuScore and memScore are 50.
+			// In terms of extended resource score:
+			// - node1 get: 2 / 4 * 100 = 50
+			// - node2 get: (10 - 2) / 10 * 100 = 80
+			// So the final scores are:
+			// - node1: (50 + 50 + 50) / 3 = 50
+			// - node2: (50 + 50 + 80) / 3 = 60
+			pod: &v1.Pod{Spec: cpuMemoryAndExtendedRes},
+			nodes: []*v1.Node{
+				makeNodeWithExtendedResource("machine1", 6000, 10000, map[string]int64{extendedRes: 4}),
+				makeNodeWithExtendedResource("machine2", 6000, 10000, map[string]int64{extendedRes: 10}),
+			},
+			args:         config.NodeResourcesLeastAllocatedArgs{Resources: extendedResourceLeastAllocatedSet},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 60}},
+			name:         "honor extended resource if the pod requests",
 		},
 	}
 

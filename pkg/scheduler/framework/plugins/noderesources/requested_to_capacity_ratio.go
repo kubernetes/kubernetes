@@ -125,7 +125,8 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 	}
 	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
-		for resource, weight := range resourceToWeightMap {
+		for resource := range requested {
+			weight := resourceToWeightMap[resource]
 			resourceScore := resourceScoringFunction(requested[resource], allocable[resource])
 			if resourceScore > 0 {
 				nodeScore += resourceScore * weight

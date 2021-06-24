@@ -122,6 +122,14 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 		{Name: string(v1.ResourceCPU), Weight: 1},
 		{Name: string(v1.ResourceMemory), Weight: 1},
 	}
+	extendedRes := "abc.com/xyz"
+	extendedResourceMostAllocatedSet := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+		{Name: extendedRes, Weight: 1},
+	}
+	cpuMemoryAndExtendedRes := *cpuAndMemory.DeepCopy()
+	cpuMemoryAndExtendedRes.Containers[0].Resources.Requests[v1.ResourceName(extendedRes)] = resource.MustParse("2")
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -293,6 +301,40 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 				},
 			}.ToAggregate(),
 			name: "resource weight larger than MaxNodeScore",
+		},
+		{
+			// Bypass extended resource if the pod does not request.
+			// For both nodes: cpuScore and memScore are 50
+			// Given that extended resource score are intentionally bypassed,
+			// the final scores are:
+			// - node1: (50 + 50) / 2 = 50
+			// - node2: (50 + 50) / 2 = 50
+			pod: &v1.Pod{Spec: cpuAndMemory},
+			nodes: []*v1.Node{
+				makeNode("machine1", 6000, 10000),
+				makeNodeWithExtendedResource("machine2", 6000, 10000, map[string]int64{extendedRes: 4}),
+			},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: extendedResourceMostAllocatedSet},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 50}},
+			name:         "bypass extended resource if the pod does not request",
+		},
+		{
+			// Honor extended resource if the pod requests.
+			// For both nodes: cpuScore and memScore are 50.
+			// In terms of extended resource score:
+			// - node1 get: 2 / 4 * 100 = 50
+			// - node2 get: 2 / 10 * 100 = 20
+			// So the final scores are:
+			// - node1: (50 + 50 + 50) / 3 = 50
+			// - node2: (50 + 50 + 20) / 3 = 40
+			pod: &v1.Pod{Spec: cpuMemoryAndExtendedRes},
+			nodes: []*v1.Node{
+				makeNodeWithExtendedResource("machine1", 6000, 10000, map[string]int64{extendedRes: 4}),
+				makeNodeWithExtendedResource("machine2", 6000, 10000, map[string]int64{extendedRes: 10}),
+			},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: extendedResourceMostAllocatedSet},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 40}},
+			name:         "honor extended resource if the pod requests",
 		},
 	}
 

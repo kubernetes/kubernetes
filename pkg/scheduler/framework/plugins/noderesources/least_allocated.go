@@ -95,7 +95,8 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle, fts feature.Fe
 func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap) int64 {
 	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
-		for resource, weight := range resToWeightMap {
+		for resource := range requested {
+			weight := resToWeightMap[resource]
 			resourceScore := leastRequestedScore(requested[resource], allocable[resource])
 			nodeScore += resourceScore * weight
 			weightSum += weight
