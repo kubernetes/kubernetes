@@ -152,7 +152,8 @@ foo: bar`),
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			fs := utilfs.NewFakeFs()
+			fs := utilfs.NewTempFs()
+			fs.MkdirAll(configDir, 0777)
 			path := filepath.Join(configDir, kubeletFile)
 			if c.file != nil {
 				if err := addFile(fs, path, *c.file); err != nil {
