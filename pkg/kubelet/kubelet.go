@@ -786,7 +786,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
-	// Safe, allowlisted sysctls can always be used as unsafe sysctls in the spec.
+	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
 	// Hence, we concatenate those two lists.
 	safeAndUnsafeSysctls := append(sysctlallowlist.SafeSysctlAllowlist(), allowedUnsafeSysctls...)
 	sysctlsAllowlist, err := sysctl.NewAllowlist(safeAndUnsafeSysctls)
