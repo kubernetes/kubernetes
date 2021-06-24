@@ -120,8 +120,6 @@ func getCertPhaseFlags(name string) []string {
 	flags := []string{
 		options.CertificatesDir,
 		options.CfgPath,
-		options.CSROnly,
-		options.CSRDir,
 		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
