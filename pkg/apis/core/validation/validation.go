@@ -1540,7 +1540,7 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	}
 	if storageos.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(&core.SecretReference{
-			Name: storageos.SecretRef.Name,
+			Name:      storageos.SecretRef.Name,
 			Namespace: storageos.SecretRef.Namespace,
 		}, fldPath.Child("secretRef"))...)
 	}
