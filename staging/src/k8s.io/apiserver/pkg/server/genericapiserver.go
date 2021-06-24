@@ -351,10 +351,15 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}()
 
 	// close socket after delayed stopCh
-	stoppedCh, err := s.NonBlockingRun(delayedStopCh.Signaled())
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(delayedStopCh.Signaled())
 	if err != nil {
 		return err
 	}
+	httpServerStoppedListeningCh := s.terminationSignals.HTTPServerStoppedListening
+	go func() {
+		<-listenerStoppedCh
+		httpServerStoppedListeningCh.Signal()
+	}()
 
 	drainedCh := s.terminationSignals.InFlightRequestsDrained
 	go func() {
@@ -389,7 +394,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
-func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, error) {
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
@@ -398,20 +403,22 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
 	if s.AuditBackend != nil {
 		if err := s.AuditBackend.Run(auditStopCh); err != nil {
-			return nil, fmt.Errorf("failed to run the audit backend: %v", err)
+			return nil, nil, fmt.Errorf("failed to run the audit backend: %v", err)
 		}
 	}
 
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
+	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
-		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
+		klog.V(1).Infof("[graceful-termination] ShutdownTimeout=%s", s.ShutdownTimeout)
+		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.ServeWithListenerStopped(s.Handler, s.ShutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
 			close(auditStopCh)
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -434,7 +441,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	return stoppedCh, nil
+	return stoppedCh, listenerStoppedCh, nil
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
