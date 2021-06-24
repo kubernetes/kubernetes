@@ -1046,7 +1046,7 @@ func (fv *FakeVolume) mountDeviceInternal(spec *Spec, devicePath string, deviceM
 	return nil
 }
 
-func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string) error {
+func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	return fv.mountDeviceInternal(spec, devicePath, deviceMountPath)
 }
 

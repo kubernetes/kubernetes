@@ -616,7 +616,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
-				deviceMountPath)
+				deviceMountPath,
+				volume.DeviceMounterArgs{FsGroup: fsGroup},
+			)
 			if err != nil {
 				og.checkForFailedMount(volumeToMount, err)
 				og.markDeviceErrorState(volumeToMount, devicePath, deviceMountPath, err, actualStateOfWorld)
