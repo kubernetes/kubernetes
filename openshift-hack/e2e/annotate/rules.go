@@ -145,7 +145,7 @@ var (
 		},
 		"[Skipped:gce]": {
 			// Requires creation of a different compute instance in a different zone and is not compatible with volumeBindingMode of WaitForFirstConsumer which we use in 4.x
-			`\[sig-scheduling\] Multi-AZ Cluster Volumes \[sig-storage\] should only be allowed to provision PDs in zones where nodes exist`,
+			`\[sig-storage\] Multi-AZ Cluster Volumes should only be allowed to provision PDs in zones where nodes exist`,
 
 			// The following tests try to ssh directly to a node. None of our nodes have external IPs
 			`\[k8s.io\] \[sig-node\] crictl should be able to run crictl on the node`,
