@@ -9,13 +9,11 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
-	github.com/hashicorp/golang-lru v0.5.1
 	github.com/json-iterator/go v1.1.11
 	github.com/kr/text v0.2.0 // indirect
 	github.com/moby/spdystream v0.2.0
