@@ -413,17 +413,17 @@ func truncateMessage(message string) string {
 
 func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
 	klog.V(3).InfoS("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
-	podCopy := pod.DeepCopy()
+	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
-	if !podutil.UpdatePodCondition(&podCopy.Status, condition) &&
+	if !podutil.UpdatePodCondition(podStatusCopy, condition) &&
 		(len(nominatedNode) == 0 || pod.Status.NominatedNodeName == nominatedNode) {
 		return nil
 	}
 	if nominatedNode != "" {
-		podCopy.Status.NominatedNodeName = nominatedNode
+		podStatusCopy.NominatedNodeName = nominatedNode
 	}
-	return util.PatchPod(client, pod, podCopy)
+	return util.PatchPodStatus(client, pod, podStatusCopy)
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
