@@ -383,13 +383,17 @@ type KubeletConfiguration struct {
 	// Default: "5m"
 	// +optional
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
-	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
-	// NodeLease provides an indicator of node health by having the Kubelet create and
-	// periodically renew a lease, named after the node, in the kube-node-lease namespace.
-	// If the lease expires, the node can be considered unhealthy.
-	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal
-	// interval may be set based on the lease duration.
-	// The field value must be greater than 0.
+	// nodeLeaseDurationSeconds is a parameter that must be
+	// greater than 0. This feature provides an indicator of node
+	// health by having the Kubelet create and periodically renew
+	// a lease, named after the node, in the kube-node-lease
+	// namespace. The renewal period is one fourth of the
+	// `nodeLeaseDurationSeconds`. The `duration` field of the
+	// lease's status is not important. The
+	// kube-controller-manager has a parameter, known on the
+	// command line as `--node-monitor-grace-period`, and marks a
+	// node unhealthy if the Kubelet does no health
+	// update for that amount of time.
 	// If DynamicKubeletConfig (deprecated; default off) is on, when
 	// dynamically updating this field, consider that
 	// decreasing the duration may reduce tolerance for issues that temporarily prevent
