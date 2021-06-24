@@ -407,6 +407,8 @@ type KubeletConfiguration struct {
 	EnableProfilingHandler bool
 	// EnableDebugFlagsHandler enables/debug/flags/v handler.
 	EnableDebugFlagsHandler bool
+	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
+	SeccompDefault bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
