@@ -1064,8 +1064,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 		// traffic that is supposed to be blocked.
 		ginkgo.It("should not mistakenly treat 'protocol: SCTP' as 'protocol: TCP', even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func() {
 			nsX, _, _, model, k8s := getK8SModel(f)
-
 			ginkgo.By("Creating a default-deny ingress policy.")
+			// Empty podSelector blocks the entire namespace
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules())
 			CreatePolicy(k8s, policy, nsX)
 
@@ -1077,7 +1077,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			ginkgo.By("Trying to connect to TCP port 81, which should be blocked by the deny-ingress policy.")
 			reachability := NewReachability(model.AllPods(), true)
-			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
