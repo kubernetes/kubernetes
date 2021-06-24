@@ -78,6 +78,7 @@ type csiClient interface {
 		secrets map[string]string,
 		volumeContext map[string]string,
 		mountOptions []string,
+		fsGroup *int64,
 	) error
 
 	NodeGetVolumeStats(
@@ -384,6 +385,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	secrets map[string]string,
 	volumeContext map[string]string,
 	mountOptions []string,
+	fsGroup *int64,
 ) error {
 	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
@@ -425,11 +427,24 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 			Block: &csipbv1.VolumeCapability_BlockVolume{},
 		}
 	} else {
+		mountVolume := &csipbv1.VolumeCapability_MountVolume{
+			FsType:     fsType,
+			MountFlags: mountOptions,
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
+			supported, err := c.NodeSupportsVolumeMountGroup(ctx)
+			if err != nil {
+				return err
+			}
+
+			if supported && fsGroup != nil {
+				mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
+			}
+		}
+
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
-			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType:     fsType,
-				MountFlags: mountOptions,
-			},
+			Mount: mountVolume,
 		}
 	}
 

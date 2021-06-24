@@ -280,6 +280,7 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 	if mounted != nil {
 		fsType = mounted.GetFsType()
 		csiVol.MountFlags = mounted.GetMountFlags()
+		csiVol.VolumeMountGroup = mounted.VolumeMountGroup
 	}
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")

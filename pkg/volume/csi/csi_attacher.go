@@ -374,7 +374,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		accessMode,
 		nodeStageSecrets,
 		csiSource.VolumeAttributes,
-		mountOptions)
+		mountOptions,
+		deviceMounterArgs.FsGroup)
 
 	if err != nil {
 		return err
