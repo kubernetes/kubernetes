@@ -600,7 +600,7 @@ func countEndpoints(eps *corev1.Endpoints) int {
 	return count
 }
 
-func TestMasterService(t *testing.T) {
+func TestAPIServerService(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
