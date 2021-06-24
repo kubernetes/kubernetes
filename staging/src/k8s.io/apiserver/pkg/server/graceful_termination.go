@@ -47,6 +47,10 @@ T0+70s: AfterShutdownDelayDuration: shutdown delay duration has passed
       up to '60s' (dictated by ShutdownTimeout)
 	- active long running requests will receive a GOAWAY.
 
+T0+70s: HTTPServerStoppedListening:
+	- this event is signaled when the HTTP Server has stopped listening
+      which is immediately after server.Shutdown has been invoked
+
 T0 + 70s + up-to 60s: InFlightRequestsDrained: existing in flight requests have been drained
 	- long running requests are outside of this scope
 	- up-to 60s: the default value of 'ShutdownTimeout' is 60s, this means that
@@ -88,6 +92,10 @@ type terminationSignals struct {
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
 	InFlightRequestsDrained terminationSignal
+
+	// HTTPServerStoppedListening termination event is signaled when the
+	// HTTP Server has stopped listening to the underlying socket.
+	HTTPServerStoppedListening terminationSignal
 }
 
 // newTerminationSignals returns an instance of terminationSignals interface to be used
@@ -97,6 +105,7 @@ func newTerminationSignals() terminationSignals {
 		ShutdownInitiated:          newNamedChannelWrapper("ShutdownInitiated"),
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
+		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 	}
 }
 
