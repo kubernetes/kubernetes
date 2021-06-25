@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	fss := cliflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, fss, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers(), fss, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -63,6 +63,30 @@ func main() {
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// If custom ClientNames are used, as below, then the controller will not use
+// the API server bootstrapped RBAC, and instead will require it to be installed
+// separately.
+func controllerInitializers() map[string]app.ControllerInitFuncConstructor {
+	controllerInitializers := app.DefaultInitFuncConstructors
+	if constructor, ok := controllerInitializers["cloud-node"]; ok {
+		constructor.InitContext.ClientName = "mycloud-external-cloud-node-controller"
+		controllerInitializers["cloud-node"] = constructor
+	}
+	if constructor, ok := controllerInitializers["cloud-node-lifecycle"]; ok {
+		constructor.InitContext.ClientName = "mycloud-external-cloud-node-lifecycle-controller"
+		controllerInitializers["cloud-node-lifecycle"] = constructor
+	}
+	if constructor, ok := controllerInitializers["service"]; ok {
+		constructor.InitContext.ClientName = "mycloud-external-service-controller"
+		controllerInitializers["service"] = constructor
+	}
+	if constructor, ok := controllerInitializers["route"]; ok {
+		constructor.InitContext.ClientName = "mycloud-external-route-controller"
+		controllerInitializers["route"] = constructor
+	}
+	return controllerInitializers
 }
 
 func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {

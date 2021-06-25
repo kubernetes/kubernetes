@@ -52,7 +52,7 @@ type nodeIPAMController struct {
 	nodeIPAMControllerOptions       nodeipamcontrolleroptions.NodeIPAMControllerOptions
 }
 
-func (nodeIpamController *nodeIPAMController) startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
+func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(initContext app.ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
 	allErrors := nodeIpamController.nodeIPAMControllerOptions.Validate()
 	if len(allErrors) > 0 {
 		klog.Fatal("NodeIPAM controller values are not properly set.")
@@ -60,11 +60,11 @@ func (nodeIpamController *nodeIPAMController) startNodeIpamControllerWrapper(com
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
 	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, ctx, cloud)
+		return startNodeIpamController(initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, ctx, cloud)
 	}
 }
 
-func startNodeIpamController(ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
+func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
@@ -147,7 +147,7 @@ func startNodeIpamController(ccmConfig *cloudcontrollerconfig.CompletedConfig, n
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		cloud,
-		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		ctx.ClientBuilder.ClientOrDie(initContext.ClientName),
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,
