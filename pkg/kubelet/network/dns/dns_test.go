@@ -743,3 +743,19 @@ func newTestPods(count int) []*v1.Pod {
 	}
 	return pods
 }
+
+func TestGetHostDNSConfig(t *testing.T) {
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testHostDnsConfigFile := "test-dns"
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, "TEST", testHostDnsConfigFile)
+	_, err := configurer.getHostDNSConfig()
+	if err != nil {
+		t.Errorf("getHostDNSConfig wanted empty dns settings, got err: %v", err)
+	}
+}

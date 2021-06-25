@@ -284,6 +284,10 @@ func (c *Configurer) getHostDNSConfig() (*runtimeapi.DNSConfig, error) {
 	if c.ResolverConfig != "" {
 		f, err := os.Open(c.ResolverConfig)
 		if err != nil {
+			// if there is no resolve file on host, return empty DNS settings.
+			if os.IsNotExist(err) {
+				return &runtimeapi.DNSConfig{}, nil
+			}
 			return nil, err
 		}
 		defer f.Close()
