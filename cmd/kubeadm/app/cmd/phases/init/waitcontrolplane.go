@@ -91,7 +91,15 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "cannot obtain client")
 	}
 
-	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
+	// Because Timeouts and ApiServerHealthCheck are not exist in v1beta2
+	// move set default value of ApiServerHealthCheck from defaults.go to here
+	// otherwise fuzzer and round trip test fail
+	var timeout time.Duration
+	if data.Cfg().Timeouts.ApiServerHealthCheck == nil {
+		timeout = kubeadmconstants.DefaultControlPlaneTimeout
+	} else {
+		timeout = data.Cfg().Timeouts.ApiServerHealthCheck.Duration
+	}
 	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")

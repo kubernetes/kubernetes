@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	utilsnet "k8s.io/utils/net"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -52,12 +53,13 @@ const (
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 // This function is used by init - when the etcd cluster is empty - or by kubeadm
 // upgrade - when the etcd cluster is already up and running (and the --initial-cluster flag have no impact)
-func CreateLocalEtcdStaticPodManifestFile(manifestDir, patchesDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
+func CreateLocalEtcdStaticPodManifestFile(manifestDir, patchesDir string, nodeName string, initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
+	cfg := &initCfg.ClusterConfiguration
 	if cfg.Etcd.External != nil {
 		return errors.New("etcd static pod manifest cannot be generated for cluster using external etcd")
 	}
 
-	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, cfg, endpoint, nodeName, []etcdutil.Member{}, isDryRun); err != nil {
+	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, initCfg, endpoint, nodeName, []etcdutil.Member{}, isDryRun); err != nil {
 		return err
 	}
 
@@ -133,7 +135,8 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 // CreateStackedEtcdStaticPodManifestFile will write local etcd static pod manifest file
 // for an additional etcd member that is joining an existing local/stacked etcd cluster.
 // Other members of the etcd cluster will be notified of the joining node in beforehand as well.
-func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
+func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, initCfg *kubeadmapi.InitaConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
+	cfg := &initCfg.ClusterConfiguration
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
@@ -178,7 +181,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 
 	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
 
-	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, cfg, endpoint, nodeName, initialCluster, isDryRun); err != nil {
+	if err := prepareAndWriteEtcdStaticPod(manifestDir, patchesDir, initCfg, endpoint, nodeName, initialCluster, isDryRun); err != nil {
 		return err
 	}
 
@@ -192,7 +195,8 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current configuration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
-func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
+func GetEtcdPodSpec(initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
+	cfg := &initCfg.ClusterConfiguration
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
@@ -200,6 +204,16 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	}
 	// probeHostname returns the correct localhost IP address family based on the endpoint AdvertiseAddress
 	probeHostname, probePort, probeScheme := staticpodutil.GetEtcdProbeEndpoint(&cfg.Etcd, utilsnet.IsIPv6String(endpoint.AdvertiseAddress))
+
+	// Because Timeouts and ApiServerHealthCheck are not exist in v1beta2
+	// move set default value of ApiServerHealthCheck from defaults.go to here
+	// otherwise fuzzer and round trip test fail
+	if initCfg.Timeouts.ApiServerHealthCheck == nil {
+		initCfg.Timeouts.ApiServerHealthCheck = &metav1.Duration{
+			Duration: kubeadmconstants.DefaultControlPlaneTimeout,
+		}
+	}
+
 	return staticpodutil.ComponentPod(
 		v1.Container{
 			Name:            kubeadmconstants.Etcd,
@@ -218,7 +232,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 				},
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
-			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, initCfg.Timeouts.ApiServerHealthCheck),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)
@@ -270,9 +284,10 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 	return command
 }
 
-func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, isDryRun bool) error {
+func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, isDryRun bool) error {
 	// gets etcd StaticPodSpec, actualized for the current ClusterConfiguration and the new list of etcd members
-	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
+	spec := GetEtcdPodSpec(initCfg, endpoint, nodeName, initialCluster)
+	cfg := &initCfg.ClusterConfiguration
 
 	var usersAndGroups *users.UsersAndGroups
 	var err error

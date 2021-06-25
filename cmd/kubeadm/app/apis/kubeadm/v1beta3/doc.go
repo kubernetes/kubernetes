@@ -36,6 +36,16 @@ limitations under the License.
 // "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
 // - Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
 // the user to configure a directory from which to take patches for components deployed by kubeadm.
+// - Add InitTimeouts to hold timeout fields that relate to registering a new control-plane to the cluster,
+// via "kubeadm init"
+// - Add JoinTimeouts to hold timeout fields that relate to registering a new control-plane or node to the cluster,
+// via "kubeadm join"
+// - Add Timeouts(InitTimeouts) field into InitConfiguration struct to holds timeout fields that relate to registering a new control-plane
+// to the cluster
+// - Add Timeouts(JoinTimeouts) field into JoinConfiguration struct to holds timeout fields that relate to registering a new control-plane or
+// node to the cluster
+// - Remove TimeoutForControlPlane field from APIServer, because TimeoutForControlPlane has been removed into InitTimeouts and JoinTimeouts
+// structure and renamed to ApiServerHealthCheck
 //
 // Migration from old kubeadm config versions
 //

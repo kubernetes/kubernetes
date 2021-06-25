@@ -48,3 +48,12 @@ func Convert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in *kubeadm.
 func Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(in, out, s)
 }
+
+// Convert_kubeadm_APIServer_To_v1beta2_APIServer is required since APIServer.TimeoutForControlPlane has be removed
+func Convert_kubeadm_APIServer_To_v1beta2_APIServer(in *kubeadm.APIServer, out *APIServer, s conversion.Scope) error {
+	return autoConvert_kubeadm_APIServer_To_v1beta2_APIServer(in, out, s)
+}
+
+func Convert_v1beta2_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
+	return autoConvert_v1beta2_APIServer_To_kubeadm_APIServer(in, out, s)
+}

@@ -148,7 +148,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
 	// TODO: add support for join dry-run: https://github.com/kubernetes/kubeadm/issues/2505
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false /* isDryRun */); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.PatchesDir(), cfg.NodeRegistration.Name, cfg, &cfg.LocalAPIEndpoint, false /* isDryRun */); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 

@@ -194,7 +194,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		err := controlplane.CreateStaticPodFiles(
 			kubeadmconstants.GetStaticPodDirectory(),
 			data.PatchesDir(),
-			&cfg.ClusterConfiguration,
+			cfg,
 			&cfg.LocalAPIEndpoint,
 			// TODO: add support for join dry-run:
 			// https://github.com/kubernetes/kubeadm/issues/2505

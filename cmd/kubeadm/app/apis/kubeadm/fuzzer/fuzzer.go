@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -59,6 +58,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = ""
 	obj.Patches = nil
+	obj.Timeouts = kubeadm.InitTimeouts{}
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -77,9 +77,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.ClusterName = "bar"
 	obj.ImageRepository = "baz"
 	obj.KubernetesVersion = "qux"
-	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
-		Duration: constants.DefaultControlPlaneTimeout,
-	}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
@@ -122,6 +119,7 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = ""
 	obj.Patches = nil
+	obj.Timeouts = kubeadm.JoinTimeouts{}
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

@@ -46,13 +46,18 @@ var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta
 
 func TestGetStaticPodSpecs(t *testing.T) {
 
+	// Creates a InitConfiguration
+	initCfg := kubeadmapi.InitConfiguration{}
+
 	// Creates a Cluster Configuration
-	cfg := &kubeadmapi.ClusterConfiguration{
+	cfg := kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
 	}
 
+	initCfg.ClusterConfiguration = cfg
+
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
+	specs := GetStaticPodSpecs(&initCfg, &kubeadmapi.APIEndpoint{})
 
 	var tests = []struct {
 		name          string
@@ -119,14 +124,17 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
+			// Creates a InitConfiguration
+			initCfg := &kubeadmapi.InitConfiguration{}
 			// Creates a Cluster Configuration
-			cfg := &kubeadmapi.ClusterConfiguration{
+			cfg := kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.9.0",
 			}
 
+			initCfg.ClusterConfiguration = cfg
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, false /* isDryRun */, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", initCfg, &kubeadmapi.APIEndpoint{}, false /* isDryRun */, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -147,11 +155,14 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
+	// Creates a InitConfiguration
+	initCfg := &kubeadmapi.InitConfiguration{}
+
 	// Creates a Cluster Configuration
-	cfg := &kubeadmapi.ClusterConfiguration{
+	cfg := kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
 	}
-
+	initCfg.ClusterConfiguration = cfg
 	patchesPath := filepath.Join(tmpdir, "patch-files")
 	err := os.MkdirAll(patchesPath, 0777)
 	if err != nil {
@@ -171,7 +182,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 
 	// Execute createStaticPodFunction with patches
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, patchesPath, cfg, &kubeadmapi.APIEndpoint{}, false /* isDryRun */, kubeadmconstants.KubeAPIServer)
+	err = CreateStaticPodFiles(manifestPath, patchesPath, initCfg, &kubeadmapi.APIEndpoint{}, false /* isDryRun */, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return

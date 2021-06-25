@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/lithammer/dedent"
 
@@ -204,8 +203,6 @@ var (
 		obj  kubeadmapiv1.ClusterConfiguration
 	}{
 		yaml: dedent.Dedent(fmt.Sprintf(`
-			apiServer:
-			  timeoutForControlPlane: 4m
 			apiVersion: %s
 			certificatesDir: /etc/kubernetes/pki
 			clusterName: LeCluster
@@ -237,11 +234,6 @@ var (
 			Etcd: kubeadmapiv1.Etcd{
 				Local: &kubeadmapiv1.LocalEtcd{
 					DataDir: "/var/lib/etcd",
-				},
-			},
-			APIServer: kubeadmapiv1.APIServer{
-				TimeoutForControlPlane: &metav1.Duration{
-					Duration: 4 * time.Minute,
 				},
 			},
 		},

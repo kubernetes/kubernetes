@@ -65,6 +65,10 @@ type InitConfiguration struct {
 	// "kubeadm init".
 	// +optional
 	Patches *Patches `json:"patches,omitempty"`
+	
+	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
+	// either via "kubeadm init" or "kubeadm join"
+	Timeouts InitTimeouts `json:"timeout,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -157,10 +161,6 @@ type APIServer struct {
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	// +optional
 	CertSANs []string `json:"certSANs,omitempty"`
-
-	// TimeoutForControlPlane controls the timeout that we use for API server to appear
-	// +optional
-	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
 }
 
 // DNSAddOnType defines string identifying DNS add-on types
@@ -198,6 +198,23 @@ type APIEndpoint struct {
 	// Defaults to 6443.
 	// +optional
 	BindPort int32 `json:"bindPort,omitempty"`
+}
+
+// InitTimeouts holds timeout fields that relate to registering a new control-planeto the cluster,
+// via "kubeadm init"
+type InitTimeouts struct {
+
+	// ApiServerHealthCheck controls the timeout that we use for API server to appear
+	// +optional
+	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
+}
+
+// JoinTimeouts holds timeout fields that relate to registering a new control-plane or node to the cluster,
+// via "kubeadm join"
+type JoinTimeouts struct {
+	// ApiServerHealthCheck controls the timeout that we use for API server to appear
+	// +optional
+	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
 }
 
 // NodeRegistrationOptions holds fields that relate to registering a new control-plane or node to the cluster, either via "kubeadm init" or "kubeadm join"
@@ -368,6 +385,10 @@ type JoinConfiguration struct {
 	// "kubeadm join".
 	// +optional
 	Patches *Patches `json:"patches,omitempty"`
+	
+	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
+	// either via "kubeadm init" or "kubeadm join"
+	Timeouts JoinTimeouts `json:"timeout,omitempty"`
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
