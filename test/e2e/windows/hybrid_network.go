@@ -81,11 +81,13 @@ var (
 )
 
 func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
-	gomega.Consistently(func() error {
+	connChecker := func() error {
 		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		_, _, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
 		return err
-	}, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	}
+	gomega.Eventually(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	gomega.Consistently(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func linuxCheck(address string, port int) []string {
