@@ -18,6 +18,7 @@ package netpol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -68,23 +69,25 @@ func UpdatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespac
 func ValidateOrFail(k8s *kubeManager, model *Model, testCase *TestCase) {
 	ginkgo.By("Validating reachability matrix...")
 
-	// 1st try
-	ginkgo.By("Validating reachability matrix... (FIRST TRY)")
-	ProbePodToPodConnectivity(k8s, model, testCase)
-	// 2nd try, in case first one failed
-	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
-		framework.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
+	err := wait.PollImmediate(3*time.Second, 15*time.Second, func() (done bool, err error) {
 		ProbePodToPodConnectivity(k8s, model, testCase)
-	}
+		_, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback)
+		if isVerbose {
+			testCase.Reachability.PrintSummary(true, true, true)
+		}
 
-	// at this point we know if we passed or failed, print final matrix and pass/fail the test.
-	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
-		testCase.Reachability.PrintSummary(true, true, true)
-		framework.Failf("Had %d wrong results in reachability matrix", wrong)
-	}
-	if isVerbose {
-		testCase.Reachability.PrintSummary(true, true, true)
-	}
+		if wrong == 0 {
+			return true, nil
+		} else {
+			if !isVerbose {
+				testCase.Reachability.PrintSummary(true, true, true)
+			}
+			framework.Logf("failed probe %d wrong results ... retrying", wrong)
+			return false, fmt.Errorf("failed probe %d wrong results.... retrying", wrong)
+		}
+	})
+	framework.ExpectNoError(err, "Wrong results in reachability matrix")
+
 	framework.Logf("VALIDATION SUCCESSFUL")
 }
 
