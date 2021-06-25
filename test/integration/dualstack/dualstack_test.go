@@ -1661,7 +1661,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
 	}
-	// service should be single stack
+	// service should remain dual stack
 	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
 	}
