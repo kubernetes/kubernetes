@@ -35,14 +35,9 @@ func TestJSONFlag(t *testing.T) {
 	o.AddFlags(fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
-	want := `      --experimental-logging-sanitization   [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-                                            Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.
-      --logging-format string               Sets the log format. Permitted formats: "json", "text".
-                                            Non-default formats don't honor these flags: --add_dir_header, --alsologtostderr, --log_backtrace_at, --log_dir, --log_file, --log_file_max_size, --logtostderr, --one_output, --skip_headers, --skip_log_headers, --stderrthreshold, --vmodule, --log-flush-frequency.
-                                            Non-default choices are currently alpha and subject to change without warning. (default "text")
-`
-	if !assert.Equal(t, want, output.String()) {
-		t.Errorf("Wrong list of flags. expect %q, got %q", want, output.String())
+	wantSubstring := `Permitted formats: "json", "text".`
+	if !assert.Contains(t, output.String(), wantSubstring) {
+		t.Errorf("JSON logging format flag is not available. expect to contain %q, got %q", wantSubstring, output.String())
 	}
 }
 
