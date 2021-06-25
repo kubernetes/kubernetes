@@ -164,6 +164,12 @@ const (
 	//
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
+
+	// owner: @dashpole
+	// alpha: v1.22
+	//
+	// Add support for distributed tracing in the API Server
+	APIServerTracing featuregate.Feature = "APIServerTracing"
 )
 
 func init() {
@@ -191,4 +197,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WarningHeaders:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.Beta},
 	APIServerIdentity:        {Default: false, PreRelease: featuregate.Alpha},
+	APIServerTracing:         {Default: false, PreRelease: featuregate.Alpha},
 }

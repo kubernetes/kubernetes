@@ -58,6 +58,7 @@ type ServerRunOptions struct {
 	EgressSelector          *genericoptions.EgressSelectorOptions
 	Metrics                 *metrics.Options
 	Logs                    *logs.Options
+	Traces                  *genericoptions.TracingOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -110,6 +111,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
 		Metrics:                 metrics.NewOptions(),
 		Logs:                    logs.NewOptions(),
+		Traces:                  genericoptions.NewTracingOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
@@ -180,6 +182,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
+	s.Traces.AddFlags(fss.FlagSet("traces"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
