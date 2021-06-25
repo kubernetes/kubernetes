@@ -19,6 +19,7 @@ package storagebackend
 import (
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -45,6 +46,8 @@ type TransportConfig struct {
 	TrustedCAFile string
 	// function to determine the egress dialer. (i.e. konnectivity server dialer)
 	EgressLookup egressselector.Lookup
+	// The TracerProvider can add tracing the connection
+	TracerProvider *trace.TracerProvider
 }
 
 // Config is configuration for creating a storage backend.
