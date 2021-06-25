@@ -38,6 +38,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -341,7 +342,7 @@ profiles:
 			options: &Options{
 				ConfigFile: configFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, err := newDefaultComponentConfig()
+					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -490,7 +491,7 @@ profiles:
 			options: &Options{
 				ConfigFile: oldConfigFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, err := newDefaultComponentConfig()
+					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -520,7 +521,7 @@ profiles:
 			name: "kubeconfig flag",
 			options: &Options{
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
@@ -593,7 +594,7 @@ profiles:
 			name: "overridden master",
 			options: &Options{
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
