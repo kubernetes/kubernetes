@@ -238,8 +238,11 @@ func (ServiceAccountSubject) SwaggerDoc() map[string]string {
 }
 
 var map_Subject = map[string]string{
-	"":     "Subject matches the originator of a request, as identified by the request authentication system. There are three ways of matching an originator; by user, group, or service account.",
-	"kind": "Required",
+	"":               "Subject matches the originator of a request, as identified by the request authentication system. There are three ways of matching an originator; by user, group, or service account.",
+	"kind":           "`kind` indicates which one of the other fields is non-empty. Required",
+	"user":           "`user` matches based on username.",
+	"group":          "`group` matches based on user group name.",
+	"serviceAccount": "`serviceAccount` matches ServiceAccounts.",
 }
 
 func (Subject) SwaggerDoc() map[string]string {
