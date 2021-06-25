@@ -882,12 +882,6 @@ func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) 
 		return false
 	}
 
-	if oldService.Spec.Type != api.ServiceTypeClusterIP &&
-		oldService.Spec.Type != api.ServiceTypeNodePort &&
-		oldService.Spec.Type != api.ServiceTypeLoadBalancer {
-		return false
-	}
-
 	// both must be of IPFamilyPolicy==PreferDualStack
 	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicyPreferDualStack {
 		return false
