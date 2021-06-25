@@ -51,7 +51,21 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
-		expectSandboxFailureEvent(f, pod, handler)
+		eventSelector := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      pod.Name,
+			"involvedObject.namespace": f.Namespace.Name,
+			"reason":                   events.FailedCreatePodSandBox,
+		}.AsSelector().String()
+		// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, framework.PodEventTimeout)
+		if err != nil {
+			framework.Logf("Warning: did not get event about FailedCreatePodSandBox. Err: %v", err)
+		}
+		// Check the pod is still not running
+		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
@@ -272,17 +286,4 @@ func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 		f.ClientSet, pod.Name, f.Namespace.Name))
-}
-
-// expectSandboxFailureEvent polls for an event with reason "FailedCreatePodSandBox" containing the
-// expected message string.
-func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) {
-	eventSelector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      pod.Name,
-		"involvedObject.namespace": f.Namespace.Name,
-		"reason":                   events.FailedCreatePodSandBox,
-	}.AsSelector().String()
-	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }
