@@ -174,9 +174,6 @@ type GenericAPIServer struct {
 	readyzChecksInstalled bool
 	livezGracePeriod      time.Duration
 	livezClock            clock.Clock
-	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
-	// will cause readyz to return unhealthy.
-	readinessStopCh chan struct{}
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
@@ -213,6 +210,10 @@ type GenericAPIServer struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
+
+	// terminationSignals provides access to the various termination
+	// signals that happen during the shutdown period of the apiserver.
+	terminationSignals terminationSignals
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -307,7 +308,10 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 	s.installHealthz()
 	s.installLivez()
-	err := s.addReadyzShutdownCheck(s.readinessStopCh)
+
+	// as soon as shutdown is initiated, readiness should start failing
+	readinessStopCh := s.terminationSignals.ShutdownInitiated.Signaled()
+	err := s.addReadyzShutdownCheck(readinessStopCh)
 	if err != nil {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
@@ -330,38 +334,45 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	delayedStopCh := make(chan struct{})
+	delayedStopCh := s.terminationSignals.AfterShutdownDelayDuration
+	shutdownInitiatedCh := s.terminationSignals.ShutdownInitiated
 
 	go func() {
-		defer close(delayedStopCh)
+		defer delayedStopCh.Signal()
 
 		<-stopCh
 
 		// As soon as shutdown is initiated, /readyz should start returning failure.
 		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
 		// and stop sending traffic to this server.
-		close(s.readinessStopCh)
+		shutdownInitiatedCh.Signal()
 
 		time.Sleep(s.ShutdownDelayDuration)
 	}()
 
 	// close socket after delayed stopCh
-	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(delayedStopCh.Signaled())
 	if err != nil {
 		return err
 	}
-
-	drainedCh := make(chan struct{})
+	httpServerStoppedListeningCh := s.terminationSignals.HTTPServerStoppedListening
 	go func() {
-		defer close(drainedCh)
+		<-listenerStoppedCh
+		httpServerStoppedListeningCh.Signal()
+	}()
+
+	drainedCh := s.terminationSignals.InFlightRequestsDrained
+	go func() {
+		defer drainedCh.Signal()
 
 		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
-		<-delayedStopCh
+		<-delayedStopCh.Signaled()
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 		s.HandlerChainWaitGroup.Wait()
 	}()
 
+	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
 	<-stopCh
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
@@ -369,19 +380,21 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	klog.V(1).Info("[graceful-termination] RunPreShutdownHooks has completed")
 
 	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
-	<-drainedCh
+	<-drainedCh.Signaled()
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
 	<-stoppedCh
 
+	klog.V(1).Info("[graceful-termination] apiserver is exiting")
 	return nil
 }
 
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
-func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, error) {
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
@@ -390,20 +403,22 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
 	if s.AuditBackend != nil {
 		if err := s.AuditBackend.Run(auditStopCh); err != nil {
-			return nil, fmt.Errorf("failed to run the audit backend: %v", err)
+			return nil, nil, fmt.Errorf("failed to run the audit backend: %v", err)
 		}
 	}
 
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
+	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
-		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
+		klog.V(1).Infof("[graceful-termination] ShutdownTimeout=%s", s.ShutdownTimeout)
+		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.ServeWithListenerStopped(s.Handler, s.ShutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
 			close(auditStopCh)
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -426,7 +441,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	return stoppedCh, nil
+	return stoppedCh, listenerStoppedCh, nil
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource

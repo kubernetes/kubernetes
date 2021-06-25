@@ -52,7 +52,7 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 	} else {
 		klog.Infof("Serving insecurely on %s", s.Listener.Addr())
 	}
-	_, err := RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
+	_, _, err := RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
 	// NOTE: we do not handle stoppedCh returned by RunServer for graceful termination here
 	return err
 }
