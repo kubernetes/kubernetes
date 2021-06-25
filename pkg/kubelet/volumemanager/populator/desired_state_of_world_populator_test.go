@@ -85,6 +85,72 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 	return dswp, fakePodManager
 }
 
+func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
+	// create dswp
+	dswp, fakePodManager := prepareDswpWithVolume(t)
+
+	// create pod
+	fakeOuterVolumeName := "dswp-test-volume-name"
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      fakeOuterVolumeName,
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", fakeOuterVolumeName, "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fakeOuterVolumeName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
+	uniqueVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+	expectedOuterVolumeName := "dswp-test-volume-name"
+
+	opts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          uniqueVolumeName,
+		OuterVolumeSpecName: generatedVolumeName, // fake reconstructed volume
+		VolumeGidVolume:     "",
+		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
+		VolumeMountState:    operationexecutor.VolumeMounted,
+	}
+	dswp.actualStateOfWorld.MarkVolumeAsAttached(opts.VolumeName, opts.VolumeSpec, "fake-node", "")
+	dswp.actualStateOfWorld.MarkVolumeAsMounted(opts)
+
+	dswp.findAndAddNewPods()
+
+	mountedVolumes := dswp.actualStateOfWorld.GetMountedVolumesForPod(podName)
+	found := false
+	for _, volume := range mountedVolumes {
+		if volume.OuterVolumeSpecName == expectedOuterVolumeName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf(
+			"Could not found pod volume %v in the list of actual state of world volumes to mount.",
+			expectedOuterVolumeName)
+	}
+
+}
+
 func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T) {
 	// create dswp
 	dswp, fakePodManager := prepareDswpWithVolume(t)

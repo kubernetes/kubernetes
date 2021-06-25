@@ -579,7 +579,8 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumeSpec: volumeSpec,
 		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
 		// for volume cleanup.
-		// TODO: in case pod is added back before reconciler starts to unmount, we can update this field from desired state information
+		// in case pod is added back to desired state, outerVolumeSpecName will be updated from dsw information.
+		// See issue #103143 and its fix for details.
 		outerVolumeSpecName: volume.volumeSpecName,
 		pod:                 pod,
 		deviceMounter:       deviceMounter,
