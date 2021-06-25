@@ -1187,9 +1187,13 @@ func TestAttacherMountDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		user, _ := user.Current()
-		if tc.populateDeviceMountPath && user.Uid == "0" {
-			t.Skipf("Skipping intentional failure on existing data when running as root.")
+		user, err := user.Current()
+		if err != nil {
+			t.Logf("Current user could not be determined, assuming non-root: %v", err)
+		} else {
+			if tc.populateDeviceMountPath && user.Uid == "0" {
+				t.Skipf("Skipping intentional failure on existing data when running as root.")
+			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
