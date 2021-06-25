@@ -50,6 +50,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
+		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		eventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -74,6 +75,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
 
 		rcName := createRuntimeClass(f, "preconfigured-handler", handler)
+		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
@@ -265,6 +267,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		framework.ExpectEqual(len(rcs.Items), 0, "filtered list should have 0 items")
 	})
 })
+
+func deleteRuntimeClass(f *framework.Framework, name string) {
+	err := f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), name, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "failed to delete RuntimeClass resource")
+}
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
 // synchronously creates it, and returns the generated name.
