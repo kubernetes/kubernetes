@@ -369,6 +369,11 @@ It'll take some time to get newer kublet, but in the meantime we'll
 continue to monitor CI. I encourage everyone to hold off from
 merging any major changes to our kubernetes fork to provide clear CI
 signal for the next 2-3 days.
+
+The following bugs were opened during the process, please treat
+them as the highest priority and release blockers for your team:
+
+<list bugs and assigned team>
 ```
 
 ## Followup work
