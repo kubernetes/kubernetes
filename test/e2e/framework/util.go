@@ -187,10 +187,10 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
-// MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
-func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
-	for _, distro := range supportedMasterOsDistros {
-		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
+// ControlPlaneOSDistroIs returns true if the control plane OS distro is included in the supportedControlPlaneOsDistros. Otherwise false.
+func ControlPlaneOSDistroIs(supportedControlPlaneOsDistros ...string) bool {
+	for _, distro := range supportedControlPlaneOsDistros {
+		if strings.EqualFold(distro, TestContext.ControlPlaneOSDistro) {
 			return true
 		}
 	}
@@ -1182,7 +1182,7 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
-// CoreDump SSHs to the master and all nodes and dumps their logs into dir.
+// CoreDump SSHs to the control plane and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
 	if TestContext.DisableLogDump {

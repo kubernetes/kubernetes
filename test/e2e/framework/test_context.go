@@ -119,7 +119,7 @@ type TestContextType struct {
 	// DumpSystemdJournal controls whether to dump the full systemd journal.
 	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
-	MasterOSDistro           string
+	ControlPlaneOSDistro     string
 	NodeOSDistro             string
 	NodeOSArch               string
 	VerifyServiceAccount     bool
@@ -129,7 +129,7 @@ type TestContextType struct {
 	CleanStart               bool
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
-	// only master Node will be monitored.
+	// only control plane Node will be monitored.
 	GatherKubeSystemResourceUsageData string
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            string
@@ -150,7 +150,7 @@ type TestContextType struct {
 	CreateTestingNS CreateTestingNSFn
 	// If set to true test will dump data about the namespace in which test was running.
 	DumpLogsOnFailure bool
-	// Disables dumping cluster log from master and nodes after all tests.
+	// Disables dumping cluster log from control plane and nodes after all tests.
 	DisableLogDump bool
 	// Path to the GCS artifacts directory to dump logs from nodes. Logexporter gets enabled if this is non-empty.
 	LogexporterGCSPath string
@@ -287,16 +287,16 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	// Randomize specs as well as suites
 	config.GinkgoConfig.RandomizeAllSpecs = true
 
-	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
+	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring control plane node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
-	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only master component metrics would be gathered.")
+	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only control plane component metrics would be gathered.")
 	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
-	flags.BoolVar(&TestContext.AllowGatheringProfiles, "allow-gathering-profiles", true, "If set to true framework will allow to gather CPU/memory allocation pprof profiles from the master.")
+	flags.BoolVar(&TestContext.AllowGatheringProfiles, "allow-gathering-profiles", true, "If set to true framework will allow to gather CPU/memory allocation pprof profiles from the control plane.")
 	flags.BoolVar(&TestContext.IncludeClusterAutoscalerMetrics, "include-cluster-autoscaler", false, "If set to true, framework will include Cluster Autoscaler when gathering metrics.")
 	flags.StringVar(&TestContext.OutputPrintType, "output-print-type", "json", "Format in which summaries should be printed: 'hr' for human readable, 'json' for JSON ones.")
 	flags.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
-	flags.BoolVar(&TestContext.DisableLogDump, "disable-log-dump", false, "If set to true, logs from master and nodes won't be gathered after test run.")
+	flags.BoolVar(&TestContext.DisableLogDump, "disable-log-dump", false, "If set to true, logs from control plane and nodes won't be gathered after test run.")
 	flags.StringVar(&TestContext.LogexporterGCSPath, "logexporter-gcs-path", "", "Path to the GCS artifacts directory to dump logs from nodes. Logexporter gets enabled if this is non-empty.")
 	flags.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flags.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
@@ -342,14 +342,14 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flags.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flags.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
-	flags.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
+	flags.StringVar(&TestContext.ControlPlaneOSDistro, "control-plane-os-distro", "debian", "The OS distribution of cluster control plane (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, windows, or custom), which determines how specific tests are implemented.")
 	flags.StringVar(&TestContext.NodeOSArch, "node-os-arch", "amd64", "The OS architecture of cluster VM instances (amd64, arm64, or custom).")
 	flags.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
-	flags.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flags.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes control plane. Only required if provider is gce or gke")
 	flags.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flags.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flags.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
@@ -363,7 +363,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flags.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flags.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
-	flags.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
+	flags.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on control plane instances. Valid only for gce, gke")
 
 	flags.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flags.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure or vsphere.")
