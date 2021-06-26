@@ -209,7 +209,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 			},
 		}
 
-		ginkgo.By("Creating a pod with a greylisted, but not whitelisted sysctl on the node")
+		ginkgo.By("Creating a pod with a greylisted, but not allowlisted sysctl on the node")
 		pod = podClient.Create(pod)
 
 		ginkgo.By("Watching for error events or started pod")

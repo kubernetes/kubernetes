@@ -188,7 +188,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register an admission webhook configuration that admits pod and configmap. Attempts to create
 		non-compliant pods and configmaps, or update/patch compliant pods and configmaps to be non-compliant MUST
 		be denied. An attempt to create a pod that causes a webhook to hang MUST result in a webhook timeout error,
-		and the pod creation MUST be denied. An attempt to create a non-compliant configmap in a whitelisted
+		and the pod creation MUST be denied. An attempt to create a non-compliant configmap in a allowlisted
 		namespace based on the webhook namespace selector MUST be allowed.
 	*/
 	framework.ConformanceIt("should be able to deny pod and configmap creation", func() {
@@ -1183,7 +1183,7 @@ func testWebhook(f *framework.Framework) {
 	// clean up the namespace
 	defer client.CoreV1().Namespaces().Delete(context.TODO(), skippedNamespaceName, metav1.DeleteOptions{})
 
-	ginkgo.By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
+	ginkgo.By("create a configmap that violates the webhook policy but is in a allowlisted namespace")
 	configmap = nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(skippedNamespaceName).Create(context.TODO(), configmap, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
