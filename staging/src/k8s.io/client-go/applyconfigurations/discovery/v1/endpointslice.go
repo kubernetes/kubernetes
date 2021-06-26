@@ -60,8 +60,19 @@ func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+	return extractEndpointSlice(endpointSlice, fieldManager, "")
+}
+
+// ExtractEndpointSliceStatus is the same as ExtractEndpointSlice except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEndpointSliceStatus(endpointSlice *discoveryv1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+	return extractEndpointSlice(endpointSlice, fieldManager, "status")
+}
+
+func extractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager string, subresource string) (*EndpointSliceApplyConfiguration, error) {
 	b := &EndpointSliceApplyConfiguration{}
-	err := managedfields.ExtractInto(endpointSlice, internal.Parser().Type("io.k8s.api.discovery.v1.EndpointSlice"), fieldManager, b)
+	err := managedfields.ExtractInto(endpointSlice, internal.Parser().Type("io.k8s.api.discovery.v1.EndpointSlice"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

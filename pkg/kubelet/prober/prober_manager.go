@@ -241,8 +241,8 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			var ready bool
 			if c.State.Running == nil {
 				ready = false
-			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
-				ready = result == results.Success
+			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
+				ready = true
 			} else {
 				// The check whether there is a probe which hasn't run yet.
 				w, exists := m.getWorker(podUID, c.Name, readiness)

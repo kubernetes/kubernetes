@@ -50,11 +50,31 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	return volumesToReturn, len(volumesToReturn) > 0
 }
 
+// ListBlockVolumesForPod returns a map of the mounted volumes for the given
+// pod. The key in the map is the OuterVolumeSpecName (i.e.
+// pod.Spec.Volumes[x].Name)
+func (kl *Kubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
+	volumesToReturn := make(map[string]volume.BlockVolume)
+	podVolumes := kl.volumeManager.GetMountedVolumesForPod(
+		volumetypes.UniquePodName(podUID))
+	for outerVolumeSpecName, volume := range podVolumes {
+		// TODO: volume.Mounter could be nil if volume object is recovered
+		// from reconciler's sync state process. PR 33616 will fix this problem
+		// to create Mounter object when recovering volume state.
+		if volume.BlockVolumeMapper == nil {
+			continue
+		}
+		volumesToReturn[outerVolumeSpecName] = volume.BlockVolumeMapper
+	}
+
+	return volumesToReturn, len(volumesToReturn) > 0
+}
+
 // podVolumesExist checks with the volume manager and returns true any of the
-// pods for the specified volume are mounted.
+// pods for the specified volume are mounted or are uncertain.
 func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 	if mountedVolumes :=
-		kl.volumeManager.GetMountedVolumesForPod(
+		kl.volumeManager.GetPossiblyMountedVolumesForPod(
 			volumetypes.UniquePodName(podUID)); len(mountedVolumes) > 0 {
 		return true
 	}
@@ -111,6 +131,11 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 
 	for _, uid := range found {
 		if allPods.Has(string(uid)) {
+			continue
+		}
+		// if the pod is within termination grace period, we shouldn't cleanup the underlying volumes
+		if kl.podKiller.IsPodPendingTerminationByUID(uid) {
+			klog.V(3).InfoS("Pod is pending termination", "podUID", uid)
 			continue
 		}
 		// If volumes have not been unmounted/detached, do not delete directory.

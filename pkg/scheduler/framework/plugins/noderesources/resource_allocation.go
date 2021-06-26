@@ -18,9 +18,7 @@ package noderesources
 
 import (
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -34,8 +32,10 @@ var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                string
-	scorer              func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	scorer              func(requested, allocable resourceToValueMap) int64
 	resourceToWeightMap resourceToWeightMap
+
+	enablePodOverhead bool
 }
 
 // resourceToValueMap contains resource name and score.
@@ -55,41 +55,26 @@ func (r *resourceAllocationScorer) score(
 	requested := make(resourceToValueMap, len(r.resourceToWeightMap))
 	allocatable := make(resourceToValueMap, len(r.resourceToWeightMap))
 	for resource := range r.resourceToWeightMap {
-		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource)
+		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
 	}
 	var score int64
 
-	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
-	if len(pod.Spec.Volumes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
-		score = r.scorer(requested, allocatable, true, nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount)
-	} else {
-		score = r.scorer(requested, allocatable, false, 0, 0)
-	}
-	if klog.V(10).Enabled() {
-		if len(pod.Spec.Volumes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
-			klog.Infof(
-				"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v , allocatable volumes %d, requested volumes %d, score %d",
-				pod.Name, node.Name, r.Name,
-				allocatable, requested, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount,
-				nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes,
-				score,
-			)
-		} else {
-			klog.Infof(
-				"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
-				pod.Name, node.Name, r.Name,
-				allocatable, requested, score,
-			)
+	score = r.scorer(requested, allocatable)
 
-		}
+	if klog.V(10).Enabled() {
+		klog.Infof(
+			"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
+			pod.Name, node.Name, r.Name,
+			allocatable, requested, score,
+		)
 	}
 
 	return score, nil
 }
 
 // calculateResourceAllocatableRequest returns resources Allocatable and Requested values
-func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
-	podRequest := calculatePodResourceRequest(pod, resource)
+func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName, enablePodOverhead bool) (int64, int64) {
+	podRequest := calculatePodResourceRequest(pod, resource, enablePodOverhead)
 	switch resource {
 	case v1.ResourceCPU:
 		return nodeInfo.Allocatable.MilliCPU, (nodeInfo.NonZeroRequested.MilliCPU + podRequest)
@@ -99,7 +84,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 	case v1.ResourceEphemeralStorage:
 		return nodeInfo.Allocatable.EphemeralStorage, (nodeInfo.Requested.EphemeralStorage + podRequest)
 	default:
-		if schedutil.IsScalarResourceName(resource) {
+		if _, exists := nodeInfo.Allocatable.ScalarResources[resource]; exists {
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
@@ -114,7 +99,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod and the
 // PodOverhead feature is enabled, the Overhead is added to the result.
 // podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
-func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
+func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName, enablePodOverhead bool) int64 {
 	var podRequest int64
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
@@ -131,7 +116,7 @@ func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && enablePodOverhead {
 		if quantity, found := pod.Spec.Overhead[resource]; found {
 			podRequest += quantity.Value()
 		}

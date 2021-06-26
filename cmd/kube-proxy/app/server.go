@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	gerrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -412,7 +411,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		// decoder, which has only v1alpha1 registered, and log a warning.
 		// The lenient path is to be dropped when support for v1alpha1 is dropped.
 		if !runtime.IsStrictDecodingError(err) {
-			return nil, gerrors.Wrap(err, "failed to decode")
+			return nil, fmt.Errorf("failed to decode: %w", err)
 		}
 
 		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
@@ -750,7 +749,7 @@ func (s *ProxyServer) Run() error {
 	// functions must configure their shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) || utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 		// Make an informer that selects for our nodename.
 		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 			informers.WithTweakListOptions(func(options *metav1.ListOptions) {

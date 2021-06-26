@@ -1,7 +1,0 @@
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: csi-hostpath-sc
-provisioner: csi-hostpath
-reclaimPolicy: Delete
-volumeBindingMode: Immediate

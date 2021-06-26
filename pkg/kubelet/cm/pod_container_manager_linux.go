@@ -57,14 +57,6 @@ type podContainerManagerImpl struct {
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerImpl{}
 
-// applyLimits sets pod cgroup resource limits
-// It also updates the resource limits on top level qos containers.
-func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
-	// This function will house the logic for setting the resource parameters
-	// on the pod container config and updating top level qos container configs
-	return nil
-}
-
 // Exists checks if the pod's cgroup already exists
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
@@ -90,13 +82,6 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
-	}
-	// Apply appropriate resource limits on the pod container
-	// Top level qos containers limits are not updated
-	// until we figure how to maintain the desired state in the kubelet.
-	// Because maintaining the desired state is difficult without checkpointing.
-	if err := m.applyLimits(pod); err != nil {
-		return fmt.Errorf("failed to apply resource limits on container for %v : %v", podContainerName, err)
 	}
 	return nil
 }

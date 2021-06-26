@@ -26,6 +26,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -40,7 +41,7 @@ func isIndexedJob(job *batch.Job) bool {
 
 // calculateSucceededIndexes returns a string representation of the list of
 // succeeded indexes in compressed format and the number of succeeded indexes.
-func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {
+func calculateSucceededIndexes(pods []*v1.Pod, completions int32) (string, int32) {
 	sort.Sort(byCompletionIndex(pods))
 	var result strings.Builder
 	var lastSucceeded int
@@ -50,6 +51,9 @@ func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {
 		ix := getCompletionIndex(p.Annotations)
 		if ix == unknownCompletionIndex {
 			continue
+		}
+		if ix >= int(completions) {
+			break
 		}
 		if p.Status.Phase == v1.PodSucceeded {
 			if firstSucceeded == math.MinInt32 {
@@ -126,19 +130,26 @@ func firstPendingIndexes(pods []*v1.Pod, count, completions int) []int {
 // is the number of repetitions. The pods to be removed are appended to `rm`,
 // while the remaining pods are appended to `left`.
 // All pods that don't have a completion index are appended to `rm`.
-func appendDuplicatedIndexPodsForRemoval(rm, left, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
+// All pods with index not in valid range are appended to `rm`.
+func appendDuplicatedIndexPodsForRemoval(rm, left, pods []*v1.Pod, completions int) ([]*v1.Pod, []*v1.Pod) {
 	sort.Sort(byCompletionIndex(pods))
 	lastIndex := unknownCompletionIndex
 	firstRepeatPos := 0
+	countLooped := 0
 	for i, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
+		if ix >= completions {
+			rm = append(rm, pods[i:]...)
+			break
+		}
 		if ix != lastIndex {
 			rm, left = appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:i], lastIndex)
 			firstRepeatPos = i
 			lastIndex = ix
 		}
+		countLooped += 1
 	}
-	return appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:], lastIndex)
+	return appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:countLooped], lastIndex)
 }
 
 func appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods []*v1.Pod, ix int) ([]*v1.Pod, []*v1.Pod) {
@@ -160,7 +171,7 @@ func getCompletionIndex(annotations map[string]string) int {
 	if annotations == nil {
 		return unknownCompletionIndex
 	}
-	v, ok := annotations[batch.JobCompletionIndexAnnotationAlpha]
+	v, ok := annotations[batch.JobCompletionIndexAnnotation]
 	if !ok {
 		return unknownCompletionIndex
 	}
@@ -193,7 +204,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{
 			FieldRef: &v1.ObjectFieldSelector{
-				FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotationAlpha),
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
 			},
 		},
 	})
@@ -203,7 +214,16 @@ func addCompletionIndexAnnotation(template *v1.PodTemplateSpec, index int) {
 	if template.Annotations == nil {
 		template.Annotations = make(map[string]string, 1)
 	}
-	template.Annotations[batch.JobCompletionIndexAnnotationAlpha] = strconv.Itoa(index)
+	template.Annotations[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
+}
+
+func podGenerateNameWithIndex(jobName string, index int) string {
+	appendIndex := "-" + strconv.Itoa(index) + "-"
+	generateNamePrefix := jobName + appendIndex
+	if len(generateNamePrefix) > names.MaxGeneratedNameLength {
+		generateNamePrefix = generateNamePrefix[:names.MaxGeneratedNameLength-len(appendIndex)] + appendIndex
+	}
+	return generateNamePrefix
 }
 
 type byCompletionIndex []*v1.Pod

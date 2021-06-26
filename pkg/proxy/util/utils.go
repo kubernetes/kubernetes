@@ -162,7 +162,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 func GetLocalAddrSet() utilnet.IPSet {
 	localAddrs, err := GetLocalAddrs()
 	if err != nil {
-		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs", err)
+		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs")
 	} else if len(localAddrs) == 0 {
 		klog.InfoS("No local addresses were found")
 	}
@@ -475,6 +475,18 @@ func WriteLine(buf *bytes.Buffer, words ...string) {
 			buf.WriteByte('\n')
 		}
 	}
+}
+
+// WriteRuleLine prepends the strings "-A" and chainName to the buffer and calls
+// WriteLine to join all the words into the buffer and terminate with newline.
+func WriteRuleLine(buf *bytes.Buffer, chainName string, words ...string) {
+	if len(words) == 0 {
+		return
+	}
+	buf.WriteString("-A ")
+	buf.WriteString(chainName)
+	buf.WriteByte(' ')
+	WriteLine(buf, words...)
 }
 
 // WriteBytesLine write bytes to buffer, terminate with newline

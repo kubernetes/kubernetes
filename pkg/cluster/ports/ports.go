@@ -25,10 +25,6 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
-	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeControllerManagerPort instead.
-	InsecureKubeControllerManagerPort = 10252
 	// KubeletReadOnlyPort exposes basic read-only services from the kubelet.
 	// May be overridden by a flag at startup.
 	// This is necessary for heapster to collect monitoring stats from the kubelet

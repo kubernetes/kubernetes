@@ -50,6 +50,7 @@ import (
 const (
 	ApplyAnnotationsFlag = "save-config"
 	DefaultErrorExitCode = 1
+	DefaultChunkSize     = 500
 )
 
 type debugError interface {
@@ -455,12 +456,9 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 	cmd.Flags().BoolVar(applyAnnotation, ApplyAnnotationsFlag, *applyAnnotation, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
 }
 
-// AddGeneratorFlags adds flags common to resource generation commands
-// TODO: need to take a pass at other generator commands to use this set of flags
-func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
-	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
-	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
-	AddDryRunFlag(cmd)
+func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
+	cmd.Flags().Int64Var(value, "chunk-size", *value,
+		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
 type ValidateOptions struct {

@@ -32,7 +32,7 @@ const (
 	// At least number of fields per line in /proc/<pid>/mountinfo.
 	expectedAtLeastNumFieldsPerMountInfo = 10
 	// How many times to retry for a consistent read of /proc/mounts.
-	maxListTries = 3
+	maxListTries = 10
 )
 
 // IsCorruptedMnt return true if err is about corrupted mount point
@@ -52,7 +52,7 @@ func IsCorruptedMnt(err error) bool {
 		underlyingError = pe.Err
 	}
 
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.

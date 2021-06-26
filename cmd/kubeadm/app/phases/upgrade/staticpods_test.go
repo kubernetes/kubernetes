@@ -29,11 +29,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.etcd.io/etcd/pkg/transport"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
 
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
@@ -53,9 +54,10 @@ const (
 	waitForHashes        = "wait-for-hashes"
 	waitForHashChange    = "wait-for-hash-change"
 	waitForPodsWithLabel = "wait-for-pods-with-label"
+)
 
-	testConfiguration = `
-apiVersion: kubeadm.k8s.io/v1beta2
+var testConfiguration = fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
 nodeRegistration:
   name: foo
@@ -67,26 +69,24 @@ bootstrapTokens:
 - token: ce3aa5.5ec8455bb76b379f
   ttl: 24h
 ---
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: %[1]s
 kind: ClusterConfiguration
 
 apiServer:
   certSANs: null
   extraArgs: null
-certificatesDir: %s
+certificatesDir: %%s
 etcd:
   local:
-    dataDir: %s
+    dataDir: %%s
     image: ""
 imageRepository: k8s.gcr.io
-kubernetesVersion: %s
+kubernetesVersion: %%s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-useHyperKubeImage: false
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 // fakeWaiter is a fake apiclient.Waiter that returns errors it was initialized with
 type fakeWaiter struct {
@@ -491,11 +491,11 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg)
+			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg, false /* isDryRun */)
 			if err != nil {
 				t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 			}
-			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
+			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint, false /* isDryRun */)
 			if err != nil {
 				t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
 			}

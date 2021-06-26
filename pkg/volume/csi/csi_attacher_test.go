@@ -754,7 +754,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			if tc.shouldFail && err == nil {
 				t.Error("expecting failure, but err is nil")
 			}
-			if tc.initAttachErr != nil {
+			if tc.initAttachErr != nil && err != nil {
 				if tc.initAttachErr.Message != err.Error() {
 					t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
 				}
@@ -1187,9 +1187,13 @@ func TestAttacherMountDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		user, _ := user.Current()
-		if tc.populateDeviceMountPath && user.Uid == "0" {
-			t.Skipf("Skipping intentional failure on existing data when running as root.")
+		user, err := user.Current()
+		if err != nil {
+			t.Logf("Current user could not be determined, assuming non-root: %v", err)
+		} else {
+			if tc.populateDeviceMountPath && user.Uid == "0" {
+				t.Skipf("Skipping intentional failure on existing data when running as root.")
+			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
@@ -1268,7 +1272,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
@@ -1440,7 +1444,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
@@ -1585,7 +1589,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 

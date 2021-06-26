@@ -53,7 +53,7 @@ func createAPIExtensionsConfig(
 	genericConfig.RESTOptionsGetter = nil
 
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
-	// because apiextentions apiserver should use its own scheme to convert resources.
+	// because apiextensions apiserver should use its own scheme to convert resources.
 	err := commandOptions.Admission.ApplyTo(
 		&genericConfig,
 		externalInformers,

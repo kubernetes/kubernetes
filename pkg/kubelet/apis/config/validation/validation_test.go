@@ -62,6 +62,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
+		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase1); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -101,6 +104,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
+		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
@@ -144,7 +150,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"GracefulNodeShutdown":    true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
-			Format: "json",
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase3); allErrors != nil {
@@ -178,8 +184,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 100 * time.Millisecond},
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 60 * time.Second},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "",
+		},
 	}
-	const numErrsErrorCase1 = 28
+	const numErrsErrorCase1 = 29
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
@@ -219,6 +228,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
 		},
 	}
 	const numErrsErrorCase2 = 3

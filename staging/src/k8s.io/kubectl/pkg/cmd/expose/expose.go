@@ -134,11 +134,11 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
 		Long:                  exposeLong,
 		Example:               exposeExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
-		ValidArgs: validArgs,
 	}
 
 	o.RecordFlags.AddFlags(cmd)

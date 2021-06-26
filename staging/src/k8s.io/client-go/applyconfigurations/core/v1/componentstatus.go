@@ -57,8 +57,19 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+	return extractComponentStatus(componentStatus, fieldManager, "")
+}
+
+// ExtractComponentStatusStatus is the same as ExtractComponentStatus except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractComponentStatusStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+	return extractComponentStatus(componentStatus, fieldManager, "status")
+}
+
+func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
-	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b)
+	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

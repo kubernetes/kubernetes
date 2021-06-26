@@ -58,8 +58,19 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+	return extractPersistentVolume(persistentVolume, fieldManager, "")
+}
+
+// ExtractPersistentVolumeStatus is the same as ExtractPersistentVolume except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPersistentVolumeStatus(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+	return extractPersistentVolume(persistentVolume, fieldManager, "status")
+}
+
+func extractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
 	b := &PersistentVolumeApplyConfiguration{}
-	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b)
+	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -20,21 +20,6 @@ import (
 	"bytes"
 )
 
-// CertKeyContentProvider provides a certificate and matching private key
-type CertKeyContentProvider interface {
-	// Name is just an identifier
-	Name() string
-	// CurrentCertKeyContent provides cert and key byte content
-	CurrentCertKeyContent() ([]byte, []byte)
-}
-
-// SNICertKeyContentProvider provides a certificate and matching private key as well as optional explicit names
-type SNICertKeyContentProvider interface {
-	CertKeyContentProvider
-	// SNINames provides names used for SNI. May return nil.
-	SNINames() []string
-}
-
 // certKeyContent holds the content for the cert and key
 type certKeyContent struct {
 	cert []byte

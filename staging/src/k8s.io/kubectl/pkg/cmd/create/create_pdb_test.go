@@ -19,7 +19,7 @@ package create
 import (
 	"testing"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -137,7 +137,7 @@ func TestCreatePdb(t *testing.T) {
 
 	tests := map[string]struct {
 		options  *PodDisruptionBudgetOpts
-		expected *policyv1beta1.PodDisruptionBudget
+		expected *policyv1.PodDisruptionBudget
 	}{
 		"test-valid-min-available-pods-number": {
 			options: &PodDisruptionBudgetOpts{
@@ -145,15 +145,15 @@ func TestCreatePdb(t *testing.T) {
 				Selector:     selectorOpts,
 				MinAvailable: podAmountNumber,
 			},
-			expected: &policyv1beta1.PodDisruptionBudget{
+			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "PodDisruptionBudget",
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pdb",
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector:     selector,
 					MinAvailable: &minAvailableNumber,
 				},
@@ -165,15 +165,15 @@ func TestCreatePdb(t *testing.T) {
 				Selector:     selectorOpts,
 				MinAvailable: podAmountPercent,
 			},
-			expected: &policyv1beta1.PodDisruptionBudget{
+			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "PodDisruptionBudget",
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pdb",
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector:     selector,
 					MinAvailable: &minAvailablePercent,
 				},
@@ -185,15 +185,15 @@ func TestCreatePdb(t *testing.T) {
 				Selector:     selectorOpts,
 				MinAvailable: podAmountNumber,
 			},
-			expected: &policyv1beta1.PodDisruptionBudget{
+			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "PodDisruptionBudget",
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pdb",
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector:     selector,
 					MinAvailable: &minUnavailableNumber,
 				},
@@ -205,15 +205,15 @@ func TestCreatePdb(t *testing.T) {
 				Selector:     selectorOpts,
 				MinAvailable: podAmountPercent,
 			},
-			expected: &policyv1beta1.PodDisruptionBudget{
+			expected: &policyv1.PodDisruptionBudget{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "PodDisruptionBudget",
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-pdb",
 				},
-				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+				Spec: policyv1.PodDisruptionBudgetSpec{
 					Selector:     selector,
 					MinAvailable: &minUnavailablePercent,
 				},

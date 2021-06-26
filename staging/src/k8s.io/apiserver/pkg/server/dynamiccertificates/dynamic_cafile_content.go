@@ -35,18 +35,6 @@ import (
 // FileRefreshDuration is exposed so that integration tests can crank up the reload speed.
 var FileRefreshDuration = 1 * time.Minute
 
-// Listener is an interface to use to notify interested parties of a change.
-type Listener interface {
-	// Enqueue should be called when an input may have changed
-	Enqueue()
-}
-
-// Notifier is a way to add listeners
-type Notifier interface {
-	// AddListener is adds a listener to be notified of potential input changes
-	AddListener(listener Listener)
-}
-
 // ControllerRunner is a generic interface for starting a controller
 type ControllerRunner interface {
 	// RunOnce runs the sync loop a single time.  This useful for synchronous priming
@@ -126,7 +114,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 		return err
 	}
 	c.caBundle.Store(caBundleAndVerifier)
-	klog.V(2).Infof("Loaded a new CA Bundle and Verifier for %q", c.Name())
+	klog.V(2).InfoS("Loaded a new CA Bundle and Verifier", "name", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
@@ -164,8 +152,8 @@ func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	klog.InfoS("Starting controller", "name", c.name)
+	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, stopCh)

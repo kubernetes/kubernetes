@@ -41,13 +41,15 @@ message ExtraValue {
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
 message TokenReview {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional TokenReviewSpec spec = 2;
 
-  // Status is filled in by the server and indicates whether the request can be authenticated.
+  // Status is filled in by the server and indicates whether the token can be authenticated.
   // +optional
   optional TokenReviewStatus status = 3;
 }

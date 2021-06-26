@@ -25,7 +25,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/spf13/pflag"
+
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugin
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -34,12 +38,10 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+
 	command := app.NewControllerManagerCommand()
 
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

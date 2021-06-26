@@ -427,6 +427,13 @@ message StatefulSetSpec {
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
   optional int32 revisionHistoryLimit = 8;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+  // +optional
+  optional int32 minReadySeconds = 9;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -469,6 +476,12 @@ message StatefulSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated StatefulSetCondition conditions = 10;
+
+  // Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
+  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+  // Remove omitempty when graduating to beta
+  // +optional
+  optional int32 availableReplicas = 11;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

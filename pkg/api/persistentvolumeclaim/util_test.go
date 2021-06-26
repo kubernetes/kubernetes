@@ -21,7 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -87,12 +88,12 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 
 				// old pvc should never be changed
 				if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
-					t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
+					t.Errorf("old pvc changed: %v", cmp.Diff(oldpvc, oldpvcInfo.pvc()))
 				}
 
 				// new pvc should not be changed
 				if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-					t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+					t.Errorf("new pvc changed: %v", cmp.Diff(newpvc, newpvcInfo.pvc()))
 				}
 			})
 		}

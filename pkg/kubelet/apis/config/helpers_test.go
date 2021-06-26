@@ -234,6 +234,7 @@ var (
 		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
+		"SeccompDefault",
 		"SerializeImagePulls",
 		"ShowHiddenMetricsForVersion",
 		"StreamingConnectionIdleTimeout.Duration",

@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -99,11 +100,18 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.ClusterRole, "clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
 	cmd.MarkFlagRequired("clusterrole")
-	cmd.MarkFlagCustom("clusterrole", "__kubectl_get_resource_clusterrole")
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the clusterrole")
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the clusterrole")
 	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+
+	// Completion for relevant flags
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"clusterrole",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return get.CompGetResource(f, cmd, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+
 	return cmd
 }
 

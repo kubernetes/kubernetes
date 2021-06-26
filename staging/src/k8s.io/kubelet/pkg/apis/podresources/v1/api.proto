@@ -27,6 +27,7 @@ message AllocatableResourcesRequest {}
 message AllocatableResourcesResponse {
     repeated ContainerDevices devices = 1;
     repeated int64 cpu_ids = 2;
+    repeated ContainerMemory memory = 3;
 }
 
 // ListPodResourcesRequest is the request made to the PodResourcesLister service
@@ -49,6 +50,14 @@ message ContainerResources {
     string name = 1;
     repeated ContainerDevices devices = 2;
     repeated int64 cpu_ids = 3;
+    repeated ContainerMemory memory = 4;
+}
+
+// ContainerMemory contains information about memory and hugepages assigned to a container
+message ContainerMemory {
+    string memory_type = 1;
+    uint64 size = 2;
+    TopologyInfo topology = 3;
 }
 
 // ContainerDevices contains information about the devices assigned to a container

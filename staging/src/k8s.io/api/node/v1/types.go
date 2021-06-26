@@ -82,6 +82,7 @@ type Scheduling struct {
 	// with a pod's existing nodeSelector. Any conflicts will cause the pod to
 	// be rejected in admission.
 	// +optional
+	// +mapType=atomic
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
 
 	// tolerations are appended (excluding duplicates) to pods running with this

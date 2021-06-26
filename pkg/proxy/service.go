@@ -54,7 +54,6 @@ type BaseServiceInfo struct {
 	nodeLocalExternal        bool
 	nodeLocalInternal        bool
 	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
-	topologyKeys             []string
 	hintsAnnotation          string
 }
 
@@ -134,11 +133,6 @@ func (info *BaseServiceInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficP
 	return info.internalTrafficPolicy
 }
 
-// TopologyKeys is part of ServicePort interface.
-func (info *BaseServiceInfo) TopologyKeys() []string {
-	return info.topologyKeys
-}
-
 // HintsAnnotation is part of ServicePort interface.
 func (info *BaseServiceInfo) HintsAnnotation() string {
 	return info.hintsAnnotation
@@ -170,7 +164,6 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		nodeLocalExternal:     nodeLocalExternal,
 		nodeLocalInternal:     nodeLocalInternal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
-		topologyKeys:          service.Spec.TopologyKeys,
 		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
 	}
 
@@ -201,7 +194,9 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// Obtain Load Balancer Ingress IPs
 	var ips []string
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		ips = append(ips, ing.IP)
+		if ing.IP != "" {
+			ips = append(ips, ing.IP)
+		}
 	}
 
 	if len(ips) > 0 {

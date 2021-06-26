@@ -499,8 +499,6 @@ message ListOptions {
   // assume bookmarks are returned at any specific interval, nor may they
   // assume the server will send any BOOKMARK event during a session.
   // If this is not a watch, this field is ignored.
-  // If the feature gate WatchBookmarks is not enabled in apiserver,
-  // this field is ignored.
   // +optional
   optional bool allowWatchBookmarks = 9;
 
@@ -589,6 +587,15 @@ message ManagedFieldsEntry {
   // FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
   // +optional
   optional FieldsV1 fieldsV1 = 7;
+
+  // Subresource is the name of the subresource used to update that object, or
+  // empty string if the object was updated through the main resource. The
+  // value of this field is used to distinguish between managers, even if they
+  // share the same name. For example, a status update will be distinct from a
+  // regular update using the same manager name.
+  // Note that the APIVersion field is not related to the Subresource field and
+  // it always corresponds to the version of the main resource.
+  optional string subresource = 8;
 }
 
 // MicroTime is version of Time with microsecond level precision.
@@ -788,6 +795,7 @@ message ObjectMeta {
 // OwnerReference contains enough information to let you identify an owning
 // object. An owning object must be in the same namespace as the dependent, or
 // be cluster-scoped, so there is no namespace field.
+// +structType=atomic
 message OwnerReference {
   // API version of the referent.
   optional string apiVersion = 5;

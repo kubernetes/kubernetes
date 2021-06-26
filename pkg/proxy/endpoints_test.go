@@ -23,7 +23,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1294,7 +1294,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFakeProxier(v1.IPv4Protocol)
+			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 			fp.hostname = nodeName
 
 			// First check that after adding all previous versions of endpoints,
@@ -1364,7 +1364,9 @@ func TestUpdateEndpointsMap(t *testing.T) {
 }
 
 func TestLastChangeTriggerTime(t *testing.T) {
-	t0 := time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
+	startTime := time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
+	t_1 := startTime.Add(-time.Second)
+	t0 := startTime.Add(time.Second)
 	t1 := t0.Add(time.Second)
 	t2 := t1.Add(time.Second)
 	t3 := t2.Add(time.Second)
@@ -1439,6 +1441,14 @@ func TestLastChangeTriggerTime(t *testing.T) {
 			expected: map[types.NamespacedName][]time.Time{},
 		},
 		{
+			name: "Endpoints create before tracker started",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t_1)
+				fp.addEndpoints(e)
+			},
+			expected: map[types.NamespacedName][]time.Time{},
+		},
+		{
 			name: "addEndpoints then deleteEndpoints",
 			scenario: func(fp *FakeProxier) {
 				e := createEndpoints("ns", "ep1", t1)
@@ -1469,7 +1479,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fp := newFakeProxier(v1.IPv4Protocol)
+		fp := newFakeProxier(v1.IPv4Protocol, startTime)
 
 		tc.scenario(fp)
 

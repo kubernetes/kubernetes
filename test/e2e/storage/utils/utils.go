@@ -24,6 +24,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -569,6 +570,16 @@ func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persistent
 
 	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
 	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+}
+
+// GetSectorSize returns the sector size of the device.
+func GetSectorSize(f *framework.Framework, pod *v1.Pod, device string) int {
+	stdout, _, err := e2evolume.PodExec(f, pod, fmt.Sprintf("blockdev --getss %s", device))
+	framework.ExpectNoError(err, "Failed to get sector size of %s", device)
+	ss, err := strconv.Atoi(stdout)
+	framework.ExpectNoError(err, "Sector size returned by blockdev command isn't integer value.")
+
+	return ss
 }
 
 // findMountPoints returns all mount points on given node under specified directory.

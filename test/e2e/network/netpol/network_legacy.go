@@ -59,7 +59,7 @@ type protocolPort struct {
 	protocol v1.Protocol
 }
 
-var _ = common.SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
+var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
@@ -1682,7 +1682,7 @@ var _ = common.SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			})
 			cleanupServerPodAndService(f, podA, serviceA)
 		})
-		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]", func() {
+		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy]", func() {
 			ginkgo.By("getting the state of the sctp module on nodes")
 			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 			framework.ExpectNoError(err)

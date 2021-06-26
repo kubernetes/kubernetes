@@ -27,18 +27,20 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "InterPodAffinity"
+	Name = names.InterPodAffinity
 )
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}
 var _ framework.FilterPlugin = &InterPodAffinity{}
 var _ framework.PreScorePlugin = &InterPodAffinity{}
 var _ framework.ScorePlugin = &InterPodAffinity{}
+var _ framework.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
@@ -54,6 +56,22 @@ func (pl *InterPodAffinity) Name() string {
 	return Name
 }
 
+// EventsToRegister returns the possible events that may make a failed Pod
+// schedulable
+func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		// All ActionType includes the following events:
+		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
+		// deleting an existing Pod may make it schedulable.
+		// - Update. Updating on an existing Pod's labels (e.g., removal) may make
+		// an unschedulable Pod schedulable.
+		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
+		// adding an assigned Pod may make it schedulable.
+		{Resource: framework.Pod, ActionType: framework.All},
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+	}
+}
+
 // New initializes a new plugin and returns it.
 func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
@@ -63,7 +81,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 	if err != nil {
 		return nil, err
 	}
-	if err := validation.ValidateInterPodAffinityArgs(args); err != nil {
+	if err := validation.ValidateInterPodAffinityArgs(nil, &args); err != nil {
 		return nil, err
 	}
 	pl := &InterPodAffinity{

@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	utilpointer "k8s.io/utils/pointer"
 )
 

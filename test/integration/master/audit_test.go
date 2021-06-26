@@ -29,6 +29,9 @@ import (
 
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -78,6 +81,26 @@ rules:
     resources:
       - group: "" # core
         resources: ["configmaps"]
+  - level: Request
+    namespaces: ["create-audit-request"]
+    resources:
+      - group: "" # core
+        resources: ["serviceaccounts/token"]
+  - level: RequestResponse
+    namespaces: ["create-audit-response"]
+    resources:
+      - group: "" # core
+        resources: ["serviceaccounts/token"]
+  - level: Request
+    namespaces: ["update-audit-request"]
+    resources:
+      - group: "apps"
+        resources: ["deployments/scale"]
+  - level: RequestResponse
+    namespaces: ["update-audit-response"]
+    resources:
+      - group: "apps"
+        resources: ["deployments/scale"]
 
 `
 	nonAdmissionWebhookNamespace       = "no-webhook-namespace"
@@ -274,9 +297,99 @@ func runTestWithVersion(t *testing.T, version string) {
 		},
 	}
 
+	crossGroupTestCases := []struct {
+		auditLevel auditinternal.Level
+		expEvents  []utils.AuditEvent
+		namespace  string
+	}{
+		{
+			auditLevel: auditinternal.LevelRequest,
+			namespace:  "create-audit-request",
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequest,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s/token", "create-audit-request", "audit-serviceaccount"),
+					Verb:              "create",
+					Code:              201,
+					User:              auditTestUser,
+					Resource:          "serviceaccounts",
+					Namespace:         "create-audit-request",
+					RequestObject:     true,
+					ResponseObject:    false,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+		{
+			auditLevel: auditinternal.LevelRequestResponse,
+			namespace:  "create-audit-response",
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequestResponse,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s/token", "create-audit-response", "audit-serviceaccount"),
+					Verb:              "create",
+					Code:              201,
+					User:              auditTestUser,
+					Resource:          "serviceaccounts",
+					Namespace:         "create-audit-response",
+					RequestObject:     true,
+					ResponseObject:    true,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+		{
+			auditLevel: auditinternal.LevelRequest,
+			namespace:  "update-audit-request",
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequest,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s/scale", "update-audit-request", "audit-deployment"),
+					Verb:              "update",
+					Code:              200,
+					User:              auditTestUser,
+					Resource:          "deployments",
+					Namespace:         "update-audit-request",
+					RequestObject:     true,
+					ResponseObject:    false,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+		{
+			auditLevel: auditinternal.LevelRequestResponse,
+			namespace:  "update-audit-response",
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequestResponse,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/%s/scale", "update-audit-response", "audit-deployment"),
+					Verb:              "update",
+					Code:              200,
+					User:              auditTestUser,
+					Resource:          "deployments",
+					Namespace:         "update-audit-response",
+					RequestObject:     true,
+					ResponseObject:    true,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+	}
+
 	for _, tc := range tcs {
 		t.Run(fmt.Sprintf("%s.%s.%t", version, tc.auditLevel, tc.enableMutatingWebhook), func(t *testing.T) {
 			testAudit(t, version, tc.auditLevel, tc.enableMutatingWebhook, tc.namespace, kubeclient, logFile)
+		})
+	}
+
+	// cross-group subResources
+	for _, tc := range crossGroupTestCases {
+		t.Run(fmt.Sprintf("cross-group-%s.%s.%s", version, tc.auditLevel, tc.namespace), func(t *testing.T) {
+			testAuditCrossGroupSubResource(t, version, tc.expEvents, tc.namespace, kubeclient, logFile)
 		})
 	}
 }
@@ -296,6 +409,52 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 		}
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, getExpectedEvents(level, enableMutatingWebhook, namespace), versions[version])
+		if err != nil {
+			return false, fmt.Errorf("unexpected error: %v", err)
+		}
+		if len(missingReport.MissingEvents) > 0 {
+			lastMissingReport = missingReport.String()
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed to get expected events -- missingReport: %s, error: %v", lastMissingReport, err)
+	}
+}
+
+func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []utils.AuditEvent, namespace string, kubeclient kubernetes.Interface, logFile *os.File) {
+	var (
+		lastMissingReport string
+		sa                *apiv1.ServiceAccount
+		deploy            *appsv1.Deployment
+	)
+
+	createNamespace(t, kubeclient, namespace)
+	switch expEvents[0].Resource {
+	case "serviceaccounts":
+		sa = createServiceAccount(t, kubeclient, namespace)
+	case "deployments":
+		deploy = createDeployment(t, kubeclient, namespace)
+	default:
+		t.Fatalf("%v resource has no cross-group sub-resources", expEvents[0].Resource)
+	}
+
+	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// perform cross-group subresources operations
+		if sa != nil {
+			tokenRequestOperations(t, kubeclient, sa.Namespace, sa.Name)
+		}
+		if deploy != nil {
+			scaleOperations(t, kubeclient, deploy.Namespace, deploy.Name)
+		}
+
+		// check for corresponding audit logs
+		stream, err := os.Open(logFile.Name())
+		if err != nil {
+			return false, fmt.Errorf("unexpected error: %v", err)
+		}
+		defer stream.Close()
+		missingReport, err := utils.CheckAuditLines(stream, expEvents, versions[version])
 		if err != nil {
 			return false, fmt.Errorf("unexpected error: %v", err)
 		}
@@ -415,6 +574,37 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface, namespac
 	expectNoError(t, err, "failed to delete audit-configmap")
 }
 
+func tokenRequestOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
+	var (
+		treq = &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{"api"},
+			},
+		}
+	)
+	// create tokenRequest
+	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, treq, metav1.CreateOptions{})
+	expectNoError(t, err, "failed to create audit-tokenRequest")
+}
+
+func scaleOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
+	var (
+		scale = &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "audit-deployment",
+				Namespace: namespace,
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: 2,
+			},
+		}
+	)
+
+	// update scale
+	_, err := kubeClient.AppsV1().Deployments(namespace).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
+	expectNoError(t, err, fmt.Sprintf("failed to update scale %v", scale))
+}
+
 func expectNoError(t *testing.T, err error, msg string) {
 	if err != nil {
 		t.Fatalf("%s: %v", msg, err)
@@ -485,4 +675,48 @@ func createNamespace(t *testing.T, kubeclient clientset.Interface, namespace str
 	}
 	_, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	expectNoError(t, err, fmt.Sprintf("failed to create namespace ns %s", namespace))
+}
+
+func createServiceAccount(t *testing.T, cs clientset.Interface, namespace string) *apiv1.ServiceAccount {
+	sa := &apiv1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "audit-serviceaccount",
+			Namespace: namespace,
+		},
+	}
+	_, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(context.TODO(), sa, metav1.CreateOptions{})
+	expectNoError(t, err, fmt.Sprintf("failed to create serviceaccount %v", sa))
+	return sa
+}
+
+func createDeployment(t *testing.T, cs clientset.Interface, namespace string) *appsv1.Deployment {
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "audit-deployment",
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "test"},
+			},
+			Template: apiv1.PodTemplateSpec{
+				Spec: apiv1.PodSpec{
+					Containers: []apiv1.Container{
+						{
+							Name:  "foo",
+							Image: "foo/bar",
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "audit-deployment-scale",
+					Namespace: namespace,
+					Labels:    map[string]string{"app": "test"},
+				},
+			},
+		},
+	}
+	_, err := cs.AppsV1().Deployments(deploy.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{})
+	expectNoError(t, err, fmt.Sprintf("failed to create deployment %v", deploy))
+	return deploy
 }

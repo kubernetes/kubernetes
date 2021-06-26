@@ -58,8 +58,19 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return extractImageReview(imageReview, fieldManager, "")
+}
+
+// ExtractImageReviewStatus is the same as ExtractImageReview except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return extractImageReview(imageReview, fieldManager, "status")
+}
+
+func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
-	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b)
+	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

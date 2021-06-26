@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
-	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -65,7 +64,6 @@ func ProbeAttachableVolumePlugins() ([]volume.VolumePlugin, error) {
 		return allPlugins, err
 	}
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
@@ -92,7 +90,6 @@ func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfigurat
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	return allPlugins, nil
@@ -145,7 +142,6 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 

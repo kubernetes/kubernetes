@@ -408,6 +408,11 @@ func TestComponentPod(t *testing.T) {
 					Labels:    map[string]string{"component": "foo", "tier": "control-plane"},
 				},
 				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						SeccompProfile: &v1.SeccompProfile{
+							Type: v1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name: "foo",

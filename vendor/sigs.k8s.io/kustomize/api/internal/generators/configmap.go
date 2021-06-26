@@ -41,5 +41,6 @@ func MakeConfigMap(
 		return nil, err
 	}
 	copyLabelsAndAnnotations(rn, args.Options)
+	setImmutable(rn, args.Options)
 	return rn, nil
 }

@@ -371,6 +371,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableDebugFlagsHandler, &out.EnableDebugFlagsHandler, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.SeccompDefault, &out.SeccompDefault, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -530,6 +533,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableDebugFlagsHandler, &out.EnableDebugFlagsHandler, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.SeccompDefault, &out.SeccompDefault, s); err != nil {
 		return err
 	}
 	return nil

@@ -1,7 +1,10 @@
 # Copyright 2020 The Kubernetes Authors.
 # SPDX-License-Identifier: Apache-2.0
 
-MYGOBIN := $(shell go env GOPATH)/bin
+MYGOBIN = $(shell go env GOBIN)
+ifeq ($(MYGOBIN),)
+MYGOBIN = $(shell go env GOPATH)/bin
+endif
 API_VERSION := "v1.19.1"
 
 .PHONY: all

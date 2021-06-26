@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -130,8 +132,9 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 // We check for double because it needs to support at least the cri-o minimum
 // plus whatever delta between node usages (which could be up to or at least crioMinMemLimit)
 func nodesAreTooUtilized(cs clientset.Interface, nodeList *v1.NodeList) bool {
+	nodeNameToPodList := podListForEachNode(cs)
 	for _, node := range nodeList.Items {
-		_, memFraction, _, memAllocatable := computeCPUMemFraction(cs, node, podRequestedResource)
+		_, memFraction, _, memAllocatable := computeCPUMemFraction(node, podRequestedResource, nodeNameToPodList[node.Name])
 		if float64(memAllocatable)-(memFraction*float64(memAllocatable)) < float64(2*crioMinMemLimit) {
 			return true
 		}
@@ -387,6 +390,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		topologyKey := "kubernetes.io/e2e-pts-score"
 
 		ginkgo.BeforeEach(func() {
+			if len(nodeList.Items) < 2 {
+				ginkgo.Skip("At least 2 nodes are required to run the test")
+			}
 			ginkgo.By("Trying to get 2 available nodes which can run pod")
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
@@ -508,8 +514,11 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	var cpuFractionMap = make(map[string]float64)
 	var memFractionMap = make(map[string]float64)
 
+	// For each node, stores its pods info
+	nodeNameToPodList := podListForEachNode(cs)
+
 	for _, node := range nodes {
-		cpuFraction, memFraction, _, _ := computeCPUMemFraction(cs, node, requestedResource)
+		cpuFraction, memFraction, _, _ := computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 		cpuFractionMap[node.Name] = cpuFraction
 		memFractionMap[node.Name] = memFraction
 		if cpuFraction > maxCPUFraction {
@@ -519,6 +528,9 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			maxMemFraction = memFraction
 		}
 	}
+
+	errChan := make(chan error, len(nodes))
+	var wg sync.WaitGroup
 
 	// we need the max one to keep the same cpu/mem use rate
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
@@ -543,7 +555,6 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			Name:   "",
 			Labels: balancePodLabel,
 			Resources: &v1.ResourceRequirements{
-				Limits:   needCreateResource,
 				Requests: needCreateResource,
 			},
 			Affinity: &v1.Affinity{
@@ -560,42 +571,65 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 				},
 			},
 		}
-
-		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
-			*initPausePod(f, *podConfig), true, framework.Logf)
-
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+				*initPausePod(f, *podConfig), true, framework.Logf)
+			if err != nil {
+				errChan <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errChan)
+	var errs []error
+	for err := range errChan {
 		if err != nil {
-			return cleanUp, err
+			errs = append(errs, err)
 		}
 	}
+	if len(errs) > 0 {
+		return cleanUp, errors.NewAggregate(errs)
+	}
 
+	nodeNameToPodList = podListForEachNode(cs)
 	for _, node := range nodes {
 		ginkgo.By("Compute Cpu, Mem Fraction after create balanced pods.")
-		computeCPUMemFraction(cs, node, requestedResource)
+		computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 	}
 
 	return cleanUp, nil
 }
 
-func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64, int64, int64) {
-	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
-	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
-	totalRequestedMemResource := resource.Requests.Memory().Value()
-	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {
+	nodeNameToPodList := make(map[string][]*v1.Pod)
+	allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
-	for _, pod := range allpods.Items {
-		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
-			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
-			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
-				continue
-			}
-			totalRequestedCPUResource += getNonZeroRequests(&pod).MilliCPU
-			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
-		}
+	for _, pod := range allPods.Items {
+		nodeName := pod.Spec.NodeName
+		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &pod)
 	}
+	return nodeNameToPodList
+}
+
+func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods []*v1.Pod) (float64, float64, int64, int64) {
+	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
+	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
+	totalRequestedMemResource := resource.Requests.Memory().Value()
+
+	for _, pod := range pods {
+		framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(pod).MilliCPU, getNonZeroRequests(pod).Memory)
+		// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+		if v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort {
+			continue
+		}
+		totalRequestedCPUResource += getNonZeroRequests(pod).MilliCPU
+		totalRequestedMemResource += getNonZeroRequests(pod).Memory
+	}
+
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 	framework.ExpectEqual(found, true)
 	cpuAllocatableMil := cpuAllocatable.MilliValue()

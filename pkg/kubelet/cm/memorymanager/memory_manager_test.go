@@ -112,6 +112,11 @@ func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string]
 	return nil
 }
 
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (p *mockPolicy) GetAllocatableMemory(s state.State) []state.Block {
+	return []state.Block{}
+}
+
 type mockRuntimeService struct {
 	err error
 }

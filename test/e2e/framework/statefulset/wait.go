@@ -121,6 +121,31 @@ func WaitForStatusReadyReplicas(c clientset.Interface, ss *appsv1.StatefulSet, e
 	}
 }
 
+// WaitForStatusAvailableReplicas waits for the ss.Status.Available to be equal to expectedReplicas
+func WaitForStatusAvailableReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
+	framework.Logf("Waiting for statefulset status.AvailableReplicas updated to %d", expectedReplicas)
+
+	ns, name := ss.Namespace, ss.Name
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
+			}
+			if ssGet.Status.AvailableReplicas != expectedReplicas {
+				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		framework.Failf("Failed waiting for stateful set status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
+	}
+}
+
 // WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
 func WaitForStatusReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
 	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)

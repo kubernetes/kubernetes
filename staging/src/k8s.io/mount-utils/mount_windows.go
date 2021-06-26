@@ -267,7 +267,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	}
 
 	// format disk if it is unformatted(raw)
-	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
+	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru"+
 		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
 	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))

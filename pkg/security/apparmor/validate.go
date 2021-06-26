@@ -20,11 +20,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
+	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -107,7 +107,7 @@ func validateHost(runtime string) error {
 	}
 
 	// Check kernel support.
-	if !IsAppArmorEnabled() {
+	if !apparmor.IsEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 
@@ -211,18 +211,4 @@ func getAppArmorFS() (string, error) {
 	}
 
 	return "", errors.New("securityfs not found")
-}
-
-// IsAppArmorEnabled returns true if apparmor is enabled for the host.
-// This function is forked from
-// https://github.com/opencontainers/runc/blob/1a81e9ab1f138c091fe5c86d0883f87716088527/libcontainer/apparmor/apparmor.go
-// to avoid the libapparmor dependency.
-func IsAppArmorEnabled() bool {
-	if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
-		if _, err = os.Stat("/sbin/apparmor_parser"); err == nil {
-			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
-			return err == nil && len(buf) > 1 && buf[0] == 'Y'
-		}
-	}
-	return false
 }

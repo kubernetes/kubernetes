@@ -278,12 +278,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
 			continue
 		}
-		exists, _, _ := dswp.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
 		var volumeToMountSpecName string
 		if volumeToMount.VolumeSpec != nil {
 			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
 		}
-		if !exists && podExists {
+		removed := dswp.actualStateOfWorld.PodRemovedFromVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		if removed && podExists {
 			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 			continue
 		}
@@ -553,7 +553,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			return nil, nil, "", err
 		}
 		if migratable {
-			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, dswp.intreeToCSITranslator)
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, pod.Namespace, dswp.intreeToCSITranslator)
 			if err != nil {
 				return nil, nil, "", err
 			}
@@ -595,7 +595,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		return nil, nil, "", err
 	}
 	if migratable {
-		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, dswp.intreeToCSITranslator)
+		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, pod.Namespace, dswp.intreeToCSITranslator)
 		if err != nil {
 			return nil, nil, "", err
 		}

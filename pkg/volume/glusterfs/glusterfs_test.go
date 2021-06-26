@@ -47,7 +47,7 @@ func TestCanSupport(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/glusterfs")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/glusterfs" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -743,7 +743,7 @@ func TestParseClassParameters(t *testing.T) {
 			if test.secret != nil {
 				return true, test.secret, nil
 			}
-			return true, nil, fmt.Errorf("Test %s did not set a secret", test.name)
+			return true, nil, fmt.Errorf("test %s did not set a secret", test.name)
 		})
 
 		cfg, err := parseClassParameters(test.parameters, client)

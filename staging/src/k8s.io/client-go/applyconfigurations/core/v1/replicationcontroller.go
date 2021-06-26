@@ -59,8 +59,19 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+	return extractReplicationController(replicationController, fieldManager, "")
+}
+
+// ExtractReplicationControllerStatus is the same as ExtractReplicationController except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractReplicationControllerStatus(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+	return extractReplicationController(replicationController, fieldManager, "status")
+}
+
+func extractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
-	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b)
+	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

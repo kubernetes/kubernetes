@@ -61,8 +61,19 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPriorityClass(priorityClass *v1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+	return extractPriorityClass(priorityClass, fieldManager, "")
+}
+
+// ExtractPriorityClassStatus is the same as ExtractPriorityClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPriorityClassStatus(priorityClass *v1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+	return extractPriorityClass(priorityClass, fieldManager, "status")
+}
+
+func extractPriorityClass(priorityClass *v1alpha1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
 	b := &PriorityClassApplyConfiguration{}
-	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b)
+	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -76,3 +76,16 @@ func copyLabelsAndAnnotations(
 	}
 	return nil
 }
+
+func setImmutable(
+	rn *yaml.RNode, opts *types.GeneratorOptions) error {
+	if opts == nil {
+		return nil
+	}
+	if opts.Immutable {
+		if _, err := rn.Pipe(yaml.SetField("immutable", yaml.NewScalarRNode("true"))); err != nil {
+			return err
+		}
+	}
+	return nil
+}

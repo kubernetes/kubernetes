@@ -27,6 +27,7 @@ import (
 
 const (
 	StorageTypeUnset = ""
+	StorageTypeETCD2 = "etcd2"
 	StorageTypeETCD3 = "etcd3"
 
 	DefaultCompactInterval      = 5 * time.Minute

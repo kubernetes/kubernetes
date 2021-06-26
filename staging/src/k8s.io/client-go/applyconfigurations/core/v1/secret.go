@@ -61,8 +61,19 @@ func Secret(name, namespace string) *SecretApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
+	return extractSecret(secret, fieldManager, "")
+}
+
+// ExtractSecretStatus is the same as ExtractSecret except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractSecretStatus(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
+	return extractSecret(secret, fieldManager, "status")
+}
+
+func extractSecret(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
 	b := &SecretApplyConfiguration{}
-	err := managedfields.ExtractInto(secret, internal.Parser().Type("io.k8s.api.core.v1.Secret"), fieldManager, b)
+	err := managedfields.ExtractInto(secret, internal.Parser().Type("io.k8s.api.core.v1.Secret"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

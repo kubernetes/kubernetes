@@ -54,8 +54,8 @@ import (
 // 	quota_test.go:100: Took 4.196205966s to scale up without quota
 // 	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	// Set up a master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// Set up a API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -75,9 +75,9 @@ func TestQuota(t *testing.T) {
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.AdmissionControl = admission
+	_, _, closeFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quotaed", s, t)
@@ -245,8 +245,8 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 }
 
 func TestQuotaLimitedResourceDenial(t *testing.T) {
-	// Set up a master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// Set up an API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -275,9 +275,9 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.AdmissionControl = admission
+	_, _, closeFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quota", s, t)

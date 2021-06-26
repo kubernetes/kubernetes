@@ -59,7 +59,6 @@ const (
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
 	podRetryPeriod       = 1 * time.Second
 	podRetryTimeout      = 1 * time.Minute
-	podReadyTimeout      = 2 * time.Minute
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -846,7 +845,7 @@ var _ = SIGDescribe("Pods", func() {
 	framework.ConformanceIt("should delete a collection of pods", func() {
 		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
 
-		zero := int64(0)
+		one := int64(1)
 
 		ginkgo.By("Create set of pods")
 		// create a set of pods in test namespace
@@ -858,7 +857,7 @@ var _ = SIGDescribe("Pods", func() {
 						"type": "Testing"},
 				},
 				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &zero,
+					TerminationGracePeriodSeconds: &one,
 					Containers: []v1.Container{{
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Name:  "token-test",
@@ -875,7 +874,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "3 pods not found")
 
 		// delete Collection of pods with a label in the current namespace
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
 
@@ -900,7 +899,7 @@ var _ = SIGDescribe("Pods", func() {
 		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
-		zero := int64(0)
+		one := int64(1)
 
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -917,7 +916,7 @@ var _ = SIGDescribe("Pods", func() {
 				Labels: testPodLabels,
 			},
 			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: &zero,
+				TerminationGracePeriodSeconds: &one,
 				Containers: []v1.Container{
 					{
 						Name:  testPodName,
@@ -931,7 +930,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("watching for Pod to be ready")
-		ctx, cancel := context.WithTimeout(context.Background(), podReadyTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
 		defer cancel()
 		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if pod, ok := event.Object.(*v1.Pod); ok {
@@ -957,7 +956,7 @@ var _ = SIGDescribe("Pods", func() {
 				Labels: map[string]string{"test-pod": "patched"},
 			},
 			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: &zero,
+				TerminationGracePeriodSeconds: &one,
 				Containers: []v1.Container{{
 					Name:  testPodName,
 					Image: testPodImage2,
@@ -1024,7 +1023,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
-		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
+		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")

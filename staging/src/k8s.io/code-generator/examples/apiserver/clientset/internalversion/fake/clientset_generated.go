@@ -78,7 +78,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // Example retrieves the ExampleClient
 func (c *Clientset) Example() exampleinternalversion.ExampleInterface {

@@ -508,8 +508,8 @@ func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
 		require.NoError(t, err)
 		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
 		assert.NoError(t, err)
-		assert.Equal(t, result, probe.Success)
-		assert.Equal(t, body, string(truncatedPayload))
+		assert.Equal(t, probe.Success, result)
+		assert.Equal(t, string(truncatedPayload), body)
 	})
 }
 
@@ -541,7 +541,7 @@ func TestHTTPProbeChecker_PayloadNormal(t *testing.T) {
 		require.NoError(t, err)
 		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
 		assert.NoError(t, err)
-		assert.Equal(t, result, probe.Success)
-		assert.Equal(t, body, string(normalPayload))
+		assert.Equal(t, probe.Success, result)
+		assert.Equal(t, string(normalPayload), body)
 	})
 }

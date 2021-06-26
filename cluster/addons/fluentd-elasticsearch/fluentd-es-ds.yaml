@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: fluentd-es
-  namespace: kube-system
+  namespace: logging
   labels:
     k8s-app: fluentd-es
     addonmanager.kubernetes.io/mode: Reconcile
@@ -35,7 +35,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: fluentd-es
-  namespace: kube-system
+  namespace: logging
   apiGroup: ""
 roleRef:
   kind: ClusterRole
@@ -45,22 +45,22 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v3.1.0
-  namespace: kube-system
+  name: fluentd-es-v3.1.1
+  namespace: logging
   labels:
     k8s-app: fluentd-es
-    version: v3.1.0
+    version: v3.1.1
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v3.1.0
+      version: v3.1.1
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
-        version: v3.1.0
+        version: v3.1.1
     spec:
       securityContext:
         seccompProfile:
@@ -111,4 +111,4 @@ spec:
           path: /var/lib/docker/containers
       - name: config-volume
         configMap:
-          name: fluentd-es-config-v0.2.0
+          name: fluentd-es-config-v0.2.1

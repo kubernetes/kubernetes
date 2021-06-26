@@ -23,9 +23,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/google/uuid"
-	"k8s.io/klog/v2"
-
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +33,10 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -52,14 +53,11 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		Level:                    level,
 	}
 
-	// prefer the id from the headers. If not available, create a new one.
-	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header.Get(auditinternal.HeaderAuditID)
-	if ids != "" {
-		ev.AuditID = types.UID(ids)
-	} else {
-		ev.AuditID = types.UID(uuid.New().String())
+	auditID, found := request.AuditIDFrom(req.Context())
+	if !found {
+		auditID = types.UID(uuid.New().String())
 	}
+	ev.AuditID = auditID
 
 	ips := utilnet.SourceIPs(req)
 	ev.SourceIPs = make([]string, len(ips))
@@ -113,7 +111,7 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, objGV schema.GroupVersion, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
@@ -155,7 +153,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
-	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
+	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
 		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)

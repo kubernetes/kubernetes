@@ -97,6 +97,7 @@ message Scheduling {
   // with a pod's existing nodeSelector. Any conflicts will cause the pod to
   // be rejected in admission.
   // +optional
+  // +mapType=atomic
   map<string, string> nodeSelector = 1;
 
   // tolerations are appended (excluding duplicates) to pods running with this

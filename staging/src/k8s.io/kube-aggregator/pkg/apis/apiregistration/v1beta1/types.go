@@ -26,8 +26,12 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// Items is the list of APIService
 	Items []APIService `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -151,7 +155,10 @@ type APIServiceStatus struct {
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
 type APIService struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec contains information for locating and communicating with a server

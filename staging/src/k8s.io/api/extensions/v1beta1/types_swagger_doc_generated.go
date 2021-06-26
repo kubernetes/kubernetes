@@ -122,6 +122,7 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetUpdateStrategy = map[string]string{
+	"":              "DaemonSetUpdateStrategy indicates the strategy that the DaemonSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
 	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
 	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
 }
@@ -321,7 +322,8 @@ func (IngressRule) SwaggerDoc() map[string]string {
 }
 
 var map_IngressRuleValue = map[string]string{
-	"": "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"":     "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"http": "http is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
 }
 
 func (IngressRuleValue) SwaggerDoc() map[string]string {
@@ -414,7 +416,7 @@ var map_NetworkPolicyPort = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
 	"protocol": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
-	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Alpha state and should be enabled using the Feature Gate \"NetworkPolicyEndPort\".",
+	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
 }
 
 func (NetworkPolicyPort) SwaggerDoc() map[string]string {

@@ -187,18 +187,16 @@ func (v *reconcileWithSchemaWalker) visitListItems(t *schema.List, element *fiel
 }
 
 func (v *reconcileWithSchemaWalker) doList(t *schema.List) (errs ValidationErrors) {
-	// reconcile lists changed from granular to atomic
+	// reconcile lists changed from granular to atomic.
+	// Note that migrations from atomic to granular are not recommended and will
+	// be treated as if they were always granular.
+	//
+	// In this case, the manager that owned the previously atomic field (and all subfields),
+	// will now own just the top-level field and none of the subfields.
 	if !v.isAtomic && t.ElementRelationship == schema.Atomic {
 		v.toRemove = fieldpath.NewSet(v.path) // remove all root and all children fields
 		v.toAdd = fieldpath.NewSet(v.path)    // add the root of the atomic
 		return errs
-	}
-	// reconcile lists changed from atomic to granular
-	if v.isAtomic && t.ElementRelationship == schema.Associative {
-		v.toAdd, errs = buildGranularFieldSet(v.path, v.value)
-		if errs != nil {
-			return errs
-		}
 	}
 	if v.fieldSet != nil {
 		errs = v.visitListItems(t, v.fieldSet)
@@ -231,7 +229,12 @@ func (v *reconcileWithSchemaWalker) visitMapItems(t *schema.Map, element *fieldp
 }
 
 func (v *reconcileWithSchemaWalker) doMap(t *schema.Map) (errs ValidationErrors) {
-	// reconcile maps and structs changed from granular to atomic
+	// reconcile maps and structs changed from granular to atomic.
+	// Note that migrations from atomic to granular are not recommended and will
+	// be treated as if they were always granular.
+	//
+	// In this case the manager that owned the previously atomic field (and all subfields),
+	// will now own just the top-level field and none of the subfields.
 	if !v.isAtomic && t.ElementRelationship == schema.Atomic {
 		if v.fieldSet != nil && v.fieldSet.Size() > 0 {
 			v.toRemove = fieldpath.NewSet(v.path) // remove all root and all children fields
@@ -239,32 +242,10 @@ func (v *reconcileWithSchemaWalker) doMap(t *schema.Map) (errs ValidationErrors)
 		}
 		return errs
 	}
-	// reconcile maps changed from atomic to granular
-	if v.isAtomic && (t.ElementRelationship == schema.Separable || t.ElementRelationship == "") {
-		v.toAdd, errs = buildGranularFieldSet(v.path, v.value)
-		if errs != nil {
-			return errs
-		}
-	}
 	if v.fieldSet != nil {
 		errs = v.visitMapItems(t, v.fieldSet)
 	}
 	return errs
-}
-
-func buildGranularFieldSet(path fieldpath.Path, value *TypedValue) (*fieldpath.Set, ValidationErrors) {
-
-	valueFieldSet, err := value.ToFieldSet()
-	if err != nil {
-		return nil, errorf("toFieldSet: %v", err)
-	}
-	if valueFieldSetAtPath, ok := fieldSetAtPath(valueFieldSet, path); ok {
-		result := fieldpath.NewSet(path)
-		resultAtPath := descendToPath(result, path)
-		*resultAtPath = *valueFieldSetAtPath
-		return result, nil
-	}
-	return nil, nil
 }
 
 func fieldSetAtPath(node *fieldpath.Set, path fieldpath.Path) (*fieldpath.Set, bool) {

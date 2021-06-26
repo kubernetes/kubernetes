@@ -15,15 +15,28 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-// PopulateQueryParameters populates "values" into "msg".
-// A value is ignored if its key starts with one of the elements in "filter".
+var valuesKeyRegexp = regexp.MustCompile("^(.*)\\[(.*)\\]$")
+
+var currentQueryParser QueryParameterParser = &defaultQueryParser{}
+
+// QueryParameterParser defines interface for all query parameter parsers
+type QueryParameterParser interface {
+	Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error
+}
+
+// PopulateQueryParameters parses query parameters
+// into "msg" using current query parser
 func PopulateQueryParameters(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
+	return currentQueryParser.Parse(msg, values, filter)
+}
+
+type defaultQueryParser struct{}
+
+// Parse populates "values" into "msg".
+// A value is ignored if its key starts with one of the elements in "filter".
+func (*defaultQueryParser) Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
 	for key, values := range values {
-		re, err := regexp.Compile("^(.*)\\[(.*)\\]$")
-		if err != nil {
-			return err
-		}
-		match := re.FindStringSubmatch(key)
+		match := valuesKeyRegexp.FindStringSubmatch(key)
 		if len(match) == 3 {
 			key = match[1]
 			values = append([]string{match[2]}, values...)
@@ -119,14 +132,16 @@ func fieldByProtoName(m reflect.Value, name string) (reflect.Value, *proto.Prope
 	props := proto.GetProperties(m.Type())
 
 	// look up field name in oneof map
-	if op, ok := props.OneofTypes[name]; ok {
-		v := reflect.New(op.Type.Elem())
-		field := m.Field(op.Field)
-		if !field.IsNil() {
-			return reflect.Value{}, nil, fmt.Errorf("field already set for %s oneof", props.Prop[op.Field].OrigName)
+	for _, op := range props.OneofTypes {
+		if name == op.Prop.OrigName || name == op.Prop.JSONName {
+			v := reflect.New(op.Type.Elem())
+			field := m.Field(op.Field)
+			if !field.IsNil() {
+				return reflect.Value{}, nil, fmt.Errorf("field already set for %s oneof", props.Prop[op.Field].OrigName)
+			}
+			field.Set(v)
+			return v.Elem().Field(0), op.Prop, nil
 		}
-		field.Set(v)
-		return v.Elem().Field(0), op.Prop, nil
 	}
 
 	for _, p := range props.Prop {

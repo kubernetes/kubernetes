@@ -376,6 +376,7 @@ func autoConvert_v1_ExecConfig_To_api_ExecConfig(in *ExecConfig, out *api.ExecCo
 	out.APIVersion = in.APIVersion
 	out.InstallHint = in.InstallHint
 	out.ProvideClusterInfo = in.ProvideClusterInfo
+	out.InteractiveMode = api.ExecInteractiveMode(in.InteractiveMode)
 	return nil
 }
 
@@ -392,6 +393,9 @@ func autoConvert_api_ExecConfig_To_v1_ExecConfig(in *api.ExecConfig, out *ExecCo
 	out.InstallHint = in.InstallHint
 	out.ProvideClusterInfo = in.ProvideClusterInfo
 	// INFO: in.Config opted out of conversion generation
+	out.InteractiveMode = ExecInteractiveMode(in.InteractiveMode)
+	// INFO: in.StdinUnavailable opted out of conversion generation
+	// INFO: in.StdinUnavailableMessage opted out of conversion generation
 	return nil
 }
 

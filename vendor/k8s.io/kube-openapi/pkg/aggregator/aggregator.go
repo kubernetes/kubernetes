@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/kube-openapi/pkg/util"
 )

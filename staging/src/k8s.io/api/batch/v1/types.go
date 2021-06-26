@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const JobCompletionIndexAnnotationAlpha = "batch.kubernetes.io/job-completion-index"
+const JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -162,9 +162,11 @@ type JobSpec struct {
 	// for each index.
 	// When value is `Indexed`, .spec.completions must be specified and
 	// `.spec.parallelism` must be less than or equal to 10^5.
+	// In addition, The Pod name takes the form
+	// `$(job-name)-$(index)-$(random-string)`,
+	// the Pod hostname takes the form `$(job-name)-$(index)`.
 	//
-	// This field is alpha-level and is only honored by servers that enable the
-	// IndexedJob feature gate. More completion modes can be added in the future.
+	// This field is beta-level. More completion modes can be added in the future.
 	// If the Job controller observes a mode that it doesn't recognize, the
 	// controller skips updates for the Job.
 	// +optional
@@ -176,9 +178,11 @@ type JobSpec struct {
 	// false to true), the Job controller will delete all active Pods associated
 	// with this Job. Users must design their workload to gracefully handle this.
 	// Suspending a Job will reset the StartTime field of the Job, effectively
-	// resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
-	// requires the SuspendJob feature gate to be enabled; otherwise this field
-	// may not be set to true. Defaults to false.
+	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
+	//
+	// This field is beta-level, gated by SuspendJob feature flag (enabled by
+	// default).
+	//
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
 }

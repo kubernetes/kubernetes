@@ -58,8 +58,19 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractFlowSchema(flowSchema *flowcontrolv1alpha1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+	return extractFlowSchema(flowSchema, fieldManager, "")
+}
+
+// ExtractFlowSchemaStatus is the same as ExtractFlowSchema except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractFlowSchemaStatus(flowSchema *flowcontrolv1alpha1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+	return extractFlowSchema(flowSchema, fieldManager, "status")
+}
+
+func extractFlowSchema(flowSchema *flowcontrolv1alpha1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
 	b := &FlowSchemaApplyConfiguration{}
-	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1alpha1.FlowSchema"), fieldManager, b)
+	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1alpha1.FlowSchema"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

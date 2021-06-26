@@ -57,8 +57,19 @@ func PodSecurityPolicy(name string) *PodSecurityPolicyApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPodSecurityPolicy(podSecurityPolicy *extensionsv1beta1.PodSecurityPolicy, fieldManager string) (*PodSecurityPolicyApplyConfiguration, error) {
+	return extractPodSecurityPolicy(podSecurityPolicy, fieldManager, "")
+}
+
+// ExtractPodSecurityPolicyStatus is the same as ExtractPodSecurityPolicy except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPodSecurityPolicyStatus(podSecurityPolicy *extensionsv1beta1.PodSecurityPolicy, fieldManager string) (*PodSecurityPolicyApplyConfiguration, error) {
+	return extractPodSecurityPolicy(podSecurityPolicy, fieldManager, "status")
+}
+
+func extractPodSecurityPolicy(podSecurityPolicy *extensionsv1beta1.PodSecurityPolicy, fieldManager string, subresource string) (*PodSecurityPolicyApplyConfiguration, error) {
 	b := &PodSecurityPolicyApplyConfiguration{}
-	err := managedfields.ExtractInto(podSecurityPolicy, internal.Parser().Type("io.k8s.api.extensions.v1beta1.PodSecurityPolicy"), fieldManager, b)
+	err := managedfields.ExtractInto(podSecurityPolicy, internal.Parser().Type("io.k8s.api.extensions.v1beta1.PodSecurityPolicy"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

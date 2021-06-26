@@ -43,7 +43,7 @@ import (
 
 const (
 	// how long to wait for a resource quota update to occur
-	resourceQuotaTimeout = 30 * time.Second
+	resourceQuotaTimeout = time.Minute
 	podName              = "pfpod"
 )
 
@@ -1419,7 +1419,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 })
 
-var _ = SIGDescribe("ResourceQuota [Feature:CrossNamespacePodAffinity] [alpha]", func() {
+var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
 	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func() {
 		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")
@@ -1830,7 +1830,7 @@ func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.R
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
 // for the specific resource name.
 func updateResourceQuotaUntilUsageAppears(c clientset.Interface, ns, quotaName string, resourceName v1.ResourceName) error {
-	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
+	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

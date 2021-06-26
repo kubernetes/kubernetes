@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -68,6 +69,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		Short:                 i18n.T("Mark node as unschedulable"),
 		Long:                  cordonLong,
 		Example:               cordonExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
@@ -96,6 +98,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 		Short:                 i18n.T("Mark node as schedulable"),
 		Long:                  uncordonLong,
 		Example:               uncordonExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
@@ -148,6 +151,7 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 			GracePeriodSeconds: -1,
 			Out:                ioStreams.Out,
 			ErrOut:             ioStreams.ErrOut,
+			ChunkSize:          cmdutil.DefaultChunkSize,
 		},
 	}
 	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
@@ -180,6 +184,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Drain node in preparation for maintenance"),
 		Long:                  drainLong,
 		Example:               drainExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunDrain())
@@ -198,6 +203,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
 
+	cmdutil.AddChunkSizeFlag(cmd, &o.drainer.ChunkSize)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -256,6 +262,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		RequestChunksOf(o.drainer.ChunkSize).
 		ResourceNames("nodes", args...).
 		SingleResourceType().
 		Flatten()

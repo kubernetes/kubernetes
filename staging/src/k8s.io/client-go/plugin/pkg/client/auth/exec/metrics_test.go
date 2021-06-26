@@ -140,9 +140,10 @@ func TestCallsMetric(t *testing.T) {
 				{Name: "TEST_EXIT_CODE", Value: fmt.Sprintf("%d", exitCode)},
 				{Name: "TEST_OUTPUT", Value: goodOutput},
 			},
+			InteractiveMode: api.IfAvailableExecInteractiveMode,
 		}
 
-		a, err := newAuthenticator(newCache(), &c, nil)
+		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,10 +172,11 @@ func TestCallsMetric(t *testing.T) {
 	// metric values.
 	refreshCreds := func(command string) {
 		c := api.ExecConfig{
-			Command:    "does not exist",
-			APIVersion: "client.authentication.k8s.io/v1beta1",
+			Command:         "does not exist",
+			APIVersion:      "client.authentication.k8s.io/v1beta1",
+			InteractiveMode: api.IfAvailableExecInteractiveMode,
 		}
-		a, err := newAuthenticator(newCache(), &c, nil)
+		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

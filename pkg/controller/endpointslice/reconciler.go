@@ -113,7 +113,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	for _, sliceToDelete := range slicesToDelete {
 		err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceToDelete.Name, service.Namespace, service.Name, err))
+			errs = append(errs, fmt.Errorf("error deleting %s EndpointSlice for Service %s/%s: %w", sliceToDelete.Name, service.Namespace, service.Name, err))
 		} else {
 			r.endpointSliceTracker.ExpectDeletion(sliceToDelete)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
@@ -199,15 +199,9 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
 		})
 
-		if len(pmSlicesToCreate) > 0 {
-			slicesToCreate = append(slicesToCreate, pmSlicesToCreate...)
-		}
-		if len(pmSlicesToUpdate) > 0 {
-			slicesToUpdate = append(slicesToUpdate, pmSlicesToUpdate...)
-		}
-		if len(pmSlicesToDelete) > 0 {
-			slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
-		}
+		slicesToCreate = append(slicesToCreate, pmSlicesToCreate...)
+		slicesToUpdate = append(slicesToUpdate, pmSlicesToUpdate...)
+		slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
 	}
 
 	// If there are unique sets of ports that are no longer desired, mark
@@ -330,9 +324,9 @@ func (r *reconciler) finalize(
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
-	topologyLabel := "disabled"
+	topologyLabel := "Disabled"
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		topologyLabel = "auto"
+		topologyLabel = "Auto"
 	}
 
 	numSlicesChanged := len(slicesToCreate) + len(slicesToUpdate) + len(slicesToDelete)

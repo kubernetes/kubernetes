@@ -20,8 +20,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-openapi/spec"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -32,8 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
@@ -43,6 +43,9 @@ type DelegatingAuthenticatorConfig struct {
 
 	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
 	TokenAccessReviewClient authenticationclient.TokenReviewInterface
+
+	// TokenAccessReviewTimeout specifies a time limit for requests made by the authorization webhook client.
+	TokenAccessReviewTimeout time.Duration
 
 	// WebhookRetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
@@ -55,7 +58,7 @@ type DelegatingAuthenticatorConfig struct {
 	// CAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this is nil, then mTLS will not be used.
-	ClientCertificateCAContentProvider CAContentProvider
+	ClientCertificateCAContentProvider dynamiccertificates.CAContentProvider
 
 	APIAudiences authenticator.Audiences
 
@@ -88,7 +91,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		if c.WebhookRetryBackoff == nil {
 			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
 		}
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout)
 		if err != nil {
 			return nil, nil, err
 		}

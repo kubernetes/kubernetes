@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -144,7 +146,7 @@ func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
-// Constants related to capability
+// Constants related to capabilities and behavior of the driver.
 const (
 	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
 	CapBlock              Capability = "block"              // raw block mode
@@ -163,9 +165,15 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapOnlineExpansion     Capability = "onlineExpansion"     // supports online volume expansion
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
 	CapTopology            Capability = "topology"            // support topology
+
+	// The driver publishes storage capacity information: when the storage class
+	// for dynamic provisioning exists, the driver is expected to provide
+	// capacity information for it.
+	CapCapacity Capability = "capacity"
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -205,6 +213,8 @@ type DriverInfo struct {
 	StressTestOptions *StressTestOptions
 	// [Optional] Scale parameters for volume snapshot stress tests.
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
+	// [Optional] Parameters for performance tests
+	PerformanceTestOptions *PerformanceTestOptions
 }
 
 // StressTestOptions contains parameters used for stress tests.
@@ -223,4 +233,25 @@ type VolumeSnapshotStressTestOptions struct {
 	NumPods int
 	// Number of snapshots to create for each volume.
 	NumSnapshots int
+}
+
+// Metrics to evaluate performance of an operation
+// TODO: Add metrics like median, mode, standard deviation, percentile
+type Metrics struct {
+	AvgLatency time.Duration
+	Throughput float64
+}
+
+// PerformanceTestProvisioningOptions contains parameters for
+// testing provisioning operation performance.
+type PerformanceTestProvisioningOptions struct {
+	VolumeSize string
+	Count      int
+	// Expected metrics from PVC creation till PVC being Bound.
+	ExpectedMetrics *Metrics
+}
+
+// PerformanceTestOptions contains parameters used for performance tests
+type PerformanceTestOptions struct {
+	ProvisioningOptions *PerformanceTestProvisioningOptions
 }

@@ -35,7 +35,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -283,7 +282,7 @@ var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 // (where it should be) and this file.
 var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidatePiorityClassName can be used to check whether the given priority
+// ValidatePriorityClassName can be used to check whether the given priority
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
@@ -1217,8 +1216,8 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	}
 
 	if container == nil {
-		// The container is not available yet, e.g. during validation of
-		// PodPreset. Stop validation now, Pod validation will refuse final
+		// The container is not available yet.
+		// Stop validation now, Pod validation will refuse final
 		// Pods with Bidirectional propagation in non-privileged containers.
 		return allErrs
 	}
@@ -1624,7 +1623,7 @@ func ValidatePersistentVolumeClaimTemplate(claimTemplate *core.PersistentVolumeC
 
 func validatePersistentVolumeClaimTemplateObjectMeta(objMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateAnnotations(objMeta.Annotations, fldPath.Child("annotations"))
-	allErrs = append(allErrs, v1validation.ValidateLabels(objMeta.Labels, fldPath.Child("labels"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(objMeta.Labels, fldPath.Child("labels"))...)
 	// All other fields are not supported and thus must not be set
 	// to avoid confusion.  We could reject individual fields,
 	// but then adding a new one to ObjectMeta wouldn't be checked
@@ -2962,10 +2961,14 @@ const (
 	// restrictions in Linux libc name resolution handling.
 	// Max number of DNS name servers.
 	MaxDNSNameservers = 3
-	// Max number of domains in search path.
-	MaxDNSSearchPaths = 6
-	// Max number of characters in search path.
-	MaxDNSSearchListChars = 256
+	// Expanded max number of domains in the search path list.
+	MaxDNSSearchPathsExpanded = 32
+	// Expanded max number of characters in the search path.
+	MaxDNSSearchListCharsExpanded = 2048
+	// Max number of domains in the search path list.
+	MaxDNSSearchPathsLegacy = 6
+	// Max number of characters in the search path list.
+	MaxDNSSearchListCharsLegacy = 256
 )
 
 func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *field.Path) field.ErrorList {
@@ -2978,7 +2981,7 @@ func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *fie
 	return allErrs
 }
 
-func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
+func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Validate DNSNone case. Must provide at least one DNS name server.
@@ -3002,12 +3005,16 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			}
 		}
 		// Validate searches.
-		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", MaxDNSSearchPaths)))
+		maxDNSSearchPaths, maxDNSSearchListChars := MaxDNSSearchPathsLegacy, MaxDNSSearchListCharsLegacy
+		if opts.AllowExpandedDNSConfig {
+			maxDNSSearchPaths, maxDNSSearchListChars = MaxDNSSearchPathsExpanded, MaxDNSSearchListCharsExpanded
+		}
+		if len(dnsConfig.Searches) > maxDNSSearchPaths {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", maxDNSSearchPaths)))
 		}
 		// Include the space between search paths.
-		if len(strings.Join(dnsConfig.Searches, " ")) > MaxDNSSearchListChars {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
+		if len(strings.Join(dnsConfig.Searches, " ")) > maxDNSSearchListChars {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v characters (including spaces) in the search list", maxDNSSearchListChars)))
 		}
 		for i, search := range dnsConfig.Searches {
 			// it is fine to have a trailing dot
@@ -3205,6 +3212,10 @@ type PodValidationOptions struct {
 	AllowInvalidPodDeletionCost bool
 	// Allow pod spec to use non-integer multiple of huge page unit size
 	AllowIndivisibleHugePagesValues bool
+	// Allow hostProcess field to be set in windows security context
+	AllowWindowsHostProcessField bool
+	// Allow more DNSSearchPaths and longer DNSSearchListChars
+	AllowExpandedDNSConfig bool
 }
 
 // ValidatePodSingleHugePageResources checks if there are multiple huge
@@ -3325,9 +3336,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"))...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
-	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"))...)
+	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"))...)
+	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath, opts)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
@@ -4086,11 +4098,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), oldPod.Spec.RestartPolicy)...)
 
 	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
-		// Tolerate IP errors if IP errors already existed in the old pod. See http://issue.k8s.io/90625
-		// TODO(liggitt): Drop the check of oldPod in 1.20
-		if oldIPErrs := validatePodIPs(oldPod); len(oldIPErrs) == 0 {
-			allErrs = append(allErrs, newIPErrs...)
-		}
+		allErrs = append(allErrs, newIPErrs...)
 	}
 
 	return allErrs
@@ -4267,7 +4275,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(idxPath, ip, msgs[i]))
 			}
 		} else {
-			allErrs = append(allErrs, validateNonSpecialIP(ip, idxPath)...)
+			allErrs = append(allErrs, ValidateNonSpecialIP(ip, idxPath)...)
 		}
 	}
 
@@ -4317,35 +4325,6 @@ func ValidateService(service *core.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Duplicate(portPath, key))
 		}
 		ports[key] = true
-	}
-
-	// Validate TopologyKeys
-	if len(service.Spec.TopologyKeys) > 0 {
-		topoPath := specPath.Child("topologyKeys")
-		// topologyKeys is mutually exclusive with 'externalTrafficPolicy=Local'
-		if service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal {
-			allErrs = append(allErrs, field.Forbidden(topoPath, "may not be specified when `externalTrafficPolicy=Local`"))
-		}
-		if len(service.Spec.TopologyKeys) > core.MaxServiceTopologyKeys {
-			allErrs = append(allErrs, field.TooMany(topoPath, len(service.Spec.TopologyKeys), core.MaxServiceTopologyKeys))
-		}
-		topoKeys := sets.NewString()
-		for i, key := range service.Spec.TopologyKeys {
-			keyPath := topoPath.Index(i)
-			if topoKeys.Has(key) {
-				allErrs = append(allErrs, field.Duplicate(keyPath, key))
-			}
-			topoKeys.Insert(key)
-			// "Any" must be the last value specified
-			if key == v1.TopologyKeyAny && i != len(service.Spec.TopologyKeys)-1 {
-				allErrs = append(allErrs, field.Invalid(keyPath, key, `"*" must be the last value specified`))
-			}
-			if key != v1.TopologyKeyAny {
-				for _, msg := range validation.IsQualifiedName(key) {
-					allErrs = append(allErrs, field.Invalid(keyPath, service.Spec.TopologyKeys, msg))
-				}
-			}
-		}
 	}
 
 	// Validate SourceRange field and annotation
@@ -5408,7 +5387,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 
 	}
 	if !limContainsCPUOrMemory && !reqContainsCPUOrMemory && (reqContainsHugePages || limContainsHugePages) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("HugePages require cpu or memory")))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "HugePages require cpu or memory"))
 	}
 
 	return allErrs
@@ -5755,15 +5734,19 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
 	}
-	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
+	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
 }
 
-func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
-	// We disallow some IPs as endpoints or external-ips.  Specifically,
-	// unspecified and loopback addresses are nonsensical and link-local
-	// addresses tend to be used for node-centric purposes (e.g. metadata
-	// service).
+// ValidateNonSpecialIP is used to validate Endpoints, EndpointSlices, and
+// external IPs. Specifically, this disallows unspecified and loopback addresses
+// are nonsensical and link-local addresses tend to be used for node-centric
+// purposes (e.g. metadata service).
+//
+// IPv6 references
+// - https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+// - https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml
+func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
@@ -5771,16 +5754,16 @@ func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 		return allErrs
 	}
 	if ip.IsUnspecified() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be unspecified (0.0.0.0)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, fmt.Sprintf("may not be unspecified (%v)", ipAddress)))
 	}
 	if ip.IsLoopback() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8, ::1/128)"))
 	}
 	if ip.IsLinkLocalUnicast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local range (169.254.0.0/16)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local range (169.254.0.0/16, fe80::/10)"))
 	}
 	if ip.IsLinkLocalMulticast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)"))
 	}
 	return allErrs
 }
@@ -5923,10 +5906,10 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 		if l := len(*windowsOptions.RunAsUserName); l == 0 {
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, "runAsUserName cannot be an empty string"))
 		} else if ctrlRegex.MatchString(*windowsOptions.RunAsUserName) {
-			errMsg := fmt.Sprintf("runAsUserName cannot contain control characters")
+			errMsg := "runAsUserName cannot contain control characters"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 		} else if parts := strings.Split(*windowsOptions.RunAsUserName, "\\"); len(parts) > 2 {
-			errMsg := fmt.Sprintf("runAsUserName cannot contain more than one backslash")
+			errMsg := "runAsUserName cannot contain more than one backslash"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 		} else {
 			var (
@@ -5953,7 +5936,7 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 			}
 
 			if l := len(user); l == 0 {
-				errMsg := fmt.Sprintf("runAsUserName's User cannot be empty")
+				errMsg := "runAsUserName's User cannot be empty"
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 			} else if l > maxRunAsUserNameUserLength {
 				errMsg := fmt.Sprintf("runAsUserName's User length must not be longer than %d characters", maxRunAsUserNameUserLength)
@@ -5969,6 +5952,91 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 				errMsg := `runAsUserName's User cannot contain the following characters: "/\:;|=,+*?<>@[]`
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 			}
+		}
+	}
+
+	return allErrs
+}
+
+func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Keep track of container and hostProcess container count for validate
+	containerCount := 0
+	hostProcessContainerCount := 0
+
+	var podHostProcess *bool
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil {
+		podHostProcess = podSpec.SecurityContext.WindowsOptions.HostProcess
+	}
+
+	if !opts.AllowWindowsHostProcessField && podHostProcess != nil {
+		// Do not allow pods to persist data that sets hostProcess (true or false)
+		errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
+		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
+		return allErrs
+	}
+
+	hostNetwork := false
+	if podSpec.SecurityContext != nil {
+		hostNetwork = podSpec.SecurityContext.HostNetwork
+	}
+
+	podshelper.VisitContainersWithPath(podSpec, fieldPath, func(c *core.Container, cFieldPath *field.Path) bool {
+		containerCount++
+
+		var containerHostProcess *bool = nil
+		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil {
+			containerHostProcess = c.SecurityContext.WindowsOptions.HostProcess
+		}
+
+		if !opts.AllowWindowsHostProcessField && containerHostProcess != nil {
+			// Do not allow pods to persist data that sets hostProcess (true or false)
+			errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
+			allErrs = append(allErrs, field.Forbidden(cFieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
+		}
+
+		if podHostProcess != nil && containerHostProcess != nil && *podHostProcess != *containerHostProcess {
+			errMsg := fmt.Sprintf("pod hostProcess value must be identical if both are specified, was %v", *podHostProcess)
+			allErrs = append(allErrs, field.Invalid(cFieldPath.Child("securityContext", "windowsOptions", "hostProcess"), *containerHostProcess, errMsg))
+		}
+
+		switch {
+		case containerHostProcess != nil && *containerHostProcess:
+			// Container explitly sets hostProcess=true
+			hostProcessContainerCount++
+		case containerHostProcess == nil && podHostProcess != nil && *podHostProcess:
+			// Container inherits hostProcess=true from pod settings
+			hostProcessContainerCount++
+		}
+
+		return true
+	})
+
+	if hostProcessContainerCount > 0 {
+		// Fail Pod validation if feature is not enabled (unless podspec already exists and contains HostProcess fields) instead of dropping fields based on PRR reivew.
+		if !opts.AllowWindowsHostProcessField {
+			errMsg := "pod must not contain Windows hostProcess containers when feature gate 'WindowsHostProcessContainers' is not enabled"
+			allErrs = append(allErrs, field.Forbidden(fieldPath, errMsg))
+			return allErrs
+		}
+
+		// At present, if a Windows Pods contains any HostProcess containers than all containers must be
+		// HostProcess containers (explicitly set or inherited).
+		if hostProcessContainerCount != containerCount {
+			errMsg := "If pod contains any hostProcess containers then all containers must be HostProcess containers"
+			allErrs = append(allErrs, field.Invalid(fieldPath, "", errMsg))
+		}
+
+		// At present Windows Pods which contain HostProcess containers must also set HostNetwork.
+		if hostNetwork != true {
+			errMsg := "hostNetwork must be true if pod contains any hostProcess containers"
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("hostNetwork"), hostNetwork, errMsg))
+		}
+
+		if !capabilities.Get().AllowPrivileged {
+			errMsg := "hostProcess containers are disallowed by cluster policy"
+			allErrs = append(allErrs, field.Forbidden(fieldPath, errMsg))
 		}
 	}
 

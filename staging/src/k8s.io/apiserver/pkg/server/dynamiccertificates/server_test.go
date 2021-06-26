@@ -208,6 +208,8 @@ func (c *nullCAContent) Name() string {
 	return c.name
 }
 
+func (c *nullCAContent) AddListener(Listener) {}
+
 // CurrentCABundleContent provides ca bundle byte content
 func (c *nullCAContent) CurrentCABundleContent() (cabundle []byte) {
 	return nil

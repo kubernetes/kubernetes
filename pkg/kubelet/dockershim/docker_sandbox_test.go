@@ -156,19 +156,6 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", statusResp))
 }
 
-// TestSandboxHasLeastPrivilegesConfig tests that the sandbox is set with no-new-privileges
-// and it uses runtime/default seccomp profile.
-func TestSandboxHasLeastPrivilegesConfig(t *testing.T) {
-	ds, _, _ := newTestDockerService()
-	config := makeSandboxConfig("foo", "bar", "1", 0)
-
-	// test the default
-	createConfig, err := ds.makeSandboxDockerConfig(config, defaultSandboxImage)
-	assert.NoError(t, err)
-	assert.Equal(t, len(createConfig.HostConfig.SecurityOpt), 1, "sandbox should use runtime/default")
-	assert.Equal(t, "no-new-privileges", createConfig.HostConfig.SecurityOpt[0], "no-new-privileges not set")
-}
-
 // TestSandboxStatusAfterRestart tests that retrieving sandbox status returns
 // an IP address even if RunPodSandbox() was not yet called for this pod, as
 // would happen on kubelet restart

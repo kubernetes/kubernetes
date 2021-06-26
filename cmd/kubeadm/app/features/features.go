@@ -32,12 +32,15 @@ const (
 	IPv6DualStack = "IPv6DualStack"
 	// PublicKeysECDSA is expected to be alpha in v1.19
 	PublicKeysECDSA = "PublicKeysECDSA"
+	// RootlessControlPlane is expected to be in alpha in v1.22
+	RootlessControlPlane = "RootlessControlPlane"
 )
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	IPv6DualStack:   {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
-	PublicKeysECDSA: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	IPv6DualStack:        {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	PublicKeysECDSA:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated

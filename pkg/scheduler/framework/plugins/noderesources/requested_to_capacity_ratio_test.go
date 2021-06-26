@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -80,7 +81,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 					{Name: "cpu", Weight: 1},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -235,12 +236,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			//  Node1 Score:
 			//  rawScoringFunction(used + requested / available)
 			//  resourceScoringFunction((0+0),8)
-			//      = maxUtilization - (8-0)*(maxUtilization/8) = 0 = rawScoringFunction(0)
+			//      = 0/8 * maxUtilization = 0 = rawScoringFunction(0)
 			//  Node1 Score: 0
 			//  Node2 scores (used resources) on 0-MaxNodeScore scale
 			//  rawScoringFunction(used + requested / available)
 			//  resourceScoringFunction((0+0),4)
-			//      = maxUtilization - (4-0)*(maxUtilization/4) = 0 = rawScoringFunction(0)
+			//      = 0/4 * maxUtilization = 0 = rawScoringFunction(0)
 			//  Node2 Score: 0
 
 			pod:          &v1.Pod{Spec: noResources},
@@ -255,12 +256,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = maxUtilization - (8-2)*(maxUtilization/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * maxUtilization = 25 = rawScoringFunction(25)
 			// Node1 Score: 2
 			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = maxUtilization - (4-2)*(maxUtilization/4) = 50 = rawScoringFunction(50)
+			//  = 2/4 * maxUtilization = 50 = rawScoringFunction(50)
 			// Node2 Score: 5
 
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
@@ -278,12 +279,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = maxUtilization - (8-2)*(maxUtilization/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * maxUtilization = 25 = rawScoringFunction(25)
 			// Node1 Score: 2
 			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((2+2),4)
-			//  = maxUtilization - (4-4)*(maxUtilization/4) = maxUtilization = rawScoringFunction(maxUtilization)
+			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
@@ -301,12 +302,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),8)
-			//  = maxUtilization - (8-4)*(maxUtilization/8) = 50 = rawScoringFunction(50)
+			//  = 4/8 * maxUtilization = 50 = rawScoringFunction(50)
 			// Node1 Score: 5
 			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),4)
-			//  = maxUtilization - (4-4)*(maxUtilization/4) = maxUtilization = rawScoringFunction(maxUtilization)
+			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 
 			pod:          &v1.Pod{Spec: extendedResourcePod2},
@@ -333,7 +334,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 					{Name: "intel.com/foo", Weight: 1},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -412,11 +413,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+0),8)
-			//  = 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			//  = 0/8 * 100 = 0 = rawScoringFunction(0)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+0),4)
-			//  = 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			//  = 0/4 * 100 = 0 = rawScoringFunction(0)
 			// Node1 Score: (0 * 3) + (0 * 5) / 8 = 0
 
 			// Node2 scores (used resources) on 0-10 scale
@@ -424,11 +425,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+0),4)
-			//  = 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			//  = 0/4 * 100 = 0 = rawScoringFunction(0)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+0),8)
-			//  = 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			//  = 0/8 * 100 = 0 = rawScoringFunction(0)
 			// Node2 Score: (0 * 3) + (0 * 5) / 8 = 0
 
 			pod:          &v1.Pod{Spec: noResources},
@@ -446,11 +447,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			//  = 2/4 * 100 = 50 = rawScoringFunction(50)
 			// Node1 Score: (2 * 3) + (5 * 5) / 8 = 4
 
 			// Node2 scores (used resources) on 0-10 scale
@@ -458,11 +459,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			//  = 2/4 * 100 = 50 = rawScoringFunction(50)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (5 * 3) + (2 * 5) / 8 = 3
 
 			pod:          &v1.Pod{Spec: extnededResourcePod1},
@@ -483,22 +484,22 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			//  = 2/4 * 100 = 50 = rawScoringFunction(50)
 			// Node1 Score: (2 * 3) + (5 * 5) / 8 = 4
 			// Node2 scores (used resources) on 0-10 scale
 			// rawScoringFunction(used + requested / available)
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((2+2),4)
-			//  = 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			//  = 4/4 * 100 = 100 = rawScoringFunction(100)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((2+2),8)
-			//  = 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			//  = 4/8 *100 = 50 = rawScoringFunction(50)
 			// Node2 Score: (10 * 3) + (5 * 5) / 8 = 7
 
 			pod:          &v1.Pod{Spec: extnededResourcePod1},
@@ -534,22 +535,22 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),8)
-			//  = 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			// 4/8 * 100 = 50 = rawScoringFunction(50)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			//  = 2/4 * 100 = 50 = rawScoringFunction(50)
 			// Node1 Score: (5 * 3) + (5 * 5) / 8 = 5
 			// Node2 scores (used resources) on 0-10 scale
 			// rawScoringFunction(used + requested / available)
 			// intel.com/foo:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),4)
-			//  = 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			//  = 4/4 * 100 = 100 = rawScoringFunction(100)
 			// intel.com/bar:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (10 * 3) + (2 * 5) / 8 = 5
 
 			pod:          &v1.Pod{Spec: extnededResourcePod2},
@@ -577,7 +578,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 					{Name: "intel.com/bar", Weight: 5},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh)
+			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

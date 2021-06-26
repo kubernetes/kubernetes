@@ -190,7 +190,7 @@ func (p *podEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []core
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
-// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+// It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (p *podEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
 	uncoveredScopes := []corev1.ScopedResourceSelectorRequirement{}
 	for _, selector := range limitedScopes {

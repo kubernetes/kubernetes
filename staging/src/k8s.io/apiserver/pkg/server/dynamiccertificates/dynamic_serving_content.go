@@ -47,7 +47,6 @@ type DynamicCertKeyPairContent struct {
 	queue workqueue.RateLimitingInterface
 }
 
-var _ Notifier = &DynamicCertKeyPairContent{}
 var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 
@@ -108,7 +107,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	}
 
 	c.certKeyPair.Store(newCertKey)
-	klog.V(2).Infof("Loaded a new cert/key pair for %q", c.Name())
+	klog.V(2).InfoS("Loaded a new cert/key pair", "name", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
@@ -127,8 +126,8 @@ func (c *DynamicCertKeyPairContent) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	klog.InfoS("Starting controller", "name", c.name)
+	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, stopCh)

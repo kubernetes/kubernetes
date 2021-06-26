@@ -301,6 +301,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	}
 
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	restartOnExit := framework.TestContext.RestartKubelet
 	server := newServer(
 		"kubelet",
 		cmd,
@@ -309,7 +310,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
 		e.monitorParent,
-		true /* restartOnExit */)
+		restartOnExit)
 	return server, server.start()
 }
 

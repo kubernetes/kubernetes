@@ -26,7 +26,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -391,10 +390,41 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// haveSameExpandedDNSConfig returns true if the oldPodSpec already had
+// ExpandedDNSConfig and podSpec has the same DNSConfig
+func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil {
+		return false
+	}
+	if podSpec == nil || podSpec.DNSConfig == nil {
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) <= apivalidation.MaxDNSSearchPathsLegacy &&
+		len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) <= apivalidation.MaxDNSSearchListCharsLegacy {
+		// didn't have ExpandedDNSConfig
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) != len(podSpec.DNSConfig.Searches) {
+		// updates DNSConfig
+		return false
+	}
+
+	for i, oldSearch := range oldPodSpec.DNSConfig.Searches {
+		if podSpec.DNSConfig.Searches[i] != oldSearch {
+			// updates DNSConfig
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
-	opts := validation.PodValidationOptions{
+	opts := apivalidation.PodValidationOptions{
 		// Allow multiple huge pages on pod create if feature is enabled
 		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 		// Allow pod spec to use hugepages in downward API if feature is enabled
@@ -402,6 +432,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
+		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
+		// Allow pod spec with expanded DNS configuration
+		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 	}
 
 	if oldPodSpec != nil {
@@ -416,6 +449,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				return !opts.AllowDownwardAPIHugePages
 			})
 		}
+		// if old spec has Windows Host Process fields set, we must allow it
+		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
@@ -582,11 +617,6 @@ func dropDisabledFields(
 		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
 		podSpec.PreemptionPolicy = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SetHostnameAsFQDN) && !setHostnameAsFQDNInUse(oldPodSpec) {
-		// Set SetHostnameAsFQDN to nil only if feature is disabled and it is not used
-		podSpec.SetHostnameAsFQDN = nil
 	}
 
 	dropDisabledPodAffinityTermFields(podSpec, oldPodSpec)
@@ -883,14 +913,6 @@ func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
 	return false
 }
 
-// setHostnameAsFQDNInUse returns true if any pod's spec defines setHostnameAsFQDN field.
-func setHostnameAsFQDNInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil || podSpec.SetHostnameAsFQDN == nil {
-		return false
-	}
-	return *podSpec.SetHostnameAsFQDN
-}
-
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
 // converted annotation value
 func SeccompAnnotationForField(field *api.SeccompProfile) string {
@@ -944,4 +966,29 @@ func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)
+// anywhere in the pod spec.
+func setsWindowsHostProcess(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	// Check Pod's WindowsOptions.HostProcess
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil && podSpec.SecurityContext.WindowsOptions.HostProcess != nil {
+		return true
+	}
+
+	// Check WindowsOptions.HostProcess for each container
+	inUse := false
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil && c.SecurityContext.WindowsOptions.HostProcess != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
 }

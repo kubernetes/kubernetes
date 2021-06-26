@@ -58,8 +58,19 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+	return extractStorageVersion(storageVersion, fieldManager, "")
+}
+
+// ExtractStorageVersionStatus is the same as ExtractStorageVersion except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStorageVersionStatus(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+	return extractStorageVersion(storageVersion, fieldManager, "status")
+}
+
+func extractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
 	b := &StorageVersionApplyConfiguration{}
-	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b)
+	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

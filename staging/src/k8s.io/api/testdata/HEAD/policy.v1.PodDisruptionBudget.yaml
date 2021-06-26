@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -43,15 +44,15 @@ spec:
 status:
   conditions:
   - lastTransitionTime: "2544-09-25T10:59:09Z"
-    message: "28"
+    message: "29"
     observedGeneration: -8886126363972008903
-    reason: "27"
+    reason: "28"
     status: 蓿彭聡A3fƻfʣ繡楙¯ĦE勗E濞
-    type: "26"
+    type: "27"
   currentHealthy: -2037845840
   desiredHealthy: -1965578645
   disruptedPods:
-    "25": "2250-04-18T21:52:38Z"
+    "26": "2250-04-18T21:52:38Z"
   disruptionsAllowed: -1942073618
   expectedPods: -347579237
   observedGeneration: -6582200896939805980

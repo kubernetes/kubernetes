@@ -21,6 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// DisruptionBudgetCause is the status cause returned for eviction failures caused by PodDisruptionBudget violations.
+const DisruptionBudgetCause metav1.CauseType = "DisruptionBudget"
+
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" pods selected by
@@ -147,4 +150,23 @@ type PodDisruptionBudgetList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Items is a list of PodDisruptionBudgets
 	Items []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
+type Eviction struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the pod that is being evicted.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// DeleteOptions may be provided
+	// +optional
+	DeleteOptions *metav1.DeleteOptions `json:"deleteOptions,omitempty" protobuf:"bytes,2,opt,name=deleteOptions"`
 }

@@ -403,7 +403,7 @@ type InterfaceAddrsPair struct {
 	addrs []net.Addr
 }
 
-func TestGetNodeAddressses(t *testing.T) {
+func TestGetNodeAddresses(t *testing.T) {
 	testCases := []struct {
 		cidrs         []string
 		nw            *fake.FakeNetwork
@@ -1176,6 +1176,44 @@ func TestWriteLine(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testBuffer.Reset()
 			WriteLine(testBuffer, testCase.words...)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, testCase.expected, testBuffer.String())
+			}
+		})
+	}
+}
+
+func TestWriteRuleLine(t *testing.T) {
+	testCases := []struct {
+		name      string
+		chainName string
+		words     []string
+		expected  string
+	}{
+		{
+			name:      "write no line due to no words",
+			chainName: "KUBE-SVC-FOO",
+			words:     []string{},
+			expected:  "",
+		},
+		{
+			name:      "write one line",
+			chainName: "KUBE-XLB-FOO",
+			words:     []string{"test1"},
+			expected:  "-A KUBE-XLB-FOO test1\n",
+		},
+		{
+			name:      "write multi word line",
+			chainName: "lolChain",
+			words:     []string{"test1", "test2", "test3"},
+			expected:  "-A lolChain test1 test2 test3\n",
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteRuleLine(testBuffer, testCase.chainName, testCase.words...)
 			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
 				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, testCase.expected, testBuffer.String())
 			}

@@ -29,6 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -86,7 +87,8 @@ var (
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
 		o = &TopPodOptions{
-			IOStreams: streams,
+			IOStreams:          streams,
+			UseProtocolBuffers: true,
 		}
 	}
 
@@ -96,6 +98,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		Short:                 i18n.T("Display Resource (CPU/Memory) usage of pods"),
 		Long:                  topPodLong,
 		Example:               topPodExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -104,11 +107,11 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		Aliases: []string{"pods", "po"},
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
-	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "If present, protocol-buffers will be used to request metrics.")
+	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	return cmd
 }
 
@@ -136,8 +139,6 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 	if o.UseProtocolBuffers {
 		config.ContentType = "application/vnd.kubernetes.protobuf"
-	} else {
-		klog.Warning("Using json format to get metrics. Next release will switch to protocol-buffers, switch early by passing --use-protocol-buffers flag")
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {

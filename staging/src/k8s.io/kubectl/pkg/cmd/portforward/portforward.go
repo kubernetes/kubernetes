@@ -61,7 +61,7 @@ type PortForwardOptions struct {
 
 var (
 	portforwardLong = templates.LongDesc(i18n.T(`
-                Forward one or more local ports to a pod. This command requires the node to have 'socat' installed.
+                Forward one or more local ports to a pod.
 
                 Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
 
@@ -109,6 +109,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Short:                 i18n.T("Forward one or more local ports to a pod"),
 		Long:                  portforwardLong,
 		Example:               portforwardExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(opts.Complete(f, cmd, args))
 			cmdutil.CheckErr(opts.Validate())

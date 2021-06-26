@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/controller-manager/config"
 	"k8s.io/controller-manager/pkg/features"
+	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
 )
 
 func TestLeaderMigrationOptions(t *testing.T) {
@@ -53,11 +54,12 @@ func TestLeaderMigrationOptions(t *testing.T) {
 			expectErr:         true,
 		},
 		{
-			name:              "enabled, but missing configuration file",
+			name:              "enabled, with default configuration",
 			flags:             []string{"--enable-leader-migration"},
 			enableFeatureGate: true,
 			expectEnabled:     true,
-			expectErr:         true,
+			expectErr:         false,
+			expectConfig:      migrationconfig.DefaultLeaderMigrationConfiguration(),
 		},
 		{
 			name:              "enabled, with custom configuration file",

@@ -252,4 +252,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.EnableDebugFlagsHandler == nil {
 		obj.EnableDebugFlagsHandler = utilpointer.BoolPtr(true)
 	}
+	if obj.SeccompDefault == nil {
+		obj.SeccompDefault = utilpointer.BoolPtr(false)
+	}
 }

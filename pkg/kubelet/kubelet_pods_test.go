@@ -1733,6 +1733,19 @@ func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 		},
 	}
 }
+func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name: cName,
+		State: v1.ContainerState{
+			Waiting: &v1.ContainerStateWaiting{},
+		},
+		LastTerminationState: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				ExitCode: -1,
+			},
+		},
+	}
+}
 func runningState(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -1870,6 +1883,109 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 	}
 }
 
+func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "containerX"},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						failedState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container waiting, terminated zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithNonZeroTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container waiting, terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container waiting, not terminated",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"init container succeeded",
+		},
+	}
+	for _, test := range tests {
+		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		status := getPhase(&test.pod.Spec, statusInfo)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
 func TestPodPhaseWithRestartNever(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
@@ -1966,6 +2082,109 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 	}
 	for _, test := range tests {
 		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "containerX"},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyNever,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						failedState("containerX"),
+					},
+				},
+			},
+			v1.PodFailed,
+			"init container terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithLastTermination("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container waiting, terminated zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingStateWithNonZeroTermination("containerX"),
+					},
+				},
+			},
+			v1.PodFailed,
+			"init container waiting, terminated non-zero",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerX"),
+					},
+				},
+			},
+			v1.PodPending,
+			"init container waiting, not terminated",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"init container succeeded",
+		},
+	}
+	for _, test := range tests {
+		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		status := getPhase(&test.pod.Spec, statusInfo)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2082,6 +2301,10 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
+
+// No special init-specific logic for this, see RestartAlways case
+// func TestPodPhaseWithRestartOnFailureInitContainers(t *testing.T) {
+// }
 
 func TestGetExec(t *testing.T) {
 	const (

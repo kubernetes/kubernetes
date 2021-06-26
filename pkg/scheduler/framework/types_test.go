@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -66,54 +66,6 @@ func TestNewResource(t *testing.T) {
 			r := NewResource(test.resourceList)
 			if !reflect.DeepEqual(test.expected, r) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, r)
-			}
-		})
-	}
-}
-
-func TestResourceList(t *testing.T) {
-	tests := []struct {
-		resource *Resource
-		expected v1.ResourceList
-	}{
-		{
-			resource: &Resource{},
-			expected: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:              *resource.NewScaledQuantity(0, -3),
-				v1.ResourceMemory:           *resource.NewQuantity(0, resource.BinarySI),
-				v1.ResourcePods:             *resource.NewQuantity(0, resource.BinarySI),
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(0, resource.BinarySI),
-			},
-		},
-		{
-			resource: &Resource{
-				MilliCPU:         4,
-				Memory:           2000,
-				EphemeralStorage: 5000,
-				AllowedPodNumber: 80,
-				ScalarResources: map[v1.ResourceName]int64{
-					"scalar.test/scalar1":        1,
-					"hugepages-test":             2,
-					"attachable-volumes-aws-ebs": 39,
-				},
-			},
-			expected: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
-				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
-				v1.ResourcePods:                     *resource.NewQuantity(80, resource.BinarySI),
-				v1.ResourceEphemeralStorage:         *resource.NewQuantity(5000, resource.BinarySI),
-				"scalar.test/" + "scalar1":          *resource.NewQuantity(1, resource.DecimalSI),
-				"attachable-volumes-aws-ebs":        *resource.NewQuantity(39, resource.DecimalSI),
-				v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(2, resource.BinarySI),
-			},
-		},
-	}
-
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			rl := test.resource.ResourceList()
-			if !reflect.DeepEqual(test.expected, rl) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, rl)
 			}
 		})
 	}
@@ -314,9 +266,8 @@ func TestNewNodeInfo(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo: NewTransientSchedulerInfo(),
-		Allocatable:   &Resource{},
-		Generation:    2,
+		Allocatable: &Resource{},
+		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
@@ -407,7 +358,6 @@ func TestNodeInfoClone(t *testing.T) {
 			nodeInfo: &NodeInfo{
 				Requested:        &Resource{},
 				NonZeroRequested: &Resource{},
-				TransientInfo:    NewTransientSchedulerInfo(),
 				Allocatable:      &Resource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
@@ -481,7 +431,6 @@ func TestNodeInfoClone(t *testing.T) {
 			expected: &NodeInfo{
 				Requested:        &Resource{},
 				NonZeroRequested: &Resource{},
-				TransientInfo:    NewTransientSchedulerInfo(),
 				Allocatable:      &Resource{},
 				Generation:       2,
 				UsedPorts: HostPortInfo{
@@ -692,9 +641,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo: NewTransientSchedulerInfo(),
-		Allocatable:   &Resource{},
-		Generation:    2,
+		Allocatable: &Resource{},
+		Generation:  2,
 		UsedPorts: HostPortInfo{
 			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
@@ -872,9 +820,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo: NewTransientSchedulerInfo(),
-				Allocatable:   &Resource{},
-				Generation:    2,
+				Allocatable: &Resource{},
+				Generation:  2,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
@@ -1005,9 +952,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo: NewTransientSchedulerInfo(),
-				Allocatable:   &Resource{},
-				Generation:    3,
+				Allocatable: &Resource{},
+				Generation:  3,
 				UsedPorts: HostPortInfo{
 					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 8080}: {},

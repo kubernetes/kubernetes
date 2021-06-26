@@ -69,7 +69,7 @@ func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 }
 
 func testPrefix(t *testing.T, prefix string) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + prefix)
@@ -93,13 +93,9 @@ func TestAppsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/apps/")
 }
 
-func TestExtensionsPrefix(t *testing.T) {
-	testPrefix(t, "/apis/extensions/")
-}
-
 func TestKubernetesService(t *testing.T) {
-	config := framework.NewMasterConfig()
-	_, _, closeFn := framework.RunAMaster(config)
+	config := framework.NewControlPlaneConfig()
+	_, _, closeFn := framework.RunAnAPIServer(config)
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
@@ -116,7 +112,7 @@ func TestKubernetesService(t *testing.T) {
 }
 
 func TestEmptyList(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	u := s.URL + "/api/v1/namespaces/default/pods"
@@ -143,59 +139,59 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
-func initStatusForbiddenMasterCongfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	return masterConfig
+func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+	return controlPlaneConfig
 }
 
-func initUnauthorizedMasterCongfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+func initUnauthorizedControlPlaneConfig() *controlplane.Config {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	masterConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
-	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	return masterConfig
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+	return controlPlaneConfig
 }
 
 func TestStatus(t *testing.T) {
 	testCases := []struct {
-		name         string
-		masterConfig *controlplane.Config
-		statusCode   int
-		reqPath      string
-		reason       string
-		message      string
+		name               string
+		controlPlaneConfig *controlplane.Config
+		statusCode         int
+		reqPath            string
+		reason             string
+		message            string
 	}{
 		{
-			name:         "404",
-			masterConfig: nil,
-			statusCode:   http.StatusNotFound,
-			reqPath:      "/apis/batch/v1/namespaces/default/jobs/foo",
-			reason:       "NotFound",
-			message:      `jobs.batch "foo" not found`,
+			name:               "404",
+			controlPlaneConfig: nil,
+			statusCode:         http.StatusNotFound,
+			reqPath:            "/apis/batch/v1/namespaces/default/jobs/foo",
+			reason:             "NotFound",
+			message:            `jobs.batch "foo" not found`,
 		},
 		{
-			name:         "403",
-			masterConfig: initStatusForbiddenMasterCongfig(),
-			statusCode:   http.StatusForbidden,
-			reqPath:      "/apis",
-			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			name:               "403",
+			controlPlaneConfig: initStatusForbiddenControlPlaneConfig(),
+			statusCode:         http.StatusForbidden,
+			reqPath:            "/apis",
+			reason:             "Forbidden",
+			message:            `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
-			name:         "401",
-			masterConfig: initUnauthorizedMasterCongfig(),
-			statusCode:   http.StatusUnauthorized,
-			reqPath:      "/apis",
-			reason:       "Unauthorized",
-			message:      `Unauthorized`,
+			name:               "401",
+			controlPlaneConfig: initUnauthorizedControlPlaneConfig(),
+			statusCode:         http.StatusUnauthorized,
+			reqPath:            "/apis",
+			reason:             "Unauthorized",
+			message:            `Unauthorized`,
 		},
 	}
 
 	for _, tc := range testCases {
-		_, s, closeFn := framework.RunAMaster(tc.masterConfig)
+		_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
 		defer closeFn()
 
 		u := s.URL + tc.reqPath
@@ -302,7 +298,7 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 }
 
 func TestObjectSizeResponses(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -353,7 +349,7 @@ func TestObjectSizeResponses(t *testing.T) {
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
@@ -434,7 +430,7 @@ func appsPath(resource, namespace, name string) string {
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 	transport := http.DefaultTransport
 
@@ -479,7 +475,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAppsGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 	transport := http.DefaultTransport
 
@@ -527,7 +523,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	resp, err := http.Get(s.URL + "/api/")
@@ -604,8 +600,8 @@ func countEndpoints(eps *corev1.Endpoints) int {
 	return count
 }
 
-func TestMasterService(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+func TestAPIServerService(t *testing.T) {
+	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -641,13 +637,13 @@ func TestMasterService(t *testing.T) {
 }
 
 func TestServiceAlloc(t *testing.T) {
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -713,7 +709,7 @@ func TestServiceAlloc(t *testing.T) {
 }
 
 // TestUpdateNodeObjects represents a simple version of the behavior of node checkins at steady
-// state. This test allows for easy profiling of a realistic master scenario for baseline CPU
+// state. This test allows for easy profiling of a realistic primary scenario for baseline CPU
 // in very large clusters. It is disabled by default - start a kube-apiserver and pass
 // UPDATE_NODE_APISERVER as the host value.
 func TestUpdateNodeObjects(t *testing.T) {

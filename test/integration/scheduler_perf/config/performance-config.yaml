@@ -475,3 +475,149 @@
     params:
       initNodes: 5000
       measurePods: 2000
+
+- name: SchedulingRequiredPodAntiAffinityWithNSSelector
+  featureGates:
+    PodAffinityNamespaceSelector: true  
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    uniqueNodeLabelStrategy:
+      labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+      podTemplatePath: config/pod-anti-affinity-ns-selector.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-anti-affinity-ns-selector.yaml
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 40
+      initNamespaces: 100
+      measurePods: 1000
+      
+- name: SchedulingPreferredAntiAffinityWithNSSelector
+  featureGates:
+    PodAffinityNamespaceSelector: true  
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    uniqueNodeLabelStrategy:
+      labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+      podTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 40
+      initNamespaces: 100
+      measurePods: 1000
+
+- name: SchedulingRequiredPodAffinityWithNSSelector
+  featureGates:
+    PodAffinityNamespaceSelector: true  
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+      podTemplatePath: config/pod-affinity-ns-selector.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-affinity-ns-selector.yaml
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 50
+      initNamespaces: 100
+      measurePods: 1000
+      
+- name: SchedulingPreferredAffinityWithNSSelector
+  featureGates:
+    PodAffinityNamespaceSelector: true  
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    uniqueNodeLabelStrategy:
+      labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+      podTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 50
+      initNamespaces: 100
+      measurePods: 1000
+    

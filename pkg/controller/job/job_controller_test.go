@@ -149,8 +149,9 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 		p.Status = v1.PodStatus{Phase: s.Phase}
 		if s.Index != noIndex {
 			p.Annotations = map[string]string{
-				batch.JobCompletionIndexAnnotationAlpha: s.Index,
+				batch.JobCompletionIndexAnnotation: s.Index,
 			}
+			p.Spec.Hostname = fmt.Sprintf("%s-%s", job.Name, s.Index)
 		}
 		podIndexer.Add(p)
 	}
@@ -366,7 +367,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 		},
-		"more active pods than completions": {
+		"more active pods than parallelism": {
 			parallelism:       2,
 			completions:       5,
 			backoffLimit:      6,
@@ -374,6 +375,17 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:        10,
 			expectedDeletions: 8,
 			expectedActive:    2,
+		},
+		"more active pods than remaining completions": {
+			parallelism:       3,
+			completions:       4,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        3,
+			succeededPods:     2,
+			expectedDeletions: 1,
+			expectedActive:    2,
+			expectedSucceeded: 2,
 		},
 		"status change": {
 			parallelism:       2,
@@ -515,14 +527,17 @@ func TestControllerSyncJob(t *testing.T) {
 			podsWithIndexes: []indexPhase{
 				{"invalid", v1.PodRunning},
 				{"invalid", v1.PodSucceeded},
+				{"invalid", v1.PodFailed},
+				{"invalid", v1.PodPending},
 				{"0", v1.PodSucceeded},
 				{"1", v1.PodRunning},
 				{"2", v1.PodRunning},
 			},
 			jobKeyForget:          true,
-			expectedDeletions:     2,
+			expectedDeletions:     3,
 			expectedActive:        2,
 			expectedSucceeded:     1,
+			expectedFailed:        0,
 			expectedCompletedIdxs: "0",
 			indexedJobEnabled:     true,
 		},
@@ -540,14 +555,34 @@ func TestControllerSyncJob(t *testing.T) {
 				{"2", v1.PodRunning},
 				{"2", v1.PodPending},
 			},
-			jobKeyForget:           true,
-			expectedCreations:      2,
-			expectedDeletions:      2,
-			expectedActive:         4,
-			expectedSucceeded:      1,
-			expectedCompletedIdxs:  "0",
-			expectedCreatedIndexes: sets.NewInt(3, 4),
-			indexedJobEnabled:      true,
+			jobKeyForget:          true,
+			expectedCreations:     0,
+			expectedDeletions:     2,
+			expectedActive:        2,
+			expectedSucceeded:     1,
+			expectedCompletedIdxs: "0",
+			indexedJobEnabled:     true,
+		},
+		"indexed job with indexes outside of range": {
+			parallelism:    2,
+			completions:    5,
+			backoffLimit:   6,
+			completionMode: batch.IndexedCompletion,
+			podsWithIndexes: []indexPhase{
+				{"0", v1.PodSucceeded},
+				{"5", v1.PodRunning},
+				{"6", v1.PodSucceeded},
+				{"7", v1.PodPending},
+				{"8", v1.PodFailed},
+			},
+			jobKeyForget:          true,
+			expectedCreations:     0, // only one of creations and deletions can happen in a sync
+			expectedSucceeded:     1,
+			expectedDeletions:     2,
+			expectedCompletedIdxs: "0",
+			expectedActive:        0,
+			expectedFailed:        0,
+			indexedJobEnabled:     true,
 		},
 		"indexed job feature disabled": {
 			parallelism:    2,
@@ -680,7 +715,7 @@ func TestControllerSyncJob(t *testing.T) {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
-			} else if tc.expectedCondition == nil && (hasFailingPods(tc.podsWithIndexes) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
+			} else if tc.expectedCondition == nil && (hasValidFailingPods(tc.podsWithIndexes, int(tc.completions)) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
 				}
@@ -699,7 +734,7 @@ func TestControllerSyncJob(t *testing.T) {
 				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
 			}
 			if tc.completionMode == batch.IndexedCompletion {
-				checkCompletionIndexesInPods(t, &fakePodControl, tc.expectedCreatedIndexes)
+				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
 			}
 			if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 				t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
@@ -770,7 +805,7 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
-func checkCompletionIndexesInPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int) {
+func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int, jobName string) {
 	t.Helper()
 	gotIndexes := sets.NewInt()
 	for _, p := range control.Templates {
@@ -780,6 +815,10 @@ func checkCompletionIndexesInPods(t *testing.T, control *controller.FakePodContr
 			t.Errorf("Created pod %s didn't have completion index", p.Name)
 		} else {
 			gotIndexes.Insert(ix)
+		}
+		expectedName := fmt.Sprintf("%s-%d", jobName, ix)
+		if diff := cmp.Equal(expectedName, p.Spec.Hostname); !diff {
+			t.Errorf("Got pod hostname %s, want %s", p.Spec.Hostname, expectedName)
 		}
 	}
 	if diff := cmp.Diff(wantIndexes.List(), gotIndexes.List()); diff != "" {
@@ -2140,7 +2179,7 @@ func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
 			Name: "JOB_COMPLETION_INDEX",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotationAlpha),
+					FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
 				},
 			},
 		},
@@ -2157,8 +2196,16 @@ func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
 	}
 }
 
-func hasFailingPods(status []indexPhase) bool {
+// hasValidFailingPods checks if there exists failed pods with valid index.
+func hasValidFailingPods(status []indexPhase, completions int) bool {
 	for _, s := range status {
+		ix, err := strconv.Atoi(s.Index)
+		if err != nil {
+			continue
+		}
+		if ix < 0 || ix >= completions {
+			continue
+		}
 		if s.Phase == v1.PodFailed {
 			return true
 		}

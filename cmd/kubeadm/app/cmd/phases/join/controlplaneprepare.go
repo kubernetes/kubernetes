@@ -192,6 +192,9 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 			data.PatchesDir(),
 			&cfg.ClusterConfiguration,
 			&cfg.LocalAPIEndpoint,
+			// TODO: add support for join dry-run:
+			// https://github.com/kubernetes/kubeadm/issues/2505
+			false,
 			component,
 		)
 		if err != nil {

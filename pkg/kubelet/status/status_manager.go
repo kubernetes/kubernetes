@@ -566,7 +566,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		klog.InfoS("Failed to get status for pod",
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName),
-			"error", err)
+			"err", err)
 		return
 	}
 

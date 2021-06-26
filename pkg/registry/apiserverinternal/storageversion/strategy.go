@@ -73,6 +73,11 @@ func (storageVersionStrategy) Validate(ctx context.Context, obj runtime.Object) 
 	return validation.ValidateStorageVersion(sv)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (storageVersionStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (storageVersionStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -88,6 +93,11 @@ func (storageVersionStrategy) ValidateUpdate(ctx context.Context, obj, old runti
 	oldStorageVersion := old.(*apiserverinternal.StorageVersion)
 	validationErrorList := validation.ValidateStorageVersionUpdate(newStorageVersion, oldStorageVersion)
 	return validationErrorList
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (storageVersionStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for storageVersion objects. Status update should
@@ -126,4 +136,9 @@ func (storageVersionStatusStrategy) PrepareForUpdate(ctx context.Context, obj, o
 
 func (storageVersionStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateStorageVersionStatusUpdate(obj.(*apiserverinternal.StorageVersion), old.(*apiserverinternal.StorageVersion))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (storageVersionStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

@@ -59,8 +59,19 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+	return extractReplicaSet(replicaSet, fieldManager, "")
+}
+
+// ExtractReplicaSetStatus is the same as ExtractReplicaSet except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractReplicaSetStatus(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+	return extractReplicaSet(replicaSet, fieldManager, "status")
+}
+
+func extractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
-	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.ReplicaSet"), fieldManager, b)
+	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.ReplicaSet"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

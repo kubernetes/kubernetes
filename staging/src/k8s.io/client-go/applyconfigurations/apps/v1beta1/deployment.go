@@ -59,8 +59,19 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractDeployment(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+	return extractDeployment(deployment, fieldManager, "")
+}
+
+// ExtractDeploymentStatus is the same as ExtractDeployment except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractDeploymentStatus(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+	return extractDeployment(deployment, fieldManager, "status")
+}
+
+func extractDeployment(deployment *appsv1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
-	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1beta1.Deployment"), fieldManager, b)
+	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1beta1.Deployment"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

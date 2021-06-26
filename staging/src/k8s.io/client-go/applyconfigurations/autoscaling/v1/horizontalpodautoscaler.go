@@ -59,8 +59,19 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "")
+}
+
+// ExtractHorizontalPodAutoscalerStatus is the same as ExtractHorizontalPodAutoscaler except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "status")
+}
+
+func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
-	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b)
+	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

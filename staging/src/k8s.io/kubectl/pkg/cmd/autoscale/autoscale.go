@@ -107,19 +107,17 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, StatefulSet, or ReplicationController"),
 		Long:                  autoscaleLong,
 		Example:               autoscaleExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs: validArgs,
 	}
 
 	// bind flag structs
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
-	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
-	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")

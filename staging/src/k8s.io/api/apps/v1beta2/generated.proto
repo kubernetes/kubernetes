@@ -519,7 +519,7 @@ message RollingUpdateDaemonSet {
   // daemonset on any given node can double if the readiness check fails, and
   // so resource intensive daemonsets should take into account that they may
   // cause evictions during disruption.
-  // This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
+  // This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
@@ -592,6 +592,7 @@ message ScaleStatus {
 
   // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
+  // +mapType=atomic
   map<string, string> selector = 2;
 
   // label selector for pods that should match the replicas count. This is a serializated
@@ -714,6 +715,13 @@ message StatefulSetSpec {
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
   optional int32 revisionHistoryLimit = 8;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+  // +optional
+  optional int32 minReadySeconds = 9;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -756,6 +764,12 @@ message StatefulSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated StatefulSetCondition conditions = 10;
+
+  // Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
+  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+  // Remove omitempty when graduating to beta
+  // +optional
+  optional int32 availableReplicas = 11;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

@@ -27,18 +27,30 @@ run_crd_tests() {
   kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "foos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -49,18 +61,30 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "bars.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "bars",
       "kind": "Bar"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -74,20 +98,32 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "resources.mygroup.example.com"
   },
   "spec": {
     "group": "mygroup.example.com",
-    "version": "v1alpha1",
     "scope": "Namespaced",
     "names": {
       "plural": "resources",
       "singular": "resource",
       "kind": "Kind",
       "listKind": "KindList"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -99,30 +135,37 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "validfoos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "validfoos",
       "kind": "ValidFoo"
     },
-    "validation": {
-      "openAPIV3Schema": {
-        "properties": {
-          "spec": {
-            "type": "array",
-            "items": {
-              "type": "number"
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "properties": {
+              "spec": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
             }
           }
         }
       }
-    }
+    ]
   }
 }
 __EOF__
@@ -202,6 +245,7 @@ run_non_native_resource_tests() {
 
   # Test that we can create a new resource of type Foo
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo-2.yaml "${kube_flags[@]}"
 
   # Test that we can list this new custom resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -262,11 +306,19 @@ run_non_native_resource_tests() {
   kube::log::status "Testing CustomResource labeling"
   kubectl "${kube_flags[@]}" label foos --all listlabel=true
   kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+  kubectl "${kube_flags[@]}" label --all --all-namespaces foo allnsLabel=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsLabel
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsLabel
 
   # Test annotating
   kube::log::status "Testing CustomResource annotating"
   kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
   kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+  kubectl "${kube_flags[@]}" annotate --all --all-namespaces foo allnsannotation=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsannotation
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsannotation
 
   # Test describing
   kube::log::status "Testing CustomResource describing"
@@ -274,6 +326,9 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos/test
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert customresourcedefinitions events
+  kube::test::describe_resource_chunk_size_assert foos events
 
   # Delete the resource with cascading strategy background.
   kubectl "${kube_flags[@]}" delete foos test --cascade=background

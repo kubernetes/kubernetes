@@ -35,9 +35,9 @@ import (
 	"text/template"
 	"time"
 
-	oidc "github.com/coreos/go-oidc"
 	jose "gopkg.in/square/go-jose.v2"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
 )
 
@@ -254,7 +254,11 @@ func (c *claimsTest) run(t *testing.T) {
 	// by writing its root CA certificate into a temporary file.
 	tempFileName := writeTempCert(t, ts.TLS.Certificates[0].Certificate[0])
 	defer os.Remove(tempFileName)
-	c.options.CAFile = tempFileName
+	caContent, err := dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", tempFileName)
+	if err != nil {
+		t.Fatalf("initialize ca: %v", err)
+	}
+	c.options.CAContentProvider = caContent
 
 	// Allow claims to refer to the serving URL of the test server.  For this,
 	// substitute all references to {{.URL}} in appropriate places.
@@ -266,15 +270,11 @@ func (c *claimsTest) run(t *testing.T) {
 		c.claimToResponseMap[claim] = replace(response, &v)
 	}
 
+	// Set the verifier to use the public key set instead of reading from a remote.
+	c.options.KeySet = &staticKeySet{keys: c.pubKeys}
+
 	// Initialize the authenticator.
-	a, err := newAuthenticator(c.options, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
-		// Set the verifier to use the public key set instead of reading from a remote.
-		a.setVerifier(oidc.NewVerifier(
-			c.options.IssuerURL,
-			&staticKeySet{keys: c.pubKeys},
-			config,
-		))
-	})
+	a, err := New(c.options)
 	if err != nil {
 		if !c.wantInitErr {
 			t.Fatalf("initialize authenticator: %v", err)

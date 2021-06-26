@@ -28,6 +28,7 @@ const (
 	SecretGenerator
 	ValueAddTransformer
 	HelmChartInflationGenerator
+	ReplacementTransformer
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -72,6 +73,7 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	PatchStrategicMergeTransformer: builtins.NewPatchStrategicMergeTransformerPlugin,
 	PatchTransformer:               builtins.NewPatchTransformerPlugin,
 	PrefixSuffixTransformer:        builtins.NewPrefixSuffixTransformerPlugin,
+	ReplacementTransformer:         builtins.NewReplacementTransformerPlugin,
 	ReplicaCountTransformer:        builtins.NewReplicaCountTransformerPlugin,
 	ValueAddTransformer:            builtins.NewValueAddTransformerPlugin,
 }

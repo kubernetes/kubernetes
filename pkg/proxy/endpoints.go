@@ -164,6 +164,11 @@ type EndpointChangeTracker struct {
 	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
 	// object to change. Used to calculate the network-programming-latency.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
+	// record the time when the endpointChangeTracker was created so we can ignore the endpoints
+	// that were generated before, because we can't estimate the network-programming-latency on those.
+	// This is specially problematic on restarts, because we process all the endpoints that may have been
+	// created hours or days before.
+	trackerStartTime time.Time
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
@@ -175,6 +180,7 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 		ipFamily:                  ipFamily,
 		recorder:                  recorder,
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
+		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
 	}
 	if endpointSlicesEnabled {
@@ -216,7 +222,7 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 	// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
 	// by-definition coming from the time of last update, which is not what
 	// we want to measure. So we simply ignore it in this cases.
-	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() && current != nil {
+	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() && current != nil && t.After(ect.trackerStartTime) {
 		ect.lastChangeTriggerTimes[namespacedName] = append(ect.lastChangeTriggerTimes[namespacedName], t)
 	}
 
@@ -276,7 +282,7 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 		// we want to measure. So we simply ignore it in this cases.
 		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
 		// when other EndpointSlice for that service still exist.
-		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice {
+		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice && t.After(ect.trackerStartTime) {
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}

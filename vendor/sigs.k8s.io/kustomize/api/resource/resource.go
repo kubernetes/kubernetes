@@ -7,158 +7,66 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"reflect"
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/filters/patchstrategicmerge"
 	"sigs.k8s.io/kustomize/api/ifc"
-	"sigs.k8s.io/kustomize/api/internal/wrappy"
 	"sigs.k8s.io/kustomize/api/konfig"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/filtersutil"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/yaml"
 )
 
-// Resource is a representation of a Kubernetes Resource Model (KRM) object
+// Resource is an RNode, representing a Kubernetes Resource Model object,
 // paired with metadata used by kustomize.
-// For more history, see sigs.k8s.io/kustomize/api/ifc.Unstructured
 type Resource struct {
-	kunStr      ifc.Kunstructured
+	kyaml.RNode
 	options     *types.GenArgs
 	refBy       []resid.ResId
 	refVarNames []string
 }
 
 const (
+	buildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
 	buildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
 	buildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
 	buildAnnotationSuffixes           = konfig.ConfigAnnoDomain + "/suffixes"
 	buildAnnotationPreviousNamespaces = konfig.ConfigAnnoDomain + "/previousNamespaces"
+
+	// the following are only for patches, to specify whether they can change names
+	// and kinds of their targets
+	buildAnnotationAllowNameChange = konfig.ConfigAnnoDomain + "/allowNameChange"
+	buildAnnotationAllowKindChange = konfig.ConfigAnnoDomain + "/allowKindChange"
+	allowed                        = "allowed"
 )
 
 var buildAnnotations = []string{
+	buildAnnotationPreviousKinds,
 	buildAnnotationPreviousNames,
 	buildAnnotationPrefixes,
 	buildAnnotationSuffixes,
 	buildAnnotationPreviousNamespaces,
+	buildAnnotationAllowNameChange,
+	buildAnnotationAllowKindChange,
 }
 
-func (r *Resource) ResetPrimaryData(incoming *Resource) {
-	r.kunStr = incoming.Copy()
-}
-
-func (r *Resource) GetAnnotations() map[string]string {
-	annotations := r.kunStr.GetAnnotations()
-	if annotations == nil {
-		return make(map[string]string)
-	}
-	return annotations
-}
-
-func (r *Resource) Copy() ifc.Kunstructured {
-	return r.kunStr.Copy()
-}
-
-func (r *Resource) GetFieldValue(f string) (interface{}, error) {
-	return r.kunStr.GetFieldValue(f)
-}
-
-func (r *Resource) GetDataMap() map[string]string {
-	return r.kunStr.GetDataMap()
-}
-
-func (r *Resource) GetBinaryDataMap() map[string]string {
-	return r.kunStr.GetBinaryDataMap()
+func (r *Resource) ResetRNode(incoming *Resource) {
+	r.RNode = *incoming.Copy()
 }
 
 func (r *Resource) GetGvk() resid.Gvk {
-	return r.kunStr.GetGvk()
+	return resid.GvkFromNode(&r.RNode)
 }
 
-func (r *Resource) GetKind() string {
-	return r.kunStr.GetKind()
-}
-
-func (r *Resource) GetLabels() map[string]string {
-	return r.kunStr.GetLabels()
-}
-
-func (r *Resource) GetName() string {
-	return r.kunStr.GetName()
-}
-
-func (r *Resource) GetSlice(p string) ([]interface{}, error) {
-	return r.kunStr.GetSlice(p)
-}
-
-func (r *Resource) GetString(p string) (string, error) {
-	return r.kunStr.GetString(p)
-}
-
-func (r *Resource) IsEmpty() (bool, error) {
-	m, err := r.kunStr.Map()
-	return len(m) == 0, err
-}
-
-func (r *Resource) Map() (map[string]interface{}, error) {
-	return r.kunStr.Map()
-}
-
-func (r *Resource) MarshalJSON() ([]byte, error) {
-	return r.kunStr.MarshalJSON()
-}
-
-func (r *Resource) MatchesLabelSelector(selector string) (bool, error) {
-	return r.kunStr.MatchesLabelSelector(selector)
-}
-
-func (r *Resource) MatchesAnnotationSelector(selector string) (bool, error) {
-	return r.kunStr.MatchesAnnotationSelector(selector)
-}
-
-func (r *Resource) SetAnnotations(m map[string]string) {
-	if len(m) == 0 {
-		// Force field erasure.
-		r.kunStr.SetAnnotations(nil)
-		return
-	}
-	r.kunStr.SetAnnotations(m)
-}
-
-func (r *Resource) SetDataMap(m map[string]string) {
-	r.kunStr.SetDataMap(m)
-}
-
-func (r *Resource) SetBinaryDataMap(m map[string]string) {
-	r.kunStr.SetBinaryDataMap(m)
+func (r *Resource) Hash(h ifc.KustHasher) (string, error) {
+	return h.Hash(&r.RNode)
 }
 
 func (r *Resource) SetGvk(gvk resid.Gvk) {
-	r.kunStr.SetGvk(gvk)
-}
-
-func (r *Resource) SetLabels(m map[string]string) {
-	if len(m) == 0 {
-		// Force field erasure.
-		r.kunStr.SetLabels(nil)
-		return
-	}
-	r.kunStr.SetLabels(m)
-}
-
-func (r *Resource) SetName(n string) {
-	r.kunStr.SetName(n)
-}
-
-func (r *Resource) SetNamespace(n string) {
-	r.kunStr.SetNamespace(n)
-}
-
-func (r *Resource) UnmarshalJSON(s []byte) error {
-	return r.kunStr.UnmarshalJSON(s)
+	r.SetKind(gvk.Kind)
+	r.SetApiVersion(gvk.ApiVersion())
 }
 
 // ResCtx is an interface describing the contextual added
@@ -178,24 +86,36 @@ type ResCtxMatcher func(ResCtx) bool
 // DeepCopy returns a new copy of resource
 func (r *Resource) DeepCopy() *Resource {
 	rc := &Resource{
-		kunStr: r.Copy(),
+		RNode: *r.Copy(),
 	}
-	rc.copyOtherFields(r)
+	rc.copyKustomizeSpecificFields(r)
 	return rc
 }
 
-// CopyMergeMetaDataFields copies everything but the non-metadata in
-// the ifc.Kunstructured map, merging labels and annotations.
-func (r *Resource) CopyMergeMetaDataFieldsFrom(other *Resource) {
-	r.SetLabels(mergeStringMaps(other.GetLabels(), r.GetLabels()))
-	r.SetAnnotations(
-		mergeStringMaps(other.GetAnnotations(), r.GetAnnotations()))
-	r.SetName(other.GetName())
-	r.SetNamespace(other.GetNamespace())
-	r.copyOtherFields(other)
+// CopyMergeMetaDataFieldsFrom copies everything but the non-metadata in
+// the resource.
+// TODO: move to RNode, use GetMeta to improve performance.
+// Must remove the kustomize bit at the end.
+func (r *Resource) CopyMergeMetaDataFieldsFrom(other *Resource) error {
+	if err := r.SetLabels(
+		mergeStringMaps(other.GetLabels(), r.GetLabels())); err != nil {
+		return fmt.Errorf("copyMerge cannot set labels - %w", err)
+	}
+	if err := r.SetAnnotations(
+		mergeStringMaps(other.GetAnnotations(), r.GetAnnotations())); err != nil {
+		return fmt.Errorf("copyMerge cannot set annotations - %w", err)
+	}
+	if err := r.SetName(other.GetName()); err != nil {
+		return fmt.Errorf("copyMerge cannot set name - %w", err)
+	}
+	if err := r.SetNamespace(other.GetNamespace()); err != nil {
+		return fmt.Errorf("copyMerge cannot set namespace - %w", err)
+	}
+	r.copyKustomizeSpecificFields(other)
+	return nil
 }
 
-func (r *Resource) copyOtherFields(other *Resource) {
+func (r *Resource) copyKustomizeSpecificFields(other *Resource) {
 	r.options = other.options
 	r.refBy = other.copyRefBy()
 	r.refVarNames = copyStringSlice(other.refVarNames)
@@ -251,10 +171,6 @@ func (r *Resource) ReferencesEqual(other *Resource) bool {
 	return len(setSelf) == len(setOther)
 }
 
-func (r *Resource) KunstructEqual(o *Resource) bool {
-	return reflect.DeepEqual(r.kunStr, o.kunStr)
-}
-
 func (r *Resource) copyRefBy() []resid.ResId {
 	if r.refBy == nil {
 		return nil
@@ -293,7 +209,9 @@ func (r *Resource) appendCsvAnnotation(name, value string) {
 	} else {
 		annotations[name] = value
 	}
-	r.SetAnnotations(annotations)
+	if err := r.SetAnnotations(annotations); err != nil {
+		panic(err)
+	}
 }
 
 func SameEndingSubarray(shortest, longest []string) bool {
@@ -348,13 +266,46 @@ func (r *Resource) RemoveBuildAnnotations() {
 	for _, a := range buildAnnotations {
 		delete(annotations, a)
 	}
-	r.SetAnnotations(annotations)
+	if err := r.SetAnnotations(annotations); err != nil {
+		panic(err)
+	}
 }
 
-func (r *Resource) setPreviousNamespaceAndName(ns string, n string) *Resource {
+func (r *Resource) setPreviousId(ns string, n string, k string) *Resource {
 	r.appendCsvAnnotation(buildAnnotationPreviousNames, n)
 	r.appendCsvAnnotation(buildAnnotationPreviousNamespaces, ns)
+	r.appendCsvAnnotation(buildAnnotationPreviousKinds, k)
 	return r
+}
+
+// AllowNameChange allows name changes to the resource.
+func (r *Resource) AllowNameChange() {
+	annotations := r.GetAnnotations()
+	annotations[buildAnnotationAllowNameChange] = allowed
+	if err := r.SetAnnotations(annotations); err != nil {
+		panic(err)
+	}
+}
+
+func (r *Resource) NameChangeAllowed() bool {
+	annotations := r.GetAnnotations()
+	v, ok := annotations[buildAnnotationAllowNameChange]
+	return ok && v == allowed
+}
+
+// AllowKindChange allows kind changes to the resource.
+func (r *Resource) AllowKindChange() {
+	annotations := r.GetAnnotations()
+	annotations[buildAnnotationAllowKindChange] = allowed
+	if err := r.SetAnnotations(annotations); err != nil {
+		panic(err)
+	}
+}
+
+func (r *Resource) KindChangeAllowed() bool {
+	annotations := r.GetAnnotations()
+	v, ok := annotations[buildAnnotationAllowKindChange]
+	return ok && v == allowed
 }
 
 // String returns resource as JSON.
@@ -401,13 +352,6 @@ func (r *Resource) NeedHashSuffix() bool {
 	return r.options != nil && r.options.ShouldAddHashSuffixToName()
 }
 
-// GetNamespace returns the namespace the resource thinks it's in.
-func (r *Resource) GetNamespace() string {
-	namespace, _ := r.GetString("metadata.namespace")
-	// if err, namespace is empty, so no need to check.
-	return namespace
-}
-
 // OrgId returns the original, immutable ResId for the resource.
 // This doesn't have to be unique in a ResMap.
 func (r *Resource) OrgId() resid.ResId {
@@ -430,14 +374,19 @@ func (r *Resource) PrevIds() []resid.ResId {
 	//     pairs on one annotation so there is no chance of error
 	names := r.getCsvAnnotation(buildAnnotationPreviousNames)
 	ns := r.getCsvAnnotation(buildAnnotationPreviousNamespaces)
-	if len(names) != len(ns) {
+	kinds := r.getCsvAnnotation(buildAnnotationPreviousKinds)
+	if len(names) != len(ns) || len(names) != len(kinds) {
 		panic(errors.New(
-			"number of previous names not equal to " +
-				"number of previous namespaces"))
+			"number of previous names, " +
+				"number of previous namespaces, " +
+				"number of previous kinds not equal"))
 	}
 	for i := range names {
+		k := kinds[i]
+		gvk := r.GetGvk()
+		gvk.Kind = k
 		ids = append(ids, resid.NewResIdWithNamespace(
-			r.GetGvk(), names[i], ns[i]))
+			gvk, names[i], ns[i]))
 	}
 	return ids
 }
@@ -445,7 +394,7 @@ func (r *Resource) PrevIds() []resid.ResId {
 // StorePreviousId stores the resource's current ID via build annotations.
 func (r *Resource) StorePreviousId() {
 	id := r.CurId()
-	r.setPreviousNamespaceAndName(id.EffectiveNamespace(), id.Name)
+	r.setPreviousId(id.EffectiveNamespace(), id.Name, id.Kind)
 }
 
 // CurId returns a ResId for the resource using the
@@ -478,38 +427,36 @@ func (r *Resource) AppendRefVarName(variable types.Var) {
 
 // ApplySmPatch applies the provided strategic merge patch.
 func (r *Resource) ApplySmPatch(patch *Resource) error {
-	node, err := filtersutil.GetRNode(patch)
-	if err != nil {
+	n, ns, k := r.GetName(), r.GetNamespace(), r.GetKind()
+	if patch.NameChangeAllowed() || patch.KindChangeAllowed() {
+		r.StorePreviousId()
+	}
+	if err := r.ApplyFilter(patchstrategicmerge.Filter{
+		Patch: &patch.RNode,
+	}); err != nil {
 		return err
 	}
-	n, ns := r.GetName(), r.GetNamespace()
-	err = r.ApplyFilter(patchstrategicmerge.Filter{
-		Patch: node,
-	})
-	if err != nil {
-		return err
+	if r.IsNilOrEmpty() {
+		return nil
 	}
-	empty, err := r.IsEmpty()
-	if err != nil {
-		return err
+	if !patch.KindChangeAllowed() {
+		r.SetKind(k)
 	}
-	if !empty {
+	if !patch.NameChangeAllowed() {
 		r.SetName(n)
-		r.SetNamespace(ns)
 	}
-	return err
+	r.SetNamespace(ns)
+	return nil
 }
 
 func (r *Resource) ApplyFilter(f kio.Filter) error {
-	if wn, ok := r.kunStr.(*wrappy.WNode); ok {
-		l, err := f.Filter([]*kyaml.RNode{wn.AsRNode()})
-		if len(l) == 0 {
-			// Hack to deal with deletion.
-			r.kunStr = wrappy.NewWNode()
-		}
-		return err
+	l, err := f.Filter([]*kyaml.RNode{&r.RNode})
+	if len(l) == 0 {
+		// The node was deleted, which means the entire resource
+		// must be deleted.  Signal that via the following:
+		r.SetYNode(nil)
 	}
-	return filtersutil.ApplyToJSON(f, r)
+	return err
 }
 
 func mergeStringMaps(maps ...map[string]string) map[string]string {

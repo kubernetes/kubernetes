@@ -3,11 +3,8 @@
 package seccomp
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp/patchbpf"
@@ -39,7 +36,7 @@ func InitSeccomp(config *configs.Seccomp) error {
 		return errors.New("cannot initialize Seccomp - nil config passed")
 	}
 
-	defaultAction, err := getAction(config.DefaultAction, nil)
+	defaultAction, err := getAction(config.DefaultAction, config.DefaultErrnoRet)
 	if err != nil {
 		return errors.New("error initializing seccomp - invalid default action")
 	}
@@ -78,24 +75,6 @@ func InitSeccomp(config *configs.Seccomp) error {
 		return fmt.Errorf("error loading seccomp filter into kernel: %s", err)
 	}
 	return nil
-}
-
-// IsEnabled returns if the kernel has been configured to support seccomp.
-func IsEnabled() bool {
-	// Try to read from /proc/self/status for kernels > 3.8
-	s, err := parseStatusFile("/proc/self/status")
-	if err != nil {
-		// Check if Seccomp is supported, via CONFIG_SECCOMP.
-		if err := unix.Prctl(unix.PR_GET_SECCOMP, 0, 0, 0, 0); err != unix.EINVAL {
-			// Make sure the kernel has CONFIG_SECCOMP_FILTER.
-			if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0); err != unix.EINVAL {
-				return true
-			}
-		}
-		return false
-	}
-	_, ok := s["Seccomp"]
-	return ok
 }
 
 // Convert Libcontainer Action to Libseccomp ScmpAction
@@ -235,33 +214,6 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 	}
 
 	return nil
-}
-
-func parseStatusFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	s := bufio.NewScanner(f)
-	status := make(map[string]string)
-
-	for s.Scan() {
-		text := s.Text()
-		parts := strings.Split(text, ":")
-
-		if len(parts) <= 1 {
-			continue
-		}
-
-		status[parts[0]] = parts[1]
-	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-
-	return status, nil
 }
 
 // Version returns major, minor, and micro.

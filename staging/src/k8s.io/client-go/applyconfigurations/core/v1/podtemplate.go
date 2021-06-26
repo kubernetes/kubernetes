@@ -58,8 +58,19 @@ func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+	return extractPodTemplate(podTemplate, fieldManager, "")
+}
+
+// ExtractPodTemplateStatus is the same as ExtractPodTemplate except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPodTemplateStatus(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+	return extractPodTemplate(podTemplate, fieldManager, "status")
+}
+
+func extractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
 	b := &PodTemplateApplyConfiguration{}
-	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b)
+	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

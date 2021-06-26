@@ -173,6 +173,7 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	_, cn := responseWriter.(http.CloseNotifier)
 	_, fl := responseWriter.(http.Flusher)
 	_, hj := responseWriter.(http.Hijacker)
@@ -195,10 +196,6 @@ type auditResponseWriter struct {
 	omitStages []auditinternal.Stage
 }
 
-func (a *auditResponseWriter) setHttpHeader() {
-	a.ResponseWriter.Header().Set(auditinternal.HeaderAuditID, string(a.event.AuditID))
-}
-
 func (a *auditResponseWriter) processCode(code int) {
 	a.once.Do(func() {
 		if a.event.ResponseStatus == nil {
@@ -216,13 +213,11 @@ func (a *auditResponseWriter) processCode(code int) {
 func (a *auditResponseWriter) Write(bs []byte) (int, error) {
 	// the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
 	a.processCode(http.StatusOK)
-	a.setHttpHeader()
 	return a.ResponseWriter.Write(bs)
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
 	a.processCode(code)
-	a.setHttpHeader()
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -244,12 +239,6 @@ func (f *fancyResponseWriterDelegator) Flush() {
 func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	// fake a response status before protocol switch happens
 	f.processCode(http.StatusSwitchingProtocols)
-
-	// This will be ignored if WriteHeader() function has already been called.
-	// It's not guaranteed Audit-ID http header is sent for all requests.
-	// For example, when user run "kubectl exec", apiserver uses a proxy handler
-	// to deal with the request, users can only get http headers returned by kubelet node.
-	f.setHttpHeader()
 
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }

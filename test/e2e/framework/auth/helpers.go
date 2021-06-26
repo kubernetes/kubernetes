@@ -18,10 +18,10 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,7 +99,7 @@ func BindClusterRole(c bindingsGetter, clusterRole, ns string, subjects ...rbacv
 	}, metav1.CreateOptions{})
 
 	if err != nil {
-		return errors.Wrapf(err, "binding clusterrole/%s for %q for %v", clusterRole, ns, subjects)
+		return fmt.Errorf("binding clusterrole/%s for %q for %v: %w", clusterRole, ns, subjects, err)
 	}
 
 	return nil
@@ -136,7 +136,7 @@ func bindInNamespace(c bindingsGetter, roleType, role, ns string, subjects ...rb
 	}, metav1.CreateOptions{})
 
 	if err != nil {
-		return errors.Wrapf(err, "binding %s/%s into %q for %v", roleType, role, ns, subjects)
+		return fmt.Errorf("binding %s/%s into %q for %v: %w", roleType, role, ns, subjects, err)
 	}
 
 	return nil

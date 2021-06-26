@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,6 +44,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -423,11 +425,9 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			for ii := range tt.extenders {
 				extenders = append(extenders, &tt.extenders[ii])
 			}
-			scheduler := &genericScheduler{
-				extenders: extenders,
-			}
+
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-			got, err := scheduler.findNodesThatPassExtenders(pod, tt.nodes, tt.filteredNodesStatuses)
+			got, err := findNodesThatPassExtenders(extenders, pod, tt.nodes, tt.filteredNodesStatuses)
 			if tt.expectsErr {
 				if err == nil {
 					t.Error("Unexpected non-error")
@@ -995,7 +995,7 @@ func TestGenericScheduler(t *testing.T) {
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1004,13 +1004,12 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
-				[]framework.Extender{},
 				schedulerapi.DefaultPercentageOfNodesToScore,
 			)
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.Schedule(ctx, fwk, framework.NewCycleState(), test.pod)
+			result, err := scheduler.Schedule(ctx, nil, fwk, framework.NewCycleState(), test.pod)
 			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
@@ -1041,7 +1040,6 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
-		nil,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1058,13 +1056,13 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1091,14 +1089,14 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1165,7 +1163,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk, err := st.NewFramework(
 				registerPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1177,7 +1175,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1310,8 +1308,14 @@ func TestZeroRequest(t *testing.T) {
 
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterScorePlugin(noderesources.LeastAllocatedName, noderesources.NewLeastAllocated, 1),
-				st.RegisterScorePlugin(noderesources.BalancedAllocationName, noderesources.NewBalancedAllocation, 1),
+				st.RegisterScorePlugin(noderesources.LeastAllocatedName,
+					func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+						return noderesources.NewLeastAllocated(plArgs, fh, feature.Features{})
+					},
+					1),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return noderesources.NewBalancedAllocation(plArgs, fh, feature.Features{})
+				}, 1),
 				st.RegisterScorePlugin(selectorspread.Name, selectorspread.New, 1),
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -1321,7 +1325,7 @@ func TestZeroRequest(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -1330,18 +1334,17 @@ func TestZeroRequest(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				nil,
 				emptySnapshot,
-				[]framework.Extender{},
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, nil, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
 			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := scheduler.prioritizeNodes(ctx, fwk, state, test.pod, test.nodes)
+			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1424,7 +1427,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1436,7 +1439,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1490,7 +1493,8 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, test.feature)()
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
-			client := &clientsetfake.Clientset{}
+			client := clientsetfake.NewSimpleClientset(test.pod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, n := range nodes {
 				cache.AddNode(n)
@@ -1510,7 +1514,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			fwk, err := st.NewFramework(
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1519,10 +1523,9 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
-				[]framework.Extender{},
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

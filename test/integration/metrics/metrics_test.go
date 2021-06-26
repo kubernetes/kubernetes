@@ -44,11 +44,11 @@ func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to contact metrics endpoint of master: %v", err)
+		return nil, fmt.Errorf("Unable to contact metrics endpoint of API server: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
+		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from API Server: %v", resp)
 	}
 	metrics := testutil.NewMetrics()
 	data, err := ioutil.ReadAll(resp.Body)
@@ -62,17 +62,17 @@ func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMetrics []string) {
 	for _, expected := range expectedMetrics {
 		if _, found := metrics[expected]; !found {
-			t.Errorf("Master metrics did not include expected metric %q", expected)
+			t.Errorf("API server metrics did not include expected metric %q", expected)
 		}
 	}
 }
 
-func TestMasterProcessMetrics(t *testing.T) {
+func TestAPIServerProcessMetrics(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	metrics, err := scrapeMetrics(s)
@@ -87,8 +87,8 @@ func TestMasterProcessMetrics(t *testing.T) {
 	})
 }
 
-func TestApiserverMetrics(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+func TestAPIServerMetrics(t *testing.T) {
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point
@@ -115,8 +115,8 @@ func TestApiserverMetrics(t *testing.T) {
 	})
 }
 
-func TestApiserverMetricsLabels(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+func TestAPIServerMetricsLabels(t *testing.T) {
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
@@ -242,7 +242,7 @@ func TestApiserverMetricsLabels(t *testing.T) {
 	}
 }
 
-func TestApiserverMetricsPods(t *testing.T) {
+func TestAPIServerMetricsPods(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -266,7 +266,7 @@ func TestApiserverMetricsPods(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAnAPIServer(framework.NewControlPlaneConfig())
 	defer closeFn()
 
 	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
@@ -356,7 +356,7 @@ func TestApiserverMetricsPods(t *testing.T) {
 	}
 }
 
-func TestApiserverMetricsNamespaces(t *testing.T) {
+func TestAPIServerMetricsNamespaces(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -372,7 +372,7 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAnAPIServer(framework.NewControlPlaneConfig())
 	defer closeFn()
 
 	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})

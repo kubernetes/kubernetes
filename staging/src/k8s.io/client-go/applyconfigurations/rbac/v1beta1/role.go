@@ -58,8 +58,19 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	return extractRole(role, fieldManager, "")
+}
+
+// ExtractRoleStatus is the same as ExtractRole except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractRoleStatus(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	return extractRole(role, fieldManager, "status")
+}
+
+func extractRole(role *rbacv1beta1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
-	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b)
+	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-openapi/spec"
 	y1_1 "gopkg.in/yaml.v2"
 	y1_2 "gopkg.in/yaml.v3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // typeToTag maps OpenAPI schema types to yaml 1.2 tags

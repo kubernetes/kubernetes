@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -708,6 +709,220 @@ func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
 	t.Errorf("%v", msg)
 }
 
+// TestOverallIPTablesRulesWithMultipleServices creates 4 types of services: ClusterIP,
+// LoadBalancer, ExternalIP and NodePort and verifies if the NAT table rules created
+// are exactly the same as what is expected. This test provides an overall view of how
+// the NAT table rules look like with the different jumps.
+func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	metrics.RegisterMetrics()
+
+	makeServiceMap(fp,
+		// create ClusterIP service
+		makeTestService(makeNSN("ns1", "svc1").Namespace, "svc1", func(svc *v1.Service) {
+			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+		// create LoadBalancer service
+		makeTestService(makeNSN("ns2", "svc2").Namespace, "svc2", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ClusterIP = "10.20.30.42"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.4",
+			}}
+			// Also ensure that invalid LoadBalancerSourceRanges will not result
+			// in a crash.
+			svc.Spec.ExternalIPs = []string{"1.2.3.4"}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
+			svc.Spec.HealthCheckNodePort = 30000
+		}),
+		// create NodePort service
+		makeTestService(makeNSN("ns3", "svc3").Namespace, "svc3", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+		}),
+		// create ExternalIP service
+		makeTestService(makeNSN("ns4", "svc4").Namespace, "svc4", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "10.20.30.44"
+			svc.Spec.ExternalIPs = []string{"50.60.70.81"}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       "p80",
+				Port:       80,
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(80),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp,
+		// create ClusterIP service endpoints
+		makeTestEndpoints(makeNSN("ns1", "svc1").Namespace, "svc1", func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: "10.180.0.1",
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+		// create LoadBalancer endpoints
+		makeTestEndpoints(makeNSN("ns2", "svc2").Namespace, "svc2", func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: "10.180.0.2",
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+		// create NodePort service endpoints
+		makeTestEndpoints(makeNSN("ns3", "svc3").Namespace, "svc3", func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: "10.180.0.3",
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+		// create ExternalIP service endpoints
+		makeTestEndpoints(makeNSN("ns4", "svc4").Namespace, "svc4", func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP:       "10.180.0.4",
+					NodeName: nil,
+				}, {
+					IP:       "10.180.0.5",
+					NodeName: utilpointer.StringPtr(testHostname),
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	expected := `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
+:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
+:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
+:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.4:80
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`
+	// Adding logic to split and sort the strings because
+	// depending on the creation order of services, the user-chains get jumbled.
+	expectedSlice := strings.Split(strings.TrimSuffix(expected, "\n"), "\n")
+	sort.Strings(expectedSlice)
+	originalSlice := strings.Split(strings.TrimSuffix(fp.iptablesData.String(), "\n"), "\n")
+	sort.Strings(originalSlice)
+
+	assert.Equal(t, expectedSlice, originalSlice)
+
+	nNatRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+	// 43 here is test specific and corresponds to one more than the number of -A lines after `*nat` in `expected`.
+	if nNatRules != 43.0 {
+		t.Fatalf("Wrong number of nat rules: expected 43 received %f", nNatRules)
+	}
+}
+
 func TestClusterIPReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
@@ -792,6 +1007,10 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	}
 
 	svcRules := ipt.GetRules(svcChain)
+	if !hasJump(svcRules, string(KubeMarkMasqChain), svcIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump from %v to KUBE-MARK-MASQ chain", svcChain), svcRules, t)
+	}
+
 	if !hasJump(svcRules, epChain, "", 0) {
 		errorf(fmt.Sprintf("Failed to jump to ep chain %v", epChain), svcRules, t)
 	}
@@ -924,6 +1143,11 @@ func TestNodePort(t *testing.T) {
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
 	if !hasJump(kubeNodePortRules, svcChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
+	}
+	expectedNodePortNonLocalTrafficMasqueradeRule := `-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ`
+	svcRules := ipt.GetRules(svcChain)
+	if !strings.Contains(fp.iptablesData.String(), expectedNodePortNonLocalTrafficMasqueradeRule) {
+		errorf(fmt.Sprintf("Didn't find the masquerade rule for node port non-local traffic in svc chain %v", svcChain), svcRules, t)
 	}
 }
 
@@ -1092,6 +1316,82 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	}
 	if !hasJump(lbRules, localEpChain, "", 0) {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrNonLocal), lbRules, t)
+	}
+}
+
+// TestNonLocalExternalIPs tests if we add the masquerade rule into svcChain in order to
+// SNAT packets to external IPs if externalTrafficPolicy is cluster and the traffic is NOT Local.
+func TestNonLocalExternalIPs(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcExternalIPs := "50.60.70.81"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = []string{svcExternalIPs}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcPort),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+	epIP1 := "10.180.0.1"
+	epIP2 := "10.180.2.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP:       epIP1,
+					NodeName: nil,
+				}, {
+					IP:       epIP2,
+					NodeName: utilpointer.StringPtr(testHostname),
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+	proto := strings.ToLower(string(v1.ProtocolTCP))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
+	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP))))
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, svcChain, svcExternalIPs, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeSvcRules, t)
+	}
+
+	svcRules := ipt.GetRules(svcChain)
+	if len(svcRules) != 4 {
+		t.Errorf("expected svcChain %v to have 4 rules, got %v", svcChain, len(svcRules))
+	}
+	if !hasJump(svcRules, string(KubeMarkMasqChain), svcIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump from %v to KUBE-MARK-MASQ chain", svcChain), svcRules, t)
+	}
+	expectedExternalIPNonLocalTrafficMasqueradeRule := `-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`
+
+	if !strings.Contains(fp.iptablesData.String(), expectedExternalIPNonLocalTrafficMasqueradeRule) {
+		errorf(fmt.Sprintf("Didn't find the masquerade rule for external-ip non-local traffic in svc chain %v", svcChain), svcRules, t)
+	}
+
+	lbRules := ipt.GetRules(lbChain)
+	if len(lbRules) != 0 {
+		t.Errorf("expected svclbChain %v to have 0 rules, got %v", lbChain, len(lbRules))
 	}
 }
 
@@ -2671,7 +2971,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
@@ -2771,7 +3071,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -j KUBE-XLB-AQI2S6QIMU7PVVRP
@@ -3094,7 +3394,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
@@ -3160,7 +3460,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ

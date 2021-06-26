@@ -27,7 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
@@ -81,7 +81,7 @@ type resetData struct {
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
 func newResetOptions() *resetOptions {
 	return &resetOptions{
-		certificatesDir: kubeadmapiv1beta2.DefaultCertificatesDir,
+		certificatesDir: kubeadmapiv1.DefaultCertificatesDir,
 		forceReset:      false,
 		kubeconfigPath:  kubeadmconstants.GetAdminKubeConfigPath(),
 	}

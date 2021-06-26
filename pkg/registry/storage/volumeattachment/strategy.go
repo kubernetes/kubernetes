@@ -104,6 +104,11 @@ func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object
 	return errs
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (volumeAttachmentStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (volumeAttachmentStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -141,6 +146,11 @@ func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
 	errorList := validation.ValidateVolumeAttachment(newVolumeAttachmentObj)
 	return append(errorList, validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (volumeAttachmentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (volumeAttachmentStrategy) AllowUnconditionalUpdate() bool {

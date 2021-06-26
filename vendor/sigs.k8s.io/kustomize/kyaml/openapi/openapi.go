@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi"
 	"sigs.k8s.io/kustomize/kyaml/openapi/kustomizationapi"
@@ -44,10 +44,9 @@ type openapiData struct {
 	// Kubernetes schema as part of the global schema
 	noUseBuiltInSchema bool
 
-	// currentOpenAPIVersion stores the version if the kubernetes openapi data
-	// that is currently stored as the schema, so that we only reparse the
-	// schema when necessary (to speed up performance)
-	currentOpenAPIVersion string
+	// schemaInit stores whether or not we've parsed the schema already,
+	// so that we only reparse the when necessary (to speed up performance)
+	schemaInit bool
 }
 
 // ResourceSchema wraps the OpenAPI Schema.
@@ -274,6 +273,15 @@ func IsNamespaceScoped(typeMeta yaml.TypeMeta) (bool, bool) {
 	return isNamespaceScoped, found
 }
 
+// IsCertainlyClusterScoped returns true for Node, Namespace, etc. and
+// false for Pod, Deployment, etc. and kinds that aren't recognized in the
+// openapi data. See:
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
+func IsCertainlyClusterScoped(typeMeta yaml.TypeMeta) bool {
+	nsScoped, found := IsNamespaceScoped(typeMeta)
+	return found && !nsScoped
+}
+
 // SuppressBuiltInSchemaUse can be called to prevent using the built-in Kubernetes
 // schema as part of the global schema.
 // Must be called before the schema is used.
@@ -477,27 +485,28 @@ func GetSchemaVersion() string {
 
 // initSchema parses the json schema
 func initSchema() {
+	if globalSchema.schemaInit {
+		return
+	}
+	globalSchema.schemaInit = true
+
 	if customSchema != nil {
-		ResetOpenAPI()
 		err := parse(customSchema)
 		if err != nil {
 			panic("invalid schema file")
 		}
-		if err := parse(kustomizationapi.MustAsset(kustomizationAPIAssetName)); err != nil {
+		if err = parse(kustomizationapi.MustAsset(kustomizationAPIAssetName)); err != nil {
 			// this should never happen
 			panic(err)
 		}
 		return
 	}
 
-	currentVersion := kubernetesOpenAPIVersion
-	if currentVersion == "" {
-		currentVersion = kubernetesOpenAPIDefaultVersion
+	if kubernetesOpenAPIVersion == "" {
+		parseBuiltinSchema(kubernetesOpenAPIDefaultVersion)
+	} else {
+		parseBuiltinSchema(kubernetesOpenAPIVersion)
 	}
-	if globalSchema.currentOpenAPIVersion != currentVersion {
-		parseBuiltinSchema(currentVersion)
-	}
-	globalSchema.currentOpenAPIVersion = currentVersion
 }
 
 // parseBuiltinSchema calls parse to parse the json schemas

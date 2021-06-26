@@ -33,7 +33,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*v1.ConfigMapList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*v1.Endpoints)) })
 	scheme.AddTypeDefaultingFunc(&v1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*v1.EndpointsList)) })
-	scheme.AddTypeDefaultingFunc(&v1.EphemeralContainers{}, func(obj interface{}) { SetObjectDefaults_EphemeralContainers(obj.(*v1.EphemeralContainers)) })
 	scheme.AddTypeDefaultingFunc(&v1.LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*v1.LimitRange)) })
 	scheme.AddTypeDefaultingFunc(&v1.LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*v1.LimitRangeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*v1.Namespace)) })
@@ -82,59 +81,6 @@ func SetObjectDefaults_EndpointsList(in *v1.EndpointsList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Endpoints(a)
-	}
-}
-
-func SetObjectDefaults_EphemeralContainers(in *v1.EphemeralContainers) {
-	for i := range in.EphemeralContainers {
-		a := &in.EphemeralContainers[i]
-		SetDefaults_EphemeralContainer(a)
-		for j := range a.EphemeralContainerCommon.Ports {
-			b := &a.EphemeralContainerCommon.Ports[j]
-			if b.Protocol == "" {
-				b.Protocol = "TCP"
-			}
-		}
-		for j := range a.EphemeralContainerCommon.Env {
-			b := &a.EphemeralContainerCommon.Env[j]
-			if b.ValueFrom != nil {
-				if b.ValueFrom.FieldRef != nil {
-					SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
-				}
-			}
-		}
-		SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
-		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
-			if a.EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet != nil {
-				SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
-			if a.EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet != nil {
-				SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.EphemeralContainerCommon.StartupProbe != nil {
-			SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
-			if a.EphemeralContainerCommon.StartupProbe.Handler.HTTPGet != nil {
-				SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.Handler.HTTPGet)
-			}
-		}
-		if a.EphemeralContainerCommon.Lifecycle != nil {
-			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
-				}
-			}
-			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
-				}
-			}
-		}
 	}
 }
 

@@ -58,8 +58,19 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractLease(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+	return extractLease(lease, fieldManager, "")
+}
+
+// ExtractLeaseStatus is the same as ExtractLease except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractLeaseStatus(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+	return extractLease(lease, fieldManager, "status")
+}
+
+func extractLease(lease *apicoordinationv1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
-	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b)
+	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

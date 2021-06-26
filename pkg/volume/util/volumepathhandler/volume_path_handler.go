@@ -30,10 +30,8 @@ import (
 )
 
 const (
-	losetupPath           = "losetup"
-	statPath              = "stat"
-	ErrDeviceNotFound     = "device not found"
-	ErrDeviceNotSupported = "device not supported"
+	losetupPath       = "losetup"
+	ErrDeviceNotFound = "device not found"
 )
 
 // BlockVolumePathHandler defines a set of operations for handling block volume-related operations

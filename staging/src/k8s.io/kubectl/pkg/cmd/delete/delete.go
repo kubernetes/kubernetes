@@ -36,6 +36,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	cmdwait "k8s.io/kubectl/pkg/cmd/wait"
 	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -135,6 +136,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
 		Example:               deleteExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(err)

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
@@ -82,7 +83,7 @@ var _ framework.PreBindPlugin = &VolumeBinding{}
 var _ framework.ScorePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
-const Name = "VolumeBinding"
+const Name = names.VolumeBinding
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
@@ -341,7 +342,7 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
-	if err := validation.ValidateVolumeBindingArgs(args); err != nil {
+	if err := validation.ValidateVolumeBindingArgs(nil, args); err != nil {
 		return nil, err
 	}
 	podInformer := fh.SharedInformerFactory().Core().V1().Pods()

@@ -21,11 +21,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -42,15 +41,10 @@ var (
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
 	genericLongDesc = cmdutil.LongDesc(`
-		Generate the %[1]s, and save them into %[2]s.cert and %[2]s.key files.%[3]s
+		Generate the %[1]s, and save them into %[2]s.crt and %[2]s.key files.%[3]s
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		` + cmdutil.AlphaDisclaimer)
-)
-
-var (
-	csrOnly bool
-	csrDir  string
 )
 
 // NewCertsPhase returns the phase for the certs
@@ -62,15 +56,6 @@ func NewCertsPhase() workflow.Phase {
 		Run:    runCerts,
 		Long:   cmdutil.MacroCommandLongDescription,
 	}
-}
-
-func localFlags() *pflag.FlagSet {
-	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
-	options.AddCSRFlag(set, &csrOnly)
-	set.MarkDeprecated(options.CSROnly, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
-	options.AddCSRDirFlag(set, &csrDir)
-	set.MarkDeprecated(options.CSRDir, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
-	return set
 }
 
 // newCertSubPhases returns sub phases for certs phase
@@ -97,7 +82,6 @@ func newCertSubPhases() []workflow.Phase {
 			lastCACert = cert
 		} else {
 			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
-			phase.LocalFlags = localFlags()
 		}
 		subPhases = append(subPhases, phase)
 	}
@@ -136,8 +120,6 @@ func getCertPhaseFlags(name string) []string {
 	flags := []string{
 		options.CertificatesDir,
 		options.CfgPath,
-		options.CSROnly,
-		options.CSRDir,
 		options.KubernetesVersion,
 	}
 	if name == "all" || name == "apiserver" {
@@ -156,7 +138,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := cmdutil.DefaultInitConfiguration()
 	// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-	defaultConfig.LocalAPIEndpoint = kubeadmapiv1beta2.APIEndpoint{
+	defaultConfig.LocalAPIEndpoint = kubeadmapiv1.APIEndpoint{
 		AdvertiseAddress: "127.0.0.1",
 	}
 
@@ -279,15 +261,6 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 
 			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
 			return nil
-		}
-
-		if csrOnly {
-			fmt.Printf("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
-			if csrDir == "" {
-				csrDir = data.CertificateWriteDir()
-			}
-
-			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
 		}
 
 		// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)

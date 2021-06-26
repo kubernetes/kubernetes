@@ -110,11 +110,11 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 	// default values from here will mean, no one can
 	// override them.
 	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+		return nil, fmt.Errorf("no cloudprovider present")
 	}
 
 	if cloud.ProviderName() != aws.ProviderName {
-		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+		return nil, fmt.Errorf("expected aws cloud, found %s", cloud.ProviderName())
 	}
 
 	instances, ok := cloud.Instances()

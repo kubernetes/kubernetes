@@ -58,8 +58,19 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return extractEndpoints(endpoints, fieldManager, "")
+}
+
+// ExtractEndpointsStatus is the same as ExtractEndpoints except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEndpointsStatus(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return extractEndpoints(endpoints, fieldManager, "status")
+}
+
+func extractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
-	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b)
+	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

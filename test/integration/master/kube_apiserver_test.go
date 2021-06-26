@@ -32,8 +32,6 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/go-openapi/spec"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -44,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -199,7 +198,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{name}`)
 	if err != nil {
 		t.Fatalf("unexpected error getting CRD OpenAPI path: %v", err)
 	}
@@ -224,7 +223,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 			},
 			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
+					Name:    "v1",
 					Served:  true,
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
@@ -247,7 +246,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Expect the CRD path to not change
-	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{name}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -289,7 +288,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 			},
 			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
+					Name:    "v1",
 					Served:  true,
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
@@ -312,7 +311,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Expect the apiextensions definition to not change, since the overlapping definition will get renamed.
-	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition`)
+	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -435,9 +434,9 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 	return reflect.DeepEqual(listenAddresses, ips)
 }
 
-func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
+func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount int) {
 	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
-	var masterCountServers = make([]*kubeapiservertesting.TestServer, masterCount)
+	var apiServerCountServers = make([]*kubeapiservertesting.TestServer, apiServerCount)
 	etcd := framework.SharedEtcd()
 
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
@@ -448,25 +447,25 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	defer registry.CleanupStorage()
 
 	wg := sync.WaitGroup{}
-	// 1. start masterCount api servers
-	for i := 0; i < masterCount; i++ {
-		// start master count api server
+	// 1. start apiServerCount api servers
+	for i := 0; i < apiServerCount; i++ {
+		// start count api server
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 				"--endpoint-reconciler-type", "master-count",
 				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-				"--apiserver-count", fmt.Sprintf("%v", masterCount),
+				"--apiserver-count", fmt.Sprintf("%v", apiServerCount),
 			}, etcd)
-			masterCountServers[i] = server
+			apiServerCountServers[i] = server
 		}(i)
 	}
 	wg.Wait()
 
-	// 2. verify master count servers have registered
+	// 2. verify API Server count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
-		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
+		client, err := kubernetes.NewForConfig(apiServerCountServers[0].ClientConfig)
 		if err != nil {
 			t.Logf("error creating client: %v", err)
 			return false, nil
@@ -476,9 +475,9 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
 		}
-		return verifyEndpointsWithIPs(masterCountServers, getEndpointIPs(endpoints)), nil
+		return verifyEndpointsWithIPs(apiServerCountServers, getEndpointIPs(endpoints)), nil
 	}); err != nil {
-		t.Fatalf("master count endpoints failed to register: %v", err)
+		t.Fatalf("API Server count endpoints failed to register: %v", err)
 	}
 
 	// 3. start lease api servers
@@ -503,8 +502,8 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 
 	time.Sleep(3 * time.Second)
 
-	// 4. Shutdown the masterCount server
-	for _, server := range masterCountServers {
+	// 4. Shutdown the apiServerCount server
+	for _, server := range apiServerCountServers {
 		server.TearDownFn()
 	}
 
@@ -526,19 +525,19 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	}
 }
 
-func TestReconcilerMasterLeaseCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 1, 2)
+func TestReconcilerAPIServerLeaseCombined(t *testing.T) {
+	testReconcilersAPIServerLease(t, 1, 2)
 }
 
-func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 1)
+func TestReconcilerAPIServerLeaseMultiMoreAPIServers(t *testing.T) {
+	testReconcilersAPIServerLease(t, 2, 1)
 }
 
-func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 2)
+func TestReconcilerAPIServerLeaseMultiCombined(t *testing.T) {
+	testReconcilersAPIServerLease(t, 2, 2)
 }
 
-func TestMultiMasterNodePortAllocation(t *testing.T) {
+func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	var kubeAPIServers []*kubeapiservertesting.TestServer
 	var clientAPIServers []*kubernetes.Clientset
 	etcd := framework.SharedEtcd()

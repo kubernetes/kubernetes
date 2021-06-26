@@ -111,7 +111,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, "")
+	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")

@@ -321,6 +321,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SeccompDefault != nil {
+		in, out := &in.SeccompDefault, &out.SeccompDefault
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

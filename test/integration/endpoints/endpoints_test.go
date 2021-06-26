@@ -33,8 +33,8 @@ import (
 )
 
 func TestEndpointUpdates(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
 	config := restclient.Config{Host: server.URL}

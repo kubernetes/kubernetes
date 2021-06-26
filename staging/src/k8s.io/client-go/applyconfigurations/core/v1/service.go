@@ -59,8 +59,19 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractService(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+	return extractService(service, fieldManager, "")
+}
+
+// ExtractServiceStatus is the same as ExtractService except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractServiceStatus(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+	return extractService(service, fieldManager, "status")
+}
+
+func extractService(service *apicorev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
-	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b)
+	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

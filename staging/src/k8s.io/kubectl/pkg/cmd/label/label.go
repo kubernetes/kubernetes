@@ -39,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -58,6 +59,7 @@ type LabelOptions struct {
 	local           bool
 	dryRunStrategy  cmdutil.DryRunStrategy
 	all             bool
+	allNamespaces   bool
 	resourceVersion string
 	selector        string
 	fieldSelector   string
@@ -131,6 +133,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Update the labels on a resource"),
 		Long:                  fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
 		Example:               labelExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -147,6 +150,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
@@ -249,6 +253,7 @@ func (o *LabelOptions) RunLabel() error {
 	if !o.local {
 		b = b.LabelSelectorParam(o.selector).
 			FieldSelectorParam(o.fieldSelector).
+			AllNamespaces(o.allNamespaces).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
 	}

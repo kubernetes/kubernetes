@@ -57,8 +57,19 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSINode(cSINode *apistoragev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return extractCSINode(cSINode, fieldManager, "")
+}
+
+// ExtractCSINodeStatus is the same as ExtractCSINode except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCSINodeStatus(cSINode *apistoragev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return extractCSINode(cSINode, fieldManager, "status")
+}
+
+func extractCSINode(cSINode *apistoragev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
-	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b)
+	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

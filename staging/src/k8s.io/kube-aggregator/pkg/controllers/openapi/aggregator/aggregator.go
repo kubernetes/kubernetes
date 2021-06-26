@@ -24,7 +24,6 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 
 	"k8s.io/klog/v2"
 
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // SpecAggregator calls out to http handlers of APIServices and merges specs. It keeps state of the last

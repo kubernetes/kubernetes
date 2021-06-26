@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinconfig"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // ResAccumulator accumulates resources and the rules
@@ -72,7 +72,7 @@ func (ra *ResAccumulator) MergeVars(incoming []types.Var) error {
 	for _, v := range incoming {
 		targetId := resid.NewResIdWithNamespace(v.ObjRef.GVK(), v.ObjRef.Name, v.ObjRef.Namespace)
 		idMatcher := targetId.GvknEquals
-		if targetId.Namespace != "" || !targetId.IsNamespaceableKind() {
+		if targetId.Namespace != "" || targetId.IsClusterScoped() {
 			// Preserve backward compatibility. An empty namespace means
 			// wildcard search on the namespace hence we still use GvknEquals
 			idMatcher = targetId.Equals
@@ -107,6 +107,7 @@ func (ra *ResAccumulator) findVarValueFromResources(v types.Var) (interface{}, e
 	for _, res := range ra.resMap.Resources() {
 		for _, varName := range res.GetRefVarNames() {
 			if varName == v.Name {
+				//nolint: staticcheck
 				s, err := res.GetFieldValue(v.FieldRef.FieldPath)
 				if err != nil {
 					return "", fmt.Errorf(

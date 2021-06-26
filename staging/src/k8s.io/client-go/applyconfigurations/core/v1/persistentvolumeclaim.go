@@ -59,8 +59,19 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "")
+}
+
+// ExtractPersistentVolumeClaimStatus is the same as ExtractPersistentVolumeClaim except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPersistentVolumeClaimStatus(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "status")
+}
+
+func extractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string, subresource string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	b := &PersistentVolumeClaimApplyConfiguration{}
-	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b)
+	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

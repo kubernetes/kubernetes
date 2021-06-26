@@ -93,7 +93,7 @@ var (
 	dumpLong = templates.LongDesc(i18n.T(`
     Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
     stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will
-    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can
+    build a set of files in that directory.  By default only dumps things in the current namespace and 'kube-system' namespace, but you can
     switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
 
     The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories

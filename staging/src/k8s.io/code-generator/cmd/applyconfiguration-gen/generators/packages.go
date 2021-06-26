@@ -63,11 +63,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, arguments.OutputPackagePath)
 	customArgs := arguments.CustomArgs.(*applygenargs.CustomArgs)
 	initialTypes := customArgs.ExternalApplyConfigurations
-	refs := refGraphForReachableTypes(pkgTypes, initialTypes)
+	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(customArgs.OpenAPISchemaFilePath, pkgTypes)
 	if err != nil {
 		klog.Fatalf("Failed build type models from typeModels %s: %v", customArgs.OpenAPISchemaFilePath, err)
 	}
+
 	groupVersions := make(map[string]clientgentypes.GroupVersions)
 	groupGoNames := make(map[string]string)
 	applyConfigsForGroupVersion := make(map[clientgentypes.GroupVersion][]applyConfig)

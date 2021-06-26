@@ -37,6 +37,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
+	appsv1autoscaling "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -266,6 +267,10 @@ func (c conversionClient) UpdateScale(ctx context.Context, name string, scale *a
 	return nil, errors.New("UpdateScale() is not implemented for conversionClient")
 }
 
+func (c conversionClient) ApplyScale(ctx context.Context, name string, scale *appsv1autoscaling.ScaleApplyConfiguration, opts metav1.ApplyOptions) (*autoscalingv1.Scale, error) {
+	return nil, errors.New("ApplyScale() is not implemented for conversionClient")
+}
+
 func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error) {
 	rsList := make([]*apps.ReplicaSet, 0, len(rcList))
 	for _, rc := range rcList {
@@ -332,22 +337,12 @@ type podControlAdapter struct {
 	controller.PodControlInterface
 }
 
-func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	// This is not used by RSC.
-	return errors.New("CreatePods() is not implemented for podControlAdapter")
-}
-
-func (pc podControlAdapter) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	// This is not used by RSC.
-	return errors.New("CreatePodsOnNode() is not implemented for podControlAdapter")
-}
-
-func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.CreatePodsWithControllerRef(namespace, template, rc, controllerRef)
+	return pc.PodControlInterface.CreatePods(namespace, template, rc, controllerRef)
 }
 
 func (pc podControlAdapter) DeletePod(namespace string, podID string, object runtime.Object) error {

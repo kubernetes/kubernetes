@@ -328,7 +328,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	authRequest := &credentialproviderapi.CredentialProviderRequest{Image: image}
 	data, err := e.encodeRequest(authRequest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode auth request: %v", err)
+		return nil, fmt.Errorf("failed to encode auth request: %w", err)
 	}
 
 	stdout := &bytes.Buffer{}
@@ -385,7 +385,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 func (e *execPlugin) encodeRequest(request *credentialproviderapi.CredentialProviderRequest) ([]byte, error) {
 	data, err := runtime.Encode(e.encoder, request)
 	if err != nil {
-		return nil, fmt.Errorf("error encoding request: %v", err)
+		return nil, fmt.Errorf("error encoding request: %w", err)
 	}
 
 	return data, nil

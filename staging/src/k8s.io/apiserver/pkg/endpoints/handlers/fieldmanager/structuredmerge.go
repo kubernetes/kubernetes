@@ -76,7 +76,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
+		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v (from %v to %v)", err, newObj.GetObjectKind().GroupVersionKind(), f.groupVersion)
 	}
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {

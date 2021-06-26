@@ -936,11 +936,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 			return "", err
 		}
 
-		// try and get canonical path for disk and if we can't throw error
-		vmDiskPath, err = getcanonicalVolumePath(ctx, vm.Datacenter, vmDiskPath)
-		if err != nil {
-			klog.Errorf("failed to get canonical path for %s on node %s: %v", vmDiskPath, convertToString(nodeName), err)
-			return "", err
+		// try and get canonical path for disk and if we can't use provided vmDiskPath
+		canonicalPath, pathFetchErr := getcanonicalVolumePath(ctx, vm.Datacenter, vmDiskPath)
+		if canonicalPath != "" && pathFetchErr == nil {
+			vmDiskPath = canonicalPath
 		}
 
 		diskUUID, err = vm.AttachDisk(ctx, vmDiskPath, &vclib.VolumeOptions{SCSIControllerType: vclib.PVSCSIControllerType, StoragePolicyName: storagePolicyName})
@@ -1776,8 +1775,8 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	// FIXME: For now, pick the first zone of datastore as the zone of volume
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {
-		labels[v1.LabelFailureDomainBetaRegion] = dsZones[0].Region
-		labels[v1.LabelFailureDomainBetaZone] = dsZones[0].FailureDomain
+		labels[v1.LabelTopologyRegion] = dsZones[0].Region
+		labels[v1.LabelTopologyZone] = dsZones[0].FailureDomain
 	}
 	return labels, nil
 }

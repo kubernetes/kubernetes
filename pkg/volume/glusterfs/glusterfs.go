@@ -77,7 +77,6 @@ const (
 	volPrefix                      = "vol_"
 	dynamicEpSvcPrefix             = "glusterfs-dynamic"
 	replicaCount                   = 3
-	durabilityType                 = "replicate"
 	secretKeyName                  = "key" // key name used in secret
 	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
 	defaultGidMin                  = 2000

@@ -209,7 +209,7 @@ var map_ListOptions = map[string]string{
 	"labelSelector":        "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
 	"fieldSelector":        "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"allowWatchBookmarks":  "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored. If the feature gate WatchBookmarks is not enabled in apiserver, this field is ignored.",
+	"allowWatchBookmarks":  "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
 	"resourceVersion":      "resourceVersion sets a constraint on what resource versions a request may be served from. See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
 	"resourceVersionMatch": "resourceVersionMatch determines how resourceVersion is applied to list calls. It is highly recommended that resourceVersionMatch be set for list calls where resourceVersion is set See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for details.\n\nDefaults to unset",
 	"timeoutSeconds":       "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
@@ -222,13 +222,14 @@ func (ListOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ManagedFieldsEntry = map[string]string{
-	"":           "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
-	"manager":    "Manager is an identifier of the workflow managing these fields.",
-	"operation":  "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
-	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
-	"time":       "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
-	"fieldsType": "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
-	"fieldsV1":   "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
+	"":            "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
+	"manager":     "Manager is an identifier of the workflow managing these fields.",
+	"operation":   "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
+	"apiVersion":  "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"time":        "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
+	"fieldsType":  "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
+	"fieldsV1":    "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
+	"subresource": "Subresource is the name of the subresource used to update that object, or empty string if the object was updated through the main resource. The value of this field is used to distinguish between managers, even if they share the same name. For example, a status update will be distinct from a regular update using the same manager name. Note that the APIVersion field is not related to the Subresource field and it always corresponds to the version of the main resource.",
 }
 
 func (ManagedFieldsEntry) SwaggerDoc() map[string]string {

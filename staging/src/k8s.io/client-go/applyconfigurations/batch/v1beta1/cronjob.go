@@ -59,8 +59,19 @@ func CronJob(name, namespace string) *CronJobApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCronJob(cronJob *batchv1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+	return extractCronJob(cronJob, fieldManager, "")
+}
+
+// ExtractCronJobStatus is the same as ExtractCronJob except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCronJobStatus(cronJob *batchv1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+	return extractCronJob(cronJob, fieldManager, "status")
+}
+
+func extractCronJob(cronJob *batchv1beta1.CronJob, fieldManager string, subresource string) (*CronJobApplyConfiguration, error) {
 	b := &CronJobApplyConfiguration{}
-	err := managedfields.ExtractInto(cronJob, internal.Parser().Type("io.k8s.api.batch.v1beta1.CronJob"), fieldManager, b)
+	err := managedfields.ExtractInto(cronJob, internal.Parser().Type("io.k8s.api.batch.v1beta1.CronJob"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

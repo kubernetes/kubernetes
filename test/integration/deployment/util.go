@@ -101,10 +101,10 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 	}
 }
 
-// dcSetup sets up necessities for Deployment integration test, including master, apiserver, informers, and clientset
+// dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
 func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -132,11 +132,11 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	return s, closeFn, rm, dc, informers, clientSet
 }
 
-// dcSimpleSetup sets up necessities for Deployment integration test, including master, apiserver,
+// dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
 func dcSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)

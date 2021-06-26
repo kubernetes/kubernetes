@@ -93,7 +93,9 @@ type csiBlockMapper struct {
 	volumeID   string
 	readOnly   bool
 	spec       *volume.Spec
+	pod        *v1.Pod
 	podUID     types.UID
+	volume.MetricsProvider
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}
@@ -111,6 +113,12 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{specName}
 func (m *csiBlockMapper) GetStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
+}
+
+// SupportsMetrics returns true for csiBlockMapper as it initializes the
+// MetricsProvider.
+func (m *csiBlockMapper) SupportsMetrics() bool {
+	return true
 }
 
 // getPublishDir returns path to a directory, where the volume is published to each pod.
@@ -210,8 +218,21 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishVolumeInfo = attachment.Status.AttachmentMetadata
 	}
 
+	// Inject pod information into volume_attributes
+	volAttribs := csiSource.VolumeAttributes
+	podInfoEnabled, err := m.plugin.podInfoEnabled(string(m.driverName))
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to assemble volume attributes: %v", err))
+	}
+	volumeLifecycleMode, err := m.plugin.getVolumeLifecycleMode(m.spec)
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to get VolumeLifecycleMode: %v", err))
+	}
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(m.pod, volumeLifecycleMode))
+	}
+
 	nodePublishSecrets := map[string]string{}
-	var err error
 	if csiSource.NodePublishSecretRef != nil {
 		nodePublishSecrets, err = getCredentialsFromSecret(m.k8s, csiSource.NodePublishSecretRef)
 		if err != nil {
@@ -241,7 +262,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishPath,
 		accessMode,
 		publishVolumeInfo,
-		csiSource.VolumeAttributes,
+		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
 		[]string{},
