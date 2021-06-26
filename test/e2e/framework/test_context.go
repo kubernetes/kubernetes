@@ -119,7 +119,7 @@ type TestContextType struct {
 	// DumpSystemdJournal controls whether to dump the full systemd journal.
 	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
-	ControlPlaneOSDistro           string
+	ControlPlaneOSDistro     string
 	NodeOSDistro             string
 	NodeOSArch               string
 	VerifyServiceAccount     bool
@@ -128,8 +128,8 @@ type TestContextType struct {
 	AllowedNotReadyNodes     int
 	CleanStart               bool
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
-	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'controlplane'
-	// only controlplane Node will be monitored.
+	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
+	// only master Node will be monitored.
 	GatherKubeSystemResourceUsageData string
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            string
@@ -243,9 +243,9 @@ type CloudConfig struct {
 	Zones             []string // for multizone tests, use this set of zones instead of querying the cloud provider. Must include Zone.
 	Region            string
 	MultiZone         bool
-	MultiControlPlane       bool
+	MultiControlPlane      bool
 	Cluster           string
-	ControlPlaneName        string
+	ControlPlaneName  string
 	NodeInstanceGroup string // comma-delimited list of groups' names
 	NumNodes          int
 	ClusterIPRange    string
@@ -253,7 +253,7 @@ type CloudConfig struct {
 	Network           string
 	ConfigFile        string // for azure and openstack
 	NodeTag           string
-	ControlPlaneTag         string
+	ControlPlaneTag   string
 
 	Provider ProviderInterface
 }
@@ -287,10 +287,10 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	// Randomize specs as well as suites
 	config.GinkgoConfig.RandomizeAllSpecs = true
 
-	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'controlplane' framework will be monitoring controlplane node only, if set to 'none' of 'false' monitoring will be turned off.")
+	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
-	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'controlplane' only controlplane component metrics would be gathered.")
+	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only controlplane component metrics would be gathered.")
 	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
 	flags.BoolVar(&TestContext.AllowGatheringProfiles, "allow-gathering-profiles", true, "If set to true framework will allow to gather CPU/memory allocation pprof profiles from the controlplane.")
 	flags.BoolVar(&TestContext.IncludeClusterAutoscalerMetrics, "include-cluster-autoscaler", false, "If set to true, framework will include Cluster Autoscaler when gathering metrics.")
@@ -314,7 +314,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/controlplane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")

@@ -551,11 +551,11 @@ func (r *ResourceMonitor) GetLatest() (ResourceUsagePerNode, error) {
 // GetControlPlaneNodeLatest returns the latest resource usage of controlplane and node.
 func (r *ResourceMonitor) GetControlPlaneNodeLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
 	result := make(ResourceUsagePerNode)
-	var controlplaneUsage ResourceUsagePerContainer
+	var controlPlaneUsage ResourceUsagePerContainer
 	var nodesUsage []ResourceUsagePerContainer
 	for node, usage := range usagePerNode {
-		if strings.HasSuffix(node, "controlplane") {
-			controlplaneUsage = usage
+		if strings.HasSuffix(node, "master") {
+			controlPlaneUsage = usage
 		} else {
 			nodesUsage = append(nodesUsage, usage)
 		}
@@ -578,7 +578,7 @@ func (r *ResourceMonitor) GetControlPlaneNodeLatest(usagePerNode ResourceUsagePe
 		nodeAvgUsage[c].MemoryWorkingSetInBytes /= uint64(len(nodesUsage))
 		nodeAvgUsage[c].MemoryRSSInBytes /= uint64(len(nodesUsage))
 	}
-	result["controlplane"] = controlplaneUsage
+	result["master"] = controlPlaneUsage
 	result["node"] = nodeAvgUsage
 	return result
 }
@@ -640,14 +640,14 @@ func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
 	return result
 }
 
-// GetMasterNodeCPUSummary returns summary of master node CPUs.
-func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
+// GetControlPlaneNodeCPUSummary returns summary of controlplane node CPUs.
+func (r *ResourceMonitor) GetControlPlaneNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
 	result := make(NodesCPUSummary)
-	var controlplaneSummary ContainersCPUSummary
+	var controlPlaneSummary ContainersCPUSummary
 	var nodesSummaries []ContainersCPUSummary
 	for node, summary := range summaryPerNode {
-		if strings.HasSuffix(node, "controlplane") {
-			controlplaneSummary = summary
+		if strings.HasSuffix(node, "master") {
+			controlPlaneSummary = summary
 		} else {
 			nodesSummaries = append(nodesSummaries, summary)
 		}
@@ -669,7 +669,7 @@ func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary
 			nodeAvgSummary[c][perc] /= float64(len(nodesSummaries))
 		}
 	}
-	result["controlplane"] = controlplaneSummary
+	result["master"] = controlPlaneSummary
 	result["node"] = nodeAvgSummary
 	return result
 }

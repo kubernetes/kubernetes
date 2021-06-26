@@ -24,5 +24,5 @@ const (
 	// GPUDevicePluginDSYAML is the official Google Device Plugin Daemonset NVIDIA GPU manifest for GKE
 	// TODO: Parametrize it by making it a feature in TestFramework.
 	// so we can override the daemonset in other setups (non COS).
-	GPUDevicePluginDSYAML = "https://raw.githubusercontent.com/kubernetes/kubernetes/controlplane/cluster/addons/device-plugins/nvidia-gpu/daemonset.yaml"
+	GPUDevicePluginDSYAML = "https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/device-plugins/nvidia-gpu/daemonset.yaml"
 )
