@@ -126,6 +126,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, true, nil
 	}
 
+	// `CheckGracefulDelete` will be implemented by specific strategy
 	if !gracefulStrategy.CheckGracefulDelete(ctx, obj, options) {
 		return false, false, nil
 	}
