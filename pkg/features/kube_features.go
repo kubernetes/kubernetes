@@ -740,6 +740,12 @@ const (
 	//
 	// Enables usage of the ReadWriteOncePod PersistentVolume access mode.
 	ReadWriteOncePod featuregate.Feature = "ReadWriteOncePod"
+
+	// owner: @enj
+	// beta: v1.22
+	//
+	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
+	CSRDuration featuregate.Feature = "CSRDuration"
 )
 
 func init() {
@@ -851,6 +857,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
 	PodSecurity:                                    {Default: false, PreRelease: featuregate.Alpha},
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
+	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

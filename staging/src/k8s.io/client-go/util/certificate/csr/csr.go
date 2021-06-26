@@ -25,8 +25,6 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,12 +39,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // RequestCertificate will either use an existing (if this process has run
 // before but not to completion) or create a certificate signing request using the
-// PEM encoded CSR and send it to API server.
-func RequestCertificate(client clientset.Interface, csrData []byte, name string, signerName string, usages []certificatesv1.KeyUsage, privateKey interface{}) (reqName string, reqUID types.UID, err error) {
+// PEM encoded CSR and send it to API server.  An optional requestedDuration may be passed
+// to set the spec.expirationSeconds field on the CSR to control the lifetime of the issued
+// certificate.  This is not guaranteed as the signer may choose to ignore the request.
+func RequestCertificate(client clientset.Interface, csrData []byte, name, signerName string, requestedDuration *time.Duration, usages []certificatesv1.KeyUsage, privateKey interface{}) (reqName string, reqUID types.UID, err error) {
 	csr := &certificatesv1.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -61,6 +63,9 @@ func RequestCertificate(client clientset.Interface, csrData []byte, name string,
 	}
 	if len(csr.Name) == 0 {
 		csr.GenerateName = "csr-"
+	}
+	if requestedDuration != nil {
+		csr.Spec.ExpirationSeconds = DurationToExpirationSeconds(*requestedDuration)
 	}
 
 	reqName, reqUID, err = create(client, csr)
@@ -83,6 +88,14 @@ func RequestCertificate(client clientset.Interface, csrData []byte, name string,
 	default:
 		return "", "", formatError("cannot create certificate signing request: %v", err)
 	}
+}
+
+func DurationToExpirationSeconds(duration time.Duration) *int32 {
+	return pointer.Int32(int32(duration / time.Second))
+}
+
+func ExpirationSecondsToDuration(expirationSeconds int32) time.Duration {
+	return time.Duration(expirationSeconds) * time.Second
 }
 
 func get(client clientset.Interface, name string) (*certificatesv1.CertificateSigningRequest, error) {

@@ -344,7 +344,7 @@ func requestNodeCertificate(ctx context.Context, client clientset.Interface, pri
 		return nil, err
 	}
 
-	reqName, reqUID, err := csr.RequestCertificate(client, csrData, name, certificatesv1.KubeAPIServerClientKubeletSignerName, usages, privateKey)
+	reqName, reqUID, err := csr.RequestCertificate(client, csrData, name, certificatesv1.KubeAPIServerClientKubeletSignerName, nil, usages, privateKey)
 	if err != nil {
 		return nil, err
 	}
