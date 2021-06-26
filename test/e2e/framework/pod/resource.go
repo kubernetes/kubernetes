@@ -425,7 +425,7 @@ func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
 
 // NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
 // that behave the same, no matter the underlying OS. If no args are given, it defaults to the pause subcommand.
-// For more information about agnhost subcommands, see: https://github.com/kubernetes/kubernetes/tree/master/test/images/agnhost#agnhost
+// For more information about agnhost subcommands, see: https://github.com/kubernetes/kubernetes/tree/controlplane/test/images/agnhost#agnhost
 func NewAgnhostPod(ns, podName string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{

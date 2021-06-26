@@ -151,7 +151,7 @@ type Result struct {
 }
 
 // NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
-// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// eg: the name returned by framework.GetControlPlaneHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
 func NodeExec(nodeName, cmd, provider string) (Result, error) {
 	return SSH(cmd, net.JoinHostPort(nodeName, SSHPort), provider)

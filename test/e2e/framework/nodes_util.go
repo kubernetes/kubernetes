@@ -59,7 +59,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {
-	if TestContext.CloudConfig.MultiMaster {
+	if TestContext.CloudConfig.MultiControlPlane {
 		// GKE Regional Clusters are being tested.
 		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
 	}
@@ -75,9 +75,9 @@ func AppendContainerCommandGroupIfNeeded(args []string) []string {
 	return args
 }
 
-// MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string) error {
-	Logf("Upgrading master to %q", v)
+// ControlPlaneUpgradeGKE upgrades controlplane node to the specified version on GKE.
+func ControlPlaneUpgradeGKE(namespace string, v string) error {
+	Logf("Upgrading controlplane to %q", v)
 	args := []string{
 		"container",
 		"clusters",
@@ -85,7 +85,7 @@ func MasterUpgradeGKE(namespace string, v string) error {
 		LocationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
-		"--master",
+		"--controlplane",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
 	}

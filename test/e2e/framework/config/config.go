@@ -40,14 +40,14 @@ limitations under the License.
 //
 //     var scaling struct {
 //             NumNodes int  `default:"1" description:"number of nodes to run on"`
-//             Master string
+//             ControlPlane string
 //     }
 //     _ = config.AddOptions(&scaling, "storage.csi.scaling")
 //
 // This defines the following command line flags:
 //
 //     -storage.csi.scaling.numNodes=<int>  - number of nodes to run on (default: 1)
-//     -storage.csi.scaling.master=<string>
+//     -storage.csi.scaling.controlplane=<string>
 //
 // All fields in the structure must be exported and have one of the following
 // types (same as in the `flag` package):
