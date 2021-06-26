@@ -74,15 +74,15 @@ def cri_tarballs():
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
-# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
+# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/debian-base:buster-v1.8.0
+# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/debian-base:buster-v1.8.0
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:08c14f378308dd053bca28f64ab4cbfbca469c8ce5b2831fc3c267adbdc2ae6a",
-    "amd64": "sha256:bfed8b269fcb8333845a55560ef35e66e71998bd4be33a6b92302f5cbe9ab181",
-    "arm": "sha256:52722bb698a8d742148c9075f3261f442f3e7bc9d12bcc9c96a045d24d27ffd4",
-    "arm64": "sha256:0ac88bfb3df67f63bc328cd23610959310c8bc36377662de3220c7c0c15f6dbd",
-    "ppc64le": "sha256:4bc9d7fa374f3e065ed4c62ac815806afe2e519bc4a9d94786e70fe88e5acc42",
-    "s390x": "sha256:3045c5d5e716ce22cf0131b4d34bac99a7539e952546e4e8cb20739079bf6401",
+    "manifest": "sha256:22666783ee41fa619ad4d7ea40800bb40901d2e27d60c0ca3339a5851374763e",
+    "amd64": "sha256:45965a68454706b7318a36cb9252c0e3f37a61b9e34578a56e06ac7d7ddb4d5e",
+    "arm": "sha256:7e1ea4457b1a5969067d79b748d6e648834ef6523f153e0780213f21590ad3e8",
+    "arm64": "sha256:336a612ad49a58e2440aa111fa3fc10e04c607b805debe4544fd2db6384d6ab8",
+    "ppc64le": "sha256:046123ab9444d9c66132b179bed6954a8bd4e35c9ff0c2194c45979021f49655",
+    "s390x": "sha256:468fae3b4ca48f0ea9c608994c12e99b32c9a617500c89efe98f84832a0ab007",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
@@ -137,7 +137,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "buster-v1.7.0",  # ignored, but kept here for documentation
+            tag = "buster-v1.8.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
