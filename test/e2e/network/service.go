@@ -2497,9 +2497,13 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	if serviceType == v1.ServiceTypeNodePort {
 		nodes, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
-		addrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-		gomega.Expect(len(addrs)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
-		svcIP = addrs[0]
+		// The node addresses must have the same IP family as the ClusterIP
+		family := v1.IPv4Protocol
+		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
+			family = v1.IPv6Protocol
+		}
+		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -2582,7 +2586,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		gomega.Expect(len(svcIP)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
+		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
