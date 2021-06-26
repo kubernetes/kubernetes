@@ -640,8 +640,8 @@ func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
 	return result
 }
 
-// GetControlPlaneNodeCPUSummary returns summary of controlplane node CPUs.
-func (r *ResourceMonitor) GetControlPlaneNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
+// GetMasterNodeCPUSummary returns summary of master node CPUs.
+func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
 	result := make(NodesCPUSummary)
 	var controlplaneSummary ContainersCPUSummary
 	var nodesSummaries []ContainersCPUSummary
