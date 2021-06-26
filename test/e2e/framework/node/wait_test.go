@@ -31,7 +31,7 @@ import (
 // since single node checks are in TestReadyForTests.
 func TestCheckReadyForTests(t *testing.T) {
 	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
-	labelNodeRoleControlPlane := "node-role.kubernetes.io/controlPlane"
+	labelNodeRoleControlPlane := "node-role.kubernetes.io/control-plane"
 
 	fromVanillaNode := func(f func(*v1.Node)) v1.Node {
 		vanillaNode := &v1.Node{
@@ -63,7 +63,7 @@ func TestCheckReadyForTests(t *testing.T) {
 			expected: true,
 		}, {
 			desc:              "Default value for nonblocking taints tolerates control plane taint",
-			nonblockingTaints: `node-role.kubernetes.io/controlPlane`,
+			nonblockingTaints: `node-role.kubernetes.io/control-plane`,
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
 					n.Spec.Taints = []v1.Taint{{Key: labelNodeRoleControlPlane, Effect: v1.TaintEffectNoSchedule}}
