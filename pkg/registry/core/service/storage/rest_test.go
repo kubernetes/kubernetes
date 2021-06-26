@@ -927,18 +927,22 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 				if tc.expectError {
 					return
 				}
-				t.Errorf("%s; Failed to create service: %#v", tc.name, err)
+				t.Errorf("failed to create service: %#v", err)
 			}
 			srv, err := getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
-				t.Errorf("%s; Unexpected error: %v", tc.name, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			if srv == nil {
-				t.Fatalf("%s; Failed to find service: %s", tc.name, tc.svc.Name)
+				t.Fatalf("failed to find service: %s", tc.svc.Name)
 			}
 			serviceNodePorts := collectServiceNodePorts(srv)
 			if (len(serviceNodePorts) != 0) != tc.expectNodePorts {
-				t.Errorf("%s; Allocated NodePorts not as expected", tc.name)
+				exp := "0"
+				if tc.expectNodePorts {
+					exp = ">0"
+				}
+				t.Errorf("allocated NodePorts not as expected: expected %v, got %v", exp, len(serviceNodePorts))
 			}
 		})
 	}
