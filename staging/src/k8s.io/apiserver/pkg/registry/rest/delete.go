@@ -130,7 +130,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, false, nil
 	}
 
-	// check if options.GracePeriodSeconds is nil, or will panic
+	// check if `options.GracePeriodSeconds` is nil, or will panic
 	if options.GracePeriodSeconds != nil {
 		now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
 		objectMeta.SetDeletionTimestamp(&now)
