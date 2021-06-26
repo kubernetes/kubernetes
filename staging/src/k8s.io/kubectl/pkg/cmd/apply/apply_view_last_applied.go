@@ -77,6 +77,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 		Short:                 i18n.T("View latest last-applied-configuration annotations of a resource/object"),
 		Long:                  applyViewLastAppliedLong,
 		Example:               applyViewLastAppliedExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, f, args))
 			cmdutil.CheckErr(options.Validate(cmd))

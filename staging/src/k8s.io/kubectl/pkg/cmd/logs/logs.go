@@ -152,6 +152,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Print the logs for a container in a pod"),
 		Long:                  logsLong,
 		Example:               logsExample,
+		ValidArgsFunction:     util.PodResourceNameAndContainerCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

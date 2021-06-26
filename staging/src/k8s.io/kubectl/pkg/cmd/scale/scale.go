@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scale"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -113,12 +114,12 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Set a new size for a Deployment, ReplicaSet or Replication Controller"),
 		Long:                  scaleLong,
 		Example:               scaleExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.RunScale())
 		},
-		ValidArgs: validArgs,
 	}
 
 	o.RecordFlags.AddFlags(cmd)

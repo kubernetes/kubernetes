@@ -17,11 +17,14 @@ limitations under the License.
 package get
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -42,6 +45,7 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/cmd/apiresources"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/scheme"
@@ -161,6 +165,15 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Short:                 i18n.T("Display one or many resources"),
 		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var comps []string
+			if len(args) == 0 {
+				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
+			} else if len(args) == 1 {
+				comps = CompGetResource(f, cmd, args[0], toComplete)
+			}
+			return comps, cobra.ShellCompDirectiveNoFileComp
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -848,4 +861,62 @@ func multipleGVKsRequested(infos []*resource.Info) bool {
 		}
 	}
 	return false
+}
+
+// CompGetResource gets the list of the resource specified which begin with `toComplete`.
+func CompGetResource(f cmdutil.Factory, cmd *cobra.Command, resourceName string, toComplete string) []string {
+	template := "{{ range .items  }}{{ .metadata.name }} {{ end }}"
+	return CompGetFromTemplate(&template, f, "", cmd, []string{resourceName}, toComplete)
+}
+
+// CompGetContainers gets the list of containers of the specified pod which begin with `toComplete`.
+func CompGetContainers(f cmdutil.Factory, cmd *cobra.Command, podName string, toComplete string) []string {
+	template := "{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
+	return CompGetFromTemplate(&template, f, "", cmd, []string{"pod", podName}, toComplete)
+}
+
+// CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
+// which begin with `toComplete`.
+func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, toComplete string) []string {
+	buf := new(bytes.Buffer)
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	o := NewGetOptions("kubectl", streams)
+
+	// Get the list of names of the specified resource
+	o.PrintFlags.TemplateFlags.GoTemplatePrintFlags.TemplateArgument = template
+	format := "go-template"
+	o.PrintFlags.OutputFormat = &format
+
+	// Do the steps Complete() would have done.
+	// We cannot actually call Complete() or Validate() as these function check for
+	// the presence of flags, which, in our case won't be there
+	if namespace != "" {
+		o.Namespace = namespace
+		o.ExplicitNamespace = true
+	} else {
+		var err error
+		o.Namespace, o.ExplicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return nil
+		}
+	}
+
+	o.ToPrinter = func(mapping *meta.RESTMapping, outputObjects *bool, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
+
+	o.Run(f, cmd, args)
+
+	var comps []string
+	resources := strings.Split(buf.String(), " ")
+	for _, res := range resources {
+		if res != "" && strings.HasPrefix(res, toComplete) {
+			comps = append(comps, res)
+		}
+	}
+	return comps
 }

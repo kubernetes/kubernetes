@@ -107,12 +107,12 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, StatefulSet, or ReplicationController"),
 		Long:                  autoscaleLong,
 		Example:               autoscaleExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs: validArgs,
 	}
 
 	// bind flag structs

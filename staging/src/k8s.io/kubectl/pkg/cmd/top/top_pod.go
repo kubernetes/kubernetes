@@ -29,6 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -97,6 +98,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		Short:                 i18n.T("Display Resource (CPU/Memory) usage of pods"),
 		Long:                  topPodLong,
 		Example:               topPodExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
