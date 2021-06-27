@@ -1169,26 +1169,6 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 		expectError          bool
 	}{
 		{
-			name: "allocate nil, gate on",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-nil"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: nil,
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      true,
-			allocateNodePortGate: true,
-			expectError:          true,
-		},
-		{
 			name: "allocate false, gate on",
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
