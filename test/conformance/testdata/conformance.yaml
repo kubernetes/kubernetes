@@ -889,6 +889,14 @@
     scale MUST be at two replicas.
   release: v1.16, v1.21
   file: test/e2e/apps/statefulset.go
+- testname: StatefulSet, list, patch and delete a collection of StatefulSets
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
+    should list, patch and delete a collection of StatefulSets [Conformance]'
+  description: When a StatefulSet is created it MUST succeed. It MUST succeed when
+    listing StatefulSets via a label selector. It MUST succeed when patching a StatefulSet.
+    It MUST succeed when deleting the StatefulSet via deleteCollection.
+  release: v1.22
+  file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Rolling Update with Partition
   codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     should perform canary updates and phased rolling updates of template modifications
