@@ -184,7 +184,7 @@ type resourceGatherWorker struct {
 func (w *resourceGatherWorker) singleProbe() {
 	data := make(ResourceUsagePerContainer)
 	if w.inKubemark {
-		kubemarkData := getKubemarkMasterComponentsResourceUsage()
+		kubemarkData := getKubemarkControlPlaneComponentsResourceUsage()
 		if kubemarkData == nil {
 			return
 		}
@@ -365,10 +365,10 @@ type NodesSet int
 const (
 	// AllNodes means all containers on all nodes.
 	AllNodes NodesSet = 0
-	// MasterNodes means all containers on Master nodes only.
-	MasterNodes NodesSet = 1
-	// MasterAndDNSNodes means all containers on Master nodes and DNS containers on other nodes.
-	MasterAndDNSNodes NodesSet = 2
+	// ControlPlaneNodes means all containers on ControlPlane nodes only.
+	ControlPlaneNodes NodesSet = 1
+	// ControlPlaneAndDNSNodes means all containers on ControlPlane nodes and DNS containers on other nodes.
+	ControlPlaneAndDNSNodes NodesSet = 2
 )
 
 // nodeHasControlPlanePods returns true if specified node has control plane pods
@@ -428,7 +428,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	}
 	dnsNodes := make(map[string]bool)
 	for _, pod := range pods.Items {
-		if options.Nodes == MasterNodes {
+		if options.Nodes == ControlPlaneNodes {
 			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
 			if err != nil {
 				return nil, err
@@ -437,7 +437,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				continue
 			}
 		}
-		if options.Nodes == MasterAndDNSNodes {
+		if options.Nodes == ControlPlaneAndDNSNodes {
 			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
 			if err != nil {
 				return nil, err
@@ -452,7 +452,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		for _, container := range pod.Status.ContainerStatuses {
 			g.containerIDs = append(g.containerIDs, container.Name)
 		}
-		if options.Nodes == MasterAndDNSNodes {
+		if options.Nodes == ControlPlaneAndDNSNodes {
 			dnsNodes[pod.Spec.NodeName] = true
 		}
 	}
@@ -481,7 +481,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				probeDuration:               options.ProbeDuration,
 				printVerboseLogs:            options.PrintVerboseLogs,
 			})
-			if options.Nodes == MasterNodes {
+			if options.Nodes == ControlPlaneNodes {
 				break
 			}
 		}
@@ -603,7 +603,7 @@ type kubemarkResourceUsage struct {
 	CPUUsageInCores         float64
 }
 
-func getMasterUsageByPrefix(prefix string) (string, error) {
+func getControlPlaneUsageByPrefix(prefix string) (string, error) {
 	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), APIAddress()+":22", TestContext.Provider)
 	if err != nil {
 		return "", err
@@ -611,13 +611,13 @@ func getMasterUsageByPrefix(prefix string) (string, error) {
 	return sshResult.Stdout, nil
 }
 
-// getKubemarkMasterComponentsResourceUsage returns the resource usage of kubemark which contains multiple combinations of cpu and memory usage for each pod name.
-func getKubemarkMasterComponentsResourceUsage() map[string]*kubemarkResourceUsage {
+// getKubemarkControlPlaneComponentsResourceUsage returns the resource usage of kubemark which contains multiple combinations of cpu and memory usage for each pod name.
+func getKubemarkControlPlaneComponentsResourceUsage() map[string]*kubemarkResourceUsage {
 	result := make(map[string]*kubemarkResourceUsage)
 	// Get kubernetes component resource usage
-	sshResult, err := getMasterUsageByPrefix("kube")
+	sshResult, err := getControlPlaneUsageByPrefix("kube")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
+		Logf("Error when trying to SSH to controlplane machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))
@@ -633,9 +633,9 @@ func getKubemarkMasterComponentsResourceUsage() map[string]*kubemarkResourceUsag
 		}
 	}
 	// Get etcd resource usage
-	sshResult, err = getMasterUsageByPrefix("bin/etcd")
+	sshResult, err = getControlPlaneUsageByPrefix("bin/etcd")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe")
+		Logf("Error when trying to SSH to controlplane machine. Skipping probe")
 		return nil
 	}
 	scanner = bufio.NewScanner(strings.NewReader(sshResult))

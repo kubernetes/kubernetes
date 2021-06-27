@@ -90,13 +90,13 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 }
 
 // GetInstancePrefix returns the INSTANCE_PREFIX env we set for e2e cluster.
-// From cluster/gce/config-test.sh, master name is set up using below format:
-// MASTER_NAME="${INSTANCE_PREFIX}-master"
-func GetInstancePrefix(masterName string) (string, error) {
-	if !strings.HasSuffix(masterName, "-master") {
-		return "", fmt.Errorf("unexpected master name format: %v", masterName)
+// From cluster/gce/config-test.sh, controlplane name is set up using below format:
+// CONTROLPLANE_NAME="${INSTANCE_PREFIX}-controlplane"
+func GetInstancePrefix(controlplaneName string) (string, error) {
+	if !strings.HasSuffix(controlplaneName, "-controlplane") {
+		return "", fmt.Errorf("unexpected controlplane name format: %v", controlplaneName)
 	}
-	return masterName[:len(masterName)-7], nil
+	return controlplaneName[:len(controlplaneName)-7], nil
 }
 
 // GetClusterName returns the CLUSTER_NAME env we set for e2e cluster.
@@ -108,16 +108,16 @@ func GetClusterName(instancePrefix string) string {
 
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
-func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange string) []*compute.Firewall {
-	instancePrefix, err := GetInstancePrefix(masterName)
+func GetE2eFirewalls(controlplaneName, controlplaneTag, nodeTag, network, clusterIPRange string) []*compute.Firewall {
+	instancePrefix, err := GetInstancePrefix(controlplaneName)
 	framework.ExpectNoError(err)
 	clusterName := GetClusterName(instancePrefix)
 
 	fws := []*compute.Firewall{}
 	fws = append(fws, &compute.Firewall{
-		Name:         clusterName + "-default-internal-master",
+		Name:         clusterName + "-default-internal-controlplane",
 		SourceRanges: []string{"10.0.0.0/8"},
-		TargetTags:   []string{masterTag},
+		TargetTags:   []string{controlplaneTag},
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
@@ -165,9 +165,9 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:       masterName + "-etcd",
-		SourceTags: []string{masterTag},
-		TargetTags: []string{masterTag},
+		Name:       controlplaneName + "-etcd",
+		SourceTags: []string{controlplaneTag},
+		TargetTags: []string{controlplaneTag},
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
@@ -180,9 +180,9 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         masterName + "-https",
+		Name:         controlplaneName + "-https",
 		SourceRanges: []string{"0.0.0.0/0"},
-		TargetTags:   []string{masterTag},
+		TargetTags:   []string{controlplaneTag},
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",

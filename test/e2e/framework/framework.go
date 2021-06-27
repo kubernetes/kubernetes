@@ -261,10 +261,10 @@ func (f *Framework) BeforeEach() {
 		var err error
 		var nodeMode NodesSet
 		switch TestContext.GatherKubeSystemResourceUsageData {
-		case "master":
-			nodeMode = MasterNodes
-		case "masteranddns":
-			nodeMode = MasterAndDNSNodes
+		case "controlplane":
+			nodeMode = ControlPlaneNodes
+		case "controlplaneanddns":
+			nodeMode = ControlPlaneAndDNSNodes
 		default:
 			nodeMode = AllNodes
 		}
@@ -294,7 +294,7 @@ func (f *Framework) BeforeEach() {
 		}()
 	}
 
-	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
+	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "controlplane"
 	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
 		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
@@ -448,7 +448,7 @@ func (f *Framework) AfterEach() {
 	if TestContext.GatherMetricsAfterTest != "false" {
 		ginkgo.By("Gathering metrics")
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
-		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
+		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "controlplane" && !ProviderIs("kubemark")
 		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)

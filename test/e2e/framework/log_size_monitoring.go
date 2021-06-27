@@ -38,7 +38,7 @@ const (
 	kubeletLogsPath          = "/var/log/kubelet.log"
 	kubeProxyLogsPath        = "/var/log/kube-proxy.log"
 	kubeAddonsLogsPath       = "/var/log/kube-addons.log"
-	kubeMasterAddonsLogsPath = "/var/log/kube-master-addons.log"
+	kubeControlPlaneAddonsLogsPath = "/var/log/kube-master-addons.log"
 	apiServerLogsPath        = "/var/log/kube-apiserver.log"
 	controllersLogsPath      = "/var/log/kube-controller-manager.log"
 	schedulerLogsPath        = "/var/log/kube-scheduler.log"
@@ -46,7 +46,7 @@ const (
 
 var (
 	nodeLogsToCheck   = []string{kubeletLogsPath, kubeProxyLogsPath}
-	masterLogsToCheck = []string{kubeletLogsPath, kubeAddonsLogsPath, kubeMasterAddonsLogsPath,
+	controlplaneLogsToCheck = []string{kubeletLogsPath, kubeAddonsLogsPath, kubeControlPlaneAddonsLogsPath,
 		apiServerLogsPath, controllersLogsPath, schedulerLogsPath}
 )
 
@@ -64,14 +64,14 @@ type LogSizeGatherer struct {
 	workChannel chan WorkItem
 }
 
-// LogsSizeVerifier gathers data about log files sizes from master and node machines.
+// LogsSizeVerifier gathers data about log files sizes from controlplane and node machines.
 // It oversees a <workersNo> workers which do the gathering.
 type LogsSizeVerifier struct {
 	client      clientset.Interface
 	stopChannel chan bool
 	// data stores LogSizeData groupped per IP and log_path
 	data          *LogsSizeData
-	masterAddress string
+	controlplaneAddress string
 	nodeAddresses []string
 	wg            sync.WaitGroup
 	workChannel   chan WorkItem
@@ -131,9 +131,9 @@ type WorkItem struct {
 	backoffMultiplier int
 }
 
-func prepareData(masterAddress string, nodeAddresses []string) *LogsSizeData {
+func prepareData(controlplaneAddress string, nodeAddresses []string) *LogsSizeData {
 	data := make(LogSizeDataTimeseries)
-	ips := append(nodeAddresses, masterAddress)
+	ips := append(nodeAddresses, controlplaneAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
 	}
@@ -168,7 +168,7 @@ func NewLogsVerifier(c clientset.Interface, stopChannel chan bool) *LogsSizeVeri
 		client:        c,
 		stopChannel:   stopChannel,
 		data:          prepareData(instanceAddress, nodeAddresses),
-		masterAddress: instanceAddress,
+		controlplaneAddress: instanceAddress,
 		nodeAddresses: nodeAddresses,
 		wg:            sync.WaitGroup{},
 		workChannel:   workChannel,
@@ -209,8 +209,8 @@ func (s *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
 func (s *LogsSizeVerifier) Run() {
 	s.workChannel <- WorkItem{
-		ip:                s.masterAddress,
-		paths:             masterLogsToCheck,
+		ip:                s.controlplaneAddress,
+		paths:             controlplaneLogsToCheck,
 		backoffMultiplier: 1,
 	}
 	for _, node := range s.nodeAddresses {
