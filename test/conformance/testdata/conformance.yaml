@@ -61,7 +61,7 @@
     pods and configmaps to be non-compliant MUST be denied. An attempt to create a
     pod that causes a webhook to hang MUST result in a webhook timeout error, and
     the pod creation MUST be denied. An attempt to create a non-compliant configmap
-    in a whitelisted namespace based on the webhook namespace selector MUST be allowed.
+    in a allowlisted namespace based on the webhook namespace selector MUST be allowed.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny custom resource definition
