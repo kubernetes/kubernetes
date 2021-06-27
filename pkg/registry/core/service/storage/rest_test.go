@@ -120,13 +120,14 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 	svc := obj.(*api.Service)
 	s.CreatedID = obj.(metav1.Object).GetName()
 	s.Service = svc.DeepCopy()
+	s.Service.ResourceVersion = "1"
 
 	if s.ServiceList == nil {
 		s.ServiceList = &api.ServiceList{}
 	}
 
 	s.ServiceList.Items = append(s.ServiceList.Items, *svc)
-	return svc, nil
+	return s.Service.DeepCopy(), nil
 }
 
 func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
@@ -268,6 +269,92 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 	return net
 }
 
+// For clarity.
+type serviceTweak func(*api.Service)
+
+// This is used to clarify test sites.
+func makeService(name string, tweaks ...serviceTweak) *api.Service {
+	// NOTE: Any field that would be populated by defaulting needs to be
+	// present and valid here.
+	svc := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Ports: []api.ServicePort{{
+				Port:       93,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(76),
+			}},
+		},
+	}
+	// Default to ClusterIP
+	tweakTypeClusterIP(svc)
+
+	for _, tweak := range tweaks {
+		tweak(svc)
+	}
+
+	return svc
+}
+
+func tweakTypeClusterIP(svc *api.Service) {
+	svc.Spec.Type = api.ServiceTypeClusterIP
+}
+
+func tweakTypeNodePort(svc *api.Service) {
+	svc.Spec.Type = api.ServiceTypeNodePort
+}
+
+func tweakTypeLoadBalancer(svc *api.Service) {
+	svc.Spec.Type = api.ServiceTypeLoadBalancer
+}
+
+func tweakTypeExternalName(svc *api.Service) {
+	svc.Spec.Type = api.ServiceTypeExternalName
+	svc.Spec.ExternalName = "example.com"
+	svc.Spec.ExternalTrafficPolicy = ""
+	svc.Spec.ClusterIP = ""
+	svc.Spec.ClusterIPs = nil
+}
+
+func tweakPorts(ports ...api.ServicePort) serviceTweak {
+	return func(svc *api.Service) {
+		svc.Spec.Ports = ports
+	}
+}
+
+func makeServicePort(name string, port int, tgtPort intstr.IntOrString) api.ServicePort {
+	return api.ServicePort{
+		Name:       name,
+		Port:       int32(port),
+		TargetPort: tgtPort,
+		Protocol:   api.ProtocolTCP,
+	}
+}
+
+func tweakClusterIPs(ips ...string) serviceTweak {
+	return func(svc *api.Service) {
+		svc.Spec.ClusterIP = ips[0]
+		svc.Spec.ClusterIPs = ips
+	}
+}
+
+func tweakIPFamilies(families ...api.IPFamily) serviceTweak {
+	return func(svc *api.Service) {
+		svc.Spec.IPFamilies = families
+	}
+}
+
+func tweakIPFamilyPolicy(policy api.IPFamilyPolicyType) serviceTweak {
+	return func(svc *api.Service) {
+		svc.Spec.IPFamilyPolicy = &policy
+	}
+}
+
 func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST, registry ServiceStorage) {
 	obj, err := registry.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
@@ -293,85 +380,27 @@ func TestServiceRegistryCreate(t *testing.T) {
 		name            string
 		families        []api.IPFamily
 		enableDualStack bool
-	}{
-		{
-			name:            "Service IPFamily default cluster dualstack:off",
-			enableDualStack: false,
-			families:        []api.IPFamily{api.IPv4Protocol},
-
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "Service IPFamily:v4 dualstack off",
-			enableDualStack: false,
-			families:        []api.IPFamily{api.IPv4Protocol},
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "Service IPFamily:v4 dualstack on",
-			enableDualStack: true,
-			families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "Service IPFamily:v6 dualstack on",
-			enableDualStack: true,
-			families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-	}
+	}{{
+		name:            "Service IPFamily default cluster dualstack:off",
+		enableDualStack: false,
+		families:        []api.IPFamily{api.IPv4Protocol},
+		svc:             makeService("foo"),
+	}, {
+		name:            "Service IPFamily:v4 dualstack off",
+		enableDualStack: false,
+		families:        []api.IPFamily{api.IPv4Protocol},
+		svc:             makeService("foo", tweakIPFamilies(api.IPv4Protocol)),
+	}, {
+		name:            "Service IPFamily:v4 dualstack on",
+		enableDualStack: true,
+		families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc:             makeService("foo", tweakIPFamilies(api.IPv4Protocol)),
+	}, {
+		name:            "Service IPFamily:v6 dualstack on",
+		enableDualStack: true,
+		families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc:             makeService("foo", tweakIPFamilies(api.IPv6Protocol)),
+	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			storage, registry, server := NewTestREST(t, nil, tc.families)
@@ -417,94 +446,35 @@ func TestServiceRegistryCreate(t *testing.T) {
 }
 
 func TestServiceRegistryCreateDryRun(t *testing.T) {
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	testCases := []struct {
 		name            string
 		svc             *api.Service
 		enableDualStack bool
-	}{
-		{
-			name:            "v4 service featuregate off",
-			enableDualStack: false,
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4"},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "v6 service featuregate on but singlestack",
-			enableDualStack: true,
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					ClusterIP:       "2000:0:0:0:0:0:0:1",
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1"},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "dualstack v4,v6 service",
-			enableDualStack: true,
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requireDualStack,
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:            "dualstack v6,v4 service",
-			enableDualStack: true,
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requireDualStack,
-					ClusterIP:       "2000:0:0:0:0:0:0:1",
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-	}
+	}{{
+		name:            "v4 service featuregate off",
+		enableDualStack: false,
+		svc:             makeService("foo", tweakClusterIPs("1.2.3.4")),
+	}, {
+		name:            "v6 service featuregate on but singlestack",
+		enableDualStack: true,
+		svc: makeService("foo",
+			tweakIPFamilies(api.IPv6Protocol),
+			tweakClusterIPs("2000::1")),
+	}, {
+		name:            "dualstack v4,v6 service",
+		enableDualStack: true,
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+			tweakClusterIPs("1.2.3.4", "2000::1")),
+	}, {
+		name:            "dualstack v6,v4 service",
+		enableDualStack: true,
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+			tweakClusterIPs("2000::1", "1.2.3.4")),
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -546,27 +516,18 @@ func TestDryRunNodePort(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Test dry run create request with a node port
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{{
-				NodePort:   30010,
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc := makeService("foo", tweakTypeNodePort)
 	ctx := genericapirequest.NewDefaultContext()
 
-	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if storage.serviceNodePorts.Has(30010) {
+	createdSvc := obj.(*api.Service)
+	if createdSvc.Spec.Ports[0].NodePort == 0 {
+		t.Errorf("expected NodePort value assigned")
+	}
+	if storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
@@ -578,42 +539,37 @@ func TestDryRunNodePort(t *testing.T) {
 	}
 
 	// Test dry run create request with multi node port
-	svc = &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{
-				{
-					Name:       "port-tcp",
-					Port:       53,
-					NodePort:   30053,
-					TargetPort: intstr.FromInt(6503),
-					Protocol:   api.ProtocolTCP,
-				},
-				{
-					Name:       "port-udp",
-					Port:       53,
-					NodePort:   30053,
-					TargetPort: intstr.FromInt(6503),
-					Protocol:   api.ProtocolUDP,
-				},
-			},
-		},
-	}
+	svc = makeService("foo",
+		tweakTypeNodePort,
+		func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				NodePort:   30053,
+				TargetPort: intstr.FromInt(6503),
+				Protocol:   api.ProtocolTCP,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				NodePort:   30053,
+				TargetPort: intstr.FromInt(6503),
+				Protocol:   api.ProtocolUDP,
+			}}
+		})
 	expectNodePorts := collectServiceNodePorts(svc)
-	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	obj, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	createdService := createdSvc.(*api.Service)
-	serviceNodePorts := collectServiceNodePorts(createdService)
-	if !reflect.DeepEqual(serviceNodePorts, expectNodePorts) {
-		t.Errorf("Expected %v, but got %v", expectNodePorts, serviceNodePorts)
+	createdSvc = obj.(*api.Service)
+	actualNodePorts := collectServiceNodePorts(createdSvc)
+	if !reflect.DeepEqual(actualNodePorts, expectNodePorts) {
+		t.Errorf("Expected %v, but got %v", expectNodePorts, actualNodePorts)
 	}
-	if storage.serviceNodePorts.Has(30053) {
-		t.Errorf("unexpected side effect: NodePort allocated")
+	for i := range svc.Spec.Ports {
+		if storage.serviceNodePorts.Has(int(svc.Spec.Ports[i].NodePort)) {
+			t.Errorf("unexpected side effect: NodePort allocated")
+		}
 	}
 	srv, err = registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -625,43 +581,41 @@ func TestDryRunNodePort(t *testing.T) {
 
 	// Test dry run create request with multiple unspecified node ports,
 	// so PortAllocationOperation.AllocateNext() will be called multiple times.
-	svc = &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{
-				{
-					Name:       "port-a",
-					Port:       53,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6503),
-				},
-				{
-					Name:       "port-b",
-					Port:       54,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6504),
-				},
-			},
-		},
-	}
-	createdSvc, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	svc = makeService("foo",
+		tweakTypeNodePort,
+		func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-a",
+				Port:       53,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6503),
+			}, {
+				Name:       "port-b",
+				Port:       54,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6504),
+			}}
+		})
+	obj, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	createdService = createdSvc.(*api.Service)
-	serviceNodePorts = collectServiceNodePorts(createdService)
-	if len(serviceNodePorts) != 2 {
-		t.Errorf("Expected service to have 2 ports, but got %v", serviceNodePorts)
-	} else if serviceNodePorts[0] == serviceNodePorts[1] {
-		t.Errorf("Expected unique port numbers, but got %v", serviceNodePorts)
+	createdSvc = obj.(*api.Service)
+	actualNodePorts = collectServiceNodePorts(createdSvc)
+	if len(actualNodePorts) != len(svc.Spec.Ports) {
+		t.Fatalf("Expected service to have %d ports, but got %v", len(svc.Spec.Ports), actualNodePorts)
+	}
+	seen := map[int]bool{}
+	for _, np := range actualNodePorts {
+		if seen[np] {
+			t.Errorf("Expected unique port numbers, but got %v", actualNodePorts)
+		} else {
+			seen[np] = true
+		}
 	}
 }
 
 func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
-
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
@@ -669,91 +623,66 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		svc             *api.Service
 		name            string
 		expectNodePorts []int
-	}{
-		{
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							NodePort:   30053,
-							TargetPort: intstr.FromInt(6503),
-							Protocol:   api.ProtocolTCP,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							NodePort:   30053,
-							TargetPort: intstr.FromInt(6503),
-							Protocol:   api.ProtocolUDP,
-						},
-					},
-				},
-			},
-			name:            "foo1",
-			expectNodePorts: []int{30053, 30053},
-		},
-		{
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       54,
-							TargetPort: intstr.FromInt(6504),
-							Protocol:   api.ProtocolTCP,
-						},
-						{
-							Name:       "port-udp",
-							Port:       54,
-							NodePort:   30054,
-							TargetPort: intstr.FromInt(6504),
-							Protocol:   api.ProtocolUDP,
-						},
-					},
-				},
-			},
-			name:            "foo2",
-			expectNodePorts: []int{30054, 30054},
-		},
-		{
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       55,
-							NodePort:   30055,
-							TargetPort: intstr.FromInt(6505),
-							Protocol:   api.ProtocolTCP,
-						},
-						{
-							Name:       "port-udp",
-							Port:       55,
-							NodePort:   30056,
-							TargetPort: intstr.FromInt(6506),
-							Protocol:   api.ProtocolUDP,
-						},
-					},
-				},
-			},
-			name:            "foo3",
-			expectNodePorts: []int{30055, 30056},
-		},
-	}
+	}{{
+		svc: makeService("foo1",
+			tweakTypeNodePort,
+			func(s *api.Service) {
+				s.Spec.Ports = []api.ServicePort{{
+					Name:       "port-tcp",
+					Port:       53,
+					NodePort:   30053,
+					TargetPort: intstr.FromInt(6503),
+					Protocol:   api.ProtocolTCP,
+				}, {
+					Name:       "port-udp",
+					Port:       53,
+					NodePort:   30053,
+					TargetPort: intstr.FromInt(6503),
+					Protocol:   api.ProtocolUDP,
+				}}
+			}),
+		name:            "foo1",
+		expectNodePorts: []int{30053, 30053},
+	}, {
+		svc: makeService("foo2",
+			tweakTypeNodePort,
+			func(s *api.Service) {
+				s.Spec.Ports = []api.ServicePort{{
+					Name:       "port-tcp",
+					Port:       54,
+					TargetPort: intstr.FromInt(6504),
+					Protocol:   api.ProtocolTCP,
+				}, {
+					Name:       "port-udp",
+					Port:       54,
+					NodePort:   30054,
+					TargetPort: intstr.FromInt(6504),
+					Protocol:   api.ProtocolUDP,
+				}}
+			}),
+		name:            "foo2",
+		expectNodePorts: []int{30054, 30054},
+	}, {
+		svc: makeService("foo3",
+			tweakTypeNodePort,
+			func(s *api.Service) {
+				s.Spec.Ports = []api.ServicePort{{
+					Name:       "port-tcp",
+					Port:       55,
+					NodePort:   30055,
+					TargetPort: intstr.FromInt(6505),
+					Protocol:   api.ProtocolTCP,
+				}, {
+					Name:       "port-udp",
+					Port:       55,
+					NodePort:   30056,
+					TargetPort: intstr.FromInt(6506),
+					Protocol:   api.ProtocolUDP,
+				}}
+			}),
+		name:            "foo3",
+		expectNodePorts: []int{30055, 30056},
+	}}
 
 	ctx := genericapirequest.NewDefaultContext()
 	for _, test := range testCases {
@@ -794,47 +723,23 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 func TestServiceStorageValidatesCreate(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	failureCases := map[string]api.Service{
-		"empty ID": {
-			ObjectMeta: metav1.ObjectMeta{Name: ""},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
-				}},
-			},
-		},
-		"empty port": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Protocol: api.ProtocolTCP,
-				}},
-			},
-		},
-		"missing targetPort": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
-				}},
-			},
-		},
+	failureCases := map[string]*api.Service{
+		"empty ID": makeService(""),
+		"empty port": makeService("foo", func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Protocol: api.ProtocolTCP,
+			}}
+		}),
+		"missing targetPort": makeService("foo", func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}}
+		}),
 	}
 	ctx := genericapirequest.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(ctx, &failureCase, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		c, err := storage.Create(ctx, failureCase, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if c != nil {
 			t.Errorf("Expected nil object")
 		}
@@ -849,19 +754,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	storage, registry, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
-	_, err := registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Type:            api.ServiceTypeClusterIP,
-			SessionAffinity: api.ServiceAffinityNone,
-			Selector:        map[string]string{"bar": "baz1"},
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := registry.Create(ctx, makeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -895,46 +788,21 @@ func TestServiceRegistryUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
-
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	obj, err := registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeExternalName,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := registry.Create(ctx, makeService("foo", tweakTypeExternalName), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	svc := obj.(*api.Service)
 
 	// Test dry run update request external name to node port
-	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{{
-				NodePort:   30020,
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	new1 := svc.DeepCopy()
+	tweakTypeNodePort(new1)
+	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new1),
+		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -944,7 +812,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if created {
 		t.Errorf("expected not created")
 	}
-	if storage.serviceNodePorts.Has(30020) {
+	if storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 	if e, a := "", registry.UpdatedID; e != a {
@@ -952,115 +820,56 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	}
 
 	// Test dry run update request external name to cluster ip
-	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			ClusterIP:       "1.2.3.4",
-			ClusterIPs:      []string{"1.2.3.4"},
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	new2 := svc.DeepCopy()
+	tweakTypeClusterIP(new2)
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new2),
+		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP("1.2.3.4")) {
+	if storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
 		t.Errorf("unexpected side effect: ip allocated")
 	}
 
 	// Test dry run update request remove node port
-	obj, err = storage.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo2", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			ClusterIP:       "1.2.3.5",
-			ClusterIPs:      []string{"1.2.3.5"},
-			Ports: []api.ServicePort{{
-				NodePort:   30020,
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, makeService("foo2", tweakTypeNodePort), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	svc = obj.(*api.Service)
+	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
+		t.Errorf("expected IP to be allocated")
+	}
+	if !storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
+		t.Errorf("expected NodePort to be allocated")
+	}
 
-	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeExternalName,
-			ExternalName:    "foo-svc",
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	new3 := svc.DeepCopy()
+	tweakTypeExternalName(new3)
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new3),
+		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !storage.serviceNodePorts.Has(30020) {
+	if !storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 
 	// Test dry run update request remove cluster ip
-	obj, err = storage.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo3", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			ClusterIP:       "1.2.3.4",
-			ClusterIPs:      []string{"1.2.3.4"},
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, makeService("foo3"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Expected no error: %v", err)
+		t.Fatalf("expected no error: %v", err)
 	}
 	svc = obj.(*api.Service)
-	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            svc.Name,
-			ResourceVersion: svc.ResourceVersion},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeExternalName,
-			ExternalName:    "foo-svc",
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+
+	new4 := svc.DeepCopy()
+	tweakTypeExternalName(new4)
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new4),
+		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
-		t.Fatalf("Expected no error: %v", err)
+		t.Fatalf("expected no error: %v", err)
 	}
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP("1.2.3.4")) {
+	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 }
@@ -1069,49 +878,18 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
-			}},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := registry.Create(ctx, makeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	failureCases := map[string]api.Service{
-		"empty ID": {
-			ObjectMeta: metav1.ObjectMeta{Name: ""},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
-				}},
-			},
-		},
-		"invalid selector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
-				}},
-			},
-		},
+	failureCases := map[string]*api.Service{
+		"empty ID": makeService(""),
+		"invalid selector": makeService("", func(svc *api.Service) {
+			svc.Spec.Selector = map[string]string{"ThisSelectorFailsValidation": "ok"}
+		}),
 	}
 	for _, failureCase := range failureCases {
-		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(&failureCase), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(failureCase), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if c != nil || created {
 			t.Errorf("Expected nil object or created false")
 		}
@@ -1125,19 +903,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc := makeService("foo", tweakTypeLoadBalancer)
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
@@ -1159,110 +925,46 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		storage.serviceNodePorts.Release(nodePort)
 	}
 }
+
 func TestAllocateLoadBalancerNodePorts(t *testing.T) {
+	setAlloc := func(val bool) serviceTweak {
+		return func(s *api.Service) {
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(val)
+		}
+	}
+
 	testcases := []struct {
 		name                 string
 		svc                  *api.Service
 		expectNodePorts      bool
 		allocateNodePortGate bool
 		expectError          bool
-	}{
-		{
-			name: "allocate false, gate on",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      false,
-			allocateNodePortGate: true,
-		},
-		{
-			name: "allocate true, gate on",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-true"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      true,
-			allocateNodePortGate: true,
-		},
-		{
-			name: "allocate nil, gate off",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: nil,
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      true,
-			allocateNodePortGate: false,
-		},
-		{
-			name: "allocate false, gate off",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      true,
-			allocateNodePortGate: false,
-		},
-		{
-			name: "allocate true, gate off",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "alloc-true"},
-				Spec: api.ServiceSpec{
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
-					Selector:                      map[string]string{"bar": "baz"},
-					SessionAffinity:               api.ServiceAffinityNone,
-					Type:                          api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectNodePorts:      true,
-			allocateNodePortGate: false,
-		},
-	}
+	}{{
+		name:                 "allocate false, gate on",
+		svc:                  makeService("alloc-false", tweakTypeLoadBalancer, setAlloc(false)),
+		expectNodePorts:      false,
+		allocateNodePortGate: true,
+	}, {
+		name:                 "allocate true, gate on",
+		svc:                  makeService("alloc-true", tweakTypeLoadBalancer, setAlloc(true)),
+		expectNodePorts:      true,
+		allocateNodePortGate: true,
+	}, {
+		name:                 "allocate nil, gate off",
+		svc:                  makeService("alloc-nil", tweakTypeLoadBalancer),
+		expectNodePorts:      true,
+		allocateNodePortGate: false,
+	}, {
+		name:                 "allocate false, gate off",
+		svc:                  makeService("alloc-false", tweakTypeLoadBalancer, setAlloc(false)),
+		expectNodePorts:      true,
+		allocateNodePortGate: false,
+	}, {
+		name:                 "allocate true, gate off",
+		svc:                  makeService("alloc-true", tweakTypeLoadBalancer, setAlloc(true)),
+		expectNodePorts:      true,
+		allocateNodePortGate: false,
+	}}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := genericapirequest.NewDefaultContext()
@@ -1303,21 +1005,10 @@ func TestServiceRegistryDelete(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
-			}},
-		},
-	}
+	svc := makeService("foo")
 	_, err := registry.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if e, a := "foo", registry.DeletedID; e != a {
@@ -1331,24 +1022,17 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Test dry run delete request with cluster ip
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			ClusterIP:       "1.2.3.4",
-			ClusterIPs:      []string{"1.2.3.4"},
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
-	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	svc := makeService("foo")
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
+	}
+	createdSvc := obj.(*api.Service)
+	if createdSvc.Spec.ClusterIP == "" {
+		t.Fatalf("expected ClusterIP to be set")
+	}
+	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
+		t.Errorf("expected ClusterIP to be allocated")
 	}
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -1357,28 +1041,22 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if e, a := "", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP("1.2.3.4")) {
+	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 
 	// Test dry run delete request with node port
-	svc = &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeNodePort,
-			Ports: []api.ServicePort{{
-				NodePort:   30030,
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
-	_, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	svc = makeService("foo2", tweakTypeNodePort)
+	obj, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
+	}
+	createdSvc = obj.(*api.Service)
+	if createdSvc.Spec.Ports[0].NodePort == 0 {
+		t.Fatalf("expected NodePort to be set")
+	}
+	if !storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
+		t.Errorf("expected NodePort to be allocated")
 	}
 
 	isValidClusterIPFields(t, storage, svc, svc)
@@ -1390,7 +1068,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if e, a := "", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
-	if !storage.serviceNodePorts.Has(30030) {
+	if !storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 }
@@ -1402,25 +1080,11 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 	dualstack_storage, dualstack_registry, dualstack_server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 	defer dualstack_server.Terminate(t)
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	// Test dry run delete request with cluster ip
-	dualstack_svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			IPFamilyPolicy:  &requireDualStack,
-			ClusterIP:       "2000:0:0:0:0:0:0:1",
-			ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-			IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	dualstack_svc := makeService("foo",
+		tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+		tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+		tweakClusterIPs("2000:0:0:0:0:0:0:1", "1.2.3.4"))
 
 	_, err := dualstack_storage.Create(ctx, dualstack_svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1445,21 +1109,10 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
-			}},
-		},
-	}
+	svc := makeService("foo", tweakTypeExternalName)
 	_, err := registry.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if e, a := "foo", registry.DeletedID; e != a {
@@ -1473,25 +1126,14 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Create non-external load balancer.
-	svc1 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
-	if _, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+	svc1 := makeService("foo")
+	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// Modify load balancer to be external.
-	svc2 := svc1.DeepCopy()
+	svc2 := obj.(*api.Service).DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -1512,32 +1154,28 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Create external load balancer.
-	svc1 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Name:       "p",
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}, {
-				Name:       "q",
-				Port:       8086,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(8086),
-			}},
-		},
-	}
-	if _, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+	svc1 := makeService("foo", func(s *api.Service) {
+		s.Spec.Type = api.ServiceTypeLoadBalancer
+		s.Spec.Ports = []api.ServicePort{{
+			Name:       "p",
+			Port:       6502,
+			Protocol:   api.ProtocolTCP,
+			TargetPort: intstr.FromInt(6502),
+		}, {
+			Name:       "q",
+			Port:       8086,
+			Protocol:   api.ProtocolTCP,
+			TargetPort: intstr.FromInt(8086),
+		}}
+	})
+	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc1.Name, storage, registry)
 
 	// Modify ports
-	svc2 := svc1.DeepCopy()
+	svc2 := obj.(*api.Service).DeepCopy()
 	svc2.Spec.Ports[1].Port = 8088
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -1548,12 +1186,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := registry.Create(ctx, makeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
@@ -1638,20 +1271,16 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods, singleStackIPv4)
 	defer server.Terminate(t)
 	for _, name := range []string{"foo", "bad"} {
-		_, err := registry.Create(ctx, &api.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
-			Spec: api.ServiceSpec{
-				Selector: map[string]string{"bar": "baz"},
-				Ports: []api.ServicePort{
-					// Service port 9393 should route to endpoint port "p", which is port 93
-					{Name: "p", Port: 9393, TargetPort: intstr.FromString("p")},
+		_, err := registry.Create(ctx, makeService(name, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{
+				// Service port 9393 should route to endpoint port "p", which is port 93
+				{Name: "p", Port: 9393, TargetPort: intstr.FromString("p")},
 
-					// Service port 93 should route to unnamed endpoint port, which is port 80
-					// This is to test that the service port definition is used when determining resource location
-					{Name: "", Port: 93, TargetPort: intstr.FromInt(80)},
-				},
-			},
-		}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				// Service port 93 should route to unnamed endpoint port, which is port 80
+				// This is to test that the service port definition is used when determining resource location
+				{Name: "", Port: 93, TargetPort: intstr.FromInt(80)},
+			}
+		}), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("error creating service: %v", err)
 		}
@@ -1806,23 +1435,13 @@ func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := registry.Create(ctx, makeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = registry.Create(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: metav1.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar2": "baz2"},
-		},
-	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err = registry.Create(ctx, makeService("foo2"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	registry.ServiceList.ResourceVersion = "1"
 	s, _ := storage.List(ctx, nil)
@@ -1845,59 +1464,36 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	svc1 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc1 := makeService("foo")
 	ctx := genericapirequest.NewDefaultContext()
-	createdSvc1, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
-	createdService1 := createdSvc1.(*api.Service)
-	if createdService1.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", createdService1.Name)
+	createdSvc1 := obj.(*api.Service)
+	if createdSvc1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", createdSvc1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService1.Spec.ClusterIPs[0])) {
-		t.Errorf("Unexpected ClusterIP: %s", createdService1.Spec.ClusterIPs[0])
+	if !makeIPNet(t).Contains(net.ParseIP(createdSvc1.Spec.ClusterIPs[0])) {
+		t.Errorf("Unexpected ClusterIP: %s", createdSvc1.Spec.ClusterIPs[0])
 	}
 
-	svc2 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		}}
+	svc2 := makeService("bar")
 	ctx = genericapirequest.NewDefaultContext()
-	createdSvc2, err := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
-	createdService2 := createdSvc2.(*api.Service)
-	if createdService2.Name != "bar" {
-		t.Errorf("Expected bar, but got %v", createdService2.Name)
+	createdSvc2 := obj.(*api.Service)
+	if createdSvc2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", createdSvc2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService2.Spec.ClusterIPs[0])) {
-		t.Errorf("Unexpected ClusterIP: %s", createdService2.Spec.ClusterIPs[0])
+	if !makeIPNet(t).Contains(net.ParseIP(createdSvc2.Spec.ClusterIPs[0])) {
+		t.Errorf("Unexpected ClusterIP: %s", createdSvc2.Spec.ClusterIPs[0])
 	}
 
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
-	testIP := ""
+	testIP := "not-an-ip"
 	for _, ip := range testIPs {
 		if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range).Has(net.ParseIP(ip)) {
 			testIP = ip
@@ -1905,29 +1501,15 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		}
 	}
 
-	svc3 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "quux"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			ClusterIP:       testIP,
-			ClusterIPs:      []string{testIP},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc3 := makeService("qux", tweakClusterIPs(testIP))
 	ctx = genericapirequest.NewDefaultContext()
-	createdSvc3, err := storage.Create(ctx, svc3, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, svc3, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdService3 := createdSvc3.(*api.Service)
-	if createdService3.Spec.ClusterIPs[0] != testIP { // specific IP
-		t.Errorf("Unexpected ClusterIP: %s", createdService3.Spec.ClusterIPs[0])
+	createdSvc3 := obj.(*api.Service)
+	if createdSvc3.Spec.ClusterIPs[0] != testIP { // specific IP
+		t.Errorf("Unexpected ClusterIP: %s", createdSvc3.Spec.ClusterIPs[0])
 	}
 }
 
@@ -1935,61 +1517,37 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	svc1 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc1 := makeService("foo")
 	ctx := genericapirequest.NewDefaultContext()
-	createdSvc1, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
-	createdService1 := createdSvc1.(*api.Service)
-	if createdService1.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", createdService1.Name)
+	createdSvc1 := obj.(*api.Service)
+	if createdSvc1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", createdSvc1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService1.Spec.ClusterIPs[0])) {
-		t.Errorf("Unexpected ClusterIP: %s", createdService1.Spec.ClusterIPs[0])
+	if !makeIPNet(t).Contains(net.ParseIP(createdSvc1.Spec.ClusterIPs[0])) {
+		t.Errorf("Unexpected ClusterIP: %s", createdSvc1.Spec.ClusterIPs[0])
 	}
 
-	_, _, err = storage.Delete(ctx, createdService1.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	_, _, err = storage.Delete(ctx, createdSvc1.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error deleting service: %v", err)
 	}
 
-	svc2 := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc2 := makeService("bar", tweakClusterIPs(svc1.Spec.ClusterIP))
 	ctx = genericapirequest.NewDefaultContext()
-	createdSvc2, err := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
-	createdService2 := createdSvc2.(*api.Service)
-	if createdService2.Name != "bar" {
-		t.Errorf("Expected bar, but got %v", createdService2.Name)
+	createdSvc2 := obj.(*api.Service)
+	if createdSvc2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", createdSvc2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService2.Spec.ClusterIPs[0])) {
-		t.Errorf("Unexpected ClusterIP: %s", createdService2.Spec.ClusterIPs[0])
+	if !makeIPNet(t).Contains(net.ParseIP(createdSvc2.Spec.ClusterIPs[0])) {
+		t.Errorf("Unexpected ClusterIP: %s", createdSvc2.Spec.ClusterIPs[0])
 	}
 }
 
@@ -1997,27 +1555,15 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc := makeService("foo")
 	ctx := genericapirequest.NewDefaultContext()
 	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("error creating service: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	createdService := createdSvc.(*api.Service)
-	if createdService.Spec.Ports[0].Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", createdService.Spec.Ports[0].Port)
+	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
+		t.Errorf("Expected port %d, but got %v", svc.Spec.Ports[0].Port, createdService.Spec.Ports[0].Port)
 	}
 	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[0])
@@ -2059,19 +1605,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
+	svc := makeService("foo", tweakTypeLoadBalancer)
 	ctx := genericapirequest.NewDefaultContext()
 	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if createdSvc == nil || err != nil {
@@ -2080,8 +1614,8 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
 	createdService := createdSvc.(*api.Service)
-	if createdService.Spec.Ports[0].Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", createdService.Spec.Ports[0].Port)
+	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
+		t.Errorf("Expected port %d, but got %v", svc.Spec.Ports[0].Port, createdService.Spec.Ports[0].Port)
 	}
 	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[0])
@@ -2098,9 +1632,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	service := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "not-default"},
-	}
+	service := makeService("test", func(s *api.Service) { s.Namespace = "not-default" })
 
 	ctx := genericapirequest.NewDefaultContext()
 	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
@@ -2120,31 +1652,20 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-		},
-	}
-	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if createdSvc == nil || err != nil {
+	svc := makeService("external-lb-esipp", tweakTypeLoadBalancer, func(s *api.Service) {
+		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+	})
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	createdService := createdSvc.(*api.Service)
-	if !service.NeedsHealthCheck(createdService) {
+	createdSvc := obj.(*api.Service)
+	if !service.NeedsHealthCheck(createdSvc) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := createdService.Spec.HealthCheckNodePort
+	port := createdSvc.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	} else {
@@ -2159,35 +1680,24 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-				// hard-code NodePort to make sure it doesn't conflict with the healthport.
-				// TODO: remove this once http://issue.k8s.io/93922 fixes auto-allocation conflicting with user-specified health check ports
-				NodePort: 30500,
-			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   30501,
-		},
-	}
-	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if createdSvc == nil || err != nil {
+	svc := makeService("external-lb-esipp", tweakTypeLoadBalancer, func(s *api.Service) {
+		// hard-code NodePort to make sure it doesn't conflict with the healthport.
+		// TODO: remove this once http://issue.k8s.io/93922 fixes auto-allocation conflicting with user-specified health check ports
+		s.Spec.Ports[0].NodePort = 30500
+		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		s.Spec.HealthCheckNodePort = 30501
+	})
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if obj == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	createdService := createdSvc.(*api.Service)
-	if !service.NeedsHealthCheck(createdService) {
+	createdSvc := obj.(*api.Service)
+	if !service.NeedsHealthCheck(createdSvc) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := createdService.Spec.HealthCheckNodePort
+	port := createdSvc.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
@@ -2205,23 +1715,12 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   int32(-1),
-		},
-	}
-	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if createdSvc == nil || err != nil {
+	svc := makeService("external-lb-esipp", tweakTypeLoadBalancer, func(s *api.Service) {
+		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		s.Spec.HealthCheckNodePort = int32(-1)
+	})
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if obj == nil || err != nil {
 		return
 	}
 	t.Errorf("Unexpected creation of service with invalid HealthCheckNodePort specified")
@@ -2232,32 +1731,21 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-		},
-	}
-	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if createdSvc == nil || err != nil {
+	svc := makeService("external-lb-esipp", tweakTypeLoadBalancer, func(s *api.Service) {
+		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
+	})
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	createdService := createdSvc.(*api.Service)
-	if service.NeedsHealthCheck(createdService) {
+	createdSvc := obj.(*api.Service)
+	if service.NeedsHealthCheck(createdSvc) {
 		t.Errorf("Expecting health check not needed, returned health check needed instead")
 	}
 	// Make sure the service does not have the health check node port allocated
-	port := createdService.Spec.HealthCheckNodePort
+	port := createdSvc.Spec.HealthCheckNodePort
 	if port != 0 {
 		// Release the health check node port at the end of the test case.
 		storage.serviceNodePorts.Release(int(port))
@@ -2266,10 +1754,6 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 }
 
 func TestInitClusterIP(t *testing.T) {
-	singleStack := api.IPFamilyPolicySingleStack
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-
 	testCases := []struct {
 		name string
 		svc  *api.Service
@@ -2279,347 +1763,141 @@ func TestInitClusterIP(t *testing.T) {
 		expectError              bool
 		expectedCountIPs         int
 		expectedClusterIPs       []string
-	}{
-		{
-			name: "Allocate single stack ClusterIP (v4)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			enableDualStackAllocator: false,
-			expectError:              false,
-			preAllocateClusterIPs:    nil,
-			expectedCountIPs:         1,
-		},
-		{
-			name: "Allocate single ClusterIP (v6)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			preAllocateClusterIPs:    nil,
-			expectedCountIPs:         1,
-		},
-		{
-			name: "Allocate specified ClusterIP (v4)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4"},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			preAllocateClusterIPs:    nil,
-			expectedCountIPs:         1,
-			expectedClusterIPs:       []string{"1.2.3.4"},
-		},
-		{
-			name: "Allocate specified ClusterIP-v6",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					ClusterIP:       "2000:0:0:0:0:0:0:1",
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1"},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         1,
-			expectedClusterIPs:       []string{"2000:0:0:0:0:0:0:1"},
-		},
-		{
-			name: "Allocate dual stack - on a non dual stack ",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &preferDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: false,
-			expectedCountIPs:         1,
-		},
-		{
-			name: "Allocate dual stack - upgrade - v4, v6",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &preferDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         2,
-		},
-		{
-			name: "Allocate dual stack - upgrade - v4, v6 - specific first IP",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &preferDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         2,
-			expectedClusterIPs:       []string{"1.2.3.4"},
-		},
-		{
-			name: "Allocate dual stack - upgrade - v6, v4",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &preferDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         2,
-		},
-		{
-			name: "Allocate dual stack - v4, v6 - specific ips",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &requireDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         2,
-			expectedClusterIPs:       []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
-		},
-		{
-			name: "Allocate dual stack - upgrade - v6, v4 - specific ips",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &requireDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "2000:0:0:0:0:0:0:1",
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         2,
-			expectedClusterIPs:       []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-		},
-		{
-			name: "Shouldn't allocate ClusterIP",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "None",
-					ClusterIPs:      []string{api.ClusterIPNone},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              false,
-			enableDualStackAllocator: false,
-			expectedCountIPs:         0,
-		},
-		{
-			name: "single stack, ip is pre allocated (ipv4)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &singleStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "1.2.3.4",
-					ClusterIPs:      []string{"1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              true,
-			enableDualStackAllocator: false,
-			expectedCountIPs:         0,
-			preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
-		},
-
-		{
-			name: "single stack, ip is pre allocated (ipv6)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &singleStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1"},
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              true,
-			enableDualStackAllocator: true, // ipv6 allocator is always the second one during test
-			expectedCountIPs:         0,
-			preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
-		},
-		{
-			name: "Allocate dual stack - upgrade - v6, v4 - specific ips (first ip can't be allocated)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &requireDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              true,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         0,
-			preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
-		},
-		{
-			name: "Allocate dual stack - upgrade - v6, v4 - specific ips (second ip can't be allocated)",
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					IPFamilyPolicy:  &requireDualStack,
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					ClusterIP:       "2000:0:0:0:0:0:0:1",
-					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectError:              true,
-			enableDualStackAllocator: true,
-			expectedCountIPs:         0,
-			preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
-		},
-	}
+	}{{
+		name:                     "Allocate single stack ClusterIP (v4)",
+		svc:                      makeService("foo"),
+		enableDualStackAllocator: false,
+		expectError:              false,
+		preAllocateClusterIPs:    nil,
+		expectedCountIPs:         1,
+	}, {
+		name: "Allocate single ClusterIP (v6)",
+		svc: makeService("foo",
+			tweakIPFamilies(api.IPv6Protocol)),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		preAllocateClusterIPs:    nil,
+		expectedCountIPs:         1,
+	}, {
+		name: "Allocate specified ClusterIP (v4)",
+		svc: makeService("foo",
+			tweakIPFamilies(api.IPv4Protocol),
+			tweakClusterIPs("1.2.3.4")),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		preAllocateClusterIPs:    nil,
+		expectedCountIPs:         1,
+		expectedClusterIPs:       []string{"1.2.3.4"},
+	}, {
+		name: "Allocate specified ClusterIP-v6",
+		svc: makeService("foo",
+			tweakIPFamilies(api.IPv6Protocol),
+			tweakClusterIPs("2000:0:0:0:0:0:0:1")),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         1,
+		expectedClusterIPs:       []string{"2000:0:0:0:0:0:0:1"},
+	}, {
+		name: "Allocate dual stack - on a non dual stack ",
+		svc: makeService("foo",
+			tweakIPFamilies(api.IPv4Protocol)),
+		expectError:              false,
+		enableDualStackAllocator: false,
+		expectedCountIPs:         1,
+	}, {
+		name: "Allocate dual stack - upgrade - v4, v6",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+			tweakIPFamilies(api.IPv4Protocol)),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         2,
+	}, {
+		name: "Allocate dual stack - upgrade - v4, v6 - specific first IP",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+			tweakIPFamilies(api.IPv4Protocol),
+			tweakClusterIPs("1.2.3.4")),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         2,
+		expectedClusterIPs:       []string{"1.2.3.4"},
+	}, {
+		name: "Allocate dual stack - upgrade - v6, v4",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+			tweakIPFamilies(api.IPv6Protocol)),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         2,
+	}, {
+		name: "Allocate dual stack - v4, v6 - specific ips",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+			tweakClusterIPs("1.2.3.4", "2000:0:0:0:0:0:0:1")),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         2,
+		expectedClusterIPs:       []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
+	}, {
+		name: "Allocate dual stack - upgrade - v6, v4 - specific ips",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+			tweakClusterIPs("2000:0:0:0:0:0:0:1", "1.2.3.4")),
+		expectError:              false,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         2,
+		expectedClusterIPs:       []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
+	}, {
+		name: "Shouldn't allocate ClusterIP",
+		svc: makeService("foo",
+			tweakClusterIPs("None")),
+		expectError:              false,
+		enableDualStackAllocator: false,
+		expectedCountIPs:         0,
+	}, {
+		name: "single stack, ip is pre allocated (ipv4)",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			tweakIPFamilies(api.IPv4Protocol),
+			tweakClusterIPs("1.2.3.4")),
+		expectError:              true,
+		enableDualStackAllocator: false,
+		expectedCountIPs:         0,
+		preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
+	}, {
+		name: "single stack, ip is pre allocated (ipv6)",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			tweakIPFamilies(api.IPv6Protocol),
+			tweakClusterIPs("2000:0:0:0:0:0:0:1")),
+		expectError:              true,
+		enableDualStackAllocator: true, // ipv6 allocator is always the second one during test
+		expectedCountIPs:         0,
+		preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
+	}, {
+		name: "Allocate dual stack - upgrade - v6, v4 - specific ips (first ip can't be allocated)",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+			tweakClusterIPs("2000:0:0:0:0:0:0:1", "1.2.3.4")),
+		expectError:              true,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         0,
+		preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
+	}, {
+		name: "Allocate dual stack - upgrade - v6, v4 - specific ips (second ip can't be allocated)",
+		svc: makeService("foo",
+			tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+			tweakClusterIPs("2000:0:0:0:0:0:0:1", "1.2.3.4")),
+		expectError:              true,
+		enableDualStackAllocator: true,
+		expectedCountIPs:         0,
+		preAllocateClusterIPs:    map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
+	}}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -2727,152 +2005,94 @@ func TestInitNodePorts(t *testing.T) {
 		name                     string
 		service                  *api.Service
 		expectSpecifiedNodePorts []int
-	}{
-		{
-			name: "Service doesn't have specified NodePort",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{},
-		},
-		{
-			name: "Service has one specified NodePort",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{{
-						Name:       "port-tcp",
-						Port:       53,
-						TargetPort: intstr.FromInt(6502),
-						Protocol:   api.ProtocolTCP,
-						NodePort:   30053,
-					}},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053},
-		},
-		{
-			name: "Service has two same ports with different protocols and specifies same NodePorts",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30054,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30054,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30054, 30054},
-		},
-		{
-			name: "Service has two same ports with different protocols and specifies different NodePorts",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30055,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30056,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30055, 30056},
-		},
-		{
-			name: "Service has two different ports with different protocols and specifies different NodePorts",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30057,
-						},
-						{
-							Name:       "port-udp",
-							Port:       54,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30058,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30057, 30058},
-		},
-		{
-			name: "Service has two same ports with different protocols but only specifies one NodePort",
-			service: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					Type:     api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30059,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30059, 30059},
-		},
-	}
+	}{{
+		name:                     "Service doesn't have specified NodePort",
+		service:                  makeService("foo", tweakTypeNodePort),
+		expectSpecifiedNodePorts: []int{},
+	}, {
+		name: "Service has one specified NodePort",
+		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053},
+	}, {
+		name: "Service has two same ports with different protocols and specifies same NodePorts",
+		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30054,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30054,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30054, 30054},
+	}, {
+		name: "Service has two same ports with different protocols and specifies different NodePorts",
+		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30055,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30056,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30055, 30056},
+	}, {
+		name: "Service has two different ports with different protocols and specifies different NodePorts",
+		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30057,
+			}, {
+				Name:       "port-udp",
+				Port:       54,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30058,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30057, 30058},
+	}, {
+		name: "Service has two same ports with different protocols but only specifies one NodePort",
+		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30059,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30059, 30059},
+	}}
 
 	for _, test := range testCases {
 		err := initNodePorts(test.service, nodePortOp)
@@ -2910,239 +2130,143 @@ func TestUpdateNodePorts(t *testing.T) {
 		oldService               *api.Service
 		newService               *api.Service
 		expectSpecifiedNodePorts []int
-	}{
-		{
-			name: "Old service and new service have the same NodePort",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-						NodePort:   30053,
-					}},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-						NodePort:   30053,
-					}},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053},
-		},
-		{
-			name: "Old service has more NodePorts than new service has",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053},
-		},
-		{
-			name: "Change protocol of ServicePort without changing NodePort",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053},
-		},
-		{
-			name: "Should allocate NodePort when changing service type to NodePort",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			expectSpecifiedNodePorts: []int{},
-		},
-		{
-			name: "Add new ServicePort with a different protocol without changing port numbers",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053, 30053},
-		},
-		{
-			name: "Change service type from ClusterIP to NodePort with same NodePort number but different protocols",
-			oldService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       53,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-			newService: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
-						{
-							Name:       "port-tcp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolTCP,
-							NodePort:   30053,
-						},
-						{
-							Name:       "port-udp",
-							Port:       53,
-							TargetPort: intstr.FromInt(6502),
-							Protocol:   api.ProtocolUDP,
-							NodePort:   30053,
-						},
-					},
-				},
-			},
-			expectSpecifiedNodePorts: []int{30053, 30053},
-		},
-	}
+	}{{
+		name: "Old service and new service have the same NodePort",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+				NodePort:   30053,
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053},
+	}, {
+		name: "Old service has more NodePorts than new service has",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30053,
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053},
+	}, {
+		name: "Change protocol of ServicePort without changing NodePort",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053},
+	}, {
+		name: "Should allocate NodePort when changing service type to NodePort",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{},
+	}, {
+		name: "Add new ServicePort with a different protocol without changing port numbers",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053, 30053},
+	}, {
+		name: "Change service type from ClusterIP to NodePort with same NodePort number but different protocols",
+		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Port:       53,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}}
+		}),
+		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
+			s.Spec.Ports = []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolTCP,
+				NodePort:   30053,
+			}, {
+				Name:       "port-udp",
+				Port:       53,
+				TargetPort: intstr.FromInt(6502),
+				Protocol:   api.ProtocolUDP,
+				NodePort:   30053,
+			}}
+		}),
+		expectSpecifiedNodePorts: []int{30053, 30053},
+	}}
 
 	for _, test := range testCases {
 		err := updateNodePorts(test.oldService, test.newService, nodePortOp)
@@ -3180,230 +2304,129 @@ func TestServiceUpgrade(t *testing.T) {
 		enableDualStackGate      bool
 		allocateIPsBeforeUpdate  map[api.IPFamily]string
 		expectUpgradeError       bool
-		svc                      api.Service
-	}{
-		{
-			name:                     "normal, no upgrade needed",
-			enableDualStackAllocator: false,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       false,
+		svc                      *api.Service
+	}{{
+		name:                     "normal, no upgrade needed",
+		enableDualStackAllocator: false,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       false,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.Selector = map[string]string{"bar": "baz2"}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:                     "error, no upgrade (has single allocator)",
-			enableDualStackAllocator: false,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       true,
-
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:                     "upgrade to v4,6",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       false,
-
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:                     "upgrade to v4,6 (specific ip)",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       false,
-
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "2000:0:0:0:0:0:0:1")
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:                     "upgrade to v4,6 (specific ip) - fail, ip is not available",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
-			expectUpgradeError:       true,
-
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "2000:0:0:0:0:0:0:1")
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		updateFunc: func(s *api.Service) {
+			s.Spec.Selector = map[string]string{"bar": "baz2"}
 		},
 
-		{
-			name:                     "upgrade to v6,4",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       false,
+		svc: makeService("foo"),
+	}, {
+		name:                     "error, no upgrade (has single allocator)",
+		enableDualStackAllocator: false,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       true,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
 		},
 
-		{
-			name:                     "upgrade to v6,4 (specific ip)",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  nil,
-			expectUpgradeError:       false,
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v4,6",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       false,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "1.2.3.4")
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
 		},
 
-		{
-			name:                     "upgrade to v6,4 (specific ip) - fail ip is already allocated",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			allocateIPsBeforeUpdate:  map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
-			expectUpgradeError:       true,
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v4,6 (specific ip)",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       false,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "1.2.3.4")
-				s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "2000:0:0:0:0:0:0:1")
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
 		},
-	}
+
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v4,6 (specific ip) - fail, ip is not available",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  map[api.IPFamily]string{api.IPv6Protocol: "2000:0:0:0:0:0:0:1"},
+		expectUpgradeError:       true,
+
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "2000:0:0:0:0:0:0:1")
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+		},
+
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v6,4",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       false,
+
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
+		},
+
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v6,4 (specific ip)",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  nil,
+		expectUpgradeError:       false,
+
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "1.2.3.4")
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
+		},
+
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
+		}),
+	}, {
+		name:                     "upgrade to v6,4 (specific ip) - fail ip is already allocated",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		allocateIPsBeforeUpdate:  map[api.IPFamily]string{api.IPv4Protocol: "1.2.3.4"},
+		expectUpgradeError:       true,
+
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requireDualStack
+			s.Spec.ClusterIPs = append(s.Spec.ClusterIPs, "1.2.3.4")
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
+		},
+
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
+		}),
+	}}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -3415,7 +2438,7 @@ func TestServiceUpgrade(t *testing.T) {
 			defer server.Terminate(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, testCase.enableDualStackGate)()
 
-			obj, err := storage.Create(ctx, &testCase.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			obj, err := storage.Create(ctx, testCase.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("error is unexpected: %v", err)
 			}
@@ -3487,115 +2510,64 @@ func TestServiceDowngrade(t *testing.T) {
 		enableDualStackAllocator bool
 		enableDualStackGate      bool
 		expectDowngradeError     bool
-		svc                      api.Service
-	}{
-		{
-			name:                     "normal, no downgrade needed. single stack => single stack",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			expectDowngradeError:     false,
+		svc                      *api.Service
+	}{{
+		name:                     "normal, no downgrade needed. single stack => single stack",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		expectDowngradeError:     false,
 
-			updateFunc: func(s *api.Service) { s.Spec.Selector = map[string]string{"bar": "baz2"} },
+		updateFunc: func(s *api.Service) { s.Spec.Selector = map[string]string{"bar": "baz2"} },
 
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requiredDualStack,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-		{
-			name:                     "normal, no downgrade needed. dual stack => dual stack",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			expectDowngradeError:     false,
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requiredDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+		}),
+	}, {
+		name:                     "normal, no downgrade needed. dual stack => dual stack",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		expectDowngradeError:     false,
 
-			updateFunc: func(s *api.Service) { s.Spec.Selector = map[string]string{"bar": "baz2"} },
+		updateFunc: func(s *api.Service) { s.Spec.Selector = map[string]string{"bar": "baz2"} },
 
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requiredDualStack,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requiredDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+		}),
+	}, {
+		name:                     "normal, downgrade v4,v6 => v4",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		expectDowngradeError:     false,
+
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &singleStack
+			s.Spec.ClusterIPs = s.Spec.ClusterIPs[0:1]
+			s.Spec.IPFamilies = s.Spec.IPFamilies[0:1]
 		},
 
-		{
-			name:                     "normal, downgrade v4,v6 => v4",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			expectDowngradeError:     false,
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requiredDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+		}),
+	}, {
+		name:                     "normal, downgrade v6,v4 => v6",
+		enableDualStackAllocator: true,
+		enableDualStackGate:      true,
+		expectDowngradeError:     false,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &singleStack
-				s.Spec.ClusterIPs = s.Spec.ClusterIPs[0:1]
-				s.Spec.IPFamilies = s.Spec.IPFamilies[0:1]
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requiredDualStack,
-
-					IPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
+		updateFunc: func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &singleStack
+			s.Spec.ClusterIPs = s.Spec.ClusterIPs[0:1]
+			s.Spec.IPFamilies = s.Spec.IPFamilies[0:1]
 		},
-		{
-			name:                     "normal, downgrade v6,v4 => v6",
-			enableDualStackAllocator: true,
-			enableDualStackGate:      true,
-			expectDowngradeError:     false,
 
-			updateFunc: func(s *api.Service) {
-				s.Spec.IPFamilyPolicy = &singleStack
-				s.Spec.ClusterIPs = s.Spec.ClusterIPs[0:1]
-				s.Spec.IPFamilies = s.Spec.IPFamilies[0:1]
-			},
-
-			svc: api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilyPolicy:  &requiredDualStack,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
-			},
-		},
-	}
+		svc: makeService("foo", func(s *api.Service) {
+			s.Spec.IPFamilyPolicy = &requiredDualStack
+			s.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+		}),
+	}}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -3603,7 +2575,7 @@ func TestServiceDowngrade(t *testing.T) {
 			defer server.Terminate(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, testCase.enableDualStackGate)()
 
-			obj, err := storage.Create(ctx, &testCase.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			obj, err := storage.Create(ctx, testCase.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("error is unexpected: %v", err)
 			}
@@ -3697,7 +2669,7 @@ func TestDefaultingValidation(t *testing.T) {
 		name       string
 		modifyRest func(rest *REST)
 		oldSvc     *api.Service
-		svc        api.Service
+		svc        *api.Service
 
 		expectedIPFamilyPolicy *api.IPFamilyPolicyType
 		expectedIPFamilies     []api.IPFamily
@@ -3707,25 +2679,17 @@ func TestDefaultingValidation(t *testing.T) {
 		// cluster configured as single stack v4
 		////////////////////////////
 		{
-			name:       "[singlestack:v4] set: externalname on a single stack - v4",
-			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeExternalName,
-				},
-			},
+			name:                   "[singlestack:v4] set: externalname on a single stack - v4",
+			modifyRest:             fnMakeSingleStackIPv4Allocator,
+			svc:                    makeService("foo", tweakTypeExternalName),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            false,
 		},
 		{
-			name:       "[singlestack:v4] set: nothing",
-			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
+			name:                   "[singlestack:v4] set: nothing",
+			modifyRest:             fnMakeSingleStackIPv4Allocator,
+			svc:                    makeService("foo"),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3734,12 +2698,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: v4Cluster IPSet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3747,12 +2707,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: v4IPFamilySet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3760,13 +2716,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: v4IPFamilySet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4"),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3774,12 +2726,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: PreferDualStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3787,13 +2735,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: PreferDualStack + v4ClusterIPSet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3801,14 +2745,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: PreferDualStack + v4ClusterIPSet + v4FamilySet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3816,12 +2756,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: v6IPSet",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3829,12 +2765,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: v6IPFamily",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3842,12 +2774,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: RequireDualStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3855,13 +2783,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: RequireDualStack + family",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3870,13 +2794,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: selectorless, families are ignored",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"None"},
-					IPFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -3884,12 +2805,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: selectorless, no families",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"None"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -3897,13 +2815,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: selectorless, user selected",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -3911,13 +2826,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: selectorless, user set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -3926,14 +2838,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: multifamily set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3941,14 +2848,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: multifamily set to singleStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3956,14 +2858,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: mult clusterips set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3971,14 +2868,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v4] set: multi clusterips set to singleStack",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -3988,25 +2880,17 @@ func TestDefaultingValidation(t *testing.T) {
 		// cluster configured as single stack v6
 		////////////////////////////
 		{
-			name:       "[singlestack:v6] set: externalname on a single stack - v4",
-			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeExternalName,
-				},
-			},
+			name:                   "[singlestack:v6] set: externalname on a single stack - v4",
+			modifyRest:             fnMakeSingleStackIPv6Allocator,
+			svc:                    makeService("foo", tweakTypeExternalName),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            false,
 		},
 		{
-			name:       "[singlestack:v6] set: nothing",
-			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
+			name:                   "[singlestack:v6] set: nothing",
+			modifyRest:             fnMakeSingleStackIPv6Allocator,
+			svc:                    makeService("foo"),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4014,12 +2898,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: v6Cluster IPSet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4027,12 +2907,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: v4IPFamilySet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4040,13 +2916,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: v6IPFamilySet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1"),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4054,12 +2926,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: PreferDualStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4067,13 +2935,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: PreferDualStack + v6ClusterIPSet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					ClusterIPs:     []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4081,14 +2945,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: PreferDualStack + v6ClusterIPSet + v6FamilySet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-					ClusterIPs:     []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakIPFamilies(api.IPv6Protocol),
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4096,12 +2956,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: v4IPSet",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.10")),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4109,12 +2965,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: v4IPFamily",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4122,12 +2974,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: RequireDualStack (on single stack ipv6 cluster)",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4135,13 +2983,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: RequireDualStack + family (on single stack ipv6 cluster)",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4151,13 +2995,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: selectorless, families are ignored",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"None"},
-					IPFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4165,12 +3006,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: selectorless, no families",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIPs: []string{"None"},
-					Type:       api.ServiceTypeClusterIP,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4178,13 +3016,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: selectorless, user selected",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4192,13 +3027,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: selectorless, user set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4207,14 +3039,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: multifamily set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4222,14 +3049,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: multifamily set to singleStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4237,14 +3059,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: mult clusterips set to preferDualStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4252,14 +3069,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[singlestack:v6] set: multi clusterips set to singleStack",
 			modifyRest: fnMakeSingleStackIPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4269,25 +3081,17 @@ func TestDefaultingValidation(t *testing.T) {
 		// cluster configured as dual stack v4,6
 		////////////////////////////
 		{
-			name:       "[dualstack:v4,v6] set: externalname on a dual stack - v4,v6",
-			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeExternalName,
-				},
-			},
+			name:                   "[dualstack:v4,v6] set: externalname on a dual stack - v4,v6",
+			modifyRest:             fnMakeDualStackStackIPv4IPv6Allocator,
+			svc:                    makeService("foo", tweakTypeExternalName),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            false,
 		},
 		{
-			name:       "[dualstack:v4,v6] set: nothing",
-			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
+			name:                   "[dualstack:v4,v6] set: nothing",
+			modifyRest:             fnMakeDualStackStackIPv4IPv6Allocator,
+			svc:                    makeService("foo"),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4296,12 +3100,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v4ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4309,12 +3109,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v4IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4322,13 +3118,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v4IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4"),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4336,12 +3128,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v6ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4349,12 +3137,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v6IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4362,13 +3146,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: v6IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1"),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4377,12 +3157,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: PreferDualStack.",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4390,13 +3166,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: PreferDualStack + v4ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4404,14 +3176,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: PreferDualStack + v4ClusterIPSet + v4FamilySet",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4420,12 +3188,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4433,13 +3197,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + family v4",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4447,13 +3207,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + family v6",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4462,14 +3218,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + family +ip v4",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10"),
+				tweakIPFamilies(api.IPv4Protocol)),
 			//
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
@@ -4478,14 +3230,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + family +ip v6",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1"),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4493,13 +3241,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + ip v6",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4507,13 +3251,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + ip v4",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4521,13 +3261,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + ips",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10", "2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10", "2000::1")),
 			//
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
@@ -4536,13 +3272,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + ips",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1", "10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1", "10.0.0.10")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4550,14 +3282,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: RequireDualStack + ips + families v6,v4",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1", "10.0.0.10"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1", "10.0.0.10"),
+				tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4565,14 +3293,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ips + families v4,v6",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10", "2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10", "2000::1"),
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4580,12 +3304,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,v6] set: selectorless, no families",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"None"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4593,13 +3314,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: selectorless, user selected",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4607,13 +3324,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: selectorless, user set to prefer",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4622,14 +3335,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[duakstack:v4,6] set: multifamily set to preferDualStack",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4637,14 +3345,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: multifamily set to singleStack",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4652,14 +3355,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: mult clusterips set to preferDualStack",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4667,14 +3365,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: multi clusterips set to singleStack",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -4684,25 +3377,17 @@ func TestDefaultingValidation(t *testing.T) {
 		// cluster configured as dual stack v6,4
 		////////////////////////////
 		{
-			name:       "[dualstack:v6,v4] set: externalname on a dual stack - v6,v4",
-			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeExternalName,
-				},
-			},
+			name:                   "[dualstack:v6,v4] set: externalname on a dual stack - v6,v4",
+			modifyRest:             fnMakeDualStackStackIPv6IPv4Allocator,
+			svc:                    makeService("foo", tweakTypeExternalName),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            false,
 		},
 		{
-			name:       "[dualstack:v6,v4] set: nothing",
-			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-				},
-			},
+			name:                   "[dualstack:v6,v4] set: nothing",
+			modifyRest:             fnMakeDualStackStackIPv6IPv4Allocator,
+			svc:                    makeService("foo"),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4710,12 +3395,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v4ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4723,12 +3404,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v4IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol)),
 			//
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
@@ -4737,13 +3414,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v4IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"10.0.0.4"},
-					IPFamilies: []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("10.0.0.4"),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -4751,12 +3424,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v6ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4764,12 +3433,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v6IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4777,13 +3442,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: v6IPFamilySet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"2000::1"},
-					IPFamilies: []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("2000::1"),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
 			expectError:            false,
@@ -4792,12 +3453,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: PreferDualStack.",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4805,13 +3462,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: PreferDualStack + v4ClusterIPSet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4819,14 +3472,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: PreferDualStack + v4ClusterIPSet + v4FamilySet",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					ClusterIPs:     []string{"10.0.0.4"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakClusterIPs("10.0.0.4")),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4835,12 +3484,8 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4848,13 +3493,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + family v4",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4862,13 +3503,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + family v6",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4876,14 +3513,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + family +ip v4",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10"),
+				tweakIPFamilies(api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4891,14 +3524,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + family +ip v6",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1"),
+				tweakIPFamilies(api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4906,13 +3535,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ip v6",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4920,13 +3545,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ip v4",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4934,13 +3555,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ip v4",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4948,13 +3565,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ips",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10", "2000::1"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10", "2000::1")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -4962,13 +3575,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ips",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1", "10.0.0.10"},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1", "10.0.0.10")),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4976,14 +3585,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ips + families v6,v4",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"2000::1", "10.0.0.10"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("2000::1", "10.0.0.10"),
+				tweakIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -4991,14 +3596,10 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: RequireDualStack + ips + families v4,v6",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIPs:     []string{"10.0.0.10", "2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				tweakClusterIPs("10.0.0.10", "2000::1"),
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -5006,12 +3607,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: selectorless, no families",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:       api.ServiceTypeClusterIP,
-					ClusterIPs: []string{"None"},
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				func(s *api.Service) { s.Spec.Selector = nil }),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
@@ -5019,13 +3617,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: selectorless, user selected",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
@@ -5034,13 +3628,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,v4] set: selectorless, user set to prefer",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"None"},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("None"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
@@ -5050,14 +3640,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[duakstack:v6,5] set: multifamily set to preferDualStack",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -5065,14 +3650,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v4,6] set: multifamily set to singleStack",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -5080,14 +3660,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,4] set: mult clusterips set to preferDualStack",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -5095,14 +3670,9 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "[dualstack:v6,4] set: multi clusterips set to singleStack",
 			modifyRest: fnMakeDualStackStackIPv6IPv4Allocator,
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     nil,
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: nil,
 			expectedIPFamilies:     nil,
 			expectError:            true,
@@ -5114,23 +3684,15 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "unchanged preferDualStack-1-ClusterUpgraded",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			oldSvc: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			oldSvc: makeService("foo",
+				tweakClusterIPs("1.1.1.1"),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1"),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -5139,23 +3701,15 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "unchanged preferDualStack-2-ClusterDowngraded",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			oldSvc: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			oldSvc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 			expectedIPFamilyPolicy: &preferDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -5164,23 +3718,14 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "changed preferDualStack-1 (cluster upgraded)",
 			modifyRest: fnMakeDualStackStackIPv4IPv6Allocator,
-			oldSvc: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			oldSvc: makeService("foo",
+				tweakClusterIPs("1.1.1.1"),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					IPFamilyPolicy: &requireDualStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 			expectedIPFamilyPolicy: &requireDualStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
@@ -5189,23 +3734,15 @@ func TestDefaultingValidation(t *testing.T) {
 		{
 			name:       "changed preferDualStack-2-ClusterDowngraded",
 			modifyRest: fnMakeSingleStackIPv4Allocator,
-			oldSvc: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1", "2001::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
+			oldSvc: makeService("foo",
+				tweakClusterIPs("1.1.1.1", "2001::1"),
+				tweakIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					ClusterIPs:     []string{"1.1.1.1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-					IPFamilyPolicy: &singleStack,
-				},
-			},
+			svc: makeService("foo",
+				tweakClusterIPs("1.1.1.1"),
+				tweakIPFamilies(api.IPv4Protocol),
+				tweakIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 			expectedIPFamilyPolicy: &singleStack,
 			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
 			expectError:            false,
@@ -5228,7 +3765,7 @@ func TestDefaultingValidation(t *testing.T) {
 				testCase.modifyRest(storage)
 			}
 
-			err := storage.tryDefaultValidateServiceClusterIPFields(testCase.oldSvc, &testCase.svc)
+			err := storage.tryDefaultValidateServiceClusterIPFields(testCase.oldSvc, testCase.svc)
 			if err != nil && !testCase.expectError {
 				t.Fatalf("error %v was not expected", err)
 			}
