@@ -714,6 +714,13 @@
     MUST succeed. It MUST succeed when deleting the Deployment.
   release: v1.20
   file: test/e2e/apps/deployment.go
+- testname: Deployment, status sub-resource
+  codename: '[sig-apps] Deployment should validate Deployment Status endpoints [Conformance]'
+  description: When a Deployment is created it MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
+  file: test/e2e/apps/deployment.go
 - testname: 'PodDisruptionBudget: list and delete collection'
   codename: '[sig-apps] DisruptionController Listing PodDisruptionBudgets for all
     namespaces should list and delete a collection of PodDisruptionBudgets [Conformance]'
