@@ -63,16 +63,12 @@ var (
 // in a completely different way. We should unify it.
 
 type serviceStorage struct {
-	GottenID           string
-	UpdatedID          string
-	CreatedID          string
-	DeletedID          string
-	Created            bool
-	DeletedImmediately bool
-	Service            *api.Service
-	OldService         *api.Service
-	ServiceList        *api.ServiceList
-	Err                error
+	GottenID    string
+	UpdatedID   string
+	CreatedID   string
+	DeletedID   string
+	Service     *api.Service
+	ServiceList *api.ServiceList
 }
 
 func (s *serviceStorage) NamespaceScoped() bool {
@@ -81,11 +77,11 @@ func (s *serviceStorage) NamespaceScoped() bool {
 
 func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	s.GottenID = name
-	return s.Service, s.Err
+	return s.Service, nil
 }
 
 func (s *serviceStorage) GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
-	return s.Service, s.Err
+	return s.Service, nil
 }
 
 func (s *serviceStorage) NewList() runtime.Object {
@@ -110,7 +106,7 @@ func (s *serviceStorage) List(ctx context.Context, options *metainternalversion.
 		res.Items = append([]api.Service{}, s.ServiceList.Items...)
 	}
 
-	return res, s.Err
+	return res, nil
 }
 
 func (s *serviceStorage) New() runtime.Object {
@@ -119,7 +115,7 @@ func (s *serviceStorage) New() runtime.Object {
 
 func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if dryrun.IsDryRun(options.DryRun) {
-		return obj, s.Err
+		return obj, nil
 	}
 	svc := obj.(*api.Service)
 	s.CreatedID = obj.(metav1.Object).GetName()
@@ -130,11 +126,11 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 	}
 
 	s.ServiceList.Items = append(s.ServiceList.Items, *svc)
-	return svc, s.Err
+	return svc, nil
 }
 
 func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, err := objInfo.UpdatedObject(ctx, s.OldService)
+	obj, err := objInfo.UpdatedObject(ctx, nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -142,14 +138,14 @@ func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.U
 		s.UpdatedID = name
 		s.Service = obj.(*api.Service)
 	}
-	return obj, s.Created, s.Err
+	return obj, false, nil
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	if !dryrun.IsDryRun(options.DryRun) {
 		s.DeletedID = name
 	}
-	return s.Service, s.DeletedImmediately, s.Err
+	return s.Service, false, nil
 }
 
 func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
