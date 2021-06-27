@@ -18,11 +18,18 @@ package request
 
 import (
 	"net/http"
+	"time"
 )
 
 type Width struct {
 	// Seats represents the number of seats associated with this request
 	Seats uint
+
+	// AdditionalLatency specifies the additional duration the seats allocated
+	// to this request must be reserved after the given request had finished.
+	// AdditionalLatency should not have any impact on the user experience, the
+	// caller must not experience this additional latency.
+	AdditionalLatency time.Duration
 }
 
 // DefaultWidthEstimator returns returns '1' as the "width"

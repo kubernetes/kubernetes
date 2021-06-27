@@ -805,10 +805,38 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool 
 func (qs *queueSet) finishRequestLocked(r *request) {
 	now := qs.clock.Now()
 	qs.totRequestsExecuting--
-	qs.totSeatsInUse -= r.Seats()
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
 	qs.obsPair.RequestsExecuting.Add(-1)
+
+	// TODO: for now we keep the logic localized so it is easier to see
+	//  how the counters are released for queueset and queue, in future we
+	//  can refactor to move this function.
+	releaseSeatsFn := func() {
+		defer qs.removeQueueIfEmptyLocked(r)
+
+		qs.totSeatsInUse -= r.Seats()
+		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
+		if r.queue != nil {
+			r.queue.seatsInUse -= r.Seats()
+		}
+	}
+
+	defer func() {
+		if r.width.AdditionalLatency <= 0 {
+			// release the seats allocated to this request immediately
+			releaseSeatsFn()
+			return
+		}
+
+		// spin up a goroutine that sleeps for AdditionalLatency and then release
+		// the seats allocated to this request, this ensures that the additional
+		// latency has no impact on the user experience.
+		go func() {
+			// TODO: use queueset clock so this is testable
+			<-time.After(r.width.AdditionalLatency)
+			releaseSeatsFn()
+		}()
+	}()
 
 	if r.queue == nil {
 		if klog.V(6).Enabled() {
@@ -825,12 +853,17 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--
-	r.queue.seatsInUse -= r.Seats()
 
 	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing",
 			qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index,
 			r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting)
+	}
+}
+
+func (qs *queueSet) removeQueueIfEmptyLocked(r *request) {
+	if r.queue == nil {
+		return
 	}
 
 	// If there are more queues than desired and this one has no
