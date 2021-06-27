@@ -92,10 +92,9 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 	requiresRepublish := true
 
 	tests := []struct {
-		name                    string
-		withCapacity            bool
-		withInline              bool
-		withServiceAccountToken bool
+		name         string
+		withCapacity bool
+		withInline   bool
 	}{
 		{
 			name:       "inline enabled",
@@ -113,21 +112,12 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			name:         "capacity disabled",
 			withCapacity: false,
 		},
-		{
-			name:                    "serviceAccountToken enabled",
-			withServiceAccountToken: true,
-		},
-		{
-			name:                    "serviceAccountToken disabled",
-			withServiceAccountToken: false,
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.withCapacity)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountToken, test.withServiceAccountToken)()
 
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -165,21 +155,6 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			} else {
 				if len(csiDriver.Spec.VolumeLifecycleModes) != 0 {
 					t.Errorf("VolumeLifecycleModes not stripped: %v", csiDriver.Spec)
-				}
-			}
-			if test.withServiceAccountToken {
-				if csiDriver.Spec.TokenRequests == nil {
-					t.Errorf("TokenRequests modified: %v", csiDriver.Spec)
-				}
-				if csiDriver.Spec.RequiresRepublish == nil {
-					t.Errorf("RequiresRepublish modified: %v", csiDriver.Spec)
-				}
-			} else {
-				if csiDriver.Spec.TokenRequests != nil {
-					t.Errorf("TokenRequests stripped: %v", csiDriver.Spec)
-				}
-				if csiDriver.Spec.RequiresRepublish != nil {
-					t.Errorf("RequiresRepublish stripped: %v", csiDriver.Spec)
 				}
 			}
 		})
@@ -227,7 +202,6 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	enabled := true
 	disabled := false
 	gcp := "gcp"
-	vault := "vault"
 	driverWithCapacityEnabled := &storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -253,29 +227,19 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			RequiresRepublish: &enabled,
 		},
 	}
-	driverWithServiceAccountTokenVault := &storage.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: storage.CSIDriverSpec{
-			TokenRequests:     []storage.TokenRequest{{Audience: vault}},
-			RequiresRepublish: &enabled,
-		},
-	}
 
 	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
 
 	tests := []struct {
-		name                          string
-		old, update                   *storage.CSIDriver
-		csiStorageCapacityEnabled     bool
-		csiInlineVolumeEnabled        bool
-		csiServiceAccountTokenEnabled bool
-		wantCapacity                  *bool
-		wantModes                     []storage.VolumeLifecycleMode
-		wantTokenRequests             []storage.TokenRequest
-		wantRequiresRepublish         *bool
-		wantGeneration                int64
+		name                      string
+		old, update               *storage.CSIDriver
+		csiStorageCapacityEnabled bool
+		csiInlineVolumeEnabled    bool
+		wantCapacity              *bool
+		wantModes                 []storage.VolumeLifecycleMode
+		wantTokenRequests         []storage.TokenRequest
+		wantRequiresRepublish     *bool
+		wantGeneration            int64
 	}{
 		{
 			name:                      "capacity feature enabled, before: none, update: enabled",
@@ -316,24 +280,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			wantModes: resultPersistent,
 		},
 		{
-			name:                          "service account token feature enabled, before: none, update: audience=gcp",
-			csiServiceAccountTokenEnabled: true,
-			old:                           driverWithNothing,
-			update:                        driverWithServiceAccountTokenGCP,
-			wantTokenRequests:             []storage.TokenRequest{{Audience: gcp}},
-			wantRequiresRepublish:         &enabled,
-			wantGeneration:                1,
-		},
-		{
-			name:                  "service account token feature disabled, before: none, update: audience=gcp",
+			name:                  "service account token feature enabled, before: none, update: audience=gcp",
 			old:                   driverWithNothing,
-			update:                driverWithServiceAccountTokenGCP,
-			wantTokenRequests:     nil,
-			wantRequiresRepublish: nil,
-		},
-		{
-			name:                  "service account token feature disabled, before: audience=vault, update: audience=gcp",
-			old:                   driverWithServiceAccountTokenVault,
 			update:                driverWithServiceAccountTokenGCP,
 			wantTokenRequests:     []storage.TokenRequest{{Audience: gcp}},
 			wantRequiresRepublish: &enabled,
@@ -345,7 +293,6 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.csiStorageCapacityEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolumeEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountToken, test.csiServiceAccountTokenEnabled)()
 
 			csiDriver := test.update.DeepCopy()
 			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)

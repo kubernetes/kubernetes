@@ -229,13 +229,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// Inject pod service account token into volume attributes
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
-		if err != nil {
-			return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
-		}
-		volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+	serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
 	}
+	volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
 
 	err = csi.NodePublishVolume(
 		ctx,
