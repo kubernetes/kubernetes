@@ -19,6 +19,7 @@ package request
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -35,6 +36,12 @@ const (
 type WorkEstimate struct {
 	// Seats represents the number of seats associated with this request
 	Seats uint
+
+	// AdditionalLatency specifies the additional duration the seats allocated
+	// to this request must be reserved after the given request had finished.
+	// AdditionalLatency should not have any impact on the user experience, the
+	// caller must not experience this additional latency.
+	AdditionalLatency time.Duration
 }
 
 // objectCountGetterFunc represents a function that gets the total

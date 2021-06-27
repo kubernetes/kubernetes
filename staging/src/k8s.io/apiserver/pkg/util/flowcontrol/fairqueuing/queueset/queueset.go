@@ -775,10 +775,48 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool 
 func (qs *queueSet) finishRequestLocked(r *request) {
 	now := qs.clock.Now()
 	qs.totRequestsExecuting--
-	qs.totSeatsInUse -= r.Seats()
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
 	qs.obsPair.RequestsExecuting.Add(-1)
+
+	S := now.Sub(r.startTime).Seconds()
+
+	// TODO: for now we keep the logic localized so it is easier to see
+	//  how the counters are tracked for queueset and queue, in future we
+	//  can refactor to move this function.
+	releaseSeatsLocked := func() {
+		defer qs.removeQueueIfEmptyLocked(r)
+
+		qs.totSeatsInUse -= r.Seats()
+		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
+		if r.queue != nil {
+			r.queue.seatsInUse -= r.Seats()
+
+			if klog.V(6).Enabled() {
+				klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing",
+					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index,
+					r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting)
+			}
+		}
+	}
+
+	defer func() {
+		if r.workEstimate.AdditionalLatency <= 0 {
+			// release the seats allocated to this request immediately
+			releaseSeatsLocked()
+			return
+		}
+
+		additionalLatency := r.workEstimate.AdditionalLatency
+		// EventAfterDuration will execute the event func in a new goroutine,
+		// so the seats allocated to this request will be released after
+		// AdditionalLatency elapses, this ensures that the additional
+		// latency has no impact on the user experience.
+		qs.clock.EventAfterDuration(func(_ time.Time) {
+			qs.lock.Lock()
+			defer qs.lock.Unlock()
+			releaseSeatsLocked()
+		}, additionalLatency)
+	}()
 
 	if r.queue == nil {
 		if klog.V(6).Enabled() {
@@ -787,20 +825,17 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		return
 	}
 
-	S := now.Sub(r.startTime).Seconds()
+	// request has finished, remove from requests executing
+	r.queue.requestsExecuting--
 
 	// When a request finishes being served, and the actual service time was S,
 	// the queue’s virtual start time is decremented by (G - S)*width.
 	r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
+}
 
-	// request has finished, remove from requests executing
-	r.queue.requestsExecuting--
-	r.queue.seatsInUse -= r.Seats()
-
-	if klog.V(6).Enabled() {
-		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing",
-			qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index,
-			r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting)
+func (qs *queueSet) removeQueueIfEmptyLocked(r *request) {
+	if r.queue == nil {
+		return
 	}
 
 	// If there are more queues than desired and this one has no
