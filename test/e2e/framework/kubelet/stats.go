@@ -548,14 +548,14 @@ func (r *ResourceMonitor) GetLatest() (ResourceUsagePerNode, error) {
 	return result, utilerrors.NewAggregate(errs)
 }
 
-// GetMasterNodeLatest returns the latest resource usage of master and node.
-func (r *ResourceMonitor) GetMasterNodeLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
+// GetControlPlaneNodeLatest returns the latest resource usage of control plane and node.
+func (r *ResourceMonitor) GetControlPlaneNodeLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
 	result := make(ResourceUsagePerNode)
-	var masterUsage ResourceUsagePerContainer
+	var controlPlaneUsage ResourceUsagePerContainer
 	var nodesUsage []ResourceUsagePerContainer
 	for node, usage := range usagePerNode {
-		if strings.HasSuffix(node, "master") {
-			masterUsage = usage
+		if strings.HasSuffix(node, "control plane") {
+			controlPlaneUsage = usage
 		} else {
 			nodesUsage = append(nodesUsage, usage)
 		}
@@ -578,7 +578,7 @@ func (r *ResourceMonitor) GetMasterNodeLatest(usagePerNode ResourceUsagePerNode)
 		nodeAvgUsage[c].MemoryWorkingSetInBytes /= uint64(len(nodesUsage))
 		nodeAvgUsage[c].MemoryRSSInBytes /= uint64(len(nodesUsage))
 	}
-	result["master"] = masterUsage
+	result["control plane"] = controlPlaneUsage
 	result["node"] = nodeAvgUsage
 	return result
 }
@@ -640,14 +640,14 @@ func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
 	return result
 }
 
-// GetMasterNodeCPUSummary returns summary of master node CPUs.
-func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
+// GetControlPlaneNodeCPUSummary returns summary of control plane node CPUs.
+func (r *ResourceMonitor) GetControlPlaneNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
 	result := make(NodesCPUSummary)
-	var masterSummary ContainersCPUSummary
+	var controlPlaneSummary ContainersCPUSummary
 	var nodesSummaries []ContainersCPUSummary
 	for node, summary := range summaryPerNode {
-		if strings.HasSuffix(node, "master") {
-			masterSummary = summary
+		if strings.HasSuffix(node, "control plane") {
+			controlPlaneSummary = summary
 		} else {
 			nodesSummaries = append(nodesSummaries, summary)
 		}
@@ -669,7 +669,7 @@ func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary
 			nodeAvgSummary[c][perc] /= float64(len(nodesSummaries))
 		}
 	}
-	result["master"] = masterSummary
+	result["control plane"] = controlPlaneSummary
 	result["node"] = nodeAvgSummary
 	return result
 }
