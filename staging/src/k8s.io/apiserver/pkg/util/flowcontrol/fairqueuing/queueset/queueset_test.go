@@ -33,6 +33,7 @@ import (
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	testclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
 
@@ -226,7 +227,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
-	req, idle := ust.uss.qs.StartRequest(context.Background(), 1, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.Width{Seats: 1}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -671,7 +672,7 @@ func TestContextCancel(t *testing.T) {
 	ctx1 := context.Background()
 	b2i := map[bool]int{false: 0, true: 1}
 	var qnc [2][2]int32
-	req1, _ := qs.StartRequest(ctx1, 1, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
+	req1, _ := qs.StartRequest(ctx1, &fcrequest.Width{Seats: 1}, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
@@ -699,7 +700,7 @@ func TestContextCancel(t *testing.T) {
 			counter.Add(1)
 			cancel2()
 		}()
-		req2, idle2a := qs.StartRequest(ctx2, 1, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
+		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.Width{Seats: 1}, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
 		if idle2a {
 			t.Error("2nd StartRequest returned idle")
 		}
@@ -758,7 +759,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	req, _ := qs.StartRequest(ctx, 1, 1, "", "fs", "test", "one", func(inQueue bool) {})
+	req, _ := qs.StartRequest(ctx, &fcrequest.Width{Seats: 1}, 1, "", "fs", "test", "one", func(inQueue bool) {})
 	if req == nil {
 		t.Fatal("expected a Request object from StartRequest, but got nil")
 	}
@@ -811,13 +812,13 @@ func TestSelectQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{width: 1},
+						&request{width: fcrequest.Width{Seats: 1}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{width: 1},
+						&request{width: fcrequest.Width{Seats: 1}},
 					),
 				},
 			},
@@ -834,7 +835,7 @@ func TestSelectQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{width: 1},
+						&request{width: fcrequest.Width{Seats: 1}},
 					),
 				},
 			},
@@ -851,13 +852,13 @@ func TestSelectQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{width: 50},
+						&request{width: fcrequest.Width{Seats: 50}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{width: 25},
+						&request{width: fcrequest.Width{Seats: 25}},
 					),
 				},
 			},
@@ -874,13 +875,13 @@ func TestSelectQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{width: 10},
+						&request{width: fcrequest.Width{Seats: 10}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{width: 25},
+						&request{width: fcrequest.Width{Seats: 25}},
 					),
 				},
 			},
@@ -897,13 +898,13 @@ func TestSelectQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{width: 10},
+						&request{width: fcrequest.Width{Seats: 10}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{width: 25},
+						&request{width: fcrequest.Width{Seats: 25}},
 					),
 				},
 			},

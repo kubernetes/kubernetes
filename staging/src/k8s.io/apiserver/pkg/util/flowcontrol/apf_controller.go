@@ -46,6 +46,7 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -81,7 +82,7 @@ type StartFunction func(ctx context.Context, hashValue uint64) (execute bool, af
 type RequestDigest struct {
 	RequestInfo *request.RequestInfo
 	User        user.Info
-	Width       uint
+	Width       fcrequest.Width
 }
 
 // `*configController` maintains eventual consistency with the API
@@ -804,7 +805,7 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	}
 	startWaitingTime = time.Now()
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
-	req, idle := plState.queues.StartRequest(ctx, rd.Width, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
+	req, idle := plState.queues.StartRequest(ctx, &rd.Width, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
 	if idle {
 		cfgCtlr.maybeReapLocked(plName, plState)
 	}

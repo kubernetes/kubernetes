@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 // request is a temporary container for "requests" with additional
@@ -44,7 +45,7 @@ type request struct {
 	startTime time.Time
 
 	// width of the request
-	width uint
+	width fcrequest.Width
 
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
