@@ -297,6 +297,10 @@ func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 		fmt.Fprint(out, "\t")
 		if available, found := metrics.Available[res]; found {
 			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
+			// Set 100% if overflow
+			if fraction > 100.0 {
+				fraction = 100.0
+			}
 			fmt.Fprintf(out, "%d%%\t", int64(fraction))
 		}
 	}
