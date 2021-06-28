@@ -468,6 +468,7 @@ func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.Cont
 func TestCheckpoint(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
@@ -500,6 +501,10 @@ func TestCheckpoint(t *testing.T) {
 		constructDevices([]string{"dev4"}),
 		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
 
 	testManager.healthyDevices[resourceName1] = sets.NewString()
 	testManager.healthyDevices[resourceName1].Insert("dev1")
@@ -510,6 +515,8 @@ func TestCheckpoint(t *testing.T) {
 	testManager.healthyDevices[resourceName2] = sets.NewString()
 	testManager.healthyDevices[resourceName2].Insert("dev1")
 	testManager.healthyDevices[resourceName2].Insert("dev2")
+	testManager.healthyDevices[resourceName3] = sets.NewString()
+	testManager.healthyDevices[resourceName3].Insert("dev5")
 
 	expectedPodDevices := testManager.podDevices
 	expectedAllocatedDevices := testManager.podDevices.devices()
@@ -716,6 +723,9 @@ func TestFilterByAffinity(t *testing.T) {
 						},
 					},
 				},
+			},
+			"devwithouttopology": {
+				ID: "dev5",
 			},
 		},
 	}
