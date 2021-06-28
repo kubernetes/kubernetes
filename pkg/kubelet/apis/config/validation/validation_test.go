@@ -190,8 +190,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "",
 		},
+		MemorySwap: kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
 	}
-	const numErrsErrorCase1 = 29
+	const numErrsErrorCase1 = 30
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}

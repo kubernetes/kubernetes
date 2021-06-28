@@ -160,6 +160,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
 		}
 	}
+	if !localFeatureGate.Enabled(features.NodeSwapEnabled) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwapEnabled feature flag is disabled"))
+	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
