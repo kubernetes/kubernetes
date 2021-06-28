@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -216,7 +217,7 @@ func TestBackoffWithJitter(t *testing.T) {
 	b := NewFakeBackOffWithJitter(initial, maxDuration, tc, maxJitterFactor)
 
 	assert := func(t *testing.T, factor int, prevDelayGot, curDelayGot time.Duration) {
-		low := time.Duration((float64(prevDelayGot) * float64(factor)))
+		low := time.Duration(float64(prevDelayGot) * float64(factor))
 		high := low + time.Duration(maxJitterFactor*float64(prevDelayGot))
 		if !((curDelayGot > low && curDelayGot <= high) || curDelayGot == maxDuration) {
 			t.Errorf("jittered delay not within range: (%s - %s], but got %s", low, high, curDelayGot)
@@ -249,4 +250,76 @@ func TestBackoffWithJitter(t *testing.T) {
 	}
 
 	t.Logf("exponentially backed off jittered delays: %v", delays)
+}
+
+func TestIsInBackOffSinceUpdateTick(t *testing.T) {
+	id := "_idIsInBackOffSinceUpdate"
+	tc := testingclock.NewFakeClock(time.Now())
+	step := time.Second
+	maxDuration := 300 * step
+	initial := 10 * step
+	b := NewFakeBackOff(initial, maxDuration, tc)
+	startTime := tc.Now()
+
+	want := map[int]time.Duration{
+		0:    0 * time.Second,
+		10:   10 * time.Second,
+		30:   20 * time.Second,
+		70:   40 * time.Second,
+		150:  80 * time.Second,
+		310:  160 * time.Second,
+		610:  300 * time.Second,
+		910:  300 * time.Second,
+		1210: 300 * time.Second,
+		1510: 300 * time.Second,
+		1810: 300 * time.Second,
+	}
+	got := map[int]time.Duration{}
+	for i := 0; i != 2000; i++ {
+		tc.SetTime(startTime.Add(time.Duration(i) * step))
+		inBackOff := b.IsInBackOffSinceUpdate(id, tc.Now())
+		if !inBackOff {
+			got[i] = b.Get(id)
+			b.Next(id, tc.Now())
+		}
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("expected \n%v got \n%v", want, got)
+	}
+}
+
+func TestIsInBackOffSinceTick(t *testing.T) {
+	id := "_idIsInBackOffSince"
+	tc := testingclock.NewFakeClock(time.Now())
+	step := time.Second
+	maxDuration := 300 * step
+	initial := 10 * step
+	b := NewFakeBackOff(initial, maxDuration, tc)
+	startTime := tc.Now()
+
+	want := map[int]time.Duration{
+		0:    0 * time.Second,
+		601:  10 * time.Second,
+		1202: 10 * time.Second,
+		1803: 10 * time.Second,
+		2404: 10 * time.Second,
+		3005: 10 * time.Second,
+		3606: 10 * time.Second,
+		4207: 10 * time.Second,
+		4808: 10 * time.Second,
+	}
+	got := map[int]time.Duration{}
+	for i := 0; i != 5000; i++ {
+		tc.SetTime(startTime.Add(time.Duration(i) * step))
+		inBackOff := b.IsInBackOffSince(id, tc.Now())
+		if !inBackOff {
+			got[i] = b.Get(id)
+			b.Next(id, tc.Now())
+		}
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("expected \n%v got \n%v", want, got)
+	}
 }
