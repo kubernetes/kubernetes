@@ -176,7 +176,6 @@ func getAllocatableMemoryFromStateFile(s *state.MemoryManagerCheckpoint) []state
 }
 
 type kubeletParams struct {
-	memoryManagerFeatureGate              bool
 	podResourcesGetAllocatableFeatureGate bool
 	memoryManagerPolicy                   string
 	systemReservedMemory                  []kubeletconfig.MemoryReservation
@@ -191,7 +190,7 @@ func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params 
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = map[string]bool{}
 	}
-	newCfg.FeatureGates["MemoryManager"] = params.memoryManagerFeatureGate
+
 	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = params.podResourcesGetAllocatableFeatureGate
 
 	newCfg.MemoryManagerPolicy = params.memoryManagerPolicy
@@ -268,7 +267,7 @@ func getAllNUMANodes() []int {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFeature:MemoryManager]", func() {
+var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
@@ -284,7 +283,6 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{
-		memoryManagerFeatureGate:              true,
 		podResourcesGetAllocatableFeatureGate: true,
 		systemReservedMemory: []kubeletconfig.MemoryReservation{
 			{
