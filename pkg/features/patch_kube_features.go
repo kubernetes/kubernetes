@@ -13,16 +13,30 @@ var (
 	// Enables the AWS EBS CSI migration for the Attach/Detach controller (ADC) only.
 	ADCCSIMigrationAWS featuregate.Feature = "ADC_CSIMigrationAWS"
 
+	// owner: @fbertina
+	// alpha: v1.22
+	//
+	// Enables the Azure Disk CSI migration for the Attach/Detach controller (ADC) only.
+	ADCCSIMigrationAzureDisk featuregate.Feature = "ADC_CSIMigrationAzureDisk"
+
 	// owner: @jsafrane
 	// alpha: v1.21
 	//
 	// Enables the Cinder CSI migration for the Attach/Detach controller (ADC) only.
 	ADCCSIMigrationCinder featuregate.Feature = "ADC_CSIMigrationCinder"
+
+	// owner: @fbertina
+	// alpha: v1.22
+	//
+	// Enables the GCE CSI migration for the Attach/Detach controller (ADC) only.
+	ADCCSIMigrationGCEPD featuregate.Feature = "ADC_CSIMigrationGCEPD"
 )
 
 var ocpDefaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	ADCCSIMigrationAWS:    {Default: true, PreRelease: featuregate.Beta},
-	ADCCSIMigrationCinder: {Default: true, PreRelease: featuregate.Beta},
+	ADCCSIMigrationAWS:       {Default: true, PreRelease: featuregate.Beta},
+	ADCCSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.Beta},
+	ADCCSIMigrationCinder:    {Default: true, PreRelease: featuregate.Beta},
+	ADCCSIMigrationGCEPD:     {Default: true, PreRelease: featuregate.Beta},
 }
 
 func init() {
