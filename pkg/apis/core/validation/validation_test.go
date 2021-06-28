@@ -9803,6 +9803,46 @@ func TestValidatePodUpdate(t *testing.T) {
 			"spec: Forbidden: pod updates",
 			"removed priority class name",
 		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(1),
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+				},
+			},
+			"",
+			"update termination grace period seconds",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(0),
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+				},
+			},
+			"spec: Forbidden: pod updates",
+			"update termination grace period seconds not 1",
+		},
 	}
 
 	for _, test := range tests {
