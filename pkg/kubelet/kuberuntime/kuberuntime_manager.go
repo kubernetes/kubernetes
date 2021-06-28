@@ -914,11 +914,11 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 	}
 
 	klog.V(3).InfoS("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
-	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
-	ts := cStatus.FinishedAt
+
 	// backOff requires a unique key to identify the container.
 	key := getStableKey(pod, container)
-	if backOff.IsInBackOffSince(key, ts) {
+	now := time.Now()
+	if backOff.IsInBackOffSinceUpdate(key, now) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
 		}
@@ -927,7 +927,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
 
-	backOff.Next(key, ts)
+	backOff.Next(key, now)
 	return false, "", nil
 }
 
