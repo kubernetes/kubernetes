@@ -18,9 +18,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,8 +61,15 @@ var (
 // in a completely different way. We should unify it.
 
 type serviceStorage struct {
-	Service     *api.Service
+	Services    map[string]*api.Service
 	ServiceList *api.ServiceList
+}
+
+func (s *serviceStorage) saveService(svc *api.Service) {
+	if s.Services == nil {
+		s.Services = map[string]*api.Service{}
+	}
+	s.Services[svc.Name] = svc.DeepCopy()
 }
 
 func (s *serviceStorage) NamespaceScoped() bool {
@@ -70,7 +77,10 @@ func (s *serviceStorage) NamespaceScoped() bool {
 }
 
 func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	return s.Service, nil
+	if s.Services[name] == nil {
+		return nil, fmt.Errorf("service %q not found", name)
+	}
+	return s.Services[name].DeepCopy(), nil
 }
 
 func getService(getter rest.Getter, ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
@@ -115,15 +125,15 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 		return obj, nil
 	}
 	svc := obj.(*api.Service)
-	s.Service = svc.DeepCopy()
-	s.Service.ResourceVersion = "1"
+	s.saveService(svc)
+	s.Services[svc.Name].ResourceVersion = "1"
 
 	if s.ServiceList == nil {
 		s.ServiceList = &api.ServiceList{}
 	}
 
 	s.ServiceList.Items = append(s.ServiceList.Items, *svc)
-	return s.Service.DeepCopy(), nil
+	return s.Services[svc.Name].DeepCopy(), nil
 }
 
 func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
@@ -132,13 +142,15 @@ func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.U
 		return nil, false, err
 	}
 	if !dryrun.IsDryRun(options.DryRun) {
-		s.Service = obj.(*api.Service)
+		s.saveService(obj.(*api.Service))
 	}
 	return obj, false, nil
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	return s.Service, false, nil
+	ret := s.Services[name]
+	delete(s.Services, name)
+	return ret, false, nil
 }
 
 func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -162,11 +174,11 @@ func (s *serviceStorage) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Se
 	return nil
 }
 
-func NewTestREST(t *testing.T, endpoints *api.EndpointsList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+func NewTestREST(t *testing.T, endpoints []*api.Endpoints, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
 	return NewTestRESTWithPods(t, endpoints, nil, ipFamilies)
 }
 
-func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Pod, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 
 	serviceStorage := &serviceStorage{}
@@ -180,13 +192,11 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if pods != nil && len(pods.Items) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
-		for ix := range pods.Items {
-			key, _ := podStorage.Pod.KeyFunc(ctx, pods.Items[ix].Name)
-			if err := podStorage.Pod.Storage.Create(ctx, key, &pods.Items[ix], nil, 0, false); err != nil {
-				t.Fatalf("Couldn't create pod: %v", err)
-			}
+	ctx := genericapirequest.NewDefaultContext()
+	for ix := range pods {
+		key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
+		if err := podStorage.Pod.Storage.Create(ctx, key, &pods[ix], nil, 0, false); err != nil {
+			t.Fatalf("Couldn't create pod: %v", err)
 		}
 	}
 	endpointStorage, err := endpointstore.NewREST(generic.RESTOptions{
@@ -197,13 +207,10 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if endpoints != nil && len(endpoints.Items) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
-		for ix := range endpoints.Items {
-			key, _ := endpointStorage.KeyFunc(ctx, endpoints.Items[ix].Name)
-			if err := endpointStorage.Store.Storage.Create(ctx, key, &endpoints.Items[ix], nil, 0, false); err != nil {
-				t.Fatalf("Couldn't create endpoint: %v", err)
-			}
+	for ix := range endpoints {
+		key, _ := endpointStorage.KeyFunc(ctx, endpoints[ix].Name)
+		if err := endpointStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
+			t.Fatalf("Couldn't create endpoint: %v", err)
 		}
 	}
 
@@ -406,12 +413,9 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 				}
 			}
 
-			srv, err := getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if srv != nil {
-				t.Errorf("unexpected service found: %v", srv)
+			_, err = getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
+			if err == nil {
+				t.Errorf("expected error")
 			}
 		})
 	}
@@ -436,12 +440,10 @@ func TestDryRunNodePort(t *testing.T) {
 	if storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
-	srv, err := getService(storage, ctx, svc.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if srv != nil {
-		t.Errorf("unexpected service found: %v", srv)
+	_, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
+	if err == nil {
+		// Should get a not-found.
+		t.Errorf("expected error")
 	}
 
 	// Test dry run create request with multi node port
@@ -466,12 +468,10 @@ func TestDryRunNodePort(t *testing.T) {
 			t.Errorf("unexpected side effect: NodePort allocated")
 		}
 	}
-	srv, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if srv != nil {
-		t.Errorf("unexpected service found: %v", srv)
+	_, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
+	if err == nil {
+		// Should get a not-found.
+		t.Errorf("expected error")
 	}
 
 	// Test dry run create request with multiple unspecified node ports,
@@ -730,11 +730,11 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	}
 	for _, failureCase := range failureCases {
 		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(failureCase), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err == nil {
+			t.Errorf("expected error")
+		}
 		if c != nil || created {
 			t.Errorf("Expected nil object or created false")
-		}
-		if !errors.IsInvalid(err) {
-			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
 	}
 }
@@ -1019,236 +1019,187 @@ func TestServiceRegistryGet(t *testing.T) {
 	}
 }
 
+func makeEndpoints(name string, addrs []api.EndpointAddress, ports []api.EndpointPort) *api.Endpoints {
+	return &api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: addrs,
+			Ports:     ports,
+		}},
+	}
+}
+
+func makeEndpointAddress(ip string, pod string) api.EndpointAddress {
+	return api.EndpointAddress{
+		IP: ip,
+		TargetRef: &api.ObjectReference{
+			Name:      pod,
+			Namespace: metav1.NamespaceDefault,
+		},
+	}
+}
+
+func makeEndpointPort(name string, port int) api.EndpointPort {
+	return api.EndpointPort{
+		Name: name,
+		Port: int32(port),
+	}
+}
+
+func makePod(name string, ips ...string) api.Pod {
+	p := api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSDefault,
+			Containers:    []api.Container{{Name: "ctr", Image: "img", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+		Status: api.PodStatus{
+			PodIPs: []api.PodIP{},
+		},
+	}
+
+	for _, ip := range ips {
+		p.Status.PodIPs = append(p.Status.PodIPs, api.PodIP{IP: ip})
+	}
+
+	return p
+}
+
 func TestServiceRegistryResourceLocation(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	endpoints := &api.EndpointsList{
-		Items: []api.Endpoints{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "bad",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{
-						{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Name: "foo", Namespace: "doesn't exist"}},
-						{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Name: "doesn't exist", Namespace: metav1.NamespaceDefault}},
-						{IP: "23.2.3.4", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}},
-					},
-					Ports: []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
-					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo-second-ip",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "2001:db7::", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
-					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}},
-			},
-		},
+	pods := []api.Pod{
+		makePod("unnamed", "1.2.3.4", "1.2.3.5"),
+		makePod("named", "1.2.3.6", "1.2.3.7"),
+		makePod("no-endpoints", "9.9.9.9"), // to prove this does not get chosen
 	}
-	pods := &api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: "Always",
-					DNSPolicy:     "Default",
-					Containers:    []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile}},
-				},
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{{IP: "1.2.3.4"}, {IP: "2001:db7::"}},
-				},
+
+	endpoints := []*api.Endpoints{
+		makeEndpoints("unnamed",
+			[]api.EndpointAddress{
+				makeEndpointAddress("1.2.3.4", "unnamed"),
 			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "bar",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: "Always",
-					DNSPolicy:     "Default",
-					Containers:    []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile}},
-				},
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{{IP: "1.2.3.5"}, {IP: "2001:db8::"}},
-				},
+			[]api.EndpointPort{
+				makeEndpointPort("", 80),
+			}),
+		makeEndpoints("unnamed2",
+			[]api.EndpointAddress{
+				makeEndpointAddress("1.2.3.5", "unnamed"),
 			},
-		},
+			[]api.EndpointPort{
+				makeEndpointPort("", 80),
+			}),
+		makeEndpoints("named",
+			[]api.EndpointAddress{
+				makeEndpointAddress("1.2.3.6", "named"),
+			},
+			[]api.EndpointPort{
+				makeEndpointPort("p", 80),
+				makeEndpointPort("q", 81),
+			}),
+		makeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
 	}
-	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods, singleStackIPv4)
+
+	storage, _, server := NewTestRESTWithPods(t, endpoints, pods, singleStackIPv4)
 	defer server.Terminate(t)
-	for _, name := range []string{"foo", "bad"} {
-		_, err := registry.Create(ctx, svctest.MakeService(name,
-			svctest.SetPorts(
-				// Service port 9393 should route to endpoint port "p", which is port 93
-				svctest.MakeServicePort("p", 9393, intstr.FromString("p"), api.ProtocolTCP),
-				// Service port 93 should route to unnamed endpoint port, which is port 80
-				// This is to test that the service port definition is used when determining resource location
+
+	ctx := genericapirequest.NewDefaultContext()
+	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
+		_, err := storage.Create(ctx,
+			svctest.MakeService(name, svctest.SetPorts(
 				svctest.MakeServicePort("", 93, intstr.FromInt(80), api.ProtocolTCP))),
 			rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
-			t.Fatalf("error creating service: %v", err)
+			t.Fatalf("unexpected error creating service %q: %v", name, err)
 		}
+
+	}
+	_, err := storage.Create(ctx,
+		svctest.MakeService("named", svctest.SetPorts(
+			svctest.MakeServicePort("p", 93, intstr.FromInt(80), api.ProtocolTCP),
+			svctest.MakeServicePort("q", 76, intstr.FromInt(81), api.ProtocolTCP))),
+		rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error creating service %q: %v", "named", err)
 	}
 	redirector := rest.Redirector(storage)
 
-	// Test a simple id.
-	location, _, err := redirector.ResourceLocation(ctx, "foo")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a simple id (using second ip).
-	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//[2001:db7::]:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "foo:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port (using second ip).
-	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//[2001:db7::]:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port number (service port 93 -> target port 80)
-	location, _, err = redirector.ResourceLocation(ctx, "foo:93")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port number (service port 93 -> target port 80, using second ip)
-	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:93")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//[2001:db7::]:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93)
-	location, _, err = redirector.ResourceLocation(ctx, "foo:9393")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93, using second ip)
-	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:9393")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "//[2001:db7::]:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a scheme + name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "https:foo:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "https://1.2.3.4:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a scheme + name + port (using second ip).
-	location, _, err = redirector.ResourceLocation(ctx, "https:foo-second-ip:p")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if location == nil {
-		t.Errorf("Unexpected nil: %v", location)
-	}
-	if e, a := "https://[2001:db7::]:93", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-
-	// Test a non-existent name + port.
-	_, _, err = redirector.ResourceLocation(ctx, "foo:q")
-	if err == nil {
-		t.Errorf("Unexpected nil error")
-	}
-
-	// Test a non-existent name + port (using second ip).
-	_, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:q")
-	if err == nil {
-		t.Errorf("Unexpected nil error")
-	}
-
-	// Test error path
-	if _, _, err = redirector.ResourceLocation(ctx, "bar"); err == nil {
-		t.Errorf("unexpected nil error")
-	}
-
-	// Test a simple id.
-	_, _, err = redirector.ResourceLocation(ctx, "bad")
-	if err == nil {
-		t.Errorf("Unexpected nil error")
+	cases := []struct {
+		query  string
+		err    bool
+		expect string
+	}{{
+		query:  "unnamed",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "unnamed:",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "unnamed:93",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "http:unnamed:",
+		expect: "http://1.2.3.4:80",
+	}, {
+		query:  "http:unnamed:93",
+		expect: "http://1.2.3.4:80",
+	}, {
+		query: "unnamed:80",
+		err:   true,
+	}, {
+		query:  "unnamed2",
+		expect: "//1.2.3.5:80",
+	}, {
+		query:  "named:p",
+		expect: "//1.2.3.6:80",
+	}, {
+		query:  "named:q",
+		expect: "//1.2.3.6:81",
+	}, {
+		query:  "named:93",
+		expect: "//1.2.3.6:80",
+	}, {
+		query:  "named:76",
+		expect: "//1.2.3.6:81",
+	}, {
+		query:  "http:named:p",
+		expect: "http://1.2.3.6:80",
+	}, {
+		query:  "http:named:q",
+		expect: "http://1.2.3.6:81",
+	}, {
+		query: "named:bad",
+		err:   true,
+	}, {
+		query: "no-endpoints",
+		err:   true,
+	}, {
+		query: "non-existent",
+		err:   true,
+	}}
+	for _, tc := range cases {
+		t.Run(tc.query, func(t *testing.T) {
+			location, _, err := redirector.ResourceLocation(ctx, tc.query)
+			if tc.err == false && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.err == true && err == nil {
+				t.Fatalf("unexpected success")
+			}
+			if !tc.err {
+				if location == nil {
+					t.Errorf("unexpected location: %v", location)
+				}
+				if e, a := tc.expect, location.String(); e != a {
+					t.Errorf("expected %q, but got %q", e, a)
+				}
+			}
+		})
 	}
 }
 
@@ -1443,23 +1394,6 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	_, _, err = storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
-	}
-}
-
-func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
-	defer server.Terminate(t)
-	service := svctest.MakeService("test", func(s *api.Service) { s.Namespace = "not-default" })
-
-	ctx := genericapirequest.NewDefaultContext()
-	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if obj != nil || created {
-		t.Error("Expected a nil object, but we got a value or created was true")
-	}
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
-		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }
 
