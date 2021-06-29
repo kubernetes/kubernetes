@@ -306,6 +306,27 @@ func ValidateSecretReference(secretRef *core.SecretReference, fldPath *field.Pat
 	return allErrs
 }
 
+func ValidateSecretObjectReference(secretRef *core.ObjectReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if secretRef.Kind != "Secret" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), secretRef.Kind, "kind should be a secret"))
+	} else {
+		if len(secretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		} else {
+			for _, msg := range ValidateSecretName(secretRef.Name, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), secretRef.Name, msg))
+			}
+		}
+		if len(secretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(secretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+	return allErrs
+}
+
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -1539,10 +1560,7 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
 	if storageos.SecretRef != nil {
-		allErrs = append(allErrs, ValidateSecretReference(&core.SecretReference{
-			Name:      storageos.SecretRef.Name,
-			Namespace: storageos.SecretRef.Namespace,
-		}, fldPath.Child("secretRef"))...)
+		allErrs = append(allErrs, ValidateSecretObjectReference(storageos.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
 }

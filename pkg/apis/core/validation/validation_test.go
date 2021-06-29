@@ -18596,3 +18596,102 @@ func TestValidateSecretReference(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateSecretObjectReference(t *testing.T) {
+	path := field.NewPath("secretRef")
+	scenarios := []struct {
+		name      string
+		errorType []field.ErrorType
+		secretRef *core.ObjectReference
+	}{
+		{
+			name: "Kind should be Secret",
+			errorType: []field.ErrorType{
+				field.ErrorTypeInvalid,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Namespace",
+				Name:      "",
+				Namespace: "default",
+			},
+		}, {
+			name: "Secret Name is Required",
+			errorType: []field.ErrorType{
+				field.ErrorTypeRequired,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "",
+				Namespace: "default",
+			},
+		}, {
+			name: "Secret Namespace is Required",
+			errorType: []field.ErrorType{
+				field.ErrorTypeRequired,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "my-secret",
+				Namespace: "",
+			},
+		}, {
+			name:      "SecretReference is Valid",
+			errorType: []field.ErrorType{},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "my-secret",
+				Namespace: "default",
+			},
+		}, {
+			name: "Secret Name is Invalid",
+			errorType: []field.ErrorType{
+				field.ErrorTypeInvalid,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "my-secret-",
+				Namespace: "default",
+			},
+		}, {
+			name: "Secret Namespace Value is Required",
+			errorType: []field.ErrorType{
+				field.ErrorTypeInvalid,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "my-secret",
+				Namespace: "default-",
+			},
+		}, {
+			name: "Secret Name and Namespace value Required",
+			errorType: []field.ErrorType{
+				field.ErrorTypeRequired,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "",
+				Namespace: "",
+			},
+		}, {
+			name: "Secret Name Invalid and Namespace is Required",
+			errorType: []field.ErrorType{
+				field.ErrorTypeRequired,
+				field.ErrorTypeInvalid,
+			},
+			secretRef: &core.ObjectReference{
+				Kind:      "Secret",
+				Name:      "my-secret-",
+				Namespace: "",
+			},
+		},
+	}
+
+	for _, testScenario := range scenarios {
+		t.Run(testScenario.name, func(t *testing.T) {
+			errs := ValidateSecretObjectReference(testScenario.secretRef, path)
+			for _, err := range errs {
+				asserttestify.Contains(t, testScenario.errorType, err.Type)
+			}
+		})
+	}
+}
