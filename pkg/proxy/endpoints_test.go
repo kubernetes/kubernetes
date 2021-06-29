@@ -24,7 +24,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1952,9 +1952,7 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 func newTestEp(ep, host string, ready, serving, terminating bool) *BaseEndpointInfo {
 	endpointInfo := &BaseEndpointInfo{Endpoint: ep, Ready: ready, Serving: serving, Terminating: terminating}
 	if host != "" {
-		endpointInfo.Topology = map[string]string{
-			"kubernetes.io/hostname": host,
-		}
+		endpointInfo.NodeName = host
 	}
 	return endpointInfo
 }
