@@ -49,7 +49,7 @@ func (s *StringSlice) Set(val string) error {
 	if s.value == nil {
 		return fmt.Errorf("no target (nil pointer to []string)")
 	}
-	if *s.value == nil || !s.changed {
+	if !s.changed {
 		*s.value = make([]string, 0)
 	}
 	*s.value = append(*s.value, val)
