@@ -809,6 +809,13 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 	if err != nil {
 		return "", err
 	}
+
+	// make podIPs order match node IP family preference #97979
+	podIPs = kl.sortPodIPs(podIPs)
+	if len(podIPs) > 0 {
+		podIP = podIPs[0]
+	}
+
 	switch internalFieldPath {
 	case "spec.nodeName":
 		return pod.Spec.NodeName, nil
@@ -1570,16 +1577,14 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	return *s
 }
 
-// convertStatusToAPIStatus creates an api PodStatus for the given pod from
-// the given internal pod status.  It is purely transformative and does not
-// alter the kubelet state at all.
-func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
-	var apiPodStatus v1.PodStatus
-
-	// The runtime pod status may have an arbitrary number of IPs, in an arbitrary
-	// order. Pick out the first returned IP of the same IP family as the node IP
-	// first, followed by the first IP of the opposite IP family (if any).
-	podIPs := make([]v1.PodIP, 0, len(podStatus.IPs))
+// sortPodIPs return the PodIPs sorted and truncated by the cluster IP family preference.
+// The runtime pod status may have an arbitrary number of IPs, in an arbitrary order.
+// PodIPs are obtained by: func (m *kubeGenericRuntimeManager) determinePodSandboxIPs()
+// Pick out the first returned IP of the same IP family as the node IP
+// first, followed by the first IP of the opposite IP family (if any)
+// and use them for the Pod.Status.PodIPs and the Downward API environment variables
+func (kl *Kubelet) sortPodIPs(podIPs []string) []string {
+	ips := make([]string, 0, 2)
 	var validPrimaryIP, validSecondaryIP func(ip string) bool
 	if len(kl.nodeIPs) == 0 || utilnet.IsIPv4(kl.nodeIPs[0]) {
 		validPrimaryIP = utilnet.IsIPv4String
@@ -1588,21 +1593,40 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		validPrimaryIP = utilnet.IsIPv6String
 		validSecondaryIP = utilnet.IsIPv4String
 	}
-	for _, ip := range podStatus.IPs {
+	for _, ip := range podIPs {
 		if validPrimaryIP(ip) {
-			podIPs = append(podIPs, v1.PodIP{IP: ip})
+			ips = append(ips, ip)
 			break
 		}
 	}
-	for _, ip := range podStatus.IPs {
+	for _, ip := range podIPs {
 		if validSecondaryIP(ip) {
-			podIPs = append(podIPs, v1.PodIP{IP: ip})
+			ips = append(ips, ip)
 			break
 		}
 	}
-	apiPodStatus.PodIPs = podIPs
-	if len(podIPs) > 0 {
-		apiPodStatus.PodIP = podIPs[0].IP
+	return ips
+}
+
+// convertStatusToAPIStatus creates an api PodStatus for the given pod from
+// the given internal pod status.  It is purely transformative and does not
+// alter the kubelet state at all.
+func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
+	var apiPodStatus v1.PodStatus
+
+	// copy pod status IPs to avoid race conditions with PodStatus #102806
+	podIPs := make([]string, len(podStatus.IPs))
+	for j, ip := range podStatus.IPs {
+		podIPs[j] = ip
+	}
+
+	// make podIPs order match node IP family preference #97979
+	podIPs = kl.sortPodIPs(podIPs)
+	for _, ip := range podIPs {
+		apiPodStatus.PodIPs = append(apiPodStatus.PodIPs, v1.PodIP{IP: ip})
+	}
+	if len(apiPodStatus.PodIPs) > 0 {
+		apiPodStatus.PodIP = apiPodStatus.PodIPs[0].IP
 	}
 
 	// set status for Pods created on versions of kube older than 1.6
