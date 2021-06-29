@@ -119,7 +119,16 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{IgnoredResources: []string{"foo"}},
+							Args: &config.NodeResourcesFitArgs{
+								IgnoredResources: []string{"foo"},
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
 						},
 						{
 							Name: "RequestedToCapacityRatio",
@@ -207,7 +216,7 @@ profiles:
 							Name: "NodeLabel",
 							Args: &config.NodeLabelArgs{PresentLabels: []string{"bars"}},
 						},
-					}, defaults.PluginConfigs...),
+					}, defaults.PluginConfigsV1beta1...),
 				},
 			},
 		},
@@ -281,12 +290,12 @@ profiles:
 								Raw:         []byte(`{"foo":"bar"}`),
 							},
 						},
-					}, defaults.PluginConfigs...),
+					}, defaults.PluginConfigsV1beta1...),
 				},
 			},
 		},
 		{
-			name: "empty and no plugin args",
+			name: "empty and no plugin args v1beta1",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
@@ -325,7 +334,15 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{},
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
 						},
 						{Name: "OutOfTreePlugin"},
 						{
@@ -378,28 +395,12 @@ profiles:
   - name: NodeResourcesFit
     args:
       ignoredResources: ["foo"]
-  - name: RequestedToCapacityRatio
-    args:
-      shape:
-      - utilization: 1
   - name: PodTopologySpread
     args:
       defaultConstraints:
       - maxSkew: 1
         topologyKey: zone
         whenUnsatisfiable: ScheduleAnyway
-  - name: NodeResourcesLeastAllocated
-    args:
-      resources:
-      - name: cpu
-        weight: 2
-      - name: unknown
-        weight: 1
-  - name: NodeResourcesMostAllocated
-    args:
-      resources:
-      - name: memory
-        weight: 1
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
@@ -428,13 +429,15 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{IgnoredResources: []string{"foo"}},
-						},
-						{
-							Name: "RequestedToCapacityRatio",
-							Args: &config.RequestedToCapacityRatioArgs{
-								Shape:     []config.UtilizationShapePoint{{Utilization: 1}},
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							Args: &config.NodeResourcesFitArgs{
+								IgnoredResources: []string{"foo"},
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
 							},
 						},
 						{
@@ -444,18 +447,6 @@ profiles:
 									{MaxSkew: 1, TopologyKey: "zone", WhenUnsatisfiable: corev1.ScheduleAnyway},
 								},
 								DefaultingType: config.SystemDefaulting,
-							},
-						},
-						{
-							Name: "NodeResourcesLeastAllocated",
-							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 2}, {Name: "unknown", Weight: 1}},
-							},
-						},
-						{
-							Name: "NodeResourcesMostAllocated",
-							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
 							},
 						},
 						{
@@ -522,12 +513,14 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{},
-						},
-						{
-							Name: "NodeResourcesLeastAllocated",
-							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
 							},
 						},
 						{
@@ -561,37 +554,37 @@ profiles:
 			wantErr: `decoding .profiles[0].pluginConfig[0]: args for plugin DefaultPreemption were not of type DefaultPreemptionArgs.kubescheduler.config.k8s.io, got InterPodAffinityArgs.kubescheduler.config.k8s.io`,
 		},
 		{
-			name: "v1beta2 RequestedToCapacityRatioArgs shape encoding is strict",
+			name: "v1beta2 NodResourcesFitArgs shape encoding is strict",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: RequestedToCapacityRatio
+  - name: NodeResourcesFit
     args:
-      shape:
-      - Utilization: 1
-        Score: 2
+      scoringStrategy:
+        requestedToCapacityRatio:
+          shape:
+          - Score: 2
+            Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"shape":[{"Score":2,"Utilization":1}]}: v1beta2.RequestedToCapacityRatioArgs.Shape: []v1beta2.UtilizationShapePoint: v1beta2.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|{"shape":[{"Score":2,"Utilization":1}]}|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}: v1beta2.NodeResourcesFitArgs.ScoringStrategy: v1beta2.ScoringStrategy.RequestedToCapacityRatio: v1beta2.RequestedToCapacityRatioParam.Shape: []v1beta2.UtilizationShapePoint: v1beta2.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|gy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}|...`,
 		},
 		{
-			name: "v1beta2 RequestedToCapacityRatioArgs resources encoding is strict",
+			name: "v1beta2 NodeResourcesFitArgs resources encoding is strict",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: RequestedToCapacityRatio
+  - name: NodeResourcesFit
     args:
-      shape:
-      - utilization: 1
-        score: 2
-      resources:
-      - Name: 1
-        Weight: 2
+      scoringStrategy:
+        resources:
+        - Name: cpu
+          Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":1}]}: v1beta2.RequestedToCapacityRatioArgs.Shape: []v1beta2.UtilizationShapePoint: Resources: []v1beta2.ResourceSpec: v1beta2.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":1,"Weight|..., bigger context ...|{"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}: v1beta2.NodeResourcesFitArgs.ScoringStrategy: v1beta2.ScoringStrategy.Resources: []v1beta2.ResourceSpec: v1beta2.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":"cpu","We|..., bigger context ...|{"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}|...`,
 		},
 		{
 			name: "out-of-tree plugin args",
@@ -616,7 +609,7 @@ profiles:
 								Raw:         []byte(`{"foo":"bar"}`),
 							},
 						},
-					}, defaults.PluginConfigs...),
+					}, defaults.PluginConfigsV1beta2...),
 				},
 			},
 		},
@@ -633,10 +626,6 @@ profiles:
     args:
   - name: NodeResourcesFit
   - name: OutOfTreePlugin
-    args:
-  - name: NodeResourcesLeastAllocated
-    args:
-  - name: NodeResourcesMostAllocated
     args:
   - name: VolumeBinding
     args:
@@ -660,21 +649,17 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{},
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
 						},
 						{Name: "OutOfTreePlugin"},
-						{
-							Name: "NodeResourcesLeastAllocated",
-							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-							},
-						},
-						{
-							Name: "NodeResourcesMostAllocated",
-							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-							},
-						},
 						{
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
@@ -964,24 +949,17 @@ profiles:
 								},
 							},
 							{
-								Name: "RequestedToCapacityRatio",
+								Name: "NodeResourcesFit",
 								Args: runtime.RawExtension{
-									Object: &v1beta2.RequestedToCapacityRatioArgs{
-										Shape: []v1beta2.UtilizationShapePoint{
-											{Utilization: 1, Score: 2},
-										},
-										Resources: []v1beta2.ResourceSpec{
-											{Name: "cpu", Weight: 2},
-										},
-									},
-								},
-							},
-							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: runtime.RawExtension{
-									Object: &v1beta2.NodeResourcesLeastAllocatedArgs{
-										Resources: []v1beta2.ResourceSpec{
-											{Name: "mem", Weight: 2},
+									Object: &v1beta2.NodeResourcesFitArgs{
+										ScoringStrategy: &v1beta2.ScoringStrategy{
+											Type:      v1beta2.RequestedToCapacityRatio,
+											Resources: []v1beta2.ResourceSpec{{Name: "cpu", Weight: 1}},
+											RequestedToCapacityRatio: &v1beta2.RequestedToCapacityRatioParam{
+												Shape: []v1beta2.UtilizationShapePoint{
+													{Utilization: 1, Score: 2},
+												},
+											},
 										},
 									},
 								},
@@ -1034,21 +1012,17 @@ profiles:
     name: VolumeBinding
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
-      kind: RequestedToCapacityRatioArgs
-      resources:
-      - name: cpu
-        weight: 2
-      shape:
-      - score: 2
-        utilization: 1
-    name: RequestedToCapacityRatio
-  - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta2
-      kind: NodeResourcesLeastAllocatedArgs
-      resources:
-      - name: mem
-        weight: 2
-    name: NodeResourcesLeastAllocated
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        requestedToCapacityRatio:
+          shape:
+          - score: 2
+            utilization: 1
+        resources:
+        - name: cpu
+          weight: 1
+        type: RequestedToCapacityRatio
+    name: NodeResourcesFit
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
       kind: PodTopologySpreadArgs
@@ -1073,9 +1047,12 @@ profiles:
 								},
 							},
 							{
-								Name: "NodeResourcesMostAllocated",
-								Args: &config.NodeResourcesMostAllocatedArgs{
-									Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
+								Name: "NodeResourcesFit",
+								Args: &config.NodeResourcesFitArgs{
+									ScoringStrategy: &config.ScoringStrategy{
+										Type:      config.LeastAllocated,
+										Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -1131,11 +1108,13 @@ profiles:
     name: InterPodAffinity
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
-      kind: NodeResourcesMostAllocatedArgs
-      resources:
-      - name: cpu
-        weight: 1
-    name: NodeResourcesMostAllocated
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourcesFit
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
       bindTimeoutSeconds: 300

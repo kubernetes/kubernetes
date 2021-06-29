@@ -34,6 +34,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.KubeSchedulerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta1.KubeSchedulerConfiguration))
 	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*v1beta1.NodeResourcesFitArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.NodeResourcesLeastAllocatedArgs{}, func(obj interface{}) {
 		SetObjectDefaults_NodeResourcesLeastAllocatedArgs(obj.(*v1beta1.NodeResourcesLeastAllocatedArgs))
 	})
@@ -58,6 +59,10 @@ func SetObjectDefaults_InterPodAffinityArgs(in *v1beta1.InterPodAffinityArgs) {
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
+}
+
+func SetObjectDefaults_NodeResourcesFitArgs(in *v1beta1.NodeResourcesFitArgs) {
+	SetDefaults_NodeResourcesFitArgs(in)
 }
 
 func SetObjectDefaults_NodeResourcesLeastAllocatedArgs(in *v1beta1.NodeResourcesLeastAllocatedArgs) {

@@ -75,6 +75,10 @@ var pluginConfigs = []v1beta1.PluginConfig{
 				Kind:       "NodeResourcesFitArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1beta1",
 			},
+			ScoringStrategy: &v1beta1.ScoringStrategy{
+				Type:      v1beta1.LeastAllocated,
+				Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+			},
 		}},
 	},
 	{
@@ -282,6 +286,10 @@ func TestSchedulerDefaults(t *testing.T) {
 									TypeMeta: metav1.TypeMeta{
 										Kind:       "NodeResourcesFitArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+									},
+									ScoringStrategy: &v1beta1.ScoringStrategy{
+										Type:      v1beta1.LeastAllocated,
+										Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 									},
 								}},
 							},
@@ -666,6 +674,30 @@ func TestPluginArgsDefaults(t *testing.T) {
 			in: &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
 				DefaultingType: v1beta1.ListDefaulting,
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs not set",
+			in:   &v1beta1.NodeResourcesFitArgs{},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs Resources empty",
+			in: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type: v1beta1.MostAllocated,
+				},
+			},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
 			},
 		},
 	}
