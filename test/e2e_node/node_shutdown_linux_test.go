@@ -21,6 +21,8 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -180,8 +182,16 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 		})
 
 		ginkgo.It("after restart dbus, should be able to gracefully shutdown", func() {
+			// allows manual restart of dbus to work in Ubuntu.
+			err := overlayDbusConfig()
+			framework.ExpectNoError(err)
+			defer func() {
+				err := restoreDbusConfig()
+				framework.ExpectNoError(err)
+			}()
+
 			ginkgo.By("Restart Dbus")
-			err := restartDbus()
+			err = restartDbus()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Emitting Shutdown signal")
@@ -260,4 +270,42 @@ func restartDbus() error {
 	cmd := "systemctl restart dbus"
 	_, err := runCommand("sh", "-c", cmd)
 	return err
+}
+
+func systemctlDaemonReload() error {
+	cmd := "systemctl daemon-reload"
+	_, err := runCommand("sh", "-c", cmd)
+	return err
+}
+
+var (
+	dbusConfPath = "/etc/systemd/system/dbus.service.d/k8s-graceful-node-shutdown-e2e.conf"
+	dbusConf     = `
+[Unit]
+RefuseManualStart=no
+RefuseManualStop=no
+[Service]
+KillMode=control-group
+ExecStop=
+`
+)
+
+func overlayDbusConfig() error {
+	err := os.MkdirAll(filepath.Dir(dbusConf), 0755)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dbusConfPath, []byte(dbusConf), 0644)
+	if err != nil {
+		return err
+	}
+	return systemctlDaemonReload()
+}
+
+func restoreDbusConfig() error {
+	err := os.Remove(dbusConf)
+	if err != nil {
+		return err
+	}
+	return systemctlDaemonReload()
 }
