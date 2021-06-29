@@ -298,6 +298,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		RequestInfoResolver:   &request.RequestInfoFactory{},
 		RequestTimeout:        10 * time.Second,
 		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:      newLifecycleSignals(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
