@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -62,8 +63,7 @@ var (
 // in a completely different way. We should unify it.
 
 type serviceStorage struct {
-	Services    map[string]*api.Service
-	ServiceList *api.ServiceList
+	Services map[string]*api.Service
 }
 
 func (s *serviceStorage) saveService(svc *api.Service) {
@@ -99,19 +99,18 @@ func (s *serviceStorage) NewList() runtime.Object {
 func (s *serviceStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 
-	// Copy metadata from internal list into result
-	res := new(api.ServiceList)
-	res.TypeMeta = s.ServiceList.TypeMeta
-	res.ListMeta = s.ServiceList.ListMeta
+	keys := make([]string, 0, len(s.Services))
+	for k := range s.Services {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 
-	if ns != metav1.NamespaceAll {
-		for _, service := range s.ServiceList.Items {
-			if ns == service.Namespace {
-				res.Items = append(res.Items, service)
-			}
+	res := new(api.ServiceList)
+	for _, k := range keys {
+		svc := s.Services[k]
+		if ns == metav1.NamespaceAll || ns == svc.Namespace {
+			res.Items = append(res.Items, *svc)
 		}
-	} else {
-		res.Items = append([]api.Service{}, s.ServiceList.Items...)
 	}
 
 	return res, nil
@@ -129,11 +128,6 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 	s.saveService(svc)
 	s.Services[svc.Name].ResourceVersion = "1"
 
-	if s.ServiceList == nil {
-		s.ServiceList = &api.ServiceList{}
-	}
-
-	s.ServiceList.Items = append(s.ServiceList.Items, *svc)
 	return s.Services[svc.Name].DeepCopy(), nil
 }
 
