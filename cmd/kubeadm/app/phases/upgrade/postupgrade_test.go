@@ -22,10 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+
+	"github.com/pkg/errors"
 )
 
 func TestMoveFiles(t *testing.T) {

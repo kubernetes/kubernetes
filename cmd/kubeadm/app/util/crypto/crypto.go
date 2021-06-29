@@ -17,11 +17,11 @@ limitations under the License.
 package crypto
 
 import (
-	"github.com/pkg/errors"
-
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+
+	"github.com/pkg/errors"
 )
 
 // CreateRandBytes returns a cryptographically secure slice of random bytes with a given size

@@ -21,15 +21,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/coredns/corefile-migration/migration"
-	"github.com/pkg/errors"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+
+	"github.com/coredns/corefile-migration/migration"
+	"github.com/pkg/errors"
 )
 
 // CoreDNSCheck validates installed kubelet version
