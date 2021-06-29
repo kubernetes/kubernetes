@@ -2967,6 +2967,7 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -2974,14 +2975,16 @@ COMMIT
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -3029,7 +3032,7 @@ COMMIT
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
-		}, { // not ready endpoints should be ignored
+		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
 			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
@@ -3067,6 +3070,7 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -3076,14 +3080,16 @@ COMMIT
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -3139,7 +3145,7 @@ COMMIT
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
-		}, { // not ready endpoints should be ignored
+		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
 			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
@@ -3152,6 +3158,119 @@ COMMIT
 	fp.OnServiceDelete(svc)
 	fp.syncProxyRules()
 	assert.NotEqual(t, expectedIPTables, fp.iptablesData.String())
+}
+
+// Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
+func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, true)
+	fp.OnServiceSynced()
+	fp.OnEndpointsSynced()
+	fp.OnEndpointSlicesSynced()
+
+	serviceName := "svc1"
+	namespaceName := "ns1"
+
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "172.20.1.1",
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+		},
+	})
+
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses:  []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses:  []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, { // not ready endpoints should be ignored
+			Addresses:  []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	result := fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 1 {
+		t.Errorf("unexpected number of health check node ports, expected 1 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
+
+	// set all endpoints to terminating
+	endpointSliceTerminating := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses: []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(false),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses: []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses: []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, { // not ready endpoints should be ignored
+			Addresses: []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(false),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}},
+	}
+
+	fp.OnEndpointSliceUpdate(endpointSlice, endpointSliceTerminating)
+	result = fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 0 {
+		t.Errorf("unexpected number of health check node ports, expected 0 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
 }
 
 func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
@@ -3397,12 +3516,12 @@ COMMIT
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -3573,5 +3692,556 @@ COMMIT
 			fp.syncProxyRules()
 			assert.NotEqual(t, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 		}
+	}
+}
+
+// Test_EndpointSliceWithTerminatingEndpoints tests that when there are local ready and ready + terminating
+// endpoints, only the ready endpoints are used.
+func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
+	tcpProtocol := v1.ProtocolTCP
+	testcases := []struct {
+		name                   string
+		terminatingFeatureGate bool
+		service                *v1.Service
+		endpointslice          *discovery.EndpointSlice
+		expectedIPTables       string
+	}{
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
+			terminatingFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints disabled, ready endpoints exist",
+			terminatingFeatureGate: false,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints enabled, only terminating endpoints exist",
+			terminatingFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						// this endpoint should be used since there are only ready terminating endpoints
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be used since there are only ready terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should not be used since it is both terminating and not ready.
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
+			terminatingFeatureGate: false,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+					},
+					{
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, testcase.terminatingFeatureGate)()
+
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt, true)
+			fp.OnServiceSynced()
+			fp.OnEndpointsSynced()
+			fp.OnEndpointSlicesSynced()
+
+			fp.OnServiceAdd(testcase.service)
+
+			fp.OnEndpointSliceAdd(testcase.endpointslice)
+			fp.syncProxyRules()
+			t.Log(fp.iptablesData.String())
+			assert.Equal(t, testcase.expectedIPTables, fp.iptablesData.String())
+
+			fp.OnEndpointSliceDelete(testcase.endpointslice)
+			fp.syncProxyRules()
+			assert.NotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+		})
 	}
 }
