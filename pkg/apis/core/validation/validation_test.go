@@ -68,8 +68,9 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	validMode := core.PersistentVolumeFilesystem
 	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		volume            *core.PersistentVolume
+		isExpectedFailure      bool
+		enableReadWriteOncePod bool
+		volume                 *core.PersistentVolume
 	}{
 		"good-volume": {
 			isExpectedFailure: false,
@@ -209,6 +210,54 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					},
 				},
 				VolumeMode: &invalidMode,
+			}),
+		},
+		"with-read-write-once-pod-feature-gate-enabled": {
+			isExpectedFailure:      false,
+			enableReadWriteOncePod: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		"with-read-write-once-pod-feature-gate-disabled": {
+			isExpectedFailure:      true,
+			enableReadWriteOncePod: false,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		"with-read-write-once-pod-and-others-feature-gate-enabled": {
+			isExpectedFailure:      true,
+			enableReadWriteOncePod: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
 			}),
 		},
 		"unexpected-namespace": {
@@ -415,7 +464,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidatePersistentVolume(scenario.volume)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
+
+			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
+			errs := ValidatePersistentVolume(scenario.volume, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -558,7 +610,8 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"))
+		opts := PersistentVolumeSpecValidationOptions{}
+		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"), opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -655,13 +708,93 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		opts := ValidationOptionsForPersistentVolume(scenario.newVolume, scenario.oldVolume)
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
+	}
+}
+
+func TestValidationOptionsForPersistentVolume(t *testing.T) {
+	tests := map[string]struct {
+		oldPv                  *core.PersistentVolume
+		enableReadWriteOncePod bool
+		expectValidationOpts   PersistentVolumeSpecValidationOptions
+	}{
+		"nil old pv": {
+			oldPv:                  nil,
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because feature enabled": {
+			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop not allowed because not used and feature disabled": {
+			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{
+				AllowReadWriteOncePod: false,
+			},
+		},
+		"rwop allowed because used and feature enabled": {
+			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because used and feature disabled": {
+			oldPv:                  pvWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
+
+			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
+			if opts != tc.expectValidationOpts {
+				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
+			}
+		})
+	}
+}
+
+func pvWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolume {
+	return &core.PersistentVolume{
+		Spec: core.PersistentVolumeSpec{
+			AccessModes: accessModes,
+		},
+	}
+}
+
+func pvcWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+		},
+	}
+}
+
+func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolumeClaimTemplate {
+	return &core.PersistentVolumeClaimTemplate{
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+		},
 	}
 }
 
@@ -729,7 +862,8 @@ func TestValidateLocalVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
+		opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
+		errs := ValidatePersistentVolume(scenario.volume, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -808,7 +942,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
+		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -909,12 +1044,14 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 	}
 
 	for _, tc := range successTestCases {
-		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) != 0 {
+		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec"), opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	for _, tc := range failedTestCases {
-		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
+		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec"), opts); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
 	}
@@ -969,8 +1106,9 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 	ten := int64(10)
 
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		claim             *core.PersistentVolumeClaim
+		isExpectedFailure      bool
+		enableReadWriteOncePod bool
+		claim                  *core.PersistentVolumeClaim
 	}{
 		"good-claim": {
 			isExpectedFailure: false,
@@ -1117,6 +1255,42 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				}
 				return claim
 			}(),
+		},
+		"with-read-write-once-pod-feature-gate-enabled": {
+			isExpectedFailure:      false,
+			enableReadWriteOncePod: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			}),
+		},
+		"with-read-write-once-pod-feature-gate-disabled": {
+			isExpectedFailure:      true,
+			enableReadWriteOncePod: false,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			}),
+		},
+		"with-read-write-once-pod-and-others-feature-gate-enabled": {
+			isExpectedFailure:      true,
+			enableReadWriteOncePod: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			}),
 		},
 		"invalid-claim-zero-capacity": {
 			isExpectedFailure: true,
@@ -1292,6 +1466,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
+
 			var errs field.ErrorList
 			if ephemeral {
 				volumes := []core.Volume{
@@ -1310,7 +1486,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				opts := PodValidationOptions{}
 				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""), opts)
 			} else {
-				errs = ValidatePersistentVolumeClaim(scenario.claim)
+				opts := ValidationOptionsForPersistentVolumeClaim(scenario.claim, nil)
+				errs = ValidatePersistentVolumeClaim(scenario.claim, opts)
 			}
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Error("Unexpected success for scenario")
@@ -1393,8 +1570,9 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
 			// ensure we have a resource version specified for updates
-			errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
+			errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -1636,6 +1814,30 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			},
 		})
 
+	validClaimRWOPAccessMode := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOncePod,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+
+	validClaimRWOPAccessModeAddAnnotation := testVolumeClaimAnnotation("foo", "ns", "description", "updated-or-added-foo-description", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOncePod,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *core.PersistentVolumeClaim
@@ -1804,6 +2006,12 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimStorageClass,
 			enableResize:      false,
 		},
+		"valid-update-rwop-used-and-rwop-feature-disabled": {
+			isExpectedFailure: false,
+			oldClaim:          validClaimRWOPAccessMode,
+			newClaim:          validClaimRWOPAccessModeAddAnnotation,
+			enableResize:      false,
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -1812,12 +2020,123 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
-			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
+			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
 			if len(errs) > 0 && !scenario.isExpectedFailure {
 				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
+	}
+}
+
+func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
+	tests := map[string]struct {
+		oldPvc                 *core.PersistentVolumeClaim
+		enableReadWriteOncePod bool
+		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+	}{
+		"nil pv": {
+			oldPvc:                 nil,
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because feature enabled": {
+			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop not allowed because not used and feature disabled": {
+			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: false,
+			},
+		},
+		"rwop allowed because used and feature enabled": {
+			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because used and feature disabled": {
+			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
+
+			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
+			if opts != tc.expectValidationOpts {
+				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
+			}
+		})
+	}
+}
+
+func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
+	tests := map[string]struct {
+		oldPvcTemplate         *core.PersistentVolumeClaimTemplate
+		enableReadWriteOncePod bool
+		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+	}{
+		"nil pv": {
+			oldPvcTemplate:         nil,
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because feature enabled": {
+			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop not allowed because not used and feature disabled": {
+			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: false,
+			},
+		},
+		"rwop allowed because used and feature enabled": {
+			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+		"rwop allowed because used and feature disabled": {
+			oldPvcTemplate:         pvcTemplateWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
+			enableReadWriteOncePod: false,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod: true,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
+
+			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
+			if opts != tc.expectValidationOpts {
+				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
 			}
 		})
 	}
@@ -4307,7 +4626,8 @@ func TestPVCVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePVC(nil),
 	}
 	for k, v := range successCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) != 0 {
+		opts := ValidationOptionsForPersistentVolumeClaim(v, nil)
+		if errs := ValidatePersistentVolumeClaim(v, opts); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -4318,7 +4638,8 @@ func TestPVCVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePVC(&empty),
 	}
 	for k, v := range errorCasesPVC {
-		if errs := ValidatePersistentVolumeClaim(v); len(errs) == 0 {
+		opts := ValidationOptionsForPersistentVolumeClaim(v, nil)
+		if errs := ValidatePersistentVolumeClaim(v, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -4337,7 +4658,8 @@ func TestPVVolumeMode(t *testing.T) {
 		"valid nil value":        createTestVolModePV(nil),
 	}
 	for k, v := range successCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) != 0 {
+		opts := ValidationOptionsForPersistentVolume(v, nil)
+		if errs := ValidatePersistentVolume(v, opts); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -4348,7 +4670,8 @@ func TestPVVolumeMode(t *testing.T) {
 		"empty value":   createTestVolModePV(&empty),
 	}
 	for k, v := range errorCasesPV {
-		if errs := ValidatePersistentVolume(v); len(errs) == 0 {
+		opts := ValidationOptionsForPersistentVolume(v, nil)
+		if errs := ValidatePersistentVolume(v, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -16569,12 +16892,14 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		if tc.expectedFail {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) == 0 {
+			opts := PersistentVolumeClaimSpecValidationOptions{}
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
 				t.Errorf("expected failure: %v", errs)
 			}
 
 		} else {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) != 0 {
+			opts := PersistentVolumeClaimSpecValidationOptions{}
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		}
