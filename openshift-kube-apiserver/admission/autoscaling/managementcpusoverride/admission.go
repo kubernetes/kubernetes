@@ -180,6 +180,11 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return admission.NewForbidden(attr, err) // can happen due to informer latency
 	}
 
+	// we can not decide the cluster type without status.controlPlaneTopology and status.infrastructureTopology
+	if clusterInfra.Status.ControlPlaneTopology == "" || clusterInfra.Status.InfrastructureTopology == "" {
+		return admission.NewForbidden(attr, fmt.Errorf("%s infrastructure resource has empty status.controlPlaneTopology or status.infrastructureTopology", PluginName))
+	}
+
 	// not the SNO cluster, skip mutation
 	// TODO: currently we supports only SNO use case because we have not yet worked out the best approach to determining whether the feature
 	// should be on or off in a multi-node cluster, and computing that state incorrectly could lead to breaking running clusters.
