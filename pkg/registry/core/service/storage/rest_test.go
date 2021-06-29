@@ -61,10 +61,6 @@ var (
 // in a completely different way. We should unify it.
 
 type serviceStorage struct {
-	GottenID    string
-	UpdatedID   string
-	CreatedID   string
-	DeletedID   string
 	Service     *api.Service
 	ServiceList *api.ServiceList
 }
@@ -74,12 +70,15 @@ func (s *serviceStorage) NamespaceScoped() bool {
 }
 
 func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	s.GottenID = name
 	return s.Service, nil
 }
 
-func (s *serviceStorage) GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
-	return s.Service, nil
+func getService(getter rest.Getter, ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+	obj, err := getter.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Service), nil
 }
 
 func (s *serviceStorage) NewList() runtime.Object {
@@ -116,7 +115,6 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 		return obj, nil
 	}
 	svc := obj.(*api.Service)
-	s.CreatedID = obj.(metav1.Object).GetName()
 	s.Service = svc.DeepCopy()
 	s.Service.ResourceVersion = "1"
 
@@ -134,16 +132,12 @@ func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.U
 		return nil, false, err
 	}
 	if !dryrun.IsDryRun(options.DryRun) {
-		s.UpdatedID = name
 		s.Service = obj.(*api.Service)
 	}
 	return obj, false, nil
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	if !dryrun.IsDryRun(options.DryRun) {
-		s.DeletedID = name
-	}
 	return s.Service, false, nil
 }
 
@@ -346,7 +340,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[i])
 				}
 			}
-			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -412,7 +406,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 				}
 			}
 
-			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -442,7 +436,7 @@ func TestDryRunNodePort(t *testing.T) {
 	if storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
-	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	srv, err := getService(registry, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -472,7 +466,7 @@ func TestDryRunNodePort(t *testing.T) {
 			t.Errorf("unexpected side effect: NodePort allocated")
 		}
 	}
-	srv, err = registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	srv, err = getService(registry, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -564,7 +558,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
 			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
 		}
-		srv, err := registry.GetService(ctx, test.name, &metav1.GetOptions{})
+		srv, err := getService(registry, ctx, test.name, &metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -634,9 +628,6 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	if updatedService.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", updatedService.Name)
 	}
-	if e, a := "foo", registry.UpdatedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
 }
 
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
@@ -666,9 +657,6 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	}
 	if storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
-	}
-	if e, a := "", registry.UpdatedID; e != a {
-		t.Errorf("Expected %q, but got %q", e, a)
 	}
 
 	// Test dry run update request external name to cluster ip
@@ -760,7 +748,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
 	}
-	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	srv, err := getService(registry, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -832,7 +820,7 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 				}
 				t.Errorf("%s; Failed to create service: %#v", tc.name, err)
 			}
-			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s; Unexpected error: %v", tc.name, err)
 			}
@@ -862,15 +850,15 @@ func TestServiceRegistryDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-	if e, a := "foo", registry.DeletedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
+	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Test dry run delete request with cluster ip
@@ -889,9 +877,6 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
-	}
-	if e, a := "", registry.DeletedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
 	}
 	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
 		t.Errorf("unexpected side effect: ip unallocated")
@@ -917,9 +902,6 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if e, a := "", registry.DeletedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
 	if !storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
@@ -930,7 +912,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 
 	// dry run for non dualstack
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-	dualstack_storage, dualstack_registry, dualstack_server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	dualstack_storage, _, dualstack_server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 	defer dualstack_server.Terminate(t)
 	// Test dry run delete request with cluster ip
 	dualstack_svc := svctest.MakeService("foo",
@@ -946,9 +928,6 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 	_, _, err = dualstack_storage.Delete(ctx, dualstack_svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
-	}
-	if e, a := "", dualstack_registry.DeletedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
 	}
 	for i, family := range dualstack_svc.Spec.IPFamilies {
 		if !dualstack_storage.serviceIPAllocatorsByFamily[family].Has(net.ParseIP(dualstack_svc.Spec.ClusterIPs[i])) {
@@ -966,9 +945,9 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-	if e, a := "foo", registry.DeletedID; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
+	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
 	}
 }
 
@@ -1033,8 +1012,9 @@ func TestServiceRegistryGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
-	storage.Get(ctx, "foo", &metav1.GetOptions{})
-	if e, a := "foo", registry.GottenID; e != a {
+	obj, _ := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	svc := obj.(*api.Service)
+	if e, a := "foo", svc.Name; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 }
