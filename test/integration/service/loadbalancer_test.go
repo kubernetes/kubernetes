@@ -160,7 +160,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 	ns := framework.CreateTestingNamespace("test-service-load-balancer-class", server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	controller, cloud, informer := newCloudProviderController(t, client)
+	controller, cloud, informer := newServiceController(t, client)
 
 	stopCh := make(chan struct{})
 	informer.Start(stopCh)
@@ -209,7 +209,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 	ns := framework.CreateTestingNamespace("test-service-immutable-load-balancer-class", server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	controller, cloud, informer := newCloudProviderController(t, client)
+	controller, cloud, informer := newServiceController(t, client)
 
 	stopCh := make(chan struct{})
 	informer.Start(stopCh)
@@ -249,7 +249,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 	}
 }
 
-func newCloudProviderController(t *testing.T, client *clientset.Clientset) (*servicecontroller.Controller, *fakecloud.Cloud, informers.SharedInformerFactory) {
+func newServiceController(t *testing.T, client *clientset.Clientset) (*servicecontroller.Controller, *fakecloud.Cloud, informers.SharedInformerFactory) {
 	cloud := &fakecloud.Cloud{}
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
@@ -262,7 +262,7 @@ func newCloudProviderController(t *testing.T, client *clientset.Clientset) (*ser
 		"test-cluster",
 		utilfeature.DefaultFeatureGate)
 	if err != nil {
-		t.Fatalf("Error creating cloud provider controller: %v", err)
+		t.Fatalf("Error creating service controller: %v", err)
 	}
 	cloud.Calls = nil // ignore any cloud calls made in init()
 	return controller, cloud, informerFactory
