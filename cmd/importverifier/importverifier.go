@@ -61,6 +61,15 @@ type ImportRestriction struct {
 	ExcludeTests bool `yaml:"excludeTests"`
 }
 
+// DisallowedImport describes an Import that should no longer be imported
+// TODO: Map to YAML if the list of DisallowedImport grow
+type DisallowedImport struct {
+	// Pkg The package that's disallowed
+	Pkg string
+	// IgnoredTrees ignore the check against those sub-trees
+	IgnoredTrees []string
+}
+
 // ForbiddenImportsFor determines all of the forbidden
 // imports for a package given the import restrictions
 func (i *ImportRestriction) ForbiddenImportsFor(pkg Package) ([]string, error) {
@@ -213,6 +222,12 @@ func main() {
 	if foundForbiddenImports {
 		os.Exit(1)
 	}
+
+	err = verifyDisallowedImports()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
 }
 
 func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
@@ -292,4 +307,48 @@ func logForbiddenPackages(base string, forbidden []string) {
 	for _, forbiddenPackage := range forbidden {
 		log.Printf("--- %s\n", forbiddenPackage)
 	}
+}
+
+// Check if any imports are disallowed
+// Exec e.g find . -name "*.go" |  grep -v vendor/ | grep -v cmd/kubeadm/app | { xargs grep 'github.com/pkg/errors' -sl || true; }
+func verifyDisallowedImports() error {
+
+	// Manually create a single entry for github/pkg/errors
+	disallowedImports := []DisallowedImport{{
+		Pkg:          "github.com/pkg/errors",
+		IgnoredTrees: []string{"cmd/kubeadm/app", "cmd/importverifier"},
+	},
+	}
+
+	cmd := "find "
+	args := []string{".", "-name", "\"*.go\"", "|", "grep", "-v", "vendor/"}
+	fArgs := []string{"|", "{", "xargs", "grep"}
+
+	for _, di := range disallowedImports {
+		// Add the Pkg to look for using grep
+		fArgs = append(fArgs, "'"+di.Pkg+"'", "-sl", "||", "true;", "}")
+
+		for _, tree := range di.IgnoredTrees {
+			args = append(args, "|", "grep", "-v", tree)
+		}
+		args = append(args, fArgs...)
+
+		fullCommand := cmd + strings.Join(args, " ")
+		stdout, err := exec.Command("bash", "-c", fullCommand).Output()
+		if err != nil {
+			var message string
+			if ee, ok := err.(*exec.ExitError); ok {
+				message = fmt.Sprintf("%v\n%v", ee, string(ee.Stderr))
+			} else {
+				message = fmt.Sprintf("%v", err)
+			}
+			return fmt.Errorf("failed to run `%s`: %v", fullCommand, message)
+		}
+
+		if len(stdout) != 0 {
+			return fmt.Errorf("Disallowed Import '%s' is used: \n%s", di.Pkg, stdout)
+		}
+	}
+
+	return nil
 }
