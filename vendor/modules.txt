@@ -2226,6 +2226,18 @@ k8s.io/metrics/pkg/client/external_metrics/fake
 # k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
 ## explicit
 k8s.io/mount-utils
+# k8s.io/pod-security-admission v0.0.0 => ./staging/src/k8s.io/pod-security-admission
+## explicit
+k8s.io/pod-security-admission/admission
+k8s.io/pod-security-admission/admission/api
+k8s.io/pod-security-admission/admission/api/load
+k8s.io/pod-security-admission/admission/api/scheme
+k8s.io/pod-security-admission/admission/api/v1alpha1
+k8s.io/pod-security-admission/admission/api/validation
+k8s.io/pod-security-admission/api
+k8s.io/pod-security-admission/metrics
+k8s.io/pod-security-admission/policy
+k8s.io/pod-security-admission/test
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit
 k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
