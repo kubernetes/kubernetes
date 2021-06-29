@@ -251,9 +251,9 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 }
 
 func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
-	if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
+	if _, err := keyutil.ParsePrivateKeyPEM(certOrKeyData); err == nil {
 		return keyutil.WriteKey(certOrKeyPath, certOrKeyData)
-	} else if _, err := certutil.ParseCertsPEM(certOrKeyData); err == nil {
+	} else if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
 		return certutil.WriteCert(certOrKeyPath, certOrKeyData)
 	}
 	return errors.New("unknown data found in Secret entry")
