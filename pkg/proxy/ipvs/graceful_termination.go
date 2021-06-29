@@ -81,6 +81,9 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 }
 
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
 	success := true
 	for name, rs := range q.list {
 		deleted, err := handler(rs)
@@ -90,7 +93,9 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 		}
 		if deleted {
 			klog.Infof("lw: remote out of the list: %s", name)
-			q.remove(rs)
+			if _, ok := q.list[rs.String()]; ok {
+				delete(q.list, rs.String())
+			}
 		}
 	}
 	return success
