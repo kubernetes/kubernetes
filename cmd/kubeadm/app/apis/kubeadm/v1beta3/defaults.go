@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -69,6 +70,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
+	if len(obj.NodeRegistration.ImagePullPolicy) == 0 {
+		obj.NodeRegistration.ImagePullPolicy = v1.PullIfNotPresent
+	}
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
@@ -130,6 +134,10 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 
 	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
+
+	if len(obj.NodeRegistration.ImagePullPolicy) == 0 {
+		obj.NodeRegistration.ImagePullPolicy = v1.PullIfNotPresent
+	}
 }
 
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
