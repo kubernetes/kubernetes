@@ -261,10 +261,10 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 	return net
 }
 
-func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST, registry ServiceStorage) {
-	obj, err := registry.Get(ctx, svcName, &metav1.GetOptions{})
+func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST) {
+	obj, err := rest.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	srv := obj.(*api.Service)
 	if srv == nil {
@@ -272,7 +272,7 @@ func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, 
 	}
 	serviceNodePorts := collectServiceNodePorts(srv)
 	if len(serviceNodePorts) == 0 {
-		t.Errorf("Failed to find NodePorts of service : %s", srv.Name)
+		t.Fatalf("Failed to find NodePorts of service : %s", srv.Name)
 	}
 	for i := range serviceNodePorts {
 		nodePort := serviceNodePorts[i]
@@ -309,7 +309,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, registry, server := NewTestREST(t, nil, tc.families)
+			storage, _, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -340,7 +340,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[i])
 				}
 			}
-			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -390,7 +390,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 			if tc.enableDualStack {
 				families = append(families, api.IPv6Protocol)
 			}
-			storage, registry, server := NewTestREST(t, nil, families)
+			storage, _, server := NewTestREST(t, nil, families)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -406,7 +406,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 				}
 			}
 
-			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -418,7 +418,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 }
 
 func TestDryRunNodePort(t *testing.T) {
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Test dry run create request with a node port
@@ -436,7 +436,7 @@ func TestDryRunNodePort(t *testing.T) {
 	if storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
-	srv, err := getService(registry, ctx, svc.Name, &metav1.GetOptions{})
+	srv, err := getService(storage, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestDryRunNodePort(t *testing.T) {
 			t.Errorf("unexpected side effect: NodePort allocated")
 		}
 	}
-	srv, err = getService(registry, ctx, svc.Name, &metav1.GetOptions{})
+	srv, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestDryRunNodePort(t *testing.T) {
 }
 
 func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	testCases := []struct {
@@ -558,7 +558,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
 			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
 		}
-		srv, err := getService(registry, ctx, test.name, &metav1.GetOptions{})
+		srv, err := getService(storage, ctx, test.name, &metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -597,10 +597,10 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol})
+	storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
-	_, err := registry.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -632,10 +632,10 @@ func TestServiceRegistryUpdate(t *testing.T) {
 
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
-	obj, err := registry.Create(ctx, svctest.MakeService("foo", svctest.SetTypeExternalName), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := storage.Create(ctx, svctest.MakeService("foo", svctest.SetTypeExternalName), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -716,9 +716,9 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -741,14 +741,14 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
 	}
-	srv, err := getService(registry, ctx, svc.Name, &metav1.GetOptions{})
+	srv, err := getService(storage, ctx, svc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -810,7 +810,7 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 			ctx := genericapirequest.NewDefaultContext()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, tc.allocateNodePortGate)()
 
-			storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+			storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 			defer server.Terminate(t)
 
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -820,7 +820,7 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 				}
 				t.Errorf("%s; Failed to create service: %#v", tc.name, err)
 			}
-			srv, err := getService(registry, ctx, tc.svc.Name, &metav1.GetOptions{})
+			srv, err := getService(storage, ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s; Unexpected error: %v", tc.name, err)
 			}
@@ -843,10 +843,10 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 
 func TestServiceRegistryDelete(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo")
-	_, err := registry.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -938,10 +938,10 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo", svctest.SetTypeExternalName)
-	_, err := registry.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -953,7 +953,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Create non-external load balancer.
@@ -969,7 +969,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc2.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc2.Name, storage)
 
 	// Change port.
 	svc3 := svc2.DeepCopy()
@@ -981,7 +981,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Create external load balancer.
@@ -994,7 +994,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc1.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc1.Name, storage)
 
 	// Modify ports
 	svc2 := obj.(*api.Service).DeepCopy()
@@ -1006,9 +1006,9 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
 	}
@@ -1254,17 +1254,16 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
-	_, err := registry.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = registry.Create(ctx, svctest.MakeService("foo2"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err = storage.Create(ctx, svctest.MakeService("foo2"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	registry.ServiceList.ResourceVersion = "1"
 	s, _ := storage.List(ctx, nil)
 	sl := s.(*api.ServiceList)
 	if len(sl.Items) != 2 {
@@ -1275,9 +1274,6 @@ func TestServiceRegistryList(t *testing.T) {
 	}
 	if e, a := "foo2", sl.Items[1].Name; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
-	}
-	if sl.ResourceVersion != "1" {
-		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }
 
@@ -1423,7 +1419,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryIPLoadBalancer(t *testing.T) {
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 
 	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
@@ -1432,7 +1428,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	if createdSvc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdService := createdSvc.(*api.Service)
 	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
@@ -1471,7 +1467,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
@@ -1480,7 +1476,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if !service.NeedsHealthCheck(createdSvc) {
@@ -1499,7 +1495,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		// hard-code NodePort to make sure it doesn't conflict with the healthport.
@@ -1512,7 +1508,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	if obj == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if !service.NeedsHealthCheck(createdSvc) {
@@ -1550,7 +1546,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 // Validate that the health check nodePort is not allocated when ExternalTrafficPolicy is set to Global.
 func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
@@ -1559,7 +1555,7 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if service.NeedsHealthCheck(createdSvc) {
