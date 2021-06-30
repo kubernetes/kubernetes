@@ -220,7 +220,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 	ginkgo.BeforeEach(func() {
 		// This test requires:
-		// - SSH master access
+		// - SSH ControlPlane access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
 		if !framework.ProviderIs("gce") {
@@ -228,7 +228,7 @@ var _ = SIGDescribe("Addon update", func() {
 		}
 
 		var err error
-		sshClient, err = getMasterSSHClient()
+		sshClient, err = getControlPlaneSSHClient()
 		framework.ExpectNoError(err, "Failed to get the master SSH client.")
 	})
 
@@ -431,7 +431,7 @@ func waitForReplicationControllerWithSelector(c clientset.Interface, namespace s
 
 // TODO use the ssh.SSH code, either adding an SCP to it or copying files
 // differently.
-func getMasterSSHClient() (*ssh.Client, error) {
+func getControlPlaneSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
 	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
 	if err != nil {

@@ -37,7 +37,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
-func addMasterReplica(zone string) error {
+func addMControlPlaneReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
 	if err != nil {
@@ -46,7 +46,7 @@ func addMasterReplica(zone string) error {
 	return nil
 }
 
-func removeMasterReplica(zone string) error {
+func removeControlPlaneReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
 	if err != nil {
@@ -117,13 +117,13 @@ func removeZoneFromZones(zones []string, zone string) []string {
 	return zones
 }
 
-// generateMasterRegexp returns a regex for matching master node name.
-func generateMasterRegexp(prefix string) string {
+// generateControlPlaneRegexp returns a regex for matching master node name.
+func generateControlPlaneRegexp(prefix string) string {
 	return prefix + "(-...)?"
 }
 
-// waitForMasters waits until the cluster has the desired number of ready masters in it.
-func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
+// waitForControlPlanes waits until the cluster has the desired number of ready masters in it.
+func waitForControlPlanes(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -131,9 +131,9 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 			continue
 		}
 
-		// Filter out nodes that are not master replicas
+		// Filter out nodes that are not controlplane replicas
 		e2enode.Filter(nodes, func(node v1.Node) bool {
-			res, err := regexp.Match(generateMasterRegexp(masterPrefix), ([]byte)(node.Name))
+			res, err := regexp.Match(generateControlPlaneRegexp(masterPrefix), ([]byte)(node.Name))
 			if err != nil {
 				framework.Logf("Failed to match regexp to node name: %v", err)
 				return false
@@ -171,7 +171,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(waitForControlPlanes(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
@@ -183,11 +183,11 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		}
 		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
-		// Clean-up additional master replicas if the test execution was broken.
+		// Clean-up additional controlplane replicas if the test execution was broken.
 		for _, zone := range additionalReplicaZones {
-			removeMasterReplica(zone)
+			removeControlPlaneReplica(zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(waitForControlPlanes(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 	})
 
 	type Action int
@@ -203,10 +203,10 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		switch action {
 		case None:
 		case AddReplica:
-			framework.ExpectNoError(addMasterReplica(zone))
+			framework.ExpectNoError(addControlPlaneReplica(zone))
 			additionalReplicaZones = append(additionalReplicaZones, zone)
 		case RemoveReplica:
-			framework.ExpectNoError(removeMasterReplica(zone))
+			framework.ExpectNoError(removeControlPlaneReplica(zone))
 			additionalReplicaZones = removeZoneFromZones(additionalReplicaZones, zone)
 		case AddNodes:
 			framework.ExpectNoError(addWorkerNodes(zone))
@@ -215,7 +215,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			framework.ExpectNoError(removeWorkerNodes(zone))
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
+		framework.ExpectNoError(waitForControlPlanes(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
 		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
@@ -245,7 +245,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 
 		step(None, "")
 		// If numAdditionalReplicas is larger then the number of remaining zones in the region,
-		// we create a few masters in the same zone and zone entry is repeated in additionalReplicaZones.
+		// we create a few controlplanes in the same zone and zone entry is repeated in additionalReplicaZones.
 		numAdditionalReplicas := 2
 		for i := 0; i < numAdditionalReplicas; i++ {
 			step(AddReplica, zones[i%len(zones)])
@@ -269,15 +269,15 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			step(AddNodes, zones[i])
 		}
 
-		// Add master repilcas.
+		// Add controlplane repilcas.
 		//
 		// If numAdditionalReplicas is larger then the number of remaining zones in the region,
-		// we create a few masters in the same zone and zone entry is repeated in additionalReplicaZones.
+		// we create a few controlplanes in the same zone and zone entry is repeated in additionalReplicaZones.
 		for i := 0; i < numAdditionalReplicas; i++ {
 			step(AddReplica, zones[i%len(zones)])
 		}
 
-		// Remove master repilcas.
+		// Remove controlplane repilcas.
 		for i := 0; i < numAdditionalReplicas; i++ {
 			step(RemoveReplica, zones[i%len(zones)])
 		}
