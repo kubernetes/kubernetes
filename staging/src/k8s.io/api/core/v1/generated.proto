@@ -2720,6 +2720,10 @@ message PersistentVolumeClaimStatus {
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
+
+  // ResizeStatus stores status of resize operation
+  // +optional
+  optional string resizeStatus = 6;
 }
 
 // PersistentVolumeClaimTemplate is used to produce

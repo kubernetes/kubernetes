@@ -197,7 +197,16 @@ func MarkFSResizeFinished(
 	kubeClient clientset.Interface) error {
 	newPVC := pvc.DeepCopy()
 	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
+	newPVC.Status.ResizeStatus = nil
 	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{})
+	_, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+	return err
+}
+
+func MarkNodeExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface) error {
+	expansionFailedOnNode := v1.PersistentVolumeClaimResizeFailedOnNode
+	newPVC := pvc.DeepCopy()
+	newPVC.Status.ResizeStatus = &expansionFailedOnNode
 	_, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
 	return err
 }

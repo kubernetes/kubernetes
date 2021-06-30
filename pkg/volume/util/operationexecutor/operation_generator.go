@@ -1832,6 +1832,9 @@ func (og *operationGenerator) nodeExpandVolume(
 			rsOpts.OldSize = pvcStatusCap
 			resizeDone, resizeErr := expandableVolumePlugin.NodeExpand(rsOpts)
 			if resizeErr != nil {
+				if volumetypes.IsOperationFinishedError(resizeErr) {
+					util.MarkNodeExpansionFailed(pvc, og.kubeClient)
+				}
 				// if driver returned FailedPrecondition error that means
 				// volume expansion should not be retried on this node but
 				// expansion operation should not block mounting

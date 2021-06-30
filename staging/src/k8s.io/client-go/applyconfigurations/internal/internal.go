@@ -4956,6 +4956,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
+    - name: resizeStatus
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.PersistentVolumeClaimTemplate
   map:
     fields:
