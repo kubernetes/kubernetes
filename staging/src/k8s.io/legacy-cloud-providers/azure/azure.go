@@ -357,7 +357,7 @@ func NewCloudWithoutFeatureGates(configReader io.Reader) (*Cloud, error) {
 func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) error {
 	// cloud-config not set, return nil so that it would be initialized from secret.
 	if config == nil {
-		klog.Warning("cloud-config is not provided, Azure cloud provider would be initialized from secret")
+		klog.InfoS("cloud-config is not provided, Azure cloud provider would be initialized from secret")
 		return nil
 	}
 
@@ -401,7 +401,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		// Only controller-manager would lazy-initialize from secret, and credentials are required for such case.
 		if fromSecret {
 			err := fmt.Errorf("no credentials provided for Azure cloud provider")
-			klog.Fatalf("%v", err)
+			klog.ErrorS(nil, "", err)
 			return err
 		}
 
@@ -412,7 +412,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 			return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 		}
 
-		klog.V(2).Infof("Azure cloud provider is starting without credentials")
+		klog.V(2).InfoS("Azure cloud provider is starting without credentials")
 	} else if err != nil {
 		return err
 	}
@@ -446,11 +446,11 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 			Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
 			Jitter:   config.CloudProviderBackoffJitter,
 		}
-		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
-			config.CloudProviderBackoffRetries,
-			config.CloudProviderBackoffExponent,
-			config.CloudProviderBackoffDuration,
-			config.CloudProviderBackoffJitter)
+		klog.V(2).InfoS("Azure cloudprovider using try backoff",
+			": retries",config.CloudProviderBackoffRetries,
+			"exponent",config.CloudProviderBackoffExponent,
+			"duration",config.CloudProviderBackoffDuration,
+			"jitter",config.CloudProviderBackoffJitter)
 	} else {
 		// CloudProviderBackoffRetries will be set to 1 by default as the requirements of Azure SDK.
 		config.CloudProviderBackoffRetries = 1
@@ -735,7 +735,7 @@ func initDiskControllers(az *Cloud) error {
 
 // SetInformers sets informers for Azure cloud provider.
 func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
-	klog.Infof("Setting up informers for Azure cloud provider")
+	klog.InfoS("Setting up informers for Azure cloud provider")
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -762,12 +762,12 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			if !isNode {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("Received unexpected object: %v", obj)
+					klog.ErrorS(nil, "Received unexpected object", "object", obj)
 					return
 				}
 				node, ok = deletedState.Obj.(*v1.Node)
 				if !ok {
-					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					klog.ErrorS(nil, "DeletedFinalStateUnknown contained non-Node object", "deletedStateObject", deletedState.Obj)
 					return
 				}
 			}
