@@ -183,7 +183,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 // Return the number of zones in which we have nodes in this cluster.
 func getZoneCount(c clientset.Interface) (int, error) {
-	zoneNames, err := e2enode.GetClusterZones(c)
+	zoneNames, err := e2enode.GetSchedulableClusterZones(c)
 	if err != nil {
 		return -1, err
 	}
@@ -204,7 +204,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	c := f.ClientSet
 	ns := f.Namespace.Name
 
-	zones, err := e2enode.GetClusterZones(c)
+	zones, err := e2enode.GetSchedulableClusterZones(c)
 	framework.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")
