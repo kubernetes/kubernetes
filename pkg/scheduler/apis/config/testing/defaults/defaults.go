@@ -32,6 +32,7 @@ var PluginsV1beta1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.NodeResourcesFit},
 			{Name: names.NodePorts},
+			{Name: names.VolumeRestrictions},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
@@ -162,6 +163,7 @@ var PluginsV1beta2 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.NodeResourcesFit},
 			{Name: names.NodePorts},
+			{Name: names.VolumeRestrictions},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
