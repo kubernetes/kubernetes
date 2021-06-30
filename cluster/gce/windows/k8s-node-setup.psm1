@@ -1805,10 +1805,11 @@ $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
 
-$LOGGINGEXPORTER_VERSION = 'v0.16.2'
+$LOGGINGEXPORTER_VERSION = 'v0.17.0'
 $LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
 $LOGGINGEXPORTER_SERVICE = 'flb-exporter'
 $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
+$LOGGINGEXPORTER_HASH = 'c808c9645d84b06b89932bd707d51a9d1d0b451b5a702a5f9b2b4462c8be6502'
 
 # Restart Logging agent or starts it if it is not currently running
 function Restart-LoggingAgent {
@@ -1923,7 +1924,10 @@ function DownloadAndInstall-LoggingAgents {
       Log-Output 'Downloading logging exporter'
       New-Item $LOGGINGEXPORTER_ROOT -ItemType 'directory' -Force | Out-Null
       MustDownload-File `
-          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe -URLs $url
+          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe `
+          -URLs $url `
+          -Hash $LOGGINGEXPORTER_HASH `
+          -Algorithm SHA256
   }
 }
 
