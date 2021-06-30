@@ -302,7 +302,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 }
 
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
-// If this returns true, the pod should not be re-tried.
+// If this returns true, the pod should be re-tried.
 func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
