@@ -365,10 +365,10 @@ type NodesSet int
 const (
 	// AllNodes means all containers on all nodes.
 	AllNodes NodesSet = 0
-	// MasterNodes means all containers on Master nodes only.
-	MasterNodes NodesSet = 1
-	// MasterAndDNSNodes means all containers on Master nodes and DNS containers on other nodes.
-	MasterAndDNSNodes NodesSet = 2
+	// ControlPlaneNodes means all containers on Master nodes only.
+	ControlPlaneNodes NodesSet = 1
+	// ControlPlaneAndDNSNodes means all containers on Master nodes and DNS containers on other nodes.
+	ControlPlaneAndDNSNodes NodesSet = 2
 )
 
 // nodeHasControlPlanePods returns true if specified node has control plane pods
@@ -428,7 +428,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	}
 	dnsNodes := make(map[string]bool)
 	for _, pod := range pods.Items {
-		if options.Nodes == MasterNodes {
+		if options.Nodes == ControlPlaneNodes {
 			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
 			if err != nil {
 				return nil, err
@@ -437,7 +437,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				continue
 			}
 		}
-		if options.Nodes == MasterAndDNSNodes {
+		if options.Nodes == ControlPlaneAndDNSNodes {
 			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
 			if err != nil {
 				return nil, err
@@ -452,7 +452,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		for _, container := range pod.Status.ContainerStatuses {
 			g.containerIDs = append(g.containerIDs, container.Name)
 		}
-		if options.Nodes == MasterAndDNSNodes {
+		if options.Nodes == ControlPlaneAndDNSNodes {
 			dnsNodes[pod.Spec.NodeName] = true
 		}
 	}
@@ -481,7 +481,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				probeDuration:               options.ProbeDuration,
 				printVerboseLogs:            options.PrintVerboseLogs,
 			})
-			if options.Nodes == MasterNodes {
+			if options.Nodes == ControlPlaneNodes {
 				break
 			}
 		}

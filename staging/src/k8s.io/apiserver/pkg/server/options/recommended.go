@@ -53,6 +53,8 @@ type RecommendedOptions struct {
 	Admission                  *AdmissionOptions
 	// API Server Egress Selector is used to control outbound traffic from the API Server
 	EgressSelector *EgressSelectorOptions
+	// Traces contains options to control distributed request tracing.
+	Traces *TracingOptions
 }
 
 func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
@@ -79,6 +81,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),
+		Traces:                     NewTracingOptions(),
 	}
 }
 
@@ -92,6 +95,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.CoreAPI.AddFlags(fs)
 	o.Admission.AddFlags(fs)
 	o.EgressSelector.AddFlags(fs)
+	o.Traces.AddFlags(fs)
 }
 
 // ApplyTo adds RecommendedOptions to the server configuration.
@@ -142,6 +146,11 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
 		}
 	}
+	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+		if err := o.Traces.ApplyTo(config.Config.EgressSelector, &config.Config); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -156,6 +165,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.CoreAPI.Validate()...)
 	errors = append(errors, o.Admission.Validate()...)
 	errors = append(errors, o.EgressSelector.Validate()...)
+	errors = append(errors, o.Traces.Validate()...)
 
 	return errors
 }

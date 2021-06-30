@@ -262,9 +262,9 @@ func (f *Framework) BeforeEach() {
 		var nodeMode NodesSet
 		switch TestContext.GatherKubeSystemResourceUsageData {
 		case "master":
-			nodeMode = MasterNodes
+			nodeMode = ControlPlaneNodes
 		case "masteranddns":
-			nodeMode = MasterAndDNSNodes
+			nodeMode = ControlPlaneAndDNSNodes
 		default:
 			nodeMode = AllNodes
 		}
