@@ -22,6 +22,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	podsecuritytest "k8s.io/pod-security-admission/test"
@@ -32,9 +33,13 @@ func TestPodSecurity(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--anonymous-auth=false",
 		"--enable-admission-plugins=PodSecurity",
+		"--allow-privileged=true",
 		// TODO: "--admission-control-config-file=" + admissionConfigFile.Name(),
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
+
+	// ensure the global is set to allow privileged containers
+	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
 
 	opts := podsecuritytest.Options{
 		ClientConfig: server.ClientConfig,
