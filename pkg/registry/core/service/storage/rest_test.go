@@ -175,8 +175,8 @@ func (s *serviceStorage) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Se
 	return nil
 }
 
-func NewTestREST(t *testing.T, endpoints []*api.Endpoints, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
-	return NewTestRESTWithPods(t, endpoints, nil, ipFamilies)
+func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+	return NewTestRESTWithPods(t, nil, nil, ipFamilies)
 }
 
 func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Pod, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
@@ -317,7 +317,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := NewTestREST(t, nil, tc.families)
+			storage, _, server := NewTestREST(t, tc.families)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -398,7 +398,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 			if tc.enableDualStack {
 				families = append(families, api.IPv6Protocol)
 			}
-			storage, _, server := NewTestREST(t, nil, families)
+			storage, _, server := NewTestREST(t, families)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -423,7 +423,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 }
 
 func TestDryRunNodePort(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Test dry run create request with a node port
@@ -502,7 +502,7 @@ func TestDryRunNodePort(t *testing.T) {
 }
 
 func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	testCases := []struct {
@@ -575,7 +575,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 }
 
 func TestServiceStorageValidatesCreate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	failureCases := map[string]*api.Service{
 		"empty ID": svctest.MakeService(""),
@@ -598,7 +598,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol})
+	storage, _, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
 	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -633,7 +633,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	obj, err := storage.Create(ctx, svctest.MakeService("foo", svctest.SetTypeExternalName), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -717,7 +717,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -742,7 +742,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -811,7 +811,7 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 			ctx := genericapirequest.NewDefaultContext()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, tc.allocateNodePortGate)()
 
-			storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+			storage, _, server := NewTestREST(t, singleStackIPv4)
 			defer server.Terminate(t)
 
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -844,7 +844,7 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 
 func TestServiceRegistryDelete(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo")
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -859,7 +859,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Test dry run delete request with cluster ip
@@ -913,7 +913,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 
 	// dry run for non dualstack
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-	dualstack_storage, _, dualstack_server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	dualstack_storage, _, dualstack_server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 	defer dualstack_server.Terminate(t)
 	// Test dry run delete request with cluster ip
 	dualstack_svc := svctest.MakeService("foo",
@@ -939,7 +939,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("foo", svctest.SetTypeExternalName)
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -954,7 +954,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Create non-external load balancer.
@@ -982,7 +982,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	// Create external load balancer.
@@ -1007,7 +1007,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1177,7 +1177,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1201,7 +1201,7 @@ func TestServiceRegistryList(t *testing.T) {
 }
 
 func TestServiceRegistryIPAllocation(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	svc1 := svctest.MakeService("foo")
@@ -1254,7 +1254,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	svc1 := svctest.MakeService("foo")
@@ -1292,7 +1292,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPUpdate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	svc := svctest.MakeService("foo")
@@ -1342,7 +1342,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryIPLoadBalancer(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 
 	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
@@ -1373,7 +1373,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
@@ -1401,7 +1401,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		// hard-code NodePort to make sure it doesn't conflict with the healthport.
@@ -1436,7 +1436,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 // Validate that the service creation fails when the requested port number is -1.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
@@ -1452,7 +1452,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 // Validate that the health check nodePort is not allocated when ExternalTrafficPolicy is set to Global.
 func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
 		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
@@ -1631,7 +1631,7 @@ func TestInitClusterIP(t *testing.T) {
 			if test.enableDualStackAllocator {
 				families = append(families, api.IPv6Protocol)
 			}
-			storage, _, server := NewTestREST(t, nil, families)
+			storage, _, server := NewTestREST(t, families)
 			defer server.Terminate(t)
 
 			copySvc := test.svc.DeepCopy()
@@ -1719,7 +1719,7 @@ func TestInitClusterIP(t *testing.T) {
 }
 
 func TestInitNodePorts(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol})
+	storage, _, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
@@ -1804,7 +1804,7 @@ func TestInitNodePorts(t *testing.T) {
 }
 
 func TestUpdateNodePorts(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
+	storage, _, server := NewTestREST(t, singleStackIPv4)
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
@@ -2060,7 +2060,7 @@ func TestServiceUpgrade(t *testing.T) {
 			if testCase.enableDualStackAllocator {
 				families = append(families, api.IPv6Protocol)
 			}
-			storage, _, server := NewTestREST(t, nil, families)
+			storage, _, server := NewTestREST(t, families)
 			defer server.Terminate(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, testCase.enableDualStackGate)()
 
@@ -2197,7 +2197,7 @@ func TestServiceDowngrade(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			storage, _, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 			defer server.Terminate(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, testCase.enableDualStackGate)()
 
@@ -3378,7 +3378,7 @@ func TestDefaultingValidation(t *testing.T) {
 	// This func only runs when feature gate is on
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	storage, _, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 	defer server.Terminate(t)
 
 	for _, testCase := range testCases {
