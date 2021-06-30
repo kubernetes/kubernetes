@@ -71,7 +71,8 @@ type GetOptions struct {
 	WatchOnly bool
 	ChunkSize int64
 
-	OutputWatchEvents bool
+	OutputWatchEvents   bool
+	IncludeDeleteEvents bool
 
 	LabelSelector     string
 	FieldSelector     string
@@ -188,6 +189,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
+	cmd.Flags().BoolVar(&o.IncludeDeleteEvents, "include-delete-events", o.IncludeDeleteEvents, "Events are deleted after 60m. Used with watch to include these DELETED events in output.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
@@ -725,6 +727,9 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			objToPrint := e.Object
 			if o.OutputWatchEvents {
 				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}
+			}
+			if e.Type == watch.Deleted && !o.IncludeDeleteEvents {
+				return false, nil
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
