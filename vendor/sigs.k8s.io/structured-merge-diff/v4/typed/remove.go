@@ -20,19 +20,26 @@ import (
 )
 
 type removingWalker struct {
-	value     value.Value
-	out       interface{}
-	schema    *schema.Schema
-	toRemove  *fieldpath.Set
-	allocator value.Allocator
+	value         value.Value
+	out           interface{}
+	schema        *schema.Schema
+	toRemove      *fieldpath.Set
+	allocator     value.Allocator
+	shouldExtract bool
 }
 
-func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef) value.Value {
+// removeItemsWithSchema will walk the given value and look for items from the toRemove set.
+// Depending on whether shouldExtract is set true or false, it will return a modified version
+// of the input value with either:
+// 1. only the items in the toRemove set (when shouldExtract is true) or
+// 2. the items from the toRemove set removed from the value (when shouldExtract is false).
+func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, shouldExtract bool) value.Value {
 	w := &removingWalker{
-		value:     val,
-		schema:    schema,
-		toRemove:  toRemove,
-		allocator: value.NewFreelistAllocator(),
+		value:         val,
+		schema:        schema,
+		toRemove:      toRemove,
+		allocator:     value.NewFreelistAllocator(),
+		shouldExtract: shouldExtract,
 	}
 	resolveSchema(schema, typeRef, val, w)
 	return value.NewValueInterface(w.out)
@@ -44,10 +51,22 @@ func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors {
 }
 
 func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
+	if !w.value.IsList() {
+		return nil
+	}
 	l := w.value.AsListUsing(w.allocator)
 	defer w.allocator.Free(l)
-	// If list is null, empty, or atomic just return
-	if l == nil || l.Length() == 0 || t.ElementRelationship == schema.Atomic {
+	// If list is null or empty just return
+	if l == nil || l.Length() == 0 {
+		return nil
+	}
+
+	// atomic lists should return everything in the case of extract
+	// and nothing in the case of remove (!w.shouldExtract)
+	if t.ElementRelationship == schema.Atomic {
+		if w.shouldExtract {
+			w.out = w.value.Unstructured()
+		}
 		return nil
 	}
 
@@ -59,11 +78,22 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 		// Ignore error because we have already validated this list
 		pe, _ := listItemToPathElement(w.allocator, w.schema, t, i, item)
 		path, _ := fieldpath.MakePath(pe)
+		// save items on the path when we shouldExtract
+		// but ignore them when we are removing (i.e. !w.shouldExtract)
 		if w.toRemove.Has(path) {
-			continue
+			if w.shouldExtract {
+				newItems = append(newItems, removeItemsWithSchema(item, w.toRemove, w.schema, t.ElementType, w.shouldExtract).Unstructured())
+			} else {
+				continue
+			}
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			item = removeItemsWithSchema(item, subset, w.schema, t.ElementType)
+			item = removeItemsWithSchema(item, subset, w.schema, t.ElementType, w.shouldExtract)
+		} else {
+			// don't save items not on the path when we shouldExtract.
+			if w.shouldExtract {
+				continue
+			}
 		}
 		newItems = append(newItems, item.Unstructured())
 	}
@@ -74,12 +104,24 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 }
 
 func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
+	if !w.value.IsMap() {
+		return nil
+	}
 	m := w.value.AsMapUsing(w.allocator)
 	if m != nil {
 		defer w.allocator.Free(m)
 	}
-	// If map is null, empty, or atomic just return
-	if m == nil || m.Empty() || t.ElementRelationship == schema.Atomic {
+	// If map is null or empty just return
+	if m == nil || m.Empty() {
+		return nil
+	}
+
+	// atomic maps should return everything in the case of extract
+	// and nothing in the case of remove (!w.shouldExtract)
+	if t.ElementRelationship == schema.Atomic {
+		if w.shouldExtract {
+			w.out = w.value.Unstructured()
+		}
 		return nil
 	}
 
@@ -96,11 +138,22 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		if ft, ok := fieldTypes[k]; ok {
 			fieldType = ft
 		}
+		// save values on the path when we shouldExtract
+		// but ignore them when we are removing (i.e. !w.shouldExtract)
 		if w.toRemove.Has(path) {
+			if w.shouldExtract {
+				newMap[k] = removeItemsWithSchema(val, w.toRemove, w.schema, fieldType, w.shouldExtract).Unstructured()
+
+			}
 			return true
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			val = removeItemsWithSchema(val, subset, w.schema, fieldType)
+			val = removeItemsWithSchema(val, subset, w.schema, fieldType, w.shouldExtract)
+		} else {
+			// don't save values not on the path when we shouldExtract.
+			if w.shouldExtract {
+				return true
+			}
 		}
 		newMap[k] = val.Unstructured()
 		return true
