@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	"k8s.io/kubernetes/pkg/api/service"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1019,36 +1020,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	}
 }
 
-func makeEndpoints(name string, addrs []api.EndpointAddress, ports []api.EndpointPort) *api.Endpoints {
-	return &api.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Subsets: []api.EndpointSubset{{
-			Addresses: addrs,
-			Ports:     ports,
-		}},
-	}
-}
-
-func makeEndpointAddress(ip string, pod string) api.EndpointAddress {
-	return api.EndpointAddress{
-		IP: ip,
-		TargetRef: &api.ObjectReference{
-			Name:      pod,
-			Namespace: metav1.NamespaceDefault,
-		},
-	}
-}
-
-func makeEndpointPort(name string, port int) api.EndpointPort {
-	return api.EndpointPort{
-		Name: name,
-		Port: int32(port),
-	}
-}
-
+// this is local because it's not fully fleshed out enough for general use.
 func makePod(name string, ips ...string) api.Pod {
 	p := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1080,29 +1052,29 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	}
 
 	endpoints := []*api.Endpoints{
-		makeEndpoints("unnamed",
+		epstest.MakeEndpoints("unnamed",
 			[]api.EndpointAddress{
-				makeEndpointAddress("1.2.3.4", "unnamed"),
+				epstest.MakeEndpointAddress("1.2.3.4", "unnamed"),
 			},
 			[]api.EndpointPort{
-				makeEndpointPort("", 80),
+				epstest.MakeEndpointPort("", 80),
 			}),
-		makeEndpoints("unnamed2",
+		epstest.MakeEndpoints("unnamed2",
 			[]api.EndpointAddress{
-				makeEndpointAddress("1.2.3.5", "unnamed"),
+				epstest.MakeEndpointAddress("1.2.3.5", "unnamed"),
 			},
 			[]api.EndpointPort{
-				makeEndpointPort("", 80),
+				epstest.MakeEndpointPort("", 80),
 			}),
-		makeEndpoints("named",
+		epstest.MakeEndpoints("named",
 			[]api.EndpointAddress{
-				makeEndpointAddress("1.2.3.6", "named"),
+				epstest.MakeEndpointAddress("1.2.3.6", "named"),
 			},
 			[]api.EndpointPort{
-				makeEndpointPort("p", 80),
-				makeEndpointPort("q", 81),
+				epstest.MakeEndpointPort("p", 80),
+				epstest.MakeEndpointPort("q", 81),
 			}),
-		makeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
+		epstest.MakeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
 	}
 
 	storage, _, server := NewTestRESTWithPods(t, endpoints, pods, singleStackIPv4)
