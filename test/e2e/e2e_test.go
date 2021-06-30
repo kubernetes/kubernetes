@@ -33,10 +33,12 @@ import (
 	// "github.com/onsi/ginkgo"
 
 	"k8s.io/component-base/version"
+	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/generated"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
+	testfixtures "k8s.io/kubernetes/test/fixtures"
 	"k8s.io/kubernetes/test/utils/image"
 
 	// test sources
@@ -85,11 +87,11 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	// Enable bindata file lookup as fallback.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
+	// Enable embedded FS file lookup as fallback
+	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
+	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
+	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
+
 	if framework.TestContext.ListConformanceTests {
 		var tests []struct {
 			Testname    string `yaml:"testname"`

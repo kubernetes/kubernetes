@@ -907,8 +907,9 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
-honnef.co/go/tools v0.0.1-2020.1.6 h1:W18jzjh8mfPez+AwGLxmOImucz/IFjpNlrKVnaj2YVc=
 honnef.co/go/tools v0.0.1-2020.1.6/go.mod h1:pyyisuGw24ruLjrr1ddx39WE0y9OooInRzEYLhQB2YY=
+honnef.co/go/tools v0.2.0 h1:ws8AfbgTX3oIczLPNPCu5166oBg9ST2vNs0rcht+mDE=
+honnef.co/go/tools v0.2.0/go.mod h1:lPVVZ2BS5TfnjLyizF7o7hv7j9/L+8cZY2hLyjP9cGY=
 k8s.io/klog/hack/tools v0.0.0-20210303110520-14dec3377f55 h1:dLsq+jacIVLNk1Jmh5RFmlTiD5kIwjYN5hh8udCyeDc=
 k8s.io/klog/hack/tools v0.0.0-20210303110520-14dec3377f55/go.mod h1:peYvfmhJdUiWTjdEpxAPkauLKX+lwVMfcSIMynAWZ14=
 mvdan.cc/gofumpt v0.1.0 h1:hsVv+Y9UsZ/mFZTxJZuHVI6shSQCtzZ11h1JEFPAZLw=

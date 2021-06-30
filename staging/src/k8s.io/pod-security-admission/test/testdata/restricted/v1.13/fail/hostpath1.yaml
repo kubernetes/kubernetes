@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath1
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+  volumes:
+  - hostPath:
+      path: /dev/null
+    name: volume-hostpath-null
+  - hostPath:
+      path: /var/lib/docker
+    name: volume-hostpath-docker
+  - hostPath:
+      path: /sys
+    name: volume-hostpath-sys

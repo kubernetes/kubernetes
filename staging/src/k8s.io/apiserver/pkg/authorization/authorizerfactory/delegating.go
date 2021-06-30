@@ -29,7 +29,7 @@ import (
 // DelegatingAuthorizerConfig is the minimal configuration needed to create an authenticator
 // built to delegate authorization to a kube API server
 type DelegatingAuthorizerConfig struct {
-	SubjectAccessReviewClient authorizationclient.SubjectAccessReviewInterface
+	SubjectAccessReviewClient authorizationclient.AuthorizationV1Interface
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -54,5 +54,9 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,
 		*c.WebhookRetryBackoff,
+		webhook.AuthorizerMetrics{
+			RecordRequestTotal:   RecordRequestTotal,
+			RecordRequestLatency: RecordRequestLatency,
+		},
 	)
 }
