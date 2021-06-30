@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/policy"
 )
@@ -40,6 +41,11 @@ type Options struct {
 	// namespaces, pods, and pod-template-containing objects.
 	// Required.
 	ClientConfig *rest.Config
+
+	// Features optionally provides information about which feature gates are enabled.
+	// This is used to skip failure cases for negative tests of data in alpha/beta fields.
+	// If unset, all testcases are run.
+	Features featuregate.FeatureGate
 
 	// CreateNamespace is an optional stub for creating a namespace with the given name and labels.
 	// Returning an error fails the test.
@@ -278,7 +284,18 @@ func Run(t *testing.T, opts Options) {
 						createController(t, i, pod, true, "")
 					}
 				})
+
+				// see if any features required for failure cases are disabled
+				var disabledRequiredFeatures []featuregate.Feature
+				for _, f := range checkData.failRequiresFeatures {
+					if opts.Features != nil && !opts.Features.Enabled(f) {
+						disabledRequiredFeatures = append(disabledRequiredFeatures, f)
+					}
+				}
 				t.Run(ns+"_fail_"+checkID, func(t *testing.T) {
+					if len(disabledRequiredFeatures) > 0 {
+						t.Skipf("features required for failure cases are disabled: %v", disabledRequiredFeatures)
+					}
 					for i, pod := range checkData.fail {
 						createPod(t, i, pod, false, checkData.expectErrorSubstring)
 						createController(t, i, pod, false, checkData.expectErrorSubstring)
