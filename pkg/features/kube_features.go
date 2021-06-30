@@ -659,6 +659,7 @@ const (
 	// owner: @hbagdi
 	// kep: http://kep.k8s.io/2365
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Enable Scope and Namespace fields on IngressClassParametersReference.
 	IngressClassNamespacedParams featuregate.Feature = "IngressClassNamespacedParams"
@@ -830,7 +831,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.Beta},
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
-	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
+	IngressClassNamespacedParams:                   {Default: true, PreRelease: featuregate.Beta},
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
 	SuspendJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
