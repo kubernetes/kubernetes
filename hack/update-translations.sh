@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+TRANSLATIONS="staging/src/k8s.io/kubectl/pkg/util/i18n/translations"
 KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
 
 generate_pot="false"
@@ -71,7 +72,7 @@ if [[ "${generate_pot}" == "true" ]]; then
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
   kube::util::ensure-temp-dir
   if msgcat -s tmp.pot > "${KUBE_TEMP}/template.pot"; then
-    mv "${KUBE_TEMP}/template.pot" translations/kubectl/template.pot
+    mv "${KUBE_TEMP}/template.pot" "${TRANSLATIONS}/kubectl/template.pot"
     rm tmp.pot
   else
     echo "Failed to update template.pot"
@@ -81,12 +82,10 @@ fi
 
 if [[ "${generate_mo}" == "true" ]]; then
   echo "Generating .po and .mo files"
-  for x in translations/*/*/*/*.po; do
+  for x in "${TRANSLATIONS}"/*/*/*/*.po; do
     msgcat -s "${x}" > tmp.po
     mv tmp.po "${x}"
     echo "generating .mo file for: ${x}"
     msgfmt "${x}" -o "$(dirname "${x}")/$(basename "${x}" .po).mo"
   done
 fi
-
-./hack/generate-bindata.sh

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generated
+package testing_manifests
 
-// No code is needed here.  This is a stub for compilation purposes.
+import (
+	"embed"
+
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+)
+
+//go:embed flexvolume guestbook kubectl sample-device-plugin.yaml scheduling/nvidia-driver-installer.yaml statefulset storage-csi
+var e2eTestingManifestsFS embed.FS
+
+func GetE2ETestingManifestsFS() e2etestfiles.EmbeddedFileSource {
+	return e2etestfiles.EmbeddedFileSource{
+		EmbeddedFS: e2eTestingManifestsFS,
+		Root:       "test/e2e/testing-manifests",
+	}
+}
