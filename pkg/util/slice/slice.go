@@ -53,18 +53,39 @@ func ContainsString(slice []string, s string, modifier func(s string) string) bo
 	return false
 }
 
+type removeStringValidator struct {
+	s        string
+	modifier func(s string) string
+}
+
+func (v *removeStringValidator) IsValid(str string) bool {
+	if str == v.s {
+		return false
+	}
+	if v.modifier != nil && v.modifier(str) == v.s {
+		return false
+	}
+	return true
+}
+
 // RemoveString returns a newly created []string that contains all items from slice that
 // are not equal to s and modifier(s) in case modifier func is provided.
 func RemoveString(slice []string, s string, modifier func(s string) string) []string {
+	return StringFilter(&removeStringValidator{s, modifier}, slice)
+}
+
+type StringFilterValidator interface {
+	IsValid(str string) bool
+}
+
+// StringFilter returns a newly created []string that contains items validated with the passed validator.
+// If no items are valid nil is returned.
+func StringFilter(v StringFilterValidator, slice []string) []string {
 	newSlice := make([]string, 0)
-	for _, item := range slice {
-		if item == s {
-			continue
+	for _, s := range slice {
+		if v.IsValid(s) {
+			newSlice = append(newSlice, s)
 		}
-		if modifier != nil && modifier(item) == s {
-			continue
-		}
-		newSlice = append(newSlice, item)
 	}
 	if len(newSlice) == 0 {
 		// Sanitize for unit tests so we don't need to distinguish empty array
