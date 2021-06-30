@@ -197,9 +197,9 @@ type udsGRPCConnector struct {
 
 func (u *udsGRPCConnector) connect(ctx context.Context) (proxier, error) {
 	udsName := u.udsName
-	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+	dialOption := grpc.WithContextDialer(func(passCtx context.Context, s string) (net.Conn, error) {
 		dialer := &net.Dialer{}
-		c, err := dialer.DialContext(ctx, "unix", udsName)
+		c, err := dialer.DialContext(passCtx, "unix", udsName)
 		if err != nil {
 			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
 			return nil, fmt.Errorf("grpc-connect(uds): %w", err)
