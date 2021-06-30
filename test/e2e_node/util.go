@@ -397,7 +397,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 }
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findKubletServiceName(running bool) string {
+func findKubeletServiceName(running bool) string {
 	cmdLine := []string{
 		"systemctl", "list-units", "*kubelet*",
 	}
@@ -415,18 +415,22 @@ func findKubletServiceName(running bool) string {
 }
 
 func restartKubelet() {
-	kubeletServiceName := findKubletServiceName(false)
+	restartKubeletWithServiceName(findKubeletServiceName(false))
+}
+
+func restartKubeletWithServiceName(kubeletServiceName string) {
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
 
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+	framework.Logf("restart output: %v", stdout)
 }
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findKubletServiceName(true)
+	kubeletServiceName := findKubeletServiceName(true)
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()

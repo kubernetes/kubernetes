@@ -45,13 +45,6 @@ import (
 )
 
 const (
-	// sampleResourceName is the name of the example resource which is used in the e2e test
-	sampleResourceName = "example.com/resource"
-	// sampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
-	sampleDevicePluginDSYAML = "test/e2e/testing-manifests/sample-device-plugin.yaml"
-	// sampleDevicePluginName is the name of the device plugin pod
-	sampleDevicePluginName = "sample-device-plugin"
-
 	// fake resource name
 	resourceName            = "example.com/resource"
 	envVarNamePluginSockDir = "PLUGIN_SOCK_DIR"
@@ -70,7 +63,7 @@ var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:Devic
 
 // numberOfSampleResources returns the number of resources advertised by a node.
 func numberOfSampleResources(node *v1.Node) int64 {
-	val, ok := node.Status.Capacity[sampleResourceName]
+	val, ok := node.Status.Capacity[SampleResourceName]
 
 	if !ok {
 		return 0
@@ -81,7 +74,7 @@ func numberOfSampleResources(node *v1.Node) int64 {
 
 // getSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests.
 func getSampleDevicePluginPod() *v1.Pod {
-	data, err := e2etestfiles.Read(sampleDevicePluginDSYAML)
+	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
 	if err != nil {
 		framework.Fail(err.Error())
 	}
@@ -89,7 +82,7 @@ func getSampleDevicePluginPod() *v1.Pod {
 	ds := readDaemonSetV1OrDie(data)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sampleDevicePluginName,
+			Name:      SampleDevicePluginName,
 			Namespace: metav1.NamespaceSystem,
 		},
 
@@ -119,7 +112,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
 		})
-		ginkgo.It("[Flaky] Verifies the Kubelet device plugin functionality.", func() {
+		ginkgo.It("Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
 			dp := getSampleDevicePluginPod()
@@ -152,11 +145,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Creating one pod on node with at least one fake-device")
-			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs"
+			// note we use "sh -c' to make sure the PID doesn't change across sleeps
+			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sh -c 'while [ ! -f /tmp/stop ]; do sleep 1s; done && rm /tmp/stop'"
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			gomega.Expect(devID1).ToNot(gomega.BeEmpty())
 
 			v1alphaPodResources, err := getV1alpha1NodeDevices()
 			framework.ExpectNoError(err)
@@ -212,6 +206,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
+			triggerPodContainerRestart(f, pod1)
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 
 			ginkgo.By("Confirming that device assignment persists even after container restart")
@@ -220,7 +215,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			restartTime := time.Now()
 			ginkgo.By("Restarting Kubelet")
-			restartKubelet()
+			restartKubeletWithServiceName(findKubeletServiceName(true))
 
 			// We need to wait for node to be ready before re-registering stub device plugin.
 			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.
@@ -252,6 +247,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
+			triggerPodContainerRestart(f, pod1)
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 			ginkgo.By("Confirming that after a kubelet restart, fake-device assignment is kept")
 			devIDRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
@@ -286,10 +282,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 30*time.Second, framework.Poll).Should(gomega.Equal(int64(0)))
 
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
+			triggerPodContainerRestart(f, pod1)
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 			devIDRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectEqual(devIDRestart1, devID1)
 
+			triggerPodContainerRestart(f, pod2)
 			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
 			devIDRestart2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
 			framework.ExpectEqual(devIDRestart2, devID2)
@@ -346,6 +344,10 @@ func makeBusyboxPod(resourceName, cmd string) *v1.Pod {
 			}},
 		},
 	}
+}
+
+func triggerPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
+	f.ExecCommandInContainer(pod.Name, pod.Spec.Containers[0].Name, "/bin/touch", "/tmp/stop")
 }
 
 // ensurePodContainerRestart confirms that pod container has restarted at least once
