@@ -24,3 +24,5 @@ spec:
       value: "0"
     - name: net.ipv4.ping_group_range
       value: 1 0
+    - name: net.ipv4.ip_unprivileged_port_start
+      value: "1024"
