@@ -61,12 +61,12 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure vmssVM client (read ops) using rate limit config: QPS=%g, bucket=%d",
+	klog.V(2).InfoS("Azure vmssVM client (read ops) using rate limit config", "CloudProviderRateLimitQPS",
 		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure vmssVM client (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+		"CloudProviderRateLimitBucket",config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure vmssVM client (write ops) using rate limit config",
+	    "CloudProviderRateLimitQPS",	config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+	    "CloudProviderRateLimitBucket",config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
 		armClient:         armClient,
@@ -124,7 +124,7 @@ func (c *Client) getVMSSVM(ctx context.Context, resourceGroupName string, VMScal
 	response, rerr := c.armClient.GetResource(ctx, resourceID, string(expand))
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in vmssvm.get.request", ": resourceID",  resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
@@ -133,7 +133,7 @@ func (c *Client) getVMSSVM(ctx context.Context, resourceGroupName string, VMScal
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in vmssvm.get.respond", "resourceID", resourceID, "err", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -187,14 +187,14 @@ func (c *Client) listVMSSVM(ctx context.Context, resourceGroupName string, virtu
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, expand)
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in vmssvm.list.request", "resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.vmssvlr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in vmssvm.list.respond", "resourceID", resourceID, "err", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -207,7 +207,7 @@ func (c *Client) listVMSSVM(ctx context.Context, resourceGroupName string, virtu
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in vmssvm.list.next", "resourceID", resourceID, "err", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
@@ -260,14 +260,14 @@ func (c *Client) updateVMSSVM(ctx context.Context, resourceGroupName string, VMS
 	response, rerr := c.armClient.PutResource(ctx, resourceID, parameters)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in vmssvm.put.request", "resourceID", resourceID, "err", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.updateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in vmssvm.put.respond", "resourceID", resourceID, "err", rerr.Error())
 			return rerr
 		}
 	}
@@ -430,7 +430,7 @@ func (c *Client) updateVMSSVMs(ctx context.Context, resourceGroupName string, VM
 
 		defer c.armClient.CloseResponse(ctx, resp.Response)
 		if resp.Error != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.put.request", resourceID, resp.Error.Error())
+			klog.V(5).InfoS("Received error in vmssvm.put.request", "resourceID", resourceID, "err", resp.Error.Error())
 			errors = append(errors, resp.Error)
 			continue
 		}
@@ -438,7 +438,7 @@ func (c *Client) updateVMSSVMs(ctx context.Context, resourceGroupName string, VM
 		if resp.Response != nil && resp.Response.StatusCode != http.StatusNoContent {
 			_, rerr := c.updateResponder(resp.Response)
 			if rerr != nil {
-				klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmssvm.put.respond", resourceID, rerr.Error())
+				klog.V(5).InfoS("Received error in vmssvm.put.respond", "resourceID", resourceID, "err", rerr.Error())
 				errors = append(errors, rerr)
 			}
 		}
