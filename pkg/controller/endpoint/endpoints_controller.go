@@ -391,17 +391,28 @@ func (e *Controller) syncService(key string) error {
 			return err
 		}
 
-		// Delete the corresponding endpoint, as the service has been deleted.
-		// TODO: Please note that this will delete an endpoint when a
-		// service is deleted. However, if we're down at the time when
-		// the service is deleted, we will miss that deletion, so this
-		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		// There is a timing issue between service and endpoint,
+		// Events to a single handler are delivered sequentially,
+		// but there is no coordination between different handlers.
+		// At the same time, checkLeftoverEndpoints will query endpoints in a separate coroutine,
+		// which may be one step ahead.
+		_, err = e.client.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err){
 			return err
 		}
-		e.triggerTimeTracker.DeleteService(namespace, name)
-		return nil
+		if errors.IsNotFound(err) {
+			// Delete the corresponding endpoint, as the service has been deleted.
+			// TODO: Please note that this will delete an endpoint when a
+			// service is deleted. However, if we're down at the time when
+			// the service is deleted, we will miss that deletion, so this
+			// doesn't completely solve the problem. See #6877.
+			err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+			e.triggerTimeTracker.DeleteService(namespace, name)
+			return nil
+		}
 	}
 
 	if service.Spec.Selector == nil {
