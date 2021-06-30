@@ -351,14 +351,13 @@ func TestRestart(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	for i := 0; i != 5; i++ {
+	for i := 0; i != 3; i++ {
 		select {
 		case <-time.After(dbusReconnectPeriod * 5):
 			t.Fatal("wait dbus connect timeout")
 		case <-connChan:
 		}
 
-		time.Sleep(dbusReconnectPeriod)
 		shutdownChanMut.Lock()
 		close(shutdownChan)
 		shutdownChanMut.Unlock()
