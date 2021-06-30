@@ -50,6 +50,10 @@ var kubernetesSwaggerSchema = prototesting.Fake{
 		"api", "openapi-spec", "swagger.json"),
 }
 
+var crdSchemas = prototesting.Fake{
+	Path: "crd-schemas.json",
+}
+
 type fakeObjectConvertor struct {
 	converter  merge.Converter
 	apiVersion fieldpath.APIVersion
@@ -143,7 +147,35 @@ func NewFakeTypeConverter(m proto.Models) TypeConverter {
 }
 
 func NewFakeOpenAPIModels() proto.Models {
-	d, err := kubernetesSwaggerSchema.OpenAPISchema()
+	models := modelsFor(kubernetesSwaggerSchema)
+	crdModels := modelsFor(crdSchemas)
+	return testModels{models: []proto.Models{models, crdModels}}
+}
+
+type testModels struct {
+	models []proto.Models
+}
+
+func (t testModels) LookupModel(n string) proto.Schema {
+	for _, m := range t.models {
+		v := m.LookupModel(n)
+		if v != nil {
+			return v
+		}
+	}
+	return nil
+}
+
+func (t testModels) ListModels() []string {
+	var result []string
+	for _, m := range t.models {
+		result = append(result, m.ListModels()...)
+	}
+	return result
+}
+
+func modelsFor(fake prototesting.Fake) proto.Models {
+	d, err := fake.OpenAPISchema()
 	if err != nil {
 		panic(err)
 	}
@@ -700,15 +732,30 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		err := f.Update(appliedObj, "fieldmanager")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Reset()
+	}
+}
 
-	if err := f.Update(objs[1], "fieldmanager_1"); err != nil {
-		b.Fatal(err)
+func BenchmarkRepeatedUpdateLargeCustomResourceMap(b *testing.B) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("example.k8s.io/v1", "PreserveUnknownFields"))
+	podBytes := getObjectBytes("large-custom-resource-map.json")
+
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(podBytes, &u.Object); err != nil {
+		b.Fatalf("error decoding YAML: %v", err)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		err := f.Update(objs[n%len(objs)], fmt.Sprintf("fieldmanager_%d", n%len(objs)))
+		err := f.Update(u, "fieldmanager")
 		if err != nil {
 			b.Fatal(err)
 		}
