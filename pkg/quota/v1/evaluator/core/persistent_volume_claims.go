@@ -188,14 +188,16 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 		result = roundUpFunc(&userRequest)
 	}
 
-	if len(pvc.Status.AllocatedResources) == 0 {
-		return result
-	}
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) && result != nil {
+		if len(pvc.Status.AllocatedResources) == 0 {
+			return result
+		}
 
-	// if AllocatedResources is set and is greater than user request, we should use it.
-	if allocatedRequest, ok := pvc.Status.AllocatedResources[corev1.ResourceStorage]; ok {
-		if allocatedRequest.Cmp(*result) > 0 {
-			result = roundUpFunc(&allocatedRequest)
+		// if AllocatedResources is set and is greater than user request, we should use it.
+		if allocatedRequest, ok := pvc.Status.AllocatedResources[corev1.ResourceStorage]; ok {
+			if allocatedRequest.Cmp(*result) > 0 {
+				result = roundUpFunc(&allocatedRequest)
+			}
 		}
 	}
 	return result
@@ -222,4 +224,14 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 		return nil, fmt.Errorf("expect *api.PersistentVolumeClaim or *v1.PersistentVolumeClaim, got %v", t)
 	}
 	return pvc, nil
+}
+
+// RequiresQuotaReplenish enables quota monitoring for PVCs.
+func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
+		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
+			return true
+		}
+	}
+	return false
 }

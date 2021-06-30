@@ -149,8 +149,9 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 				newService := newObj.(*v1.Service)
 				notifyUpdate = core.GetQuotaServiceType(oldService) != core.GetQuotaServiceType(newService)
 			case schema.GroupResource{Resource: "persistentvolumeclaims"}:
-				// we always track quotas for PVC
-				notifyUpdate = true
+				oldPVC := oldObj.(*v1.PersistentVolumeClaim)
+				newPVC := newObj.(*v1.PersistentVolumeClaim)
+				notifyUpdate = core.RequiresQuotaReplenish(newPVC, oldPVC)
 			}
 			if notifyUpdate {
 				event := &event{
