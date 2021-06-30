@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/init-container-test: runtime/default
+  name: apparmorprofile4
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+  initContainers:
+  - name: init-container-test
