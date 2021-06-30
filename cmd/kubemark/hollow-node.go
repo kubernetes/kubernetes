@@ -42,6 +42,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -273,8 +274,8 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 		execer := &fakeexec.FakeExec{
 			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
 		}
-		eventBroadcaster := events.NewEventBroadcasterAdapter(client)
-		recorder := eventBroadcaster.NewRecorder("kubemark")
+		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,

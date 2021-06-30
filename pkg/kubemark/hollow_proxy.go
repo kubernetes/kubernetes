@@ -69,7 +69,7 @@ func NewHollowProxyOrDie(
 	iptInterface utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	execer utilexec.Interface,
-	broadcaster events.EventBroadcasterAdapter,
+	broadcaster events.EventBroadcaster,
 	recorder events.EventRecorder,
 	useRealProxier bool,
 	proxierSyncPeriod time.Duration,

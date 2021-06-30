@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
@@ -84,8 +85,8 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	if err != nil {
 		return nil, err
 	}
-	eventBroadcaster := events.NewEventBroadcasterAdapter(client)
-	recorder := eventBroadcaster.NewRecorder("kube-proxy")
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",

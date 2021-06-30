@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
@@ -139,8 +140,8 @@ func newProxyServer(
 	klog.Infof("Detected node IP %s", nodeIP.String())
 
 	// Create event recorder
-	eventBroadcaster := events.NewEventBroadcasterAdapter(client)
-	recorder := eventBroadcaster.NewRecorder("kube-proxy")
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "kube-proxy")
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",

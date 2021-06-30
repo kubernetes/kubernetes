@@ -523,7 +523,7 @@ type ProxyServer struct {
 	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
 	Proxier                proxy.Provider
-	Broadcaster            events.EventBroadcasterAdapter
+	Broadcaster            events.EventBroadcaster
 	Recorder               events.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
