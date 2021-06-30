@@ -102,7 +102,7 @@ func GetStaticPodSpecs(initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadma
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir, patchesDir string, initOrJoinCfg interface{} , endpoint *kubeadmapi.APIEndpoint, isDryRun bool, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, patchesDir string, initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(initCfg, endpoint)

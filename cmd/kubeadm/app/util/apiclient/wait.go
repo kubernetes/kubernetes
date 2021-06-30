@@ -73,6 +73,14 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 	}
 }
 
+func NewKubeWaiterInstance(client clientset.Interface, timeout time.Duration, writer io.Writer) KubeWaiter {
+	return KubeWaiter{
+		client:  client,
+		timeout: timeout,
+		writer:  writer,
+	}
+}
+
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func (w *KubeWaiter) WaitForAPI() error {
 	start := time.Now()
@@ -169,6 +177,29 @@ func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
 		// This main goroutine sends whatever the f function returns (error or not) to the channel
 		// This in order to continue on success (nil error), or just fail if the function returns an error
 		errC <- f()
+	}(errorChan, w)
+
+	// This call is blocking until one of the goroutines sends to errorChan
+	return <-errorChan
+}
+
+// NewWaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
+// healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
+// Note: NewWaitForKubeletAndFunc is copied from WaitForKubeletAndFunc with a few of changes for set TLSBootstrapTimeout(renamed to kubeletTLSBootstrap) be
+// configurable.
+func (w *KubeWaiter) NewWaitForKubeletAndFunc(f func(timeout time.Duration) error) error {
+	errorChan := make(chan error, 1)
+
+	go func(errC chan error, waiter Waiter) {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
+			errC <- err
+		}
+	}(errorChan, w)
+
+	go func(errC chan error, waiter Waiter) {
+		// This main goroutine sends whatever the f function returns (error or not) to the channel
+		// This in order to continue on success (nil error), or just fail if the function returns an error
+		errC <- f(w.timeout)
 	}(errorChan, w)
 
 	// This call is blocking until one of the goroutines sends to errorChan

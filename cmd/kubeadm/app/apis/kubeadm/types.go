@@ -216,6 +216,9 @@ type JoinTimeouts struct {
 	// ApiServerHealthCheck controls the timeout that we use for API server to appear
 	// +optional
 	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
+
+	// kubeletTLSBootstrap specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
+	KubeletTLSBootstrap *metav1.Duration `json:"kubeletTLSBootstrap,omitempty"`
 }
 
 // NodeRegistrationOptions holds fields that relate to registering a new control-plane or node to the cluster, either via "kubeadm init" or "kubeadm join"
@@ -360,7 +363,7 @@ type JoinConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm join".
 	Patches *Patches
-	
+
 	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
 	// either via "kubeadm init" or "kubeadm join"
 	Timeouts JoinTimeouts `json:"timeout,omitempty"`

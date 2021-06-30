@@ -514,6 +514,11 @@ func (in *JoinTimeouts) DeepCopyInto(out *JoinTimeouts) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.KubeletTLSBootstrap != nil {
+		in, out := &in.KubeletTLSBootstrap, &out.KubeletTLSBootstrap
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

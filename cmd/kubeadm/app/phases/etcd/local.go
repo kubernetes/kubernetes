@@ -135,7 +135,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 // CreateStackedEtcdStaticPodManifestFile will write local etcd static pod manifest file
 // for an additional etcd member that is joining an existing local/stacked etcd cluster.
 // Other members of the etcd cluster will be notified of the joining node in beforehand as well.
-func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, initCfg *kubeadmapi.InitaConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
+func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, patchesDir string, nodeName string, initCfg *kubeadmapi.InitConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) error {
 	cfg := &initCfg.ClusterConfiguration
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")

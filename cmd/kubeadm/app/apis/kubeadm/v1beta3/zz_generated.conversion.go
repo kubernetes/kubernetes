@@ -772,6 +772,7 @@ func Convert_kubeadm_JoinControlPlane_To_v1beta3_JoinControlPlane(in *kubeadm.Jo
 
 func autoConvert_v1beta3_JoinTimeouts_To_kubeadm_JoinTimeouts(in *JoinTimeouts, out *kubeadm.JoinTimeouts, s conversion.Scope) error {
 	out.ApiServerHealthCheck = (*v1.Duration)(unsafe.Pointer(in.ApiServerHealthCheck))
+	out.KubeletTLSBootstrap = (*v1.Duration)(unsafe.Pointer(in.KubeletTLSBootstrap))
 	return nil
 }
 
@@ -782,6 +783,7 @@ func Convert_v1beta3_JoinTimeouts_To_kubeadm_JoinTimeouts(in *JoinTimeouts, out 
 
 func autoConvert_kubeadm_JoinTimeouts_To_v1beta3_JoinTimeouts(in *kubeadm.JoinTimeouts, out *JoinTimeouts, s conversion.Scope) error {
 	out.ApiServerHealthCheck = (*v1.Duration)(unsafe.Pointer(in.ApiServerHealthCheck))
+	out.KubeletTLSBootstrap = (*v1.Duration)(unsafe.Pointer(in.KubeletTLSBootstrap))
 	return nil
 }
 

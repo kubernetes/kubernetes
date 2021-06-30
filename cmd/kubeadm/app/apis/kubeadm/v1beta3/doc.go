@@ -46,6 +46,7 @@ limitations under the License.
 // node to the cluster
 // - Remove TimeoutForControlPlane field from APIServer, because TimeoutForControlPlane has been removed into InitTimeouts and JoinTimeouts
 // structure and renamed to ApiServerHealthCheck
+// - Add KubeletTLSBootstrap field into JoinTimeouts to specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 //
 // Migration from old kubeadm config versions
 //
