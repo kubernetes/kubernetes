@@ -49,7 +49,7 @@ const (
 func (az *Cloud) InitializeCloudFromSecret() {
 	config, err := az.getConfigFromSecret()
 	if err != nil {
-		klog.Warningf("Failed to get cloud-config from secret: %v, skip initializing from secret", err)
+		klog.InfoS("Failed to get cloud-config from secret, skip initializing from secret", "err", err)
 		return
 	}
 
@@ -59,7 +59,7 @@ func (az *Cloud) InitializeCloudFromSecret() {
 	}
 
 	if err := az.InitializeCloudFromConfig(config, true); err != nil {
-		klog.Errorf("Failed to initialize Azure cloud provider: %v", err)
+		klog.ErrorS(nil, "Failed to initialize Azure cloud provider", err)
 	}
 }
 
