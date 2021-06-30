@@ -218,7 +218,9 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
-		klog.Warningf("Config not found: %s", strings.Join(missingList, ", "))
+		missingString := strings.Join(missingList, ", ")
+
+		rules.Warner.Warn(fmt.Sprintf("Config not found: %s", missingString))
 	}
 
 	// first merge all of our maps
