@@ -36,13 +36,21 @@ func TestNewCmdVersionWithoutConfigFile(t *testing.T) {
 	if err := o.Validate(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// FIXME soltysh:
-	// since we have defaulting to localhost:8080 in staging/src/k8s.io/client-go/tools/clientcmd/client_config.go#getDefaultServer
-	// we need to ignore the localhost:8080 server, when above gets removed this should be dropped too
-	if err := o.Run(); err != nil && !strings.Contains(err.Error(), "localhost:8080") {
+	if err := o.Run(); err != nil && !shouldIgnoreError(err) {
 		t.Errorf("Cannot execute version command: %v", err)
 	}
 	if !strings.Contains(buf.String(), "Client Version") {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+}
+
+func shouldIgnoreError(err error) bool {
+	errStr := err.Error()
+	// The default GitVersion is "v0.0.0-master+$Format:%H$" which is not a valid semantic version,
+	// so it fails to be parsed. We simply ignore this error to make the test pass locally.
+	return strings.Contains(errStr, "v0.0.0-master+$Format:%H$") ||
+		// FIXME soltysh:
+		// since we have defaulting to localhost:8080 in staging/src/k8s.io/client-go/tools/clientcmd/client_config.go#getDefaultServer
+		// we need to ignore the localhost:8080 server, when above gets removed this should be dropped too
+		strings.Contains(errStr, "localhost:8080")
 }
