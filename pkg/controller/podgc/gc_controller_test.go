@@ -73,15 +73,24 @@ func TestGCTerminated(t *testing.T) {
 		deletedPodNames sets.String
 	}{
 		{
-			name: "threshold = 0, disables terminated pod deletion",
+			name: "threshold < 0, disables terminated pod deletion",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 			},
-			threshold: 0,
-			// threshold = 0 disables terminated pod deletion
+			threshold:       -1,
+			// threshold < 0, disables terminated pod deletion
 			deletedPodNames: sets.NewString(),
 		},
+		 {
+                        name: "threshold = 0, delete pod a which is PodFailed and pod b which is PodSucceeded",
+                        pods: []nameToPhase{
+                                {name: "a", phase: v1.PodFailed},
+                                {name: "b", phase: v1.PodSucceeded},
+                        },
+                        threshold:       0,
+                        deletedPodNames: sets.NewString("a", "b"),
+                },
 		{
 			name: "threshold = 1, delete pod a which is PodFailed and pod b which is PodSucceeded",
 			pods: []nameToPhase{
