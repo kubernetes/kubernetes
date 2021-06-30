@@ -438,7 +438,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			},
 			patchType: types.MergePatchType,
 			patchBody: []byte(`{"spec": {"ephemeralContainers":[]}}`),
-			valid:     false,
+			valid:     true,
 		},
 		{
 			name: "remove the single container (JSON)",
@@ -483,7 +483,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, tc.patchBody, metav1.PatchOptions{}, "ephemeralcontainers"); tc.valid && err != nil {
 			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
-			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+			t.Errorf("%v: unexpected forbidden update to ephemeral containers", tc.name)
 		}
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
@@ -581,7 +581,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 				},
 			},
 			update: nil,
-			valid:  false,
+			valid:  true,
 		},
 		{
 			name: "remove all containers, empty",
@@ -596,7 +596,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 				},
 			},
 			update: []v1.EphemeralContainer{},
-			valid:  false,
+			valid:  true,
 		},
 		{
 			name: "increase number of containers",
@@ -660,7 +660,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			valid: false,
+			valid: true,
 		},
 	}
 
@@ -674,7 +674,7 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); tc.valid && err != nil {
 			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
-			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+			t.Errorf("%v: unexpected forbidden update to ephemeral containers", tc.name)
 		}
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)

@@ -10537,7 +10537,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			}},
-			"may not be removed",
+			"",
 			"Remove an Ephemeral Container",
 		},
 		{
@@ -10557,7 +10557,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			}},
-			"may not be removed",
+			"",
 			"Replace an Ephemeral Container",
 		},
 		{

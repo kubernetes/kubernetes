@@ -4229,15 +4229,13 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	}
 	allErrs := validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, specPath, opts)
 
-	// Existing EphemeralContainers may not be changed. Order isn't preserved by patch, so check each individually.
-	newContainerIndex := make(map[string]*core.EphemeralContainer)
+	// Existing EphemeralContainers may not be changed, but can be removed. Order isn't preserved by patch, so check each individually.
+	newEphemeralContainerIndex := make(map[string]*core.EphemeralContainer)
 	for i := range newPod.Spec.EphemeralContainers {
-		newContainerIndex[newPod.Spec.EphemeralContainers[i].Name] = &newPod.Spec.EphemeralContainers[i]
+		newEphemeralContainerIndex[newPod.Spec.EphemeralContainers[i].Name] = &newPod.Spec.EphemeralContainers[i]
 	}
 	for _, old := range oldPod.Spec.EphemeralContainers {
-		if new, ok := newContainerIndex[old.Name]; !ok {
-			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be removed\n", old.Name)))
-		} else if !apiequality.Semantic.DeepEqual(old, *new) {
+		if new, ok := newEphemeralContainerIndex[old.Name]; ok && !apiequality.Semantic.DeepEqual(old, *new) {
 			specDiff := diff.ObjectDiff(old, *new)
 			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be changed\n%v", old.Name, specDiff)))
 		}
