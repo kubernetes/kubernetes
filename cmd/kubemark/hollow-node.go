@@ -179,7 +179,7 @@ func newHollowNodeCommand() *cobra.Command {
 
 func run(cmd *cobra.Command, config *hollowNodeConfig) {
 	// To help debugging, immediately log version and print flags.
-	klog.Infof("Version: %+v", version.Get())
+	klog.InfoS("version", version.Get())
 	cliflag.PrintFlags(cmd.Flags())
 
 	if !knownMorphs.Has(config.Morph) {
