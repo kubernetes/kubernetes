@@ -36,6 +36,11 @@ func TestCPUSetBuilder(t *testing.T) {
 	if len(elems) != result.Size() {
 		t.Fatalf("expected cpuset %s to have the same size as %v", result, elems)
 	}
+
+	b.Add(6)
+	if len(elems) != result.Size() {
+		t.Error("expected call to Add after Result to have no effect")
+	}
 }
 
 func TestCPUSetSize(t *testing.T) {

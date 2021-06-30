@@ -121,7 +121,7 @@ func TestEvaluateTypes(t *testing.T) {
 		},
 		{
 			In:   `-0.0`,
-			Data: float64(-0.0),
+			Data: float64(0.0),
 			Out:  `-0`,
 		},
 		{
