@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
@@ -27,7 +28,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -144,6 +147,27 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
 	}))
+}
+
+// AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
+func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) {
+	namespace := c.f.Namespace.Name
+
+	podJS, err := json.Marshal(pod)
+	ExpectNoError(err, "error creating JSON for pod: %v", err)
+
+	ecPod := pod.DeepCopy()
+	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
+	ecJS, err := json.Marshal(ecPod)
+	ExpectNoError(err, "error creating JSON for pod with ephemeral container: %v", err)
+
+	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
+	ExpectNoError(err, "error creating patch to add ephemeral container: %v", err)
+
+	_, err = c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
+	ExpectNoError(err, "Failed to patch ephemeral containers in pod %q: %v", pod.Name, err)
+
+	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
 }
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
