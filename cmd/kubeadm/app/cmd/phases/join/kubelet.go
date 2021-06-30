@@ -107,7 +107,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	defer os.Remove(bootstrapKubeConfigFile)
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
-	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
+	klog.V(1).InfoS("[kubelet-start] writing bootstrap kubelet config file", "path", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
@@ -115,7 +115,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
 	if _, err := os.Stat(cfg.CACertPath); os.IsNotExist(err) {
-		klog.V(1).Infof("[kubelet-start] writing CA certificate at %s", cfg.CACertPath)
+		klog.V(1).InfoS("[kubelet-start] writing CA certificate", "path", cfg.CACertPath)
 		if err := certutil.WriteCert(cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 			return errors.Wrap(err, "couldn't save the CA certificate to disk")
 		}
@@ -136,7 +136,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// and it has the "Ready" status.
 	// A new Node with the same name as an existing control-plane Node can cause undefined
 	// behavior and ultimately control-plane failure.
-	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
+	klog.V(1).InfoS("[kubelet-start] Checking for an existing Node in the cluster with name and status ", "nodeName", nodeName, "status", v1.NodeReady)
 	node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "cannot get Node %q", nodeName)
