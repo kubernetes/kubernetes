@@ -53,7 +53,7 @@ func NewAdmissionWebhookServer(handler http.Handler) (string, func(), error) {
 // AdmissionWebhookHandler creates a HandlerFunc that decodes/encodes AdmissionReview and performs
 // given admit function
 func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) error) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		data, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -82,7 +82,7 @@ func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) 
 		if err := json.NewEncoder(w).Encode(review); err != nil {
 			t.Errorf("Marshal of response failed with error: %v", err)
 		}
-	})
+	}
 }
 
 // LocalhostCert was generated from crypto/tls/generate_cert.go with the following command:
