@@ -251,7 +251,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
 			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
-			klog.Infof("marking node %s for deletion", node)
+			klog.InfoS("marking node for deletion", "node", node)
 			// Mark node for deletion from kubemark cluster.
 			// Once it becomes unready after replication controller
 			// deletion has been noticed, we will delete it explicitly.
@@ -339,7 +339,7 @@ func (kubemarkController *KubemarkController) runNodeCreation(stop <-chan struct
 			kubemarkController.nodeGroupQueueSizeLock.Lock()
 			err := kubemarkController.addNodeToNodeGroup(nodeGroup)
 			if err != nil {
-				klog.Errorf("failed to add node to node group %s: %v", nodeGroup, err)
+				klog.ErrorS(err, "failed to add node to node group", "nodeGroup", nodeGroup)
 			} else {
 				kubemarkController.nodeGroupQueueSize[nodeGroup]--
 			}
@@ -376,7 +376,7 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
 				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
-					klog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
+					klog.ErrorS(err, "failed to delete node %s from kubemark cluster", "nodeName", node.Name)
 				}
 			}
 			return
