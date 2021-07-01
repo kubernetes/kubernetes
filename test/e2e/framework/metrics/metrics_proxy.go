@@ -68,8 +68,8 @@ func SetupMetricsProxy(c clientset.Interface) error {
 				})
 			}
 		}
-		if len(foundComponents) != 2 {
-			klog.Infof("Only %d components found. Will retry.", len(foundComponents))
+		if len(foundComponents) < 2 {
+			klog.Infof("Only %d components found, at least 2 expected. Will retry.", len(foundComponents))
 			klog.Infof("Found components: %v", foundComponents)
 			return false, nil
 		}
