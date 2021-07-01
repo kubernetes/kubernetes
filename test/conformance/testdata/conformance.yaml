@@ -925,6 +925,14 @@
     StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+- testname: StatefulSet, status sub-resource
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
+    should validate Statefulset Status endpoints [Conformance]'
+  description: When a StatefulSet is created it MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
+  file: test/e2e/apps/statefulset.go
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
     CSR API operations [Conformance]'
