@@ -892,7 +892,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
 		})
 
-		ginkgo.It("should list, patch and delete a collection of StatefulSets", func() {
+		/*
+			Release: v1.22
+			Testname: StatefulSet, list, patch and delete a collection of StatefulSets
+			Description: When a StatefulSet is created it MUST succeed. It
+			MUST succeed when listing StatefulSets via a label selector. It
+			MUST succeed when patching a StatefulSet. It MUST succeed when
+			deleting the StatefulSet via deleteCollection.
+		*/
+		framework.ConformanceIt("should list, patch and delete a collection of StatefulSets", func() {
 
 			ssPatchReplicas := int32(2)
 			ssPatchImage := imageutils.GetE2EImage(imageutils.Pause)
