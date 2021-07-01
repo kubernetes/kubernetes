@@ -284,15 +284,12 @@ func makeService(name string, tweaks ...serviceTweak) *api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
-			Ports: []api.ServicePort{{
-				Port:       93,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(76),
-			}},
 		},
 	}
 	// Default to ClusterIP
 	tweakTypeClusterIP(svc)
+	// Default to 1 port
+	tweakPorts(makeServicePort("", 93, intstr.FromInt(76), api.ProtocolTCP))(svc)
 
 	for _, tweak := range tweaks {
 		tweak(svc)
@@ -327,12 +324,12 @@ func tweakPorts(ports ...api.ServicePort) serviceTweak {
 	}
 }
 
-func makeServicePort(name string, port int, tgtPort intstr.IntOrString) api.ServicePort {
+func makeServicePort(name string, port int, tgtPort intstr.IntOrString, proto api.Protocol) api.ServicePort {
 	return api.ServicePort{
 		Name:       name,
 		Port:       int32(port),
 		TargetPort: tgtPort,
-		Protocol:   api.ProtocolTCP,
+		Protocol:   proto,
 	}
 }
 
@@ -352,6 +349,17 @@ func tweakIPFamilies(families ...api.IPFamily) serviceTweak {
 func tweakIPFamilyPolicy(policy api.IPFamilyPolicyType) serviceTweak {
 	return func(svc *api.Service) {
 		svc.Spec.IPFamilyPolicy = &policy
+	}
+}
+
+func tweakNodePorts(values ...int) serviceTweak {
+	return func(svc *api.Service) {
+		for i := range svc.Spec.Ports {
+			if i >= len(values) {
+				break
+			}
+			svc.Spec.Ports[i].NodePort = int32(values[i])
+		}
 	}
 }
 
@@ -541,21 +549,10 @@ func TestDryRunNodePort(t *testing.T) {
 	// Test dry run create request with multi node port
 	svc = makeService("foo",
 		tweakTypeNodePort,
-		func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				NodePort:   30053,
-				TargetPort: intstr.FromInt(6503),
-				Protocol:   api.ProtocolTCP,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				NodePort:   30053,
-				TargetPort: intstr.FromInt(6503),
-				Protocol:   api.ProtocolUDP,
-			}}
-		})
+		tweakPorts(
+			makeServicePort("port-tcp", 53, intstr.FromInt(6503), api.ProtocolTCP),
+			makeServicePort("port-udp", 53, intstr.FromInt(6503), api.ProtocolUDP)),
+		tweakNodePorts(30053, 30053))
 	expectNodePorts := collectServiceNodePorts(svc)
 	obj, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -583,19 +580,9 @@ func TestDryRunNodePort(t *testing.T) {
 	// so PortAllocationOperation.AllocateNext() will be called multiple times.
 	svc = makeService("foo",
 		tweakTypeNodePort,
-		func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-a",
-				Port:       53,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6503),
-			}, {
-				Name:       "port-b",
-				Port:       54,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6504),
-			}}
-		})
+		tweakPorts(
+			makeServicePort("port-a", 53, intstr.FromInt(6503), api.ProtocolTCP),
+			makeServicePort("port-b", 54, intstr.FromInt(6504), api.ProtocolUDP)))
 	obj, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -626,60 +613,28 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 	}{{
 		svc: makeService("foo1",
 			tweakTypeNodePort,
-			func(s *api.Service) {
-				s.Spec.Ports = []api.ServicePort{{
-					Name:       "port-tcp",
-					Port:       53,
-					NodePort:   30053,
-					TargetPort: intstr.FromInt(6503),
-					Protocol:   api.ProtocolTCP,
-				}, {
-					Name:       "port-udp",
-					Port:       53,
-					NodePort:   30053,
-					TargetPort: intstr.FromInt(6503),
-					Protocol:   api.ProtocolUDP,
-				}}
-			}),
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6503), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6503), api.ProtocolUDP)),
+			tweakNodePorts(30053, 30053)),
 		name:            "foo1",
 		expectNodePorts: []int{30053, 30053},
 	}, {
 		svc: makeService("foo2",
 			tweakTypeNodePort,
-			func(s *api.Service) {
-				s.Spec.Ports = []api.ServicePort{{
-					Name:       "port-tcp",
-					Port:       54,
-					TargetPort: intstr.FromInt(6504),
-					Protocol:   api.ProtocolTCP,
-				}, {
-					Name:       "port-udp",
-					Port:       54,
-					NodePort:   30054,
-					TargetPort: intstr.FromInt(6504),
-					Protocol:   api.ProtocolUDP,
-				}}
-			}),
+			tweakPorts(
+				makeServicePort("port-tcp", 54, intstr.FromInt(6504), api.ProtocolTCP),
+				makeServicePort("port-udp", 54, intstr.FromInt(6504), api.ProtocolUDP)),
+			tweakNodePorts(30054, 30054)),
 		name:            "foo2",
 		expectNodePorts: []int{30054, 30054},
 	}, {
 		svc: makeService("foo3",
 			tweakTypeNodePort,
-			func(s *api.Service) {
-				s.Spec.Ports = []api.ServicePort{{
-					Name:       "port-tcp",
-					Port:       55,
-					NodePort:   30055,
-					TargetPort: intstr.FromInt(6505),
-					Protocol:   api.ProtocolTCP,
-				}, {
-					Name:       "port-udp",
-					Port:       55,
-					NodePort:   30056,
-					TargetPort: intstr.FromInt(6506),
-					Protocol:   api.ProtocolUDP,
-				}}
-			}),
+			tweakPorts(
+				makeServicePort("port-tcp", 55, intstr.FromInt(6505), api.ProtocolTCP),
+				makeServicePort("port-udp", 55, intstr.FromInt(6506), api.ProtocolUDP)),
+			tweakNodePorts(30055, 30056)),
 		name:            "foo3",
 		expectNodePorts: []int{30055, 30056},
 	}}
@@ -725,17 +680,10 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	defer server.Terminate(t)
 	failureCases := map[string]*api.Service{
 		"empty ID": makeService(""),
-		"empty port": makeService("foo", func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Protocol: api.ProtocolTCP,
-			}}
-		}),
-		"missing targetPort": makeService("foo", func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
-			}}
-		}),
+		"empty port": makeService("foo", tweakPorts(
+			makeServicePort("p", 0, intstr.FromInt(80), api.ProtocolTCP))),
+		"missing targetPort": makeService("foo", tweakPorts(
+			makeServicePort("p", 80, intstr.IntOrString{}, api.ProtocolTCP))),
 	}
 	ctx := genericapirequest.NewDefaultContext()
 	for _, failureCase := range failureCases {
@@ -1154,20 +1102,11 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	defer server.Terminate(t)
 
 	// Create external load balancer.
-	svc1 := makeService("foo", func(s *api.Service) {
-		s.Spec.Type = api.ServiceTypeLoadBalancer
-		s.Spec.Ports = []api.ServicePort{{
-			Name:       "p",
-			Port:       6502,
-			Protocol:   api.ProtocolTCP,
-			TargetPort: intstr.FromInt(6502),
-		}, {
-			Name:       "q",
-			Port:       8086,
-			Protocol:   api.ProtocolTCP,
-			TargetPort: intstr.FromInt(8086),
-		}}
-	})
+	svc1 := makeService("foo",
+		tweakTypeLoadBalancer,
+		tweakPorts(
+			makeServicePort("p", 6502, intstr.FromInt(6502), api.ProtocolTCP),
+			makeServicePort("q", 8086, intstr.FromInt(8086), api.ProtocolTCP)))
 	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -1271,16 +1210,14 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods, singleStackIPv4)
 	defer server.Terminate(t)
 	for _, name := range []string{"foo", "bad"} {
-		_, err := registry.Create(ctx, makeService(name, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{
+		_, err := registry.Create(ctx, makeService(name,
+			tweakPorts(
 				// Service port 9393 should route to endpoint port "p", which is port 93
-				{Name: "p", Port: 9393, TargetPort: intstr.FromString("p")},
-
+				makeServicePort("p", 9393, intstr.FromString("p"), api.ProtocolTCP),
 				// Service port 93 should route to unnamed endpoint port, which is port 80
 				// This is to test that the service port definition is used when determining resource location
-				{Name: "", Port: 93, TargetPort: intstr.FromInt(80)},
-			}
-		}), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				makeServicePort("", 93, intstr.FromInt(80), api.ProtocolTCP))),
+			rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("error creating service: %v", err)
 		}
@@ -2011,86 +1948,47 @@ func TestInitNodePorts(t *testing.T) {
 		expectSpecifiedNodePorts: []int{},
 	}, {
 		name: "Service has one specified NodePort",
-		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}}
-		}),
+		service: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
 		expectSpecifiedNodePorts: []int{30053},
 	}, {
 		name: "Service has two same ports with different protocols and specifies same NodePorts",
-		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30054,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30054,
-			}}
-		}),
+		service: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30054, 30054)),
 		expectSpecifiedNodePorts: []int{30054, 30054},
 	}, {
 		name: "Service has two same ports with different protocols and specifies different NodePorts",
-		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30055,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30056,
-			}}
-		}),
+		service: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30055, 30056)),
 		expectSpecifiedNodePorts: []int{30055, 30056},
 	}, {
 		name: "Service has two different ports with different protocols and specifies different NodePorts",
-		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30057,
-			}, {
-				Name:       "port-udp",
-				Port:       54,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30058,
-			}}
-		}),
+		service: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 54, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30057, 30058)),
 		expectSpecifiedNodePorts: []int{30057, 30058},
 	}, {
 		name: "Service has two same ports with different protocols but only specifies one NodePort",
-		service: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30059,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-			}}
-		}),
+		service: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30059)),
 		expectSpecifiedNodePorts: []int{30059, 30059},
 	}}
 
@@ -2132,139 +2030,81 @@ func TestUpdateNodePorts(t *testing.T) {
 		expectSpecifiedNodePorts []int
 	}{{
 		name: "Old service and new service have the same NodePort",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-				NodePort:   30053,
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-				NodePort:   30053,
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("", 6502, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("", 6502, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
 		expectSpecifiedNodePorts: []int{30053},
 	}, {
 		name: "Old service has more NodePorts than new service has",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30053,
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30053, 30053)),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
 		expectSpecifiedNodePorts: []int{30053},
 	}, {
 		name: "Change protocol of ServicePort without changing NodePort",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30053,
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30053)),
 		expectSpecifiedNodePorts: []int{30053},
 	}, {
 		name: "Should allocate NodePort when changing service type to NodePort",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeClusterIP,
+			tweakPorts(
+				makeServicePort("", 6502, intstr.FromInt(6502), api.ProtocolUDP))),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("", 6502, intstr.FromInt(6502), api.ProtocolUDP))),
 		expectSpecifiedNodePorts: []int{},
 	}, {
 		name: "Add new ServicePort with a different protocol without changing port numbers",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30053,
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP)),
+			tweakNodePorts(30053)),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30053, 30053)),
 		expectSpecifiedNodePorts: []int{30053, 30053},
 	}, {
 		name: "Change service type from ClusterIP to NodePort with same NodePort number but different protocols",
-		oldService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Port:       53,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}}
-		}),
-		newService: makeService("foo", tweakTypeNodePort, func(s *api.Service) {
-			s.Spec.Ports = []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolTCP,
-				NodePort:   30053,
-			}, {
-				Name:       "port-udp",
-				Port:       53,
-				TargetPort: intstr.FromInt(6502),
-				Protocol:   api.ProtocolUDP,
-				NodePort:   30053,
-			}}
-		}),
+		oldService: makeService("foo",
+			tweakTypeClusterIP,
+			tweakPorts(
+				makeServicePort("", 53, intstr.FromInt(6502), api.ProtocolTCP))),
+		newService: makeService("foo",
+			tweakTypeNodePort,
+			tweakPorts(
+				makeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
+				makeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
+			tweakNodePorts(30053, 30053)),
 		expectSpecifiedNodePorts: []int{30053, 30053},
 	}}
 
