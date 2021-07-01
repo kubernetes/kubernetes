@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/admission/api/validation"
 	"k8s.io/pod-security-admission/api"
@@ -191,7 +190,7 @@ func (a *Admission) ValidateConfiguration() error {
 
 // Validate admits an API request.
 // The objects in admission attributes are expected to be external v1 objects that we care about.
-func (a *Admission) Validate(ctx context.Context, attrs admission.Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) Validate(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
 	var response admissionv1.AdmissionResponse
 	switch attrs.GetResource().GroupResource() {
 	case corev1.Resource("namespaces"):
@@ -207,32 +206,42 @@ func (a *Admission) Validate(ctx context.Context, attrs admission.Attributes) ad
 	return response
 }
 
-func (a *Admission) ValidateNamespace(ctx context.Context, attrs admission.Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
 		return allowedResponse()
 	}
-	namespace, ok := attrs.GetObject().(*corev1.Namespace)
+	obj, err := attrs.GetObject()
+	if err != nil {
+		klog.ErrorS(err, "failed to decode object")
+		return internalErrorResponse("failed to decode object")
+	}
+	namespace, ok := obj.(*corev1.Namespace)
 	if !ok {
-		klog.InfoS("failed to assert namespace type", "type", reflect.TypeOf(attrs.GetObject()))
+		klog.InfoS("failed to assert namespace type", "type", reflect.TypeOf(obj))
 		return internalErrorResponse("failed to decode namespace")
 	}
 
 	newPolicy, newErr := a.PolicyToEvaluate(namespace.Labels)
 
 	switch attrs.GetOperation() {
-	case admission.Create:
+	case admissionv1.Create:
 		// require valid labels on create
 		if newErr != nil {
 			return invalidResponse(newErr.Error())
 		}
 		return allowedResponse()
 
-	case admission.Update:
+	case admissionv1.Update:
 		// if update, check if policy labels changed
-		oldNamespace, ok := attrs.GetOldObject().(*corev1.Namespace)
+		oldObj, err := attrs.GetOldObject()
+		if err != nil {
+			klog.ErrorS(err, "failed to decode old object")
+			return internalErrorResponse("failed to decode old object")
+		}
+		oldNamespace, ok := oldObj.(*corev1.Namespace)
 		if !ok {
-			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(attrs.GetOldObject()))
+			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(oldObj))
 			return internalErrorResponse("failed to decode old namespace")
 		}
 		oldPolicy, oldErr := a.PolicyToEvaluate(oldNamespace.Labels)
@@ -283,26 +292,36 @@ var ignoredPodSubresources = map[string]bool{
 	"status":      true,
 }
 
-func (a *Admission) ValidatePod(ctx context.Context, attrs admission.Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
 		return allowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
-	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserInfo().GetName()) {
+	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
 		return allowedResponse()
 	}
 
-	pod, ok := attrs.GetObject().(*corev1.Pod)
+	obj, err := attrs.GetObject()
+	if err != nil {
+		klog.ErrorS(err, "failed to decode object")
+		return internalErrorResponse("failed to decode object")
+	}
+	pod, ok := obj.(*corev1.Pod)
 	if !ok {
-		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(attrs.GetObject()))
+		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
 		return internalErrorResponse("failed to decode pod")
 	}
 	enforce := true
-	if attrs.GetOperation() == admission.Update {
-		oldPod, ok := attrs.GetOldObject().(*corev1.Pod)
+	if attrs.GetOperation() == admissionv1.Update {
+		oldObj, err := attrs.GetOldObject()
+		if err != nil {
+			klog.ErrorS(err, "failed to decode old object")
+			return internalErrorResponse("failed to decode old object")
+		}
+		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
-			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(attrs.GetOldObject()))
+			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
 			return internalErrorResponse("failed to decode old pod")
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
@@ -313,17 +332,22 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs admission.Attributes)
 	return a.EvaluatePod(ctx, attrs.GetNamespace(), &pod.ObjectMeta, &pod.Spec, enforce)
 }
 
-func (a *Admission) ValidatePodController(ctx context.Context, attrs admission.Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
 		return allowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
-	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserInfo().GetName()) {
+	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
 		return allowedResponse()
 	}
 
-	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(attrs.GetObject())
+	obj, err := attrs.GetObject()
+	if err != nil {
+		klog.ErrorS(err, "failed to decode object")
+		return internalErrorResponse("failed to decode object")
+	}
+	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
 		return internalErrorResponse("failed to extract pod template")
