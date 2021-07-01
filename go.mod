@@ -69,10 +69,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v1.0.0-rc95.0.20210608002938-1f5126fe967e
 	github.com/opencontainers/selinux v1.8.0
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
-	github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
-	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
-	github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
+	github.com/openshift/api v0.0.0-20210521075222-e273a339932a
+	github.com/openshift/apiserver-library-go v0.0.0-20210701134359-ec2b755e3a59
+	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
+	github.com/openshift/library-go v0.0.0-20210521084623-7392ea9b02ca
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_model v0.2.0
@@ -103,16 +103,16 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.21.0-rc.0
+	k8s.io/api v0.21.1
 	k8s.io/apiextensions-apiserver v0.21.0-rc.0
-	k8s.io/apimachinery v0.21.0-rc.0
-	k8s.io/apiserver v0.21.0-rc.0
+	k8s.io/apimachinery v0.21.1
+	k8s.io/apiserver v0.21.1
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.21.0-rc.0
+	k8s.io/client-go v0.21.1
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.21.0-rc.0
-	k8s.io/component-base v0.21.0-rc.0
+	k8s.io/code-generator v0.21.1
+	k8s.io/component-base v0.21.1
 	k8s.io/component-helpers v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
@@ -397,7 +397,7 @@ replace (
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
-	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
+	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210701134359-ec2b755e3a59
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
@@ -508,15 +508,15 @@ replace (
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 => gotest.tools/v3 v3.0.3
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.3
-	k8s.io/api => k8s.io/api v0.21.0-rc.0
+	k8s.io/api => k8s.io/api v0.21.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.0-rc.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.21.0-rc.0
-	k8s.io/apiserver => k8s.io/apiserver v0.21.0-rc.0
+	k8s.io/apimachinery => k8s.io/apimachinery v0.21.1
+	k8s.io/apiserver => k8s.io/apiserver v0.21.1
 	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-	k8s.io/client-go => k8s.io/client-go v0.21.0-rc.0
+	k8s.io/client-go => k8s.io/client-go v0.21.1
 	k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
 	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
-	k8s.io/code-generator => k8s.io/code-generator v0.21.0-rc.0
+	k8s.io/code-generator => k8s.io/code-generator v0.21.1
 	k8s.io/component-base => k8s.io/component-base v0.21.0-rc.0
 	k8s.io/component-helpers => ./staging/src/k8s.io/component-helpers
 	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
