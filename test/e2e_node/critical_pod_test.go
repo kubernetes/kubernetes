@@ -19,19 +19,24 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -50,7 +55,9 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			}
 		})
 
-		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func() {
+		podMap := make(map[string]*v1.Pod)
+
+		ginkgo.It("should be able to create and delete a critical pod", func() {
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {
@@ -82,14 +89,22 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 				Requests: getNodeCPUAndMemoryCapacity(f),
 			}, node)
 
-			// Create pods, starting with non-critical so that the critical preempts the other pods.
-			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
-			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
+			ginkgo.By("Creating pods, starting with non-critical so that the critical preempts the other pods.")
+			createdPods := f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
+			for _, pod := range createdPods {
+				podMap[pod.Name] = pod
+			}
 
-			// Check that non-critical pods other than the besteffort have been evicted
+			ginkgo.By("Creating the critical pod")
+			createSyncInNamespaceFromPod(f, criticalPod)
+
+			ginkgo.By("Checking that non-critical pods other than the besteffort have been evicted")
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+
+			ginkgo.By(fmt.Sprintf("Checking that non-critical pods other than the besteffort have been evicted (%d pods)", len(updatedPodList.Items)))
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
+				framework.Logf("pod %q status %v", p.Name, p.Status)
 				if p.Name == nonCriticalBestEffort.Name {
 					framework.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
 				} else {
@@ -99,10 +114,8 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 		})
 		ginkgo.AfterEach(func() {
 			// Delete Pods
-			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			deleteSyncInNamespace(f, criticalPodName, kubeapi.NamespaceSystem, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			deletePodsAsync(f, podMap)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
@@ -110,6 +123,24 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 		})
 	})
 })
+
+func createSyncInNamespaceFromPod(f *framework.Framework, pod *v1.Pod) *v1.Pod {
+	p := f.PodClientNS(pod.Namespace).Create(pod)
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, p.Namespace, framework.PodStartTimeout))
+	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
+	p, err := f.PodClientNS(pod.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	return p
+}
+
+func deleteSyncInNamespace(f *framework.Framework, name, namespace string, options metav1.DeleteOptions, timeout time.Duration) {
+	err := f.PodClientNS(namespace).Delete(context.TODO(), name, options)
+	if err != nil && !apierrors.IsNotFound(err) {
+		framework.Failf("Failed to delete pod %q in namespace %q: %v", name, namespace, err)
+	}
+	gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, namespace, name, labels.Everything(),
+		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q in namespace %q  to disappear", name, namespace)
+}
 
 func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
