@@ -31,7 +31,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 
 	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
@@ -197,11 +197,6 @@ func (info *endpointsInfo) IsTerminating() bool {
 	return info.terminating
 }
 
-// GetTopology returns the topology information of the endpoint.
-func (info *endpointsInfo) GetTopology() map[string]string {
-	return nil
-}
-
 // GetZoneHint returns the zone hint for the endpoint.
 func (info *endpointsInfo) GetZoneHints() sets.String {
 	return sets.String{}
@@ -220,6 +215,16 @@ func (info *endpointsInfo) Port() (int, error) {
 // Equal is part of proxy.Endpoint interface.
 func (info *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
+}
+
+// GetNodeName returns the NodeName for this endpoint.
+func (info *endpointsInfo) GetNodeName() string {
+	return ""
+}
+
+// GetZone returns the Zone for this endpoint.
+func (info *endpointsInfo) GetZone() string {
+	return ""
 }
 
 //Uses mac prefix and IPv4 address to return a mac address
