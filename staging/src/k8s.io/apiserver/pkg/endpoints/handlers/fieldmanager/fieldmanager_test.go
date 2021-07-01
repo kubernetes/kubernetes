@@ -51,7 +51,7 @@ var kubernetesSwaggerSchema = prototesting.Fake{
 }
 
 var crdSchemas = prototesting.Fake{
-	Path: "crd-schemas.json",
+	Path: filepath.Join("testdata", "crd-schemas.json"),
 }
 
 type fakeObjectConvertor struct {
@@ -89,16 +89,34 @@ type TestFieldManager struct {
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, "", nil)
+	return NewTestFieldManagerWithOptions(gvk, TestFieldManagerOptions{})
 }
 
 func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, "scale", nil)
+	return NewTestFieldManagerWithOptions(gvk, TestFieldManagerOptions{Subresource: "scale"})
 }
 
 func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
-	m := NewFakeOpenAPIModels()
-	typeConverter := NewFakeTypeConverter(m)
+	return NewTestFieldManagerWithOptions(gvk, TestFieldManagerOptions{
+		ChainFieldManager:     chainFieldManager,
+		Subresource:           subresource,
+		PreserveUnknownFields: false,
+	})
+}
+
+type TestFieldManagerOptions struct {
+	ChainFieldManager     func(Manager) Manager
+	Subresource           string
+	PreserveUnknownFields bool
+	Models                proto.Models
+}
+
+func NewTestFieldManagerWithOptions(gvk schema.GroupVersionKind, options TestFieldManagerOptions) TestFieldManager {
+	m := options.Models
+	if m == nil {
+		m = modelsFor(kubernetesSwaggerSchema)
+	}
+	typeConverter := NewFakeTypeConverter(m, options.PreserveUnknownFields)
 	converter := newVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{converter, apiVersion}
@@ -119,27 +137,29 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainF
 	f = NewLastAppliedUpdater(
 		NewLastAppliedManager(
 			NewProbabilisticSkipNonAppliedManager(
-				NewBuildManagerInfoManager(
-					NewManagedFieldsUpdater(
-						NewStripMetaManager(f),
-					), gvk.GroupVersion(), subresource,
+				NewCapManagersManager(
+					NewBuildManagerInfoManager(
+						NewManagedFieldsUpdater(
+							NewStripMetaManager(f),
+						), gvk.GroupVersion(), options.Subresource,
+					), DefaultMaxUpdateManagers,
 				), &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability,
 			), typeConverter, objectConverter, gvk.GroupVersion(),
 		),
 	)
-	if chainFieldManager != nil {
-		f = chainFieldManager(f)
+	if options.ChainFieldManager != nil {
+		f = options.ChainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: NewFieldManager(f, subresource),
+		fieldManager: NewFieldManager(f, options.Subresource),
 		apiVersion:   gvk.GroupVersion().String(),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
 }
 
-func NewFakeTypeConverter(m proto.Models) TypeConverter {
-	tc, err := NewTypeConverter(m, false)
+func NewFakeTypeConverter(m proto.Models, preserveUnknownFields bool) TypeConverter {
+	tc, err := NewTypeConverter(m, preserveUnknownFields)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to build TypeConverter: %v", err))
 	}
@@ -147,31 +167,7 @@ func NewFakeTypeConverter(m proto.Models) TypeConverter {
 }
 
 func NewFakeOpenAPIModels() proto.Models {
-	models := modelsFor(kubernetesSwaggerSchema)
-	crdModels := modelsFor(crdSchemas)
-	return testModels{models: []proto.Models{models, crdModels}}
-}
-
-type testModels struct {
-	models []proto.Models
-}
-
-func (t testModels) LookupModel(n string) proto.Schema {
-	for _, m := range t.models {
-		v := m.LookupModel(n)
-		if v != nil {
-			return v
-		}
-	}
-	return nil
-}
-
-func (t testModels) ListModels() []string {
-	var result []string
-	for _, m := range t.models {
-		result = append(result, m.ListModels()...)
-	}
-	return result
+	return modelsFor(kubernetesSwaggerSchema)
 }
 
 func modelsFor(fake prototesting.Fake) proto.Models {
@@ -598,7 +594,7 @@ func BenchmarkConvertObjectToTyped(b *testing.B) {
 		b.Run(test.gvk.Kind, func(b *testing.B) {
 			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
 			m := NewFakeOpenAPIModels()
-			typeConverter := NewFakeTypeConverter(m)
+			typeConverter := NewFakeTypeConverter(m, false)
 
 			structured, err := runtime.Decode(decoder, test.obj)
 			if err != nil {
@@ -660,7 +656,7 @@ func BenchmarkCompare(b *testing.B) {
 		b.Run(test.gvk.Kind, func(b *testing.B) {
 			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
 			m := NewFakeOpenAPIModels()
-			typeConverter := NewFakeTypeConverter(m)
+			typeConverter := NewFakeTypeConverter(m, false)
 
 			structured, err := runtime.Decode(decoder, test.obj)
 			if err != nil {
@@ -732,10 +728,15 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+
+	if err := f.Update(objs[1], "fieldmanager_1"); err != nil {
+		b.Fatal(err)
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		err := f.Update(appliedObj, "fieldmanager")
+		err := f.Update(objs[n%len(objs)], fmt.Sprintf("fieldmanager_%d", n%len(objs)))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -743,23 +744,71 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 	}
 }
 
-func BenchmarkRepeatedUpdateLargeCustomResourceMap(b *testing.B) {
-	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("example.k8s.io/v1", "PreserveUnknownFields"))
-	podBytes := getObjectBytes("large-custom-resource-map.json")
-
-	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal(podBytes, &u.Object); err != nil {
-		b.Fatalf("error decoding YAML: %v", err)
+func BenchmarkUpdateLargeCustomResource(b *testing.B) {
+	cases := []struct {
+		gvk  schema.GroupVersionKind
+		opts TestFieldManagerOptions
+	}{
+		{
+			gvk:  schema.FromAPIVersionAndKind("example.k8s.io/v1", "NoSchema"),
+			opts: TestFieldManagerOptions{PreserveUnknownFields: true, Models: modelsFor(crdSchemas)},
+		},
+		{
+			gvk:  schema.FromAPIVersionAndKind("example.k8s.io/v1", "LargeStatus"),
+			opts: TestFieldManagerOptions{Models: modelsFor(crdSchemas)},
+		},
 	}
+	for _, tc := range cases {
+		b.Run(tc.gvk.String(), func(b *testing.B) {
+			f := NewTestFieldManagerWithOptions(tc.gvk, tc.opts)
+			apiVersion, kind := tc.gvk.ToAPIVersionAndKind()
+			items := map[string]interface{}{}
+			for i := 0; i < 100; i++ {
+				items[fmt.Sprintf("item%d", i)] = map[string]interface{}{
+					"field1": "i am a teapot",
+					"field2": false,
+					"field3": map[string]interface{}{
+						"nested1": "value1",
+						"nested2": "value2",
+						"nested3": "value3",
+						"nested4": map[string]interface{}{
+							"xyz": "abc",
+						},
+					},
+				}
+			}
+			obj := map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       kind,
+				"metadata": map[string]interface{}{
+					"name": "example-preserved-unknown-fields-1",
+				},
+				"spec":   map[string]interface{}{},
+				"status": map[string]interface{}{"items": items},
+			}
+			u := &unstructured.Unstructured{Object: obj}
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		err := f.Update(u, "fieldmanager")
-		if err != nil {
-			b.Fatal(err)
-		}
-		f.Reset()
+			u2 := u.DeepCopyObject().(*unstructured.Unstructured)
+			u2status := u2.Object["status"].(map[string]interface{})
+			u2items := u2status["items"].(map[string]interface{})
+			u2item1 := u2items["item1"].(map[string]interface{})
+			u2item1["field1"] = "i need coffee"
+			crs := []*unstructured.Unstructured{u, u2}
+
+			err := f.Apply(u, "fieldmanager", true)
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				err := f.Update(crs[n%len(crs)], "fieldmanager")
+				if err != nil {
+					b.Fatal(err)
+				}
+				f.Reset()
+			}
+		})
 	}
 }
 
