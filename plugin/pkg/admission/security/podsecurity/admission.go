@@ -28,12 +28,12 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/audit"
@@ -169,9 +169,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
-	a = &lazyConvertingAttributes{Attributes: a}
-
-	result := p.delegate.Validate(ctx, a)
+	result := p.delegate.Validate(ctx, &lazyConvertingAttributes{Attributes: a})
 	for _, w := range result.Warnings {
 		warning.AddWarning(ctx, "", w)
 	}
@@ -191,32 +189,35 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 type lazyConvertingAttributes struct {
 	admission.Attributes
 
-	convertObjectOnce sync.Once
-	convertedObject   runtime.Object
+	convertObjectOnce    sync.Once
+	convertedObject      runtime.Object
+	convertedObjectError error
 
-	convertOldObjectOnce sync.Once
-	convertedOldObject   runtime.Object
+	convertOldObjectOnce    sync.Once
+	convertedOldObject      runtime.Object
+	convertedOldObjectError error
 }
 
-func (l *lazyConvertingAttributes) GetObject() runtime.Object {
+func (l *lazyConvertingAttributes) GetObject() (runtime.Object, error) {
 	l.convertObjectOnce.Do(func() {
-		obj, err := convert(l.Attributes.GetObject())
-		if err != nil {
-			utilruntime.HandleError(err)
-		}
-		l.convertedObject = obj
+		l.convertedObject, l.convertedObjectError = convert(l.Attributes.GetObject())
 	})
-	return l.convertedObject
+	return l.convertedObject, l.convertedObjectError
 }
-func (l *lazyConvertingAttributes) GetOldObject() runtime.Object {
+
+func (l *lazyConvertingAttributes) GetOldObject() (runtime.Object, error) {
 	l.convertOldObjectOnce.Do(func() {
-		obj, err := convert(l.Attributes.GetOldObject())
-		if err != nil {
-			utilruntime.HandleError(err)
-		}
-		l.convertedOldObject = obj
+		l.convertedOldObject, l.convertedOldObjectError = convert(l.Attributes.GetOldObject())
 	})
-	return l.convertedOldObject
+	return l.convertedOldObject, l.convertedOldObjectError
+}
+
+func (l *lazyConvertingAttributes) GetOperation() admissionv1.Operation {
+	return admissionv1.Operation(l.Attributes.GetOperation())
+}
+
+func (l *lazyConvertingAttributes) GetUserName() string {
+	return l.GetUserInfo().GetName()
 }
 
 func convert(in runtime.Object) (runtime.Object, error) {
