@@ -1,7 +1,4 @@
 pkg/util/flag
-test/e2e/apimachinery
-vendor/k8s.io/apimachinery/pkg/util/json
-vendor/k8s.io/apimachinery/pkg/util/strategicpatch
 vendor/k8s.io/apiserver/pkg/server/dynamiccertificates
 vendor/k8s.io/apiserver/pkg/server/filters
 vendor/k8s.io/apiserver/pkg/server/routes
