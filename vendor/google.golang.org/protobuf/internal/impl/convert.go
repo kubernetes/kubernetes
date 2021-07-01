@@ -423,6 +423,13 @@ func (c *messageConverter) PBValueOf(v reflect.Value) pref.Value {
 	if v.Type() != c.goType {
 		panic(fmt.Sprintf("invalid type: got %v, want %v", v.Type(), c.goType))
 	}
+	if c.isNonPointer() {
+		if v.CanAddr() {
+			v = v.Addr() // T => *T
+		} else {
+			v = reflect.Zero(reflect.PtrTo(v.Type()))
+		}
+	}
 	if m, ok := v.Interface().(pref.ProtoMessage); ok {
 		return pref.ValueOfMessage(m.ProtoReflect())
 	}
@@ -436,6 +443,16 @@ func (c *messageConverter) GoValueOf(v pref.Value) reflect.Value {
 		rv = reflect.ValueOf(u.protoUnwrap())
 	} else {
 		rv = reflect.ValueOf(m.Interface())
+	}
+	if c.isNonPointer() {
+		if rv.Type() != reflect.PtrTo(c.goType) {
+			panic(fmt.Sprintf("invalid type: got %v, want %v", rv.Type(), reflect.PtrTo(c.goType)))
+		}
+		if !rv.IsNil() {
+			rv = rv.Elem() // *T => T
+		} else {
+			rv = reflect.Zero(rv.Type().Elem())
+		}
 	}
 	if rv.Type() != c.goType {
 		panic(fmt.Sprintf("invalid type: got %v, want %v", rv.Type(), c.goType))
@@ -451,6 +468,9 @@ func (c *messageConverter) IsValidPB(v pref.Value) bool {
 	} else {
 		rv = reflect.ValueOf(m.Interface())
 	}
+	if c.isNonPointer() {
+		return rv.Type() == reflect.PtrTo(c.goType)
+	}
 	return rv.Type() == c.goType
 }
 
@@ -459,9 +479,18 @@ func (c *messageConverter) IsValidGo(v reflect.Value) bool {
 }
 
 func (c *messageConverter) New() pref.Value {
+	if c.isNonPointer() {
+		return c.PBValueOf(reflect.New(c.goType).Elem())
+	}
 	return c.PBValueOf(reflect.New(c.goType.Elem()))
 }
 
 func (c *messageConverter) Zero() pref.Value {
 	return c.PBValueOf(reflect.Zero(c.goType))
+}
+
+// isNonPointer reports whether the type is a non-pointer type.
+// This never occurs for generated message types.
+func (c *messageConverter) isNonPointer() bool {
+	return c.goType.Kind() != reflect.Ptr
 }

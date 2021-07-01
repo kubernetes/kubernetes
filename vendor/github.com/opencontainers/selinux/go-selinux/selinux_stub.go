@@ -2,6 +2,8 @@
 
 package selinux
 
+const privContainerMountLabel = ""
+
 func setDisabled() {
 }
 

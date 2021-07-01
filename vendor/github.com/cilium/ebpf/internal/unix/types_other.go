@@ -43,6 +43,7 @@ const (
 	PROT_READ                = 0x1
 	PROT_WRITE               = 0x2
 	MAP_SHARED               = 0x1
+	PERF_ATTR_SIZE_VER1      = 0
 	PERF_TYPE_SOFTWARE       = 0x1
 	PERF_TYPE_TRACEPOINT     = 0
 	PERF_COUNT_SW_BPF_OUTPUT = 0xa
