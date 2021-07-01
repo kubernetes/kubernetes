@@ -7,10 +7,10 @@ go 1.16
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.6.1
-	k8s.io/api v0.21.0-rc.0
-	k8s.io/apimachinery v0.21.0-rc.0
-	k8s.io/client-go v0.21.0-rc.0
-	k8s.io/code-generator v0.21.0-rc.0
+	k8s.io/api v0.21.1
+	k8s.io/apimachinery v0.21.1
+	k8s.io/client-go v0.21.1
+	k8s.io/code-generator v0.21.1
 )
 
 replace (

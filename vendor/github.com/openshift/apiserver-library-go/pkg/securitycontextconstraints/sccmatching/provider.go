@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user"
 	sccutil "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
@@ -273,7 +274,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 				continue
 			}
 
-			if !allowedVolumes.Has(string(fsType)) {
+			if !allowsVolumeType(allowedVolumes, fsType, v.VolumeSource) {
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "volumes").Index(i), string(fsType),
 					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
@@ -466,4 +467,22 @@ func createSeccompStrategy(allowedProfiles []string) (seccomp.SeccompStrategy, e
 // createSysctlsStrategy creates a new sysctls strategy
 func createSysctlsStrategy(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls []string) (sysctl.SysctlsStrategy, error) {
 	return sysctl.NewMustMatchPatterns(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls), nil
+}
+
+// allowsVolumeType determines whether the type and volume are valid
+// given the volumes allowed by an scc.
+//
+// This function was derived from a psp function of the same name in
+// pkg/security/podsecuritypolicy/provider.go and updated for scc
+// compatibility.
+func allowsVolumeType(allowedVolumes sets.String, fsType securityv1.FSType, volumeSource api.VolumeSource) bool {
+	if allowedVolumes.Has(string(fsType)) {
+		return true
+	}
+
+	// If secret volumes are allowed by the scc, allow the projected
+	// volume sources that bound service account token volumes expose.
+	return allowedVolumes.Has(string(securityv1.FSTypeSecret)) &&
+		fsType == securityv1.FSProjected &&
+		sccutil.IsOnlyServiceAccountTokenSources(volumeSource.Projected)
 }
