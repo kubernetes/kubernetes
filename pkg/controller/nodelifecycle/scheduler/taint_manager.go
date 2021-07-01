@@ -87,7 +87,8 @@ type NoExecuteTaintManager struct {
 	getNode               GetNodeFunc
 	getPodsAssignedToNode GetPodsByNodeNameFunc
 
-	taintEvictionQueue *TimedWorkerQueue
+	taintEvictionQueue      *TimedWorkerQueue
+	forceTaintEvictionQueue *TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
 	taintedNodesLock sync.Mutex
 	taintedNodes     map[string][]v1.Taint
@@ -97,9 +98,11 @@ type NoExecuteTaintManager struct {
 
 	nodeUpdateQueue workqueue.Interface
 	podUpdateQueue  workqueue.Interface
+
+	forceEvictionSeconds *int64
 }
 
-func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName)) func(args *WorkArgs) error {
+func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), force bool) func(args *WorkArgs) error {
 	return func(args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
@@ -107,9 +110,19 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		if emitEventFunc != nil {
 			emitEventFunc(args.NamespacedName)
 		}
+
+		var gracePeriodSeconds *int64
+		if force {
+			int64Zero := int64(0)
+			gracePeriodSeconds = &int64Zero
+		}
+
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+			err = c.CoreV1().Pods(ns).Delete(context.TODO(), name,
+				metav1.DeleteOptions{
+					GracePeriodSeconds: gracePeriodSeconds,
+				})
 			if err == nil {
 				break
 			}
@@ -166,6 +179,9 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
+	// TODO: pass through kube-controller-manager
+	forceEvictionSeconds := int64(30)
+
 	tm := &NoExecuteTaintManager{
 		client:                c,
 		recorder:              recorder,
@@ -176,8 +192,11 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 
 		nodeUpdateQueue: workqueue.NewNamed("noexec_taint_node"),
 		podUpdateQueue:  workqueue.NewNamed("noexec_taint_pod"),
+
+		forceEvictionSeconds: &forceEvictionSeconds,
 	}
-	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent))
+	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, false))
+	tm.forceTaintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, true))
 
 	return tm
 }
@@ -335,6 +354,9 @@ func (tc *NoExecuteTaintManager) cancelWorkWithEvent(nsName types.NamespacedName
 	if tc.taintEvictionQueue.CancelWork(nsName.String()) {
 		tc.emitCancelPodDeletionEvent(nsName)
 	}
+	if tc.forceTaintEvictionQueue.CancelWork(nsName.String()) {
+		tc.emitCancelPodDeletionEvent(nsName)
+	}
 }
 
 func (tc *NoExecuteTaintManager) processPodOnNode(
@@ -353,6 +375,9 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(podNamespacedName)
 		tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())
+		if tc.forceEvictionSeconds != nil {
+			tc.forceTaintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now().Add(time.Duration(*tc.forceEvictionSeconds)*time.Second))
+		}
 		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)
@@ -374,6 +399,9 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 		tc.cancelWorkWithEvent(podNamespacedName)
 	}
 	tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
+	if tc.forceEvictionSeconds != nil {
+		tc.forceTaintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime.Add(time.Duration(*tc.forceEvictionSeconds)*time.Second))
+	}
 }
 
 func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
