@@ -727,6 +727,11 @@ func (in *VolumeBindingArgs) DeepCopyInto(out *VolumeBindingArgs) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.Shape != nil {
+		in, out := &in.Shape, &out.Shape
+		*out = make([]UtilizationShapePoint, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

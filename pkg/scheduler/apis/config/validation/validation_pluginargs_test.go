@@ -25,7 +25,12 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -950,9 +955,10 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 
 func TestValidateVolumeBindingArgs(t *testing.T) {
 	cases := []struct {
-		name    string
-		args    config.VolumeBindingArgs
-		wantErr error
+		name     string
+		args     config.VolumeBindingArgs
+		features map[featuregate.Feature]bool
+		wantErr  error
 	}{
 		{
 			name: "zero is a valid config",
@@ -971,14 +977,112 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: -10,
 			},
-			wantErr: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "bindTimeoutSeconds",
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "bindTimeoutSeconds",
+				BadValue: int64(-10),
+				Detail:   "invalid BindTimeoutSeconds, should not be a negative value",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=off] shape should be nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              nil,
 			},
 		},
+		{
+			name: "[VolumeCapacityPriority=off] error if the shape is not nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 1, Score: 1},
+					{Utilization: 3, Score: 3},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape should not be empty",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              []config.UtilizationShapePoint{},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeRequired,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape points must be sorted in increasing order",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 3, Score: 3},
+					{Utilization: 1, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:   field.ErrorTypeInvalid,
+				Field:  "shape[1].utilization",
+				Detail: "Invalid value: 1: utilization values must be sorted in increasing order",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape point: invalid utilization and score",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: -1, Score: 1},
+					{Utilization: 10, Score: -1},
+					{Utilization: 20, Score: 11},
+					{Utilization: 101, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[2].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[3].utilization",
+				},
+			}),
+		},
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
 			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)

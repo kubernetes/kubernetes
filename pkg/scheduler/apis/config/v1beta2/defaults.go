@@ -245,6 +245,18 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta2.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
 	}
+	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		obj.Shape = []v1beta2.UtilizationShapePoint{
+			{
+				Utilization: 0,
+				Score:       0,
+			},
+			{
+				Utilization: 100,
+				Score:       int32(config.MaxCustomPriorityScore),
+			},
+		}
+	}
 }
 
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta2.PodTopologySpreadArgs) {

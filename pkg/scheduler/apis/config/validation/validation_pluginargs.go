@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -294,13 +296,21 @@ func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) e
 
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
-	var err error
+	var allErrs field.ErrorList
 
 	if args.BindTimeoutSeconds < 0 {
-		err = field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value")
+		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
 	}
 
-	return err
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
+	} else if args.Shape != nil {
+		// When the feature is off, return an error if the config is not nil.
+		// This prevents unexpected configuration from taking effect when the
+		// feature turns on in the future.
+		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate VolumeCapacityPriority"))
+	}
+	return allErrs.ToAggregate()
 }
 
 func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs) error {
