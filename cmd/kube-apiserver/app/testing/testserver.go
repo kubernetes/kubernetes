@@ -215,11 +215,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
-	if instanceOptions.StorageVersionWrapFunc != nil {
-		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
-	}
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
+	}
+	if instanceOptions.StorageVersionWrapFunc != nil {
+		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
 	}
 
 	errCh := make(chan error)
