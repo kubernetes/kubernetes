@@ -86,7 +86,7 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
@@ -451,7 +451,7 @@ replace (
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
 	golang.org/x/mod => golang.org/x/mod v0.4.2
-	golang.org/x/net => golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+	golang.org/x/net => golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20210616094352-59db8d763f22

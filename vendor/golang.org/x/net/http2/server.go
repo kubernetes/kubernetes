@@ -231,13 +231,12 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 
 	if s.TLSConfig == nil {
 		s.TLSConfig = new(tls.Config)
-	} else if s.TLSConfig.CipherSuites != nil {
-		// If they already provided a CipherSuite list, return
-		// an error if it has a bad order or is missing
-		// ECDHE_RSA_WITH_AES_128_GCM_SHA256 or ECDHE_ECDSA_WITH_AES_128_GCM_SHA256.
+	} else if s.TLSConfig.CipherSuites != nil && s.TLSConfig.MinVersion < tls.VersionTLS13 {
+		// If they already provided a TLS 1.0–1.2 CipherSuite list, return an
+		// error if it is missing ECDHE_RSA_WITH_AES_128_GCM_SHA256 or
+		// ECDHE_ECDSA_WITH_AES_128_GCM_SHA256.
 		haveRequired := false
-		sawBad := false
-		for i, cs := range s.TLSConfig.CipherSuites {
+		for _, cs := range s.TLSConfig.CipherSuites {
 			switch cs {
 			case tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 				// Alternative MTI cipher to not discourage ECDSA-only servers.
@@ -245,14 +244,9 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
 				haveRequired = true
 			}
-			if isBadCipher(cs) {
-				sawBad = true
-			} else if sawBad {
-				return fmt.Errorf("http2: TLSConfig.CipherSuites index %d contains an HTTP/2-approved cipher suite (%#04x), but it comes after unapproved cipher suites. With this configuration, clients that don't support previous, approved cipher suites may be given an unapproved one and reject the connection.", i, cs)
-			}
 		}
 		if !haveRequired {
-			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 or TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256).")
+			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 or TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)")
 		}
 	}
 
@@ -2789,8 +2783,12 @@ func (w *responseWriter) Push(target string, opts *http.PushOptions) error {
 		// but PUSH_PROMISE requests cannot have a body.
 		// http://tools.ietf.org/html/rfc7540#section-8.2
 		// Also disallow Host, since the promised URL must be absolute.
-		switch strings.ToLower(k) {
-		case "content-length", "content-encoding", "trailer", "te", "expect", "host":
+		if asciiEqualFold(k, "content-length") ||
+			asciiEqualFold(k, "content-encoding") ||
+			asciiEqualFold(k, "trailer") ||
+			asciiEqualFold(k, "te") ||
+			asciiEqualFold(k, "expect") ||
+			asciiEqualFold(k, "host") {
 			return fmt.Errorf("promised request headers cannot include %q", k)
 		}
 	}
