@@ -58,8 +58,8 @@ func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *us
 	case kubeadmconstants.KubeScheduler:
 		return runKubeSchedulerAsNonRoot(
 			pod,
-			usersAndGroups.Users.ID(kubeadmconstants.KubeControllerManagerUserName),
-			usersAndGroups.Groups.ID(kubeadmconstants.KubeControllerManagerUserName),
+			usersAndGroups.Users.ID(kubeadmconstants.KubeSchedulerUserName),
+			usersAndGroups.Groups.ID(kubeadmconstants.KubeSchedulerUserName),
 			users.UpdatePathOwnerAndPermissions,
 		)
 	case kubeadmconstants.Etcd:
