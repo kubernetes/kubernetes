@@ -1,7 +1,6 @@
 package btf
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -37,6 +36,7 @@ type Type interface {
 type namedType interface {
 	Type
 	name() string
+	essentialName() string
 }
 
 // Name identifies a type.
@@ -46,6 +46,10 @@ type Name string
 
 func (n Name) name() string {
 	return string(n)
+}
+
+func (n Name) essentialName() string {
+	return essentialName(string(n))
 }
 
 // Void is the unit type of BTF.
@@ -174,8 +178,7 @@ func (s *Struct) walk(tdq *typeDeque) {
 
 func (s *Struct) copy() Type {
 	cpy := *s
-	cpy.Members = make([]Member, len(s.Members))
-	copy(cpy.Members, s.Members)
+	cpy.Members = copyMembers(s.Members)
 	return &cpy
 }
 
@@ -206,13 +209,18 @@ func (u *Union) walk(tdq *typeDeque) {
 
 func (u *Union) copy() Type {
 	cpy := *u
-	cpy.Members = make([]Member, len(u.Members))
-	copy(cpy.Members, u.Members)
+	cpy.Members = copyMembers(u.Members)
 	return &cpy
 }
 
 func (u *Union) members() []Member {
 	return u.Members
+}
+
+func copyMembers(orig []Member) []Member {
+	cpy := make([]Member, len(orig))
+	copy(cpy, orig)
+	return cpy
 }
 
 type composite interface {
@@ -511,7 +519,7 @@ func Sizeof(typ Type) (int, error) {
 		switch v := typ.(type) {
 		case *Array:
 			if n > 0 && int64(v.Nelems) > math.MaxInt64/n {
-				return 0, errors.New("overflow")
+				return 0, fmt.Errorf("type %s: overflow", typ)
 			}
 
 			// Arrays may be of zero length, which allows
@@ -532,28 +540,30 @@ func Sizeof(typ Type) (int, error) {
 			continue
 
 		default:
-			return 0, fmt.Errorf("unrecognized type %T", typ)
+			return 0, fmt.Errorf("unsized type %T", typ)
 		}
 
 		if n > 0 && elem > math.MaxInt64/n {
-			return 0, errors.New("overflow")
+			return 0, fmt.Errorf("type %s: overflow", typ)
 		}
 
 		size := n * elem
 		if int64(int(size)) != size {
-			return 0, errors.New("overflow")
+			return 0, fmt.Errorf("type %s: overflow", typ)
 		}
 
 		return int(size), nil
 	}
 
-	return 0, errors.New("exceeded type depth")
+	return 0, fmt.Errorf("type %s: exceeded type depth", typ)
 }
 
 // copy a Type recursively.
 //
 // typ may form a cycle.
-func copyType(typ Type) Type {
+//
+// Returns any errors from transform verbatim.
+func copyType(typ Type, transform func(Type) (Type, error)) (Type, error) {
 	var (
 		copies = make(map[Type]Type)
 		work   typeDeque
@@ -566,7 +576,17 @@ func copyType(typ Type) Type {
 			continue
 		}
 
-		cpy := (*t).copy()
+		var cpy Type
+		if transform != nil {
+			tf, err := transform(*t)
+			if err != nil {
+				return nil, fmt.Errorf("copy %s: %w", typ, err)
+			}
+			cpy = tf.copy()
+		} else {
+			cpy = (*t).copy()
+		}
+
 		copies[*t] = cpy
 		*t = cpy
 
@@ -574,7 +594,7 @@ func copyType(typ Type) Type {
 		cpy.walk(&work)
 	}
 
-	return typ
+	return typ, nil
 }
 
 // typeDeque keeps track of pointers to types which still
