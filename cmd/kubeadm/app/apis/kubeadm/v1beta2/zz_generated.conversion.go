@@ -647,6 +647,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kube
 	}
 	out.CertificateKey = in.CertificateKey
 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -677,6 +678,7 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in *kube
 	}
 	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 	return nil
 }
 

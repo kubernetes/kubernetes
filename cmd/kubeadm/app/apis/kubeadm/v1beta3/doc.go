@@ -34,7 +34,8 @@ limitations under the License.
 // - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
 // to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
 // "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
-
+// - Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
+// the user to configure a directory from which to take patches for components deployed by kubeadm.
 //
 // Migration from old kubeadm config versions
 //

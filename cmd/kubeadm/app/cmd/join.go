@@ -516,7 +516,14 @@ func (j *joinData) OutputWriter() io.Writer {
 
 // PatchesDir returns the folder where patches for components are stored
 func (j *joinData) PatchesDir() string {
-	return j.patchesDir
+	// If provided, make the flag value override the one in config.
+	if len(j.patchesDir) > 0 {
+		return j.patchesDir
+	}
+	if j.cfg.Patches != nil {
+		return j.cfg.Patches.Directory
+	}
+	return ""
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
