@@ -1,4 +1,3 @@
-pkg/util/flag
 test/e2e/apimachinery
 vendor/k8s.io/apimachinery/pkg/util/json
 vendor/k8s.io/apimachinery/pkg/util/strategicpatch

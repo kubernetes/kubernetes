@@ -46,6 +46,10 @@ func TestIPVar(t *testing.T) {
 			expectErr: true,
 			expectVal: defaultIP,
 		},
+		{
+			argc:      "blah --ip=",
+			expectVal: "",
+		},
 	}
 	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
@@ -94,6 +98,11 @@ func TestIPPortVar(t *testing.T) {
 			desc:      "valid ipv4 2",
 			argc:      "blah --ipport=127.0.0.1",
 			expectVal: "127.0.0.1",
+		},
+		{
+			desc:      "valid empty string",
+			argc:      "blah --ipport=",
+			expectVal: "",
 		},
 
 		{
@@ -222,6 +231,11 @@ func TestReservedMemoryVar(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			desc:      "valid empty input",
+			argc:      "blah --reserved-memory=",
+			expectVal: []kubeletconfig.MemoryReservation{},
 		},
 		{
 			desc:      "invalid input",

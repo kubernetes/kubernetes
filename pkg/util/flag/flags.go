@@ -36,9 +36,9 @@ import (
 // TODO(mikedanese): remove these flag wrapper types when we remove command line flags
 
 var (
-	_ pflag.Value = &IPVar{}
-	_ pflag.Value = &IPPortVar{}
-	_ pflag.Value = &PortRangeVar{}
+	_ pflag.Value = IPVar{}
+	_ pflag.Value = IPPortVar{}
+	_ pflag.Value = PortRangeVar{}
 	_ pflag.Value = &ReservedMemoryVar{}
 )
 
@@ -49,11 +49,7 @@ type IPVar struct {
 
 // Set sets the flag value
 func (v IPVar) Set(s string) error {
-	if len(s) == 0 {
-		v.Val = nil
-		return nil
-	}
-	if netutils.ParseIPSloppy(s) == nil {
+	if netutils.ParseIPSloppy(s) == nil && len(s) != 0 {
 		return fmt.Errorf("%q is not a valid IP address", s)
 	}
 	if v.Val == nil {
@@ -84,19 +80,14 @@ type IPPortVar struct {
 
 // Set sets the flag value
 func (v IPPortVar) Set(s string) error {
-	if len(s) == 0 {
-		v.Val = nil
-		return nil
-	}
-
 	if v.Val == nil {
 		// it's okay to panic here since this is programmer error
 		panic("the string pointer passed into IPPortVar should not be nil")
 	}
 
-	// Both IP and IP:port are valid.
-	// Attempt to parse into IP first.
-	if netutils.ParseIPSloppy(s) != nil {
+	// IP, IP:port, and empty string are valid.
+	// Attempt to parse into IP first or check for empty string.
+	if netutils.ParseIPSloppy(s) != nil || len(s) == 0 {
 		*v.Val = s
 		return nil
 	}
@@ -169,21 +160,20 @@ type ReservedMemoryVar struct {
 // Set sets the flag value
 func (v *ReservedMemoryVar) Set(s string) error {
 	if v.Value == nil {
-		return fmt.Errorf("no target (nil pointer to *[]MemoryReservation")
+		// it's okay to panic here since this is programmer error
+		panic("the []MemoryReservation pointer passed into ReservedMemoryVar should not be nil")
 	}
 
 	if s == "" {
-		v.Value = nil
+		if v.initialized || *v.Value != nil {
+			*v.Value = []kubeletconfig.MemoryReservation{}
+		}
 		return nil
 	}
 
 	if !v.initialized || *v.Value == nil {
 		*v.Value = make([]kubeletconfig.MemoryReservation, 0)
 		v.initialized = true
-	}
-
-	if s == "" {
-		return nil
 	}
 
 	numaNodeReservation := strings.Split(s, ":")
