@@ -752,7 +752,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryExternalService(t *testing.T) {
+func TestServiceRegistryLoadBalancerService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
@@ -949,7 +949,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryDeleteExternal(t *testing.T) {
+func TestServiceRegistryDeleteExternalName(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
@@ -964,19 +964,19 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryUpdateExternalService(t *testing.T) {
+func TestServiceRegistryUpdateLoadBalancerService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
-	// Create non-external load balancer.
+	// Create non-loadbalancer.
 	svc1 := svctest.MakeService("foo")
 	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Modify load balancer to be external.
+	// Modify to be loadbalancer.
 	svc2 := obj.(*api.Service).DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
@@ -992,12 +992,12 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
+func TestServiceRegistryUpdateMultiPortLoadBalancerService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
-	// Create external load balancer.
+	// Create load balancer.
 	svc1 := svctest.MakeService("foo",
 		svctest.SetTypeLoadBalancer,
 		svctest.SetPorts(
