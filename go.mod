@@ -522,10 +522,10 @@ replace (
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
-	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.10
-	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.12
-	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.3
-	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.10.20
+	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.11
+	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.13
+	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
+	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.11.0
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

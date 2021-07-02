@@ -6,7 +6,7 @@ package valueadd
 import (
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
