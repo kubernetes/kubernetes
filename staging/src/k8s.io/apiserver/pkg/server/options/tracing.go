@@ -35,7 +35,7 @@ import (
 	"k8s.io/utils/path"
 )
 
-const apiserverService = "kube-apiserver"
+const apiserverService = "apiserver"
 
 // TracingOptions contain configuration options for tracing
 // exporters
