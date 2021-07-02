@@ -16,10 +16,6 @@ limitations under the License.
 
 package server
 
-import (
-	"k8s.io/klog/v2"
-)
-
 /*
 We make an attempt here to identify the events that take place during
 lifecycle of the apiserver.
@@ -69,6 +65,9 @@ type lifecycleSignal interface {
 	// Signaled returns a channel that is closed when the underlying event
 	// has been signaled. Successive calls to Signaled return the same value.
 	Signaled() <-chan struct{}
+
+	// Name returns the name of the signal, useful for logging.
+	Name() string
 }
 
 // lifecycleSignals provides an abstraction of the events that
@@ -127,10 +126,13 @@ func (e *namedChannelWrapper) Signal() {
 		// already closed, don't close again.
 	default:
 		close(e.ch)
-		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", e.name)
 	}
 }
 
 func (e *namedChannelWrapper) Signaled() <-chan struct{} {
 	return e.ch
+}
+
+func (e *namedChannelWrapper) Name() string {
+	return e.name
 }
