@@ -62,6 +62,7 @@ func SetTypeClusterIP(svc *api.Service) {
 		svc.Spec.Ports[i].NodePort = 0
 	}
 	svc.Spec.ExternalName = ""
+	svc.Spec.ExternalTrafficPolicy = ""
 }
 
 // SetTypeNodePort sets the service type to NodePort and clears other fields.

@@ -259,7 +259,27 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 	return net
 }
 
+func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
+	t.Helper()
+	ip := net.ParseIP(ipstr)
+	if ip == nil {
+		t.Errorf("error parsing IP %q", ipstr)
+		return false
+	}
+	return alloc.Has(ip)
+}
+
+func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bool {
+	t.Helper()
+	if port == 0 {
+		t.Errorf("port is 0")
+		return false
+	}
+	return alloc.Has(int(port))
+}
+
 func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST) {
+	t.Helper()
 	obj, err := rest.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -399,7 +419,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 
 			for i, family := range tc.svc.Spec.IPFamilies {
 				alloc := storage.serviceIPAllocatorsByFamily[family]
-				if alloc.Has(net.ParseIP(tc.svc.Spec.ClusterIPs[i])) {
+				if ipIsAllocated(t, alloc, tc.svc.Spec.ClusterIPs[i]) {
 					t.Errorf("unexpected side effect: ip allocated %v", tc.svc.Spec.ClusterIPs[i])
 				}
 			}
@@ -428,7 +448,7 @@ func TestDryRunNodePort(t *testing.T) {
 	if createdSvc.Spec.Ports[0].NodePort == 0 {
 		t.Errorf("expected NodePort value assigned")
 	}
-	if storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
+	if portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 	_, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
@@ -455,7 +475,7 @@ func TestDryRunNodePort(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", expectNodePorts, actualNodePorts)
 	}
 	for i := range svc.Spec.Ports {
-		if storage.serviceNodePorts.Has(int(svc.Spec.Ports[i].NodePort)) {
+		if portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[i].NodePort) {
 			t.Errorf("unexpected side effect: NodePort allocated")
 		}
 	}
@@ -635,43 +655,45 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	// Test dry run update request external name to node port
 	new1 := svc.DeepCopy()
 	svctest.SetTypeNodePort(new1)
-	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new1),
+	svctest.SetNodePorts(30001)(new1) // DryRun does not set port values yet
+	obj, created, err := storage.Update(ctx, new1.Name, rest.DefaultUpdatedObjectInfo(new1),
 		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if updatedSvc == nil {
+	if obj == nil {
 		t.Errorf("Expected non-nil object")
 	}
 	if created {
 		t.Errorf("expected not created")
 	}
-	if storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
+	if portIsAllocated(t, storage.serviceNodePorts, new1.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 
 	// Test dry run update request external name to cluster ip
 	new2 := svc.DeepCopy()
 	svctest.SetTypeClusterIP(new2)
+	svctest.SetClusterIPs("1.2.3.4")(new2) // DryRun does not set IP values yet
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(new2),
 		rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
+	if ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], new2.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip allocated")
 	}
 
 	// Test dry run update request remove node port
-	obj, err = storage.Create(ctx, svctest.MakeService("foo2", svctest.SetTypeNodePort), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, svctest.MakeService("foo2", svctest.SetTypeNodePort, svctest.SetNodePorts(30001)), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	svc = obj.(*api.Service)
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
+	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], svc.Spec.ClusterIP) {
 		t.Errorf("expected IP to be allocated")
 	}
-	if !storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
+	if !portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
@@ -682,12 +704,12 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !storage.serviceNodePorts.Has(int(svc.Spec.Ports[0].NodePort)) {
+	if !portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 
 	// Test dry run update request remove cluster ip
-	obj, err = storage.Create(ctx, svctest.MakeService("foo3"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err = storage.Create(ctx, svctest.MakeService("foo3", svctest.SetClusterIPs("1.2.3.4")), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("expected no error: %v", err)
 	}
@@ -700,7 +722,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error: %v", err)
 	}
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(svc.Spec.ClusterIP)) {
+	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], svc.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 }
@@ -862,14 +884,14 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if createdSvc.Spec.ClusterIP == "" {
 		t.Fatalf("expected ClusterIP to be set")
 	}
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
+	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
 		t.Errorf("expected ClusterIP to be allocated")
 	}
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
+	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 
@@ -883,7 +905,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if createdSvc.Spec.Ports[0].NodePort == 0 {
 		t.Fatalf("expected NodePort to be set")
 	}
-	if !storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
+	if !portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
@@ -893,7 +915,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !storage.serviceNodePorts.Has(int(createdSvc.Spec.Ports[0].NodePort)) {
+	if !portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 }
@@ -921,7 +943,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	for i, family := range dualstack_svc.Spec.IPFamilies {
-		if !dualstack_storage.serviceIPAllocatorsByFamily[family].Has(net.ParseIP(dualstack_svc.Spec.ClusterIPs[i])) {
+		if !ipIsAllocated(t, dualstack_storage.serviceIPAllocatorsByFamily[family], dualstack_svc.Spec.ClusterIPs[i]) {
 			t.Errorf("unexpected side effect: ip unallocated %v", dualstack_svc.Spec.ClusterIPs[i])
 		}
 	}
@@ -1225,7 +1247,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
 	testIP := "not-an-ip"
 	for _, ip := range testIPs {
-		if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range).Has(net.ParseIP(ip)) {
+		if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range), ip) {
 			testIP = ip
 			break
 		}
@@ -1314,7 +1336,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
 	testIP := ""
 	for _, ip := range testIPs {
-		if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range).Has(net.ParseIP(ip)) {
+		if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range), ip) {
 			testIP = ip
 			break
 		}
@@ -1660,8 +1682,7 @@ func TestInitClusterIP(t *testing.T) {
 						family = api.IPv6Protocol
 					}
 					allocator := storage.serviceIPAllocatorsByFamily[family]
-					// has retruns true if it was allocated *sigh*..
-					if !allocator.Has(net.ParseIP(ip)) {
+					if !ipIsAllocated(t, allocator, ip) {
 						t.Fatalf("expected ip:%v to be allocated by %v allocator. it was not", ip, family)
 					}
 				}
@@ -2107,8 +2128,7 @@ func TestServiceUpgrade(t *testing.T) {
 			for i, family := range updatedSvc.Spec.IPFamilies {
 				ip := updatedSvc.Spec.ClusterIPs[i]
 				allocator := storage.serviceIPAllocatorsByFamily[family]
-				// has retruns true if it was allocated *sigh*..
-				if !allocator.Has(net.ParseIP(ip)) {
+				if !ipIsAllocated(t, allocator, ip) {
 					t.Fatalf("expected ip:%v to be allocated by %v allocator. it was not", ip, family)
 				}
 			}
@@ -2241,7 +2261,7 @@ func TestServiceDowngrade(t *testing.T) {
 				releasedIPFamily := copySvc.Spec.IPFamilies[1]
 				allocator := storage.serviceIPAllocatorsByFamily[releasedIPFamily]
 
-				if allocator.Has(net.ParseIP(releasedIP)) {
+				if ipIsAllocated(t, allocator, releasedIP) {
 					t.Fatalf("expected ip:%v to be released by %v allocator. it was not", releasedIP, releasedIPFamily)
 				}
 			}

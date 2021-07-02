@@ -36,8 +36,6 @@ type Interface interface {
 	ForEach(func(net.IP))
 	CIDR() net.IPNet
 	IPFamily() api.IPFamily
-
-	// For testing
 	Has(ip net.IP) bool
 }
 
