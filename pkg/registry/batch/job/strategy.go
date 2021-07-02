@@ -61,10 +61,9 @@ func (jobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garb
 	}
 	switch groupVersion {
 	case batchv1.SchemeGroupVersion:
-		// for back compatibility
-		return rest.OrphanDependents
-	default:
 		return rest.DeleteDependents
+	default:
+		return rest.OrphanDependents
 	}
 }
 
