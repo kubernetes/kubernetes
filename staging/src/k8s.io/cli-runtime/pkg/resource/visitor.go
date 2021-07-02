@@ -595,7 +595,7 @@ func FilterNamespace(info *Info, err error) error {
 	}
 	if !info.Namespaced() {
 		info.Namespace = ""
-		UpdateObjectNamespace(info, nil)
+		return UpdateObjectNamespace(info, nil)
 	}
 	return nil
 }
@@ -612,7 +612,7 @@ func SetNamespace(namespace string) VisitorFunc {
 		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
-			UpdateObjectNamespace(info, nil)
+			return UpdateObjectNamespace(info, nil)
 		}
 		return nil
 	}
@@ -632,8 +632,7 @@ func RequireNamespace(namespace string) VisitorFunc {
 		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
-			UpdateObjectNamespace(info, nil)
-			return nil
+			return UpdateObjectNamespace(info, nil)
 		}
 		if info.Namespace != namespace {
 			return fmt.Errorf("the namespace from the provided object %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", info.Namespace, namespace, info.Namespace)

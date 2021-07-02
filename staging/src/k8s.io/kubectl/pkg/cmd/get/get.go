@@ -690,7 +690,10 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	// print the current object
 	var objsToPrint []runtime.Object
 	if isList {
-		objsToPrint, _ = meta.ExtractList(obj)
+		objsToPrint, err = meta.ExtractList(obj)
+		if err != nil {
+			return err
+		}
 	} else {
 		objsToPrint = append(objsToPrint, obj)
 	}
@@ -702,7 +705,10 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			return fmt.Errorf("unable to output the provided object: %v", err)
 		}
 	}
-	writer.Flush()
+	err = writer.Flush()
+	if err != nil {
+		return err
+	}
 	if isList {
 		// we can start outputting objects now, watches started from lists don't emit synthetic added events
 		*outputObjects = true
@@ -720,7 +726,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
-	intr.Run(func() error {
+	return intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			objToPrint := e.Object
 			if o.OutputWatchEvents {
@@ -729,14 +735,20 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
 			}
-			writer.Flush()
+			err = writer.Flush()
+			if err != nil {
+				return false, err
+			}
 			// after processing at least one event, start outputting objects
 			*outputObjects = true
 			return false, nil
 		})
+		if err == watchtools.ErrWatchClosed {
+			// Condition passed to UntilWithoutRetry() above is never satisfied, so this error is expected.
+			err = nil
+		}
 		return err
 	})
-	return nil
 }
 
 func (o *GetOptions) printGeneric(r *resource.Result) error {

@@ -29,6 +29,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -2497,20 +2500,19 @@ pod/foo
 
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdGet("kubectl", tf, streams)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
 
-			cmd.Flags().Set("watch", "true")
-			cmd.Flags().Set("all-namespaces", "true")
-			cmd.Flags().Set("show-kind", "true")
-			cmd.Flags().Set("output-watch-events", "true")
+			require.NoError(t, cmd.Flags().Set("watch", "true"))
+			require.NoError(t, cmd.Flags().Set("all-namespaces", "true"))
+			require.NoError(t, cmd.Flags().Set("show-kind", "true"))
+			require.NoError(t, cmd.Flags().Set("output-watch-events", "true"))
 			if len(tc.format) > 0 {
-				cmd.Flags().Set("output", tc.format)
+				require.NoError(t, cmd.Flags().Set("output", tc.format))
 			}
 
 			cmd.Run(cmd, []string{"pods"})
-			if e, a := tc.expected, buf.String(); e != a {
-				t.Errorf("expected\n%v\ngot\n%v", e, a)
-			}
+			assert.Equal(t, tc.expected, buf.String())
 		})
 	}
 }
