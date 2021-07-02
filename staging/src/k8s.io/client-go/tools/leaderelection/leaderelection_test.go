@@ -87,6 +87,9 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		observedTime   time.Time
 		reactors       []Reactor
 
+		key               string
+		keyComparisonFunc KeyComparisonFunc
+
 		expectSuccess    bool
 		transitionLeader bool
 		outHolder        string
@@ -212,6 +215,92 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			outHolder:     "bing",
 		},
 		{
+			name: "don't acquire from led, acked object with key",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(),
+							&rl.LeaderElectionRecord{HolderIdentity: "bing", HolderKey: "a"}), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			expectSuccess: false,
+			outHolder:     "bing",
+		},
+		{
+			name: "don't acquire from led, acked object with key when our key is smaller",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(),
+							&rl.LeaderElectionRecord{HolderIdentity: "bing", HolderKey: "zzzz"}), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			key: "aaa",
+			keyComparisonFunc: func(existingKey string) bool {
+				return "aaa" > existingKey
+			},
+
+			expectSuccess: false,
+			outHolder:     "bing",
+		},
+		{
+			name: "steal from led object with key when our key is larger",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(),
+							&rl.LeaderElectionRecord{HolderIdentity: "bing", HolderKey: "aaa"}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			key: "zzz",
+			keyComparisonFunc: func(existingKey string) bool {
+				return "zzz" > existingKey
+			},
+
+			transitionLeader: true,
+			expectSuccess:    true,
+			outHolder:        "baz",
+		},
+		{
+			name: "handle led object with no key",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(),
+							&rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			key: "zzz",
+			keyComparisonFunc: func(existingKey string) bool {
+				return existingKey != "" && "zzz" > existingKey
+			},
+
+			expectSuccess: false,
+			outHolder:     "bing",
+		},
+		{
 			name: "renew already acquired object",
 			reactors: []Reactor{
 				{
@@ -247,6 +336,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
+				Key:           test.key,
 				EventRecorder: &record.FakeRecorder{},
 			}
 			c := &fake.Clientset{}
@@ -281,6 +371,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 
 			lec := LeaderElectionConfig{
 				Lock:          lock,
+				KeyComparison: test.keyComparisonFunc,
 				LeaseDuration: 10 * time.Second,
 				Callbacks: LeaderCallbacks{
 					OnNewLeader: func(l string) {
@@ -1130,7 +1221,6 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 
 		lockObj = action.(fakeclient.UpdateAction).GetObject()
 		return true, lockObj, nil
-
 	})
 
 	c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {

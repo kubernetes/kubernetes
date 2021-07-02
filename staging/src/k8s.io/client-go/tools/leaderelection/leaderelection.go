@@ -65,7 +65,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-
 	"k8s.io/klog/v2"
 )
 
@@ -109,6 +108,8 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	return &le, nil
 }
 
+type KeyComparisonFunc func(existingKey string) bool
+
 type LeaderElectionConfig struct {
 	// Lock is the resource that will be used for locking
 	Lock rl.Interface
@@ -137,6 +138,24 @@ type LeaderElectionConfig struct {
 	//
 	// Core clients default this value to 2 seconds.
 	RetryPeriod time.Duration
+
+	// KeyComparison defines a function to compare the existing leader's key to our own.
+	// If the function returns true, indicating our key has high precedence, we will take over
+	// leadership even if their is another un-expired leader.
+	//
+	// This can be used to implemented a prioritized leader election. For example, if multiple
+	// versions of the same application run simultaneously, we can ensure the newest version
+	// will become the leader.
+	//
+	// It is the responsibility of the caller to ensure that all KeyComparison functions are
+	// logically consistent between all clients participating in the leader election to avoid multiple
+	// clients claiming to have high precedence and constantly pre-empting the existing leader.
+	//
+	// KeyComparison functions should ensure they handle an empty existingKey, as "key" is not a required field.
+	//
+	// Warning: when a lock is stolen (from KeyComparison returning true), the old leader may not
+	// immediately be notified they have lost the leader election.
+	KeyComparison KeyComparisonFunc
 
 	// Callbacks are callbacks that are triggered during certain lifecycle
 	// events of the LeaderElector
@@ -318,6 +337,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
+		HolderKey:            le.config.Lock.Key(),
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),
 		RenewTime:            now,
 		AcquireTime:          now,
@@ -349,8 +369,14 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
 		le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		!le.IsLeader() {
-		klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
-		return false
+		if le.config.KeyComparison != nil && le.config.KeyComparison(oldLeaderElectionRecord.HolderKey) {
+			// Lock is held and not expired, but our key is higher than the existing one.
+			// We will pre-empt the existing leader.
+			klog.V(4).Infof("lock is held by %v with key %v, but our key (%v) evicts it", oldLeaderElectionRecord.HolderIdentity, oldLeaderElectionRecord.HolderKey, le.config.Lock.Key())
+		} else {
+			klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
+			return false
+		}
 	}
 
 	// 3. We're going to try to update. The leaderElectionRecord is set to it's default

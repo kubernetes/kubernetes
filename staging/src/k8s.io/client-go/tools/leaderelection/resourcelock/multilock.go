@@ -99,6 +99,11 @@ func (ml *MultiLock) Identity() string {
 	return ml.Primary.Identity()
 }
 
+// Key returns the Key of the lock
+func (ml *MultiLock) Key() string {
+	return ml.Primary.Key()
+}
+
 func ConcatRawRecord(primaryRaw, secondaryRaw []byte) []byte {
 	return bytes.Join([][]byte{primaryRaw, secondaryRaw}, []byte(","))
 }

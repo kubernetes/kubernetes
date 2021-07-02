@@ -120,3 +120,8 @@ func (cml *ConfigMapLock) Describe() string {
 func (cml *ConfigMapLock) Identity() string {
 	return cml.LockConfig.Identity
 }
+
+// Identity returns the Identity of the lock
+func (cml *ConfigMapLock) Key() string {
+	return cml.LockConfig.Key
+}

@@ -30,6 +30,7 @@ import (
 
 type fakeLock struct {
 	identity string
+	key      string
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
@@ -53,6 +54,11 @@ func (fl *fakeLock) RecordEvent(string) {}
 // Identity is a dummy to allow us to have a fakeLock for testing.
 func (fl *fakeLock) Identity() string {
 	return fl.identity
+}
+
+// Key is a dummy to allow us to have a fakeLock for testing.
+func (fl *fakeLock) Key() string {
+	return fl.key
 }
 
 // Describe is a dummy to allow us to have a fakeLock for testing.

@@ -101,6 +101,11 @@ func (ll *LeaseLock) Identity() string {
 	return ll.LockConfig.Identity
 }
 
+// Key returns the Key of the lock
+func (ll *LeaseLock) Key() string {
+	return ll.LockConfig.Key
+}
+
 func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElectionRecord {
 	var r LeaderElectionRecord
 	if spec.HolderIdentity != nil {

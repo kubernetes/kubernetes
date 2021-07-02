@@ -115,3 +115,8 @@ func (el *EndpointsLock) Describe() string {
 func (el *EndpointsLock) Identity() string {
 	return el.LockConfig.Identity
 }
+
+// Key returns the Key of the lock
+func (el *EndpointsLock) Key() string {
+	return el.LockConfig.Key
+}

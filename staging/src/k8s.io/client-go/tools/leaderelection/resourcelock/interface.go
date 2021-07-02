@@ -48,7 +48,9 @@ type LeaderElectionRecord struct {
 	// attempt to acquire leases with empty identities and will wait for the full lease
 	// interval to expire before attempting to reacquire. This value is set to empty when
 	// a client voluntarily steps down.
-	HolderIdentity       string      `json:"holderIdentity"`
+	HolderIdentity string `json:"holderIdentity"`
+	// HolderKey is the Key of the lease owner. This may be empty if a key is not set.
+	HolderKey            string      `json:"holderKey"`
 	LeaseDurationSeconds int         `json:"leaseDurationSeconds"`
 	AcquireTime          metav1.Time `json:"acquireTime"`
 	RenewTime            metav1.Time `json:"renewTime"`
@@ -66,6 +68,10 @@ type ResourceLockConfig struct {
 	// Identity is the unique string identifying a lease holder across
 	// all participants in an election.
 	Identity string
+	// Key is a user-defined value used to indicate how high priority this lock
+	// have. Other locks may steal the lock from us if they believe their key
+	// has a higher priority.
+	Key string
 	// EventRecorder is optional.
 	EventRecorder EventRecorder
 }
@@ -90,6 +96,8 @@ type Interface interface {
 
 	// Identity will return the locks Identity
 	Identity() string
+
+	Key() string
 
 	// Describe is used to convert details on current resource lock
 	// into a string
