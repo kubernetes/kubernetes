@@ -13,9 +13,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"net/url"
-	"os"
-	"strings"
 	"time"
 
 	"go.opencensus.io/plugin/ochttp"
@@ -25,12 +22,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport/cert"
 	"google.golang.org/api/transport/http/internal/propagation"
-)
-
-const (
-	mTLSModeAlways = "always"
-	mTLSModeNever  = "never"
-	mTLSModeAuto   = "auto"
+	"google.golang.org/api/transport/internal/dca"
 )
 
 // NewClient returns an HTTP client for use communicating with a Google cloud
@@ -41,11 +33,7 @@ func NewClient(ctx context.Context, opts ...option.ClientOption) (*http.Client, 
 	if err != nil {
 		return nil, "", err
 	}
-	clientCertSource, err := getClientCertificateSource(settings)
-	if err != nil {
-		return nil, "", err
-	}
-	endpoint, err := getEndpoint(settings, clientCertSource)
+	clientCertSource, endpoint, err := dca.GetClientCertificateSourceAndEndpoint(settings)
 	if err != nil {
 		return nil, "", err
 	}
@@ -100,7 +88,7 @@ func newTransport(ctx context.Context, base http.RoundTripper, settings *interna
 		}
 
 		ts := creds.TokenSource
-		if settings.TokenSource != nil {
+		if settings.ImpersonationConfig == nil && settings.TokenSource != nil {
 			ts = settings.TokenSource
 		}
 		trans = &oauth2.Transport{
@@ -187,6 +175,10 @@ func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source) htt
 		}
 	}
 
+	// If possible, configure http2 transport in order to use ReadIdleTimeout
+	// setting. This can only be done in Go 1.16 and up.
+	configureHTTP2(trans)
+
 	return trans
 }
 
@@ -217,88 +209,4 @@ func addOCTransport(trans http.RoundTripper, settings *internal.DialSettings) ht
 		Base:        trans,
 		Propagation: &propagation.HTTPFormat{},
 	}
-}
-
-// getClientCertificateSource returns a default client certificate source, if
-// not provided by the user.
-//
-// A nil default source can be returned if the source does not exist. Any exceptions
-// encountered while initializing the default source will be reported as client
-// error (ex. corrupt metadata file).
-//
-// The overall logic is as follows:
-// 1. If both endpoint override and client certificate are specified, use them as is.
-// 2. If user does not specify client certificate, we will attempt to use default
-//    client certificate.
-// 3. If user does not specify endpoint override, we will use defaultMtlsEndpoint if
-//    client certificate is available and defaultEndpoint otherwise.
-//
-// Implications of the above logic:
-// 1. If the user specifies a non-mTLS endpoint override but client certificate is
-//    available, we will pass along the cert anyway and let the server decide what to do.
-// 2. If the user specifies an mTLS endpoint override but client certificate is not
-//    available, we will not fail-fast, but let backend throw error when connecting.
-//
-// We would like to avoid introducing client-side logic that parses whether the
-// endpoint override is an mTLS url, since the url pattern may change at anytime.
-func getClientCertificateSource(settings *internal.DialSettings) (cert.Source, error) {
-	if settings.HTTPClient != nil {
-		return nil, nil // HTTPClient is incompatible with ClientCertificateSource
-	} else if settings.ClientCertSource != nil {
-		return settings.ClientCertSource, nil
-	} else {
-		return cert.DefaultSource()
-	}
-
-}
-
-// getEndpoint returns the endpoint for the service, taking into account the
-// user-provided endpoint override "settings.Endpoint"
-//
-// If no endpoint override is specified, we will either return the default endpoint or
-// the default mTLS endpoint if a client certificate is available.
-//
-// You can override the default endpoint (mtls vs. regular) by setting the
-// GOOGLE_API_USE_MTLS environment variable.
-//
-// If the endpoint override is an address (host:port) rather than full base
-// URL (ex. https://...), then the user-provided address will be merged into
-// the default endpoint. For example, WithEndpoint("myhost:8000") and
-// WithDefaultEndpoint("https://foo.com/bar/baz") will return "https://myhost:8080/bar/baz"
-func getEndpoint(settings *internal.DialSettings, clientCertSource cert.Source) (string, error) {
-	if settings.Endpoint == "" {
-		mtlsMode := getMTLSMode()
-		if mtlsMode == mTLSModeAlways || (clientCertSource != nil && mtlsMode == mTLSModeAuto) {
-			return settings.DefaultMTLSEndpoint, nil
-		}
-		return settings.DefaultEndpoint, nil
-	}
-	if strings.Contains(settings.Endpoint, "://") {
-		// User passed in a full URL path, use it verbatim.
-		return settings.Endpoint, nil
-	}
-	if settings.DefaultEndpoint == "" {
-		return "", errors.New("WithEndpoint requires a full URL path")
-	}
-
-	// Assume user-provided endpoint is host[:port], merge it with the default endpoint.
-	return mergeEndpoints(settings.DefaultEndpoint, settings.Endpoint)
-}
-
-func getMTLSMode() string {
-	mode := os.Getenv("GOOGLE_API_USE_MTLS")
-	if mode == "" {
-		// TODO(shinfan): Update this to "auto" when the mTLS feature is fully released.
-		return mTLSModeNever
-	}
-	return strings.ToLower(mode)
-}
-
-func mergeEndpoints(base, newHost string) (string, error) {
-	u, err := url.Parse(base)
-	if err != nil {
-		return "", err
-	}
-	u.Host = newHost
-	return u.String(), nil
 }

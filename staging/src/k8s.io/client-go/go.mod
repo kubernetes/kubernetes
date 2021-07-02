@@ -5,6 +5,7 @@ module k8s.io/client-go
 go 1.16
 
 require (
+	cloud.google.com/go v0.81.0 // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18
 	github.com/Azure/go-autorest/autorest/adal v0.9.13
 	github.com/davecgh/go-spew v1.1.1
