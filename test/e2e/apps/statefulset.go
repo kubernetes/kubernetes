@@ -892,7 +892,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
 		})
 
-		ginkgo.It("should list, patch and delete a collection of StatefulSets", func() {
+		/*
+			Release: v1.22
+			Testname: StatefulSet, list, patch and delete a collection of StatefulSets
+			Description: When a StatefulSet is created it MUST succeed. It
+			MUST succeed when listing StatefulSets via a label selector. It
+			MUST succeed when patching a StatefulSet. It MUST succeed when
+			deleting the StatefulSet via deleteCollection.
+		*/
+		framework.ConformanceIt("should list, patch and delete a collection of StatefulSets", func() {
 
 			ssPatchReplicas := int32(2)
 			ssPatchImage := imageutils.GetE2EImage(imageutils.Pause)
@@ -954,7 +962,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(len(ssList.Items), 0, "filtered list should have no Statefulsets")
 		})
 
-		ginkgo.It("should validate Statefulset Status endpoints", func() {
+		/*
+			Release: v1.22
+			Testname: StatefulSet, status sub-resource
+			Description: When a StatefulSet is created it MUST succeed.
+			Attempt to read, update and patch its status sub-resource; all
+			mutating sub-resource operations MUST be visible to subsequent reads.
+		*/
+		framework.ConformanceIt("should validate Statefulset Status endpoints", func() {
 			ssClient := c.AppsV1().StatefulSets(ns)
 			labelSelector := "e2e=testing"
 

@@ -42,11 +42,11 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.AuthenticationV1Interface
-		sarClient   authorizationclient.SubjectAccessReviewInterface
+		sarClient   authorizationclient.AuthorizationV1Interface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
 		tokenClient = client.AuthenticationV1()
-		sarClient = client.AuthorizationV1().SubjectAccessReviews()
+		sarClient = client.AuthorizationV1()
 	}
 
 	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
@@ -102,7 +102,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
-func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
+func BuildAuthz(client authorizationclient.AuthorizationV1Interface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
 	switch authz.Mode {
 	case kubeletconfig.KubeletAuthorizationModeAlwaysAllow:
 		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil

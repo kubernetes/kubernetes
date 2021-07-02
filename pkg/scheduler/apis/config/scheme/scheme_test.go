@@ -733,6 +733,16 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Args: runtime.RawExtension{
 									Object: &v1beta1.VolumeBindingArgs{
 										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										Shape: []v1beta1.UtilizationShapePoint{
+											{
+												Utilization: 0,
+												Score:       0,
+											},
+											{
+												Utilization: 100,
+												Score:       10,
+											},
+										},
 									},
 								},
 							},
@@ -804,6 +814,11 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
+      shape:
+      - score: 0
+        utilization: 0
+      - score: 10
+        utilization: 100
     name: VolumeBinding
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
@@ -855,6 +870,16 @@ profiles:
 								Name: "VolumeBinding",
 								Args: &config.VolumeBindingArgs{
 									BindTimeoutSeconds: 300,
+									Shape: []config.UtilizationShapePoint{
+										{
+											Utilization: 0,
+											Score:       0,
+										},
+										{
+											Utilization: 100,
+											Score:       10,
+										},
+									},
 								},
 							},
 							{
@@ -913,6 +938,11 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
+      shape:
+      - score: 0
+        utilization: 0
+      - score: 10
+        utilization: 100
     name: VolumeBinding
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
@@ -945,6 +975,16 @@ profiles:
 								Args: runtime.RawExtension{
 									Object: &v1beta2.VolumeBindingArgs{
 										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										Shape: []v1beta2.UtilizationShapePoint{
+											{
+												Utilization: 0,
+												Score:       0,
+											},
+											{
+												Utilization: 100,
+												Score:       10,
+											},
+										},
 									},
 								},
 							},
@@ -1009,6 +1049,11 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
+      shape:
+      - score: 0
+        utilization: 0
+      - score: 10
+        utilization: 100
     name: VolumeBinding
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2

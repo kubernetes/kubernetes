@@ -612,7 +612,7 @@ func (rs *REST) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]s
 		} else {
 			parsedIP := net.ParseIP(ip)
 			if err := allocator.Allocate(parsedIP); err != nil {
-				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocated ip:%v with error:%v", ip, err))}
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP %v: %v", ip, err))}
 				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 			allocated[family] = ip

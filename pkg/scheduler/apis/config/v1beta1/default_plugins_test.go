@@ -47,6 +47,7 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1beta1.Plugin{
 						{Name: names.NodeResourcesFit},
 						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
 						{Name: names.PodTopologySpread},
 						{Name: names.InterPodAffinity},
 						{Name: names.VolumeBinding},
@@ -129,6 +130,7 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1beta1.Plugin{
 						{Name: names.NodeResourcesFit},
 						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
 						{Name: names.PodTopologySpread},
 						{Name: names.InterPodAffinity},
 						{Name: names.VolumeBinding},

@@ -157,7 +157,7 @@ func (i *createdState) transition(s containerState) error {
 }
 
 func (i *createdState) destroy() error {
-	i.c.initProcess.signal(unix.SIGKILL)
+	_ = i.c.initProcess.signal(unix.SIGKILL)
 	return destroy(i.c)
 }
 

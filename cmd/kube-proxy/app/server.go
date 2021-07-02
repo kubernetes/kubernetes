@@ -736,7 +736,7 @@ func (s *ProxyServer) Run() error {
 	go serviceConfig.Run(wait.NeverStop)
 
 	if s.UseEndpointSlices {
-		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1beta1().EndpointSlices(), s.ConfigSyncPeriod)
+		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.ConfigSyncPeriod)
 		endpointSliceConfig.RegisterEventHandler(s.Proxier)
 		go endpointSliceConfig.Run(wait.NeverStop)
 	} else {

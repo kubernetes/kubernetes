@@ -29,7 +29,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -3023,19 +3023,19 @@ COMMIT
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+			NodeName:   utilpointer.StringPtr("node2"),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
+			NodeName:   utilpointer.StringPtr("node3"),
 		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
+			NodeName:   utilpointer.StringPtr("node4"),
 		}},
 	}
 
@@ -3136,19 +3136,19 @@ COMMIT
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+			NodeName:   utilpointer.StringPtr("node2"),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
+			NodeName:   utilpointer.StringPtr("node3"),
 		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
+			NodeName:   utilpointer.StringPtr("node4"),
 		}},
 	}
 	fp.OnEndpointSliceAdd(endpointSlice)
@@ -3196,19 +3196,19 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, { // not ready endpoints should be ignored
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}},
 	}
 
@@ -3238,7 +3238,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     utilpointer.BoolPtr(true),
 				Terminating: utilpointer.BoolPtr(false),
 			},
-			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName: utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses: []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{
@@ -3246,7 +3246,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     utilpointer.BoolPtr(true),
 				Terminating: utilpointer.BoolPtr(true),
 			},
-			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName: utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses: []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{
@@ -3254,7 +3254,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     utilpointer.BoolPtr(true),
 				Terminating: utilpointer.BoolPtr(true),
 			},
-			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName: utilpointer.StringPtr(testHostname),
 		}, { // not ready endpoints should be ignored
 			Addresses: []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{
@@ -3262,7 +3262,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     utilpointer.BoolPtr(false),
 				Terminating: utilpointer.BoolPtr(true),
 			},
-			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName: utilpointer.StringPtr(testHostname),
 		}},
 	}
 
@@ -3679,7 +3679,7 @@ COMMIT
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": ep.hostname},
+				NodeName:   utilpointer.StringPtr(ep.hostname),
 			})
 		}
 
@@ -3746,7 +3746,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
@@ -3755,7 +3755,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
@@ -3765,7 +3765,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
@@ -3775,7 +3775,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since it's not local
@@ -3785,7 +3785,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+						NodeName: utilpointer.StringPtr("host-1"),
 					},
 				},
 			},
@@ -3879,7 +3879,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
@@ -3888,7 +3888,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
@@ -3898,7 +3898,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
@@ -3908,7 +3908,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since it's not local
@@ -3918,7 +3918,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+						NodeName: utilpointer.StringPtr("host-1"),
 					},
 				},
 			},
@@ -4013,7 +4013,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
@@ -4023,7 +4023,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should not be used since it is both terminating and not ready.
@@ -4033,7 +4033,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						// this endpoint should be ignored for node ports since it's not local
@@ -4043,7 +4043,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+						NodeName: utilpointer.StringPtr("host-1"),
 					},
 				},
 			},
@@ -4132,7 +4132,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
@@ -4141,7 +4141,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.3"},
@@ -4150,7 +4150,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.4"},
@@ -4159,7 +4159,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(true),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
@@ -4168,7 +4168,7 @@ COMMIT
 							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
-						Topology: map[string]string{"kubernetes.io/hostname": "host-1"},
+						NodeName: utilpointer.StringPtr("host-1"),
 					},
 				},
 			},

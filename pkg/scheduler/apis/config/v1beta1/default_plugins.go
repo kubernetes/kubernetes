@@ -38,6 +38,7 @@ func getDefaultPlugins() *v1beta1.Plugins {
 			Enabled: []v1beta1.Plugin{
 				{Name: names.NodeResourcesFit},
 				{Name: names.NodePorts},
+				{Name: names.VolumeRestrictions},
 				{Name: names.PodTopologySpread},
 				{Name: names.InterPodAffinity},
 				{Name: names.VolumeBinding},

@@ -337,6 +337,7 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []v1beta1.Plugin{
 									{Name: names.NodeResourcesFit},
 									{Name: names.NodePorts},
+									{Name: names.VolumeRestrictions},
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
@@ -697,6 +698,30 @@ func TestPluginArgsDefaults(t *testing.T) {
 				ScoringStrategy: &v1beta1.ScoringStrategy{
 					Type:      v1beta1.MostAllocated,
 					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority disabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority enabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+				Shape: []v1beta1.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
 				},
 			},
 		},

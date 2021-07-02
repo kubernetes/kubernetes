@@ -38,7 +38,6 @@ import (
 	utilio "k8s.io/utils/io"
 	utilpath "k8s.io/utils/path"
 
-	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -393,15 +392,6 @@ func createManager(containerName string) (cgroups.Manager, error) {
 		Parent: "/",
 		Name:   containerName,
 		Resources: &configs.Resources{
-			Devices: []*libcontainerdevices.Rule{
-				{
-					Type:        'a',
-					Permissions: "rwm",
-					Allow:       true,
-					Minor:       libcontainerdevices.Wildcard,
-					Major:       libcontainerdevices.Wildcard,
-				},
-			},
 			SkipDevices: true,
 		},
 	}

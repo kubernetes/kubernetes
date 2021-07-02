@@ -18,6 +18,8 @@ package phases
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -195,6 +197,20 @@ func runCerts(c workflow.RunData) error {
 	}
 
 	fmt.Printf("[certs] Using certificateDir folder %q\n", data.CertificateWriteDir())
+
+	// If using an external CA while dryrun, copy CA cert to dryrun dir for later use
+	if data.ExternalCA() && data.DryRun() {
+		externalCAFile := filepath.Join(data.Cfg().CertificatesDir, kubeadmconstants.CACertName)
+		fileInfo, _ := os.Stat(externalCAFile)
+		contents, err := os.ReadFile(externalCAFile)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName), contents, fileInfo.Mode())
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -18,6 +18,23 @@ reason about the proposed changes.
 ## Running the tests
 
 Many of the tests require privileges to set resource limits and load eBPF code.
-The easiest way to obtain these is to run the tests with `sudo`:
+The easiest way to obtain these is to run the tests with `sudo`.
 
-    sudo go test ./...
+To test the current package with your local kernel you can simply run:
+```
+go test -exec sudo  ./...
+```
+
+To test the current package with a different kernel version you can use the [run-tests.sh](run-tests.sh) script.
+It requires [virtme](https://github.com/amluto/virtme) and qemu to be installed.
+
+Examples:
+
+```bash
+# Run all tests on a 5.4 kernel
+./run-tests.sh 5.4
+
+# Run a subset of tests:
+./run-tests.sh 5.4 go test ./link
+```
+

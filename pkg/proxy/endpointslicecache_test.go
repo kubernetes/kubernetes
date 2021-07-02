@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -235,7 +235,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:80",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -243,7 +243,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:80",
 						IsLocal:     true,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host1"},
+						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -251,7 +251,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.3:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.3:80",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -271,7 +271,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:80",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -279,7 +279,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:80",
 						IsLocal:     true,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host1"},
+						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -287,7 +287,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:8080": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:8080",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -295,7 +295,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:8080": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:8080",
 						IsLocal:     true,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host1"},
+						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -500,9 +500,8 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		}
 
 		if len(hosts) > 0 {
-			endpoint.Topology = map[string]string{
-				"kubernetes.io/hostname": hosts[i%len(hosts)],
-			}
+			hostname := hosts[i%len(hosts)]
+			endpoint.NodeName = &hostname
 		}
 
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpoint)

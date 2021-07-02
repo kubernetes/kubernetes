@@ -21,6 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -46,6 +48,19 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 			obj.Labels = labels
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
+	}
+
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
