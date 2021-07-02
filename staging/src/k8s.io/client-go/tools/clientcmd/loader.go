@@ -219,7 +219,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
 		missingString := strings.Join(missingList, ", ")
-
 		rules.Warner.Warn(fmt.Sprintf("Config not found: %s", missingString))
 	}
 
