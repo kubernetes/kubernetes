@@ -219,6 +219,10 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage bo
 	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
 	summarySandboxStats := make([]statsapi.PodStats, 0, len(podSandboxMap))
 	for _, criSandboxStat := range criSandboxStats {
+		if criSandboxStat == nil || criSandboxStat.Attributes == nil {
+			klog.V(5).InfoS("Unable to find CRI stats for sandbox")
+			continue
+		}
 		podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
 		if !found {
 			continue
@@ -686,7 +690,7 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 	}
 
 	// Bypass the cache if the CRI implementation specified the UsageNanoCores.
-	if stats.Cpu.UsageNanoCores != nil {
+	if stats.Cpu != nil && stats.Cpu.UsageNanoCores != nil {
 		return &stats.Cpu.UsageNanoCores.Value
 	}
 
@@ -913,6 +917,9 @@ func extractIDFromCgroupPath(cgroupPath string) string {
 }
 
 func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Network == nil {
+		return
+	}
 	criNetwork := criPodStat.Linux.Network
 	iStats := statsapi.NetworkStats{
 		Time:           metav1.NewTime(time.Unix(0, criNetwork.Timestamp)),
@@ -928,38 +935,53 @@ func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 func criInterfaceToSummary(criIface *runtimeapi.NetworkInterfaceUsage) statsapi.InterfaceStats {
 	return statsapi.InterfaceStats{
 		Name:     criIface.Name,
-		RxBytes:  &criIface.RxBytes.Value,
-		RxErrors: &criIface.RxErrors.Value,
-		TxBytes:  &criIface.TxBytes.Value,
-		TxErrors: &criIface.TxErrors.Value,
+		RxBytes:  valueOfUInt64Value(criIface.RxBytes),
+		RxErrors: valueOfUInt64Value(criIface.RxErrors),
+		TxBytes:  valueOfUInt64Value(criIface.TxBytes),
+		TxErrors: valueOfUInt64Value(criIface.TxErrors),
 	}
 }
 
 func addCRIPodCPUStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Cpu == nil {
+		return
+	}
 	criCPU := criPodStat.Linux.Cpu
 	ps.CPU = &statsapi.CPUStats{
 		Time:                 metav1.NewTime(time.Unix(0, criCPU.Timestamp)),
-		UsageNanoCores:       &criCPU.UsageNanoCores.Value,
-		UsageCoreNanoSeconds: &criCPU.UsageCoreNanoSeconds.Value,
+		UsageNanoCores:       valueOfUInt64Value(criCPU.UsageNanoCores),
+		UsageCoreNanoSeconds: valueOfUInt64Value(criCPU.UsageCoreNanoSeconds),
 	}
 }
 
 func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Memory == nil {
+		return
+	}
 	criMemory := criPodStat.Linux.Memory
 	ps.Memory = &statsapi.MemoryStats{
 		Time:            metav1.NewTime(time.Unix(0, criMemory.Timestamp)),
-		AvailableBytes:  &criMemory.AvailableBytes.Value,
-		UsageBytes:      &criMemory.UsageBytes.Value,
-		WorkingSetBytes: &criMemory.WorkingSetBytes.Value,
-		RSSBytes:        &criMemory.RssBytes.Value,
-		PageFaults:      &criMemory.PageFaults.Value,
-		MajorPageFaults: &criMemory.MajorPageFaults.Value,
+		AvailableBytes:  valueOfUInt64Value(criMemory.AvailableBytes),
+		UsageBytes:      valueOfUInt64Value(criMemory.UsageBytes),
+		WorkingSetBytes: valueOfUInt64Value(criMemory.WorkingSetBytes),
+		RSSBytes:        valueOfUInt64Value(criMemory.RssBytes),
+		PageFaults:      valueOfUInt64Value(criMemory.PageFaults),
+		MajorPageFaults: valueOfUInt64Value(criMemory.MajorPageFaults),
 	}
 }
 
 func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
-	criProcess := criPodStat.Linux.Process
-	ps.ProcessStats = &statsapi.ProcessStats{
-		ProcessCount: &criProcess.ProcessCount.Value,
+	if criPodStat == nil || criPodStat.Linux == nil || criPodStat.Linux.Process == nil {
+		return
 	}
+	ps.ProcessStats = &statsapi.ProcessStats{
+		ProcessCount: valueOfUInt64Value(criPodStat.Linux.Process.ProcessCount),
+	}
+}
+
+func valueOfUInt64Value(value *runtimeapi.UInt64Value) *uint64 {
+	if value == nil {
+		return nil
+	}
+	return &value.Value
 }
