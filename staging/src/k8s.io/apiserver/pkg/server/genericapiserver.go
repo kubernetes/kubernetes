@@ -211,9 +211,8 @@ type GenericAPIServer struct {
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
 
-	// terminationSignals provides access to the various termination
-	// signals that happen during the shutdown period of the apiserver.
-	terminationSignals terminationSignals
+	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
+	lifecycleSignals lifecycleSignals
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -310,7 +309,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.installLivez()
 
 	// as soon as shutdown is initiated, readiness should start failing
-	readinessStopCh := s.terminationSignals.ShutdownInitiated.Signaled()
+	readinessStopCh := s.lifecycleSignals.ShutdownInitiated.Signaled()
 	err := s.addReadyzShutdownCheck(readinessStopCh)
 	if err != nil {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
@@ -334,8 +333,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	delayedStopCh := s.terminationSignals.AfterShutdownDelayDuration
-	shutdownInitiatedCh := s.terminationSignals.ShutdownInitiated
+	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
+	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
 
 	go func() {
 		defer delayedStopCh.Signal()
@@ -355,13 +354,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	httpServerStoppedListeningCh := s.terminationSignals.HTTPServerStoppedListening
+	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
 	go func() {
 		<-listenerStoppedCh
 		httpServerStoppedListeningCh.Signal()
 	}()
 
-	drainedCh := s.terminationSignals.InFlightRequestsDrained
+	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
 	go func() {
 		defer drainedCh.Signal()
 
