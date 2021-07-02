@@ -52,33 +52,33 @@ type result struct {
 	response *http.Response
 }
 
-// wrap a terminationSignal so the test can inject its own callback
+// wrap a lifecycleSignal so the test can inject its own callback
 type wrappedTerminationSignal struct {
-	terminationSignal
-	callback func(bool, string, terminationSignal)
+	lifecycleSignal
+	callback func(bool, string, lifecycleSignal)
 }
 
 func (w *wrappedTerminationSignal) Signal() {
 	var name string
-	if ncw, ok := w.terminationSignal.(*namedChannelWrapper); ok {
+	if ncw, ok := w.lifecycleSignal.(*namedChannelWrapper); ok {
 		name = ncw.name
 	}
 
 	// the callback is invoked before and after the termination event is signaled
 	if w.callback != nil {
-		w.callback(true, name, w.terminationSignal)
+		w.callback(true, name, w.lifecycleSignal)
 	}
-	w.terminationSignal.Signal()
+	w.lifecycleSignal.Signal()
 	if w.callback != nil {
-		w.callback(false, name, w.terminationSignal)
+		w.callback(false, name, w.lifecycleSignal)
 	}
 }
 
-func wrapTerminationSignals(t *testing.T, ts *terminationSignals, callback func(bool, string, terminationSignal)) {
-	newWrappedTerminationSignal := func(delegated terminationSignal) terminationSignal {
+func wrapTerminationSignals(t *testing.T, ts *lifecycleSignals, callback func(bool, string, lifecycleSignal)) {
+	newWrappedTerminationSignal := func(delegated lifecycleSignal) lifecycleSignal {
 		return &wrappedTerminationSignal{
-			terminationSignal: delegated,
-			callback:          callback,
+			lifecycleSignal: delegated,
+			callback:        callback,
 		}
 	}
 
@@ -116,7 +116,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	// record the termination events in the order they are signaled
 	var signalOrderLock sync.Mutex
 	signalOrderGot := make([]string, 0)
-	recordOrderFn := func(before bool, name string, e terminationSignal) {
+	recordOrderFn := func(before bool, name string, e lifecycleSignal) {
 		if !before {
 			return
 		}
@@ -147,7 +147,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
 		requestMustSucceed(t, resultGot)
 	})
-	steps := func(before bool, name string, e terminationSignal) {
+	steps := func(before bool, name string, e lifecycleSignal) {
 		// Before AfterShutdownDelayDuration event is signaled, the test
 		// will send request(s) to assert on expected behavior.
 		if name == "AfterShutdownDelayDuration" && before {
@@ -157,7 +157,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// wrap the termination signals of the GenericAPIServer so the test can inject its own callback
-	wrapTerminationSignals(t, &s.terminationSignals, func(before bool, name string, e terminationSignal) {
+	wrapTerminationSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
 		recordOrderFn(before, name, e)
 		steps(before, name, e)
 	})
@@ -192,7 +192,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// step 4: wait for the HTTP Server listener to have stopped
-	httpServerStoppedListeningCh := s.terminationSignals.HTTPServerStoppedListening
+	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
 	select {
 	case <-httpServerStoppedListeningCh.Signaled():
 	case <-time.After(5 * time.Second):

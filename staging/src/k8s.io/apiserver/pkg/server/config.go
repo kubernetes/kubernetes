@@ -225,10 +225,10 @@ type Config struct {
 	// RequestWidthEstimator is used to estimate the "width" of the incoming request(s).
 	RequestWidthEstimator flowcontrolrequest.WidthEstimatorFunc
 
-	// terminationSignals provides access to the various shutdown signals
-	// that happen during the graceful termination of the apiserver.
+	// lifecycleSignals provides access to the various signals
+	// that happen during lifecycle of the apiserver.
 	// it's intentionally marked private as it should never be overridden.
-	terminationSignals terminationSignals
+	lifecycleSignals lifecycleSignals
 
 	//===========================================================================
 	// values below here are targets for removal
@@ -354,7 +354,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc:       genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		RequestWidthEstimator: flowcontrolrequest.DefaultWidthEstimator,
-		terminationSignals:    newTerminationSignals(),
+		lifecycleSignals:      newLifecycleSignals(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -608,7 +608,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
 
-		terminationSignals: c.terminationSignals,
+		lifecycleSignals: c.lifecycleSignals,
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
