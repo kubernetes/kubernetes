@@ -19,6 +19,7 @@ package testing
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilpointer "k8s.io/utils/pointer"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -86,6 +87,16 @@ func SetTypeExternalName(svc *api.Service) {
 	svc.Spec.ExternalTrafficPolicy = ""
 	svc.Spec.ClusterIP = ""
 	svc.Spec.ClusterIPs = nil
+}
+
+// SetTypeExternalNameTrue sets the allocate LB node port to true.
+func SetAllocateLBNodePortTrue(svc *api.Service) {
+	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+}
+
+// SetTypeExternalNameFalse sets the allocate LB node port to false.
+func SetAllocateLBNodePortFalse(svc *api.Service) {
+	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 }
 
 // SetPorts sets the service ports list.
