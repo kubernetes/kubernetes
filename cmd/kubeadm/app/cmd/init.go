@@ -386,9 +386,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := options.kubeconfigDir
-		if options.dryRun {
-			kubeconfigDir = dryRunDir
-		}
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
