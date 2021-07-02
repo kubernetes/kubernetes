@@ -44,8 +44,9 @@
   "spec": {
     "request": "OA==",
     "signerName": "20",
+    "expirationSeconds": 1305381319,
     "usages": [
-      "J枊a"
+      "鯹)晿\u003c"
     ],
     "username": "21",
     "uid": "22",
@@ -61,14 +62,14 @@
   "status": {
     "conditions": [
       {
-        "type": "o,c鮽ort昍řČ扷5Ɨ",
-        "status": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
+        "type": ".蘯6ċV夸",
+        "status": "Č扷5ƗǸƢ6/ʕVŚ(ĿȊ甞谐颋ǅS",
         "reason": "26",
         "message": "27",
-        "lastUpdateTime": "1985-03-23T14:10:57Z",
-        "lastTransitionTime": "2352-05-22T04:29:36Z"
+        "lastUpdateTime": "2762-08-27T06:50:32Z",
+        "lastTransitionTime": "2214-12-23T19:22:14Z"
       }
     ],
-    "certificate": "cw=="
+    "certificate": "fQ=="
   }
 }

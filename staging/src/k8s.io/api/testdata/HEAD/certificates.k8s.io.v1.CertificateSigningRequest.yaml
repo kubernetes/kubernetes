@@ -31,6 +31,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
+  expirationSeconds: 1305381319
   extra:
     "24":
     - "25"
@@ -40,14 +41,14 @@ spec:
   signerName: "20"
   uid: "22"
   usages:
-  - J枊a
+  - 鯹)晿<
   username: "21"
 status:
-  certificate: cw==
+  certificate: fQ==
   conditions:
-  - lastTransitionTime: "2352-05-22T04:29:36Z"
-    lastUpdateTime: "1985-03-23T14:10:57Z"
+  - lastTransitionTime: "2214-12-23T19:22:14Z"
+    lastUpdateTime: "2762-08-27T06:50:32Z"
     message: "27"
     reason: "26"
-    status: ěĂ凗蓏Ŋ蛊ĉy緅縕
-    type: o,c鮽ort昍řČ扷5Ɨ
+    status: Č扷5ƗǸƢ6/ʕVŚ(ĿȊ甞谐颋ǅS
+    type: .蘯6ċV夸
