@@ -161,7 +161,7 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos := getCRICadvisorStats(allInfos)
+	caInfos, allInfos := getCRICadvisorStats(allInfos)
 
 	// get network stats for containers.
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
@@ -255,7 +255,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos := getCRICadvisorStats(allInfos)
+	caInfos, allInfos := getCRICadvisorStats(allInfos)
 
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
@@ -811,10 +811,10 @@ func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(
 	}
 }
 
-func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[string]cadvisorapiv2.ContainerInfo {
+func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
 	stats := make(map[string]cadvisorapiv2.ContainerInfo)
-	infos = removeTerminatedContainerInfo(infos)
-	for key, info := range infos {
+	filteredInfos, cinfosByPodCgroupKey := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	for key, info := range filteredInfos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
 		// entries in our summary. For details on .mount units:
@@ -828,7 +828,7 @@ func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[strin
 		}
 		stats[extractIDFromCgroupPath(key)] = info
 	}
-	return stats
+	return stats, cinfosByPodCgroupKey
 }
 
 func extractIDFromCgroupPath(cgroupPath string) string {

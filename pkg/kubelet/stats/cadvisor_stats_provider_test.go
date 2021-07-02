@@ -34,7 +34,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 )
 
-func TestRemoveTerminatedContainerInfo(t *testing.T) {
+func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 	const (
 		seedPastPod0Infra      = 1000
 		seedPastPod0Container0 = 2000
@@ -63,10 +63,16 @@ func TestRemoveTerminatedContainerInfo(t *testing.T) {
 		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
 	}
-	output := removeTerminatedContainerInfo(infos)
-	assert.Len(t, output, 2)
+	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	assert.Len(t, filteredInfos, 2)
+	assert.Len(t, allInfos, 6)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
-		if _, found := output[c]; !found {
+		if _, found := filteredInfos[c]; !found {
+			t.Errorf("%q is expected to be in the output\n", c)
+		}
+	}
+	for _, c := range []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0"} {
+		if _, found := allInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
 	}
