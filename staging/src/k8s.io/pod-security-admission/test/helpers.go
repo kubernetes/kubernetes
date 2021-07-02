@@ -65,3 +65,11 @@ func ensureSELinuxOptions(p *corev1.Pod) *corev1.Pod {
 	}
 	return p
 }
+
+// ensureAnnotation makes sure that pod.Annotations is never nil
+func ensureAnnotation(pod *corev1.Pod) *corev1.Pod {
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	return pod
+}
