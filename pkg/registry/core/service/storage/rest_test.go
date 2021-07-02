@@ -278,26 +278,6 @@ func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bo
 	return alloc.Has(int(port))
 }
 
-func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST) {
-	t.Helper()
-	obj, err := rest.Get(ctx, svcName, &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	srv := obj.(*api.Service)
-	if srv == nil {
-		t.Fatalf("Failed to find service: %s", svcName)
-	}
-	serviceNodePorts := collectServiceNodePorts(srv)
-	if len(serviceNodePorts) == 0 {
-		t.Fatalf("Failed to find NodePorts of service : %s", srv.Name)
-	}
-	for i := range serviceNodePorts {
-		nodePort := serviceNodePorts[i]
-		rest.serviceNodePorts.Release(nodePort)
-	}
-}
-
 func TestServiceRegistryCreate(t *testing.T) {
 	testCases := []struct {
 		svc             *api.Service
@@ -772,11 +752,6 @@ func TestServiceRegistryLoadBalancerService(t *testing.T) {
 	if len(serviceNodePorts) == 0 {
 		t.Errorf("Failed to find NodePorts of service : %s", srv.Name)
 	}
-	for i := range serviceNodePorts {
-		nodePort := serviceNodePorts[i]
-		// Release the node port at the end of the test case.
-		storage.serviceNodePorts.Release(nodePort)
-	}
 }
 
 func TestAllocateLoadBalancerNodePorts(t *testing.T) {
@@ -843,12 +818,6 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 			serviceNodePorts := collectServiceNodePorts(srv)
 			if (len(serviceNodePorts) != 0) != tc.expectNodePorts {
 				t.Errorf("%s; Allocated NodePorts not as expected", tc.name)
-			}
-
-			for i := range serviceNodePorts {
-				nodePort := serviceNodePorts[i]
-				// Release the node port at the end of the test case.
-				storage.serviceNodePorts.Release(nodePort)
 			}
 		})
 	}
@@ -982,7 +951,6 @@ func TestServiceRegistryUpdateLoadBalancerService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc2.Name, storage)
 
 	// Change port.
 	svc3 := svc2.DeepCopy()
@@ -1007,7 +975,6 @@ func TestServiceRegistryUpdateMultiPortLoadBalancerService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc1.Name, storage)
 
 	// Modify ports
 	svc2 := obj.(*api.Service).DeepCopy()
@@ -1363,7 +1330,6 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	if createdSvc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdService := createdSvc.(*api.Service)
 	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
@@ -1394,7 +1360,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if !service.NeedsHealthCheck(createdSvc) {
@@ -1403,9 +1368,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	port := createdSvc.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
-	} else {
-		// Release the health check node port at the end of the test case.
-		storage.serviceNodePorts.Release(int(port))
 	}
 }
 
@@ -1426,7 +1388,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	if obj == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if !service.NeedsHealthCheck(createdSvc) {
@@ -1438,10 +1399,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	}
 	if port != 30501 {
 		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", 30501, port)
-	}
-	if port != 0 {
-		// Release the health check node port at the end of the test case.
-		storage.serviceNodePorts.Release(int(port))
 	}
 }
 
@@ -1473,7 +1430,6 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	if obj == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
-	defer releaseServiceNodePorts(t, ctx, svc.Name, storage)
 
 	createdSvc := obj.(*api.Service)
 	if service.NeedsHealthCheck(createdSvc) {
@@ -1482,8 +1438,6 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	// Make sure the service does not have the health check node port allocated
 	port := createdSvc.Spec.HealthCheckNodePort
 	if port != 0 {
-		// Release the health check node port at the end of the test case.
-		storage.serviceNodePorts.Release(int(port))
 		t.Errorf("Unexpected allocation of health check node port: %v", port)
 	}
 }
@@ -1733,7 +1687,6 @@ func TestInitNodePorts(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
-	defer nodePortOp.Finish()
 
 	testCases := []struct {
 		name                     string
@@ -1818,7 +1771,6 @@ func TestUpdateNodePorts(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
-	defer nodePortOp.Finish()
 
 	testCases := []struct {
 		name                     string
