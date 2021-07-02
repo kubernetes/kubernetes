@@ -29,7 +29,7 @@
   "description": "Creates and runs virtual machines on Google Cloud Platform.",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/compute/docs/reference/latest/",
-  "etag": "\"uWj2hSb4GVjzdDlAnRd2gbM1ZQ8/pyrls0FjB-CHfiQixrG9Uhuqqcg\"",
+  "etag": "\"uWj2hSb4GVjzdDlAnRd2gbM1ZQ8/7OA9WRBh4HiOx7jUxLhYlvmh-JU\"",
   "icons": {
     "x16": "https://www.google.com/images/icons/product/compute_engine-16.png",
     "x32": "https://www.google.com/images/icons/product/compute_engine-32.png"
@@ -10231,6 +10231,12 @@
               "location": "query",
               "type": "string"
             },
+            "secureTags": {
+              "description": "Secure tags to apply to this instance. These can be later modified by the update method. Maximum number of secure tags allowed is 300.",
+              "location": "query",
+              "repeated": true,
+              "type": "string"
+            },
             "sourceInstanceTemplate": {
               "description": "Specifies instance template to create the instance.\n\nThis field is optional. It can be a full or partial URL. For example, the following are all valid URLs to an instance template:  \n- https://www.googleapis.com/compute/v1/projects/project/global/instanceTemplates/instanceTemplate \n- projects/project/global/instanceTemplates/instanceTemplate \n- global/instanceTemplates/instanceTemplate",
               "location": "query",
@@ -11564,6 +11570,11 @@
             "instance"
           ],
           "parameters": {
+            "clearSecureTag": {
+              "description": "Whether to clear secure tags from the instance.\n\nThis property is mutually exclusive with the secure_tag property; you can only specify one or the other, but not both.",
+              "location": "query",
+              "type": "boolean"
+            },
             "instance": {
               "description": "Name of the instance resource to update.",
               "location": "path",
@@ -11615,6 +11626,12 @@
             "requestId": {
               "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
               "location": "query",
+              "type": "string"
+            },
+            "secureTags": {
+              "description": "Secure tags to apply to this instance. Maximum number of secure tags allowed is 300.",
+              "location": "query",
+              "repeated": true,
               "type": "string"
             },
             "zone": {
@@ -23119,7 +23136,7 @@
           ]
         },
         "export": {
-          "description": "Export the changed blocks between two instant snapshots to a customer?s bucket in the user specified format.",
+          "description": "Export the changed blocks between two instant snapshots to a customer's bucket in the user specified format.",
           "httpMethod": "POST",
           "id": "compute.regionInstantSnapshots.export",
           "parameterOrder": [
@@ -34942,7 +34959,7 @@
           ]
         },
         "export": {
-          "description": "Export the changed blocks between two instant snapshots to a customer?s bucket in the user specified format.",
+          "description": "Export the changed blocks between two instant snapshots to a customer's bucket in the user specified format.",
           "httpMethod": "POST",
           "id": "compute.zoneInstantSnapshots.export",
           "parameterOrder": [
@@ -35604,7 +35621,7 @@
       }
     }
   },
-  "revision": "20210322",
+  "revision": "20210415",
   "rootUrl": "https://compute.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -36713,7 +36730,7 @@
           "type": "integer"
         },
         "maintenanceInterval": {
-          "description": "Specifies whether this VM may be a stable fleet VM. Setting this to \"Periodic\" designates this VM as a Stable Fleet VM.\n\nSee go/stable-fleet-ug for more details.",
+          "description": "For more information about maintenance intervals, see Setting maintenance intervals.",
           "enum": [
             "PERIODIC"
           ],
@@ -36746,22 +36763,6 @@
         "instanceProperties": {
           "$ref": "AllocationSpecificSKUAllocationReservedInstanceProperties",
           "description": "The instance properties for the reservation."
-        }
-      },
-      "type": "object"
-    },
-    "Any": {
-      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a URL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form of utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\nFoo foo = ...; Any any; any.PackFrom(foo); ... if (any.UnpackTo(\u0026foo)) { ... }\n\nExample 2: Pack and unpack a message in Java.\n\nFoo foo = ...; Any any = Any.pack(foo); ... if (any.is(Foo.class)) { foo = any.unpack(Foo.class); }\n\nExample 3: Pack and unpack a message in Python.\n\nfoo = Foo(...) any = Any() any.Pack(foo) ... if any.Is(Foo.DESCRIPTOR): any.Unpack(foo) ...\n\nExample 4: Pack and unpack a message in Go\n\nfoo := \u0026pb.Foo{...} any, err := anypb.New(foo) if err != nil { ... } ... foo := \u0026pb.Foo{} if err := any.UnmarshalTo(foo); err != nil { ... }\n\nThe pack methods provided by protobuf library will by default use 'type.googleapis.com/full.type.name' as the type URL and the unpack methods only use the fully qualified type name after the last '/' in the type URL, for example \"foo.bar.com/x/y.z\" will yield type name \"y.z\".\n\n\n\nJSON ==== The JSON representation of an `Any` value uses the regular representation of the deserialized, embedded message, with an additional field `@type` which contains the type URL. Example:\n\npackage google.profile; message Person { string first_name = 1; string last_name = 2; }\n\n{ \"@type\": \"type.googleapis.com/google.profile.Person\", \"firstName\": , \"lastName\":  }\n\nIf the embedded message type is well-known and has a custom JSON representation, that representation will be embedded adding a field `value` which holds the custom JSON in addition to the `@type` field. Example (for message [google.protobuf.Duration][]):\n\n{ \"@type\": \"type.googleapis.com/google.protobuf.Duration\", \"value\": \"1.212s\" }",
-      "id": "Any",
-      "properties": {
-        "typeUrl": {
-          "description": "A URL/resource name that uniquely identifies the type of the serialized protocol buffer message. This string must contain at least one \"/\" character. The last segment of the URL's path must represent the fully qualified name of the type (as in `path/google.protobuf.Duration`). The name should be in a canonical form (e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they expect it to use in the context of Any. However, for URLs which use the scheme `http`, `https`, or no scheme, one can optionally set up a type server that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed. * An HTTP GET on the URL must yield a [google.protobuf.Type][] value in binary format, or produce an error. * Applications are allowed to cache lookup results based on the URL, or have them precompiled into a binary to avoid any lookup. Therefore, binary compatibility needs to be preserved on changes to types. (Use versioned type names to manage breaking changes.)\n\nNote: this functionality is not currently available in the official protobuf release, and it is not used for type URLs beginning with type.googleapis.com.\n\nSchemes other than `http`, `https` (or the empty scheme) might be used with implementation specific semantics.",
-          "type": "string"
-        },
-        "value": {
-          "description": "Must be a valid serialized protocol buffer of the above specified type.",
-          "format": "byte",
-          "type": "string"
         }
       },
       "type": "object"
@@ -37125,7 +37126,7 @@
       "properties": {
         "autoscalingPolicy": {
           "$ref": "AutoscalingPolicy",
-          "description": "The configuration parameters for the autoscaling algorithm. You can define one or more of the policies for an autoscaler: cpuUtilization, customMetricUtilizations, and loadBalancingUtilization.\n\nIf none of these are specified, the default will be to autoscale based on cpuUtilization to 0.6 or 60%."
+          "description": "The configuration parameters for the autoscaling algorithm. You can define one or more signals for an autoscaler: cpuUtilization, customMetricUtilizations, and loadBalancingUtilization.\n\nIf none of these are specified, the default will be to autoscale based on cpuUtilization to 0.6 or 60%."
         },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
@@ -37962,6 +37963,10 @@
           },
           "type": "array"
         },
+        "cacheKeyPolicy": {
+          "$ref": "BackendBucketCdnPolicyCacheKeyPolicy",
+          "description": "The CacheKeyPolicy for this CdnPolicy."
+        },
         "cacheMode": {
           "description": "Specifies the cache setting for all responses from this backend. The possible values are:\n\nUSE_ORIGIN_HEADERS Requires the origin to set valid caching headers to cache content. Responses without these headers will not be cached at Google's edge, and will require a full trip to the origin on every request, potentially impacting performance and increasing load on the origin server.\n\nFORCE_CACHE_ALL Cache all content, ignoring any \"private\", \"no-store\" or \"no-cache\" directives in Cache-Control response headers. Warning: this may result in Cloud CDN caching private, per-user (user identifiable) content.\n\nCACHE_ALL_STATIC Automatically cache static content, including common image formats, media (video and audio), and web assets (JavaScript and CSS). Requests and responses that are marked as uncacheable, as well as dynamic content (including HTML), will not be cached.",
           "enum": [
@@ -38035,6 +38040,27 @@
         "headerName": {
           "description": "The header field name to match on when bypassing cache. Values are case-insensitive.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BackendBucketCdnPolicyCacheKeyPolicy": {
+      "description": "Message containing what to include in the cache key for a request for Cloud CDN.",
+      "id": "BackendBucketCdnPolicyCacheKeyPolicy",
+      "properties": {
+        "includeHttpHeaders": {
+          "description": "Allows HTTP request headers (by name) to be used in the cache key.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "queryStringWhitelist": {
+          "description": "Names of query string parameters to include in cache keys. All other parameters will be excluded. '\u0026' and '=' will be percent encoded and not treated as delimiters.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -38348,9 +38374,11 @@
             "HTTPS",
             "SSL",
             "TCP",
-            "UDP"
+            "UDP",
+            "UNSPECIFIED"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -39352,6 +39380,13 @@
           },
           "type": "array"
         },
+        "secureTags": {
+          "description": "Secure tags to apply to this instance. These can be later modified by the update method. Maximum number of secure tags allowed is 300.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "sourceInstanceTemplate": {
           "description": "Specifies the instance template from which to create instances. You may combine sourceInstanceTemplate with instanceProperties to override specific values from an existing instance template. Bulk API follows the semantics of JSON Merge Patch described by RFC 7396.\n\nIt can be a full or partial URL. For example, the following are all valid URLs to an instance template:  \n- https://www.googleapis.com/compute/v1/projects/project/global/instanceTemplates/instanceTemplate \n- projects/project/global/instanceTemplates/instanceTemplate \n- global/instanceTemplates/instanceTemplate  \n\nThis field is optional.",
           "type": "string"
@@ -39390,6 +39425,20 @@
         "includeHost": {
           "description": "If true, requests to different hosts will be cached separately.",
           "type": "boolean"
+        },
+        "includeHttpHeaders": {
+          "description": "Allows HTTP request headers (by name) to be used in the cache key.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includeNamedCookies": {
+          "description": "Allows HTTP cookies (by name) to be used in the cache key. The name=value pair will be used in the cache key Cloud CDN generates.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "includeProtocol": {
           "description": "If true, http and https requests will be cached separately.",
@@ -42454,13 +42503,6 @@
           },
           "type": "array"
         },
-        "targetSecureLabels": {
-          "description": "A list of secure labels that controls which instances the firewall rule applies to. If targetSecureLabel are specified, then the firewall rule applies only to instances in the VPC network that have one of those secure labels. targetSecureLabel may not be set at the same time as targetServiceAccounts. If neither targetServiceAccounts nor targetSecureLabel are specified, the firewall rule applies to all instances on the specified network. Maximum number of target label values allowed is 256.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "targetSecureTags": {
           "description": "A list of secure tags that controls which instances the firewall rule applies to. If targetSecureTag are specified, then the firewall rule applies only to instances in the VPC network that have one of those EFFECTIVE secure tags, if all the target_secure_tag are in INEFFECTIVE state, then this rule will be ignored. targetSecureTag may not be set at the same time as targetServiceAccounts. If neither targetServiceAccounts nor targetSecureTag are specified, the firewall rule applies to all instances on the specified network. Maximum number of target label tags allowed is 256.",
           "items": {
@@ -42498,13 +42540,6 @@
         },
         "srcIpRanges": {
           "description": "CIDR IP address range. Maximum number of source CIDR IP ranges allowed is 256.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "srcSecureLabels": {
-          "description": "List of firewall label values, which should be matched at the source of the traffic. Maximum number of source label values allowed is 256.",
           "items": {
             "type": "string"
           },
@@ -42597,11 +42632,13 @@
             "ALL",
             "ESP",
             "ICMP",
+            "L3_DEFAULT",
             "SCTP",
             "TCP",
             "UDP"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -46179,13 +46216,6 @@
           "$ref": "Scheduling",
           "description": "Sets the scheduling options for this instance."
         },
-        "secureLabels": {
-          "description": "Secure labels to apply to this instance. These can be later modified by the update method. Maximum number of secure labels allowed is 300.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "secureTags": {
           "description": "Secure tags to apply to this instance. These can be later modified by the update method. Maximum number of secure tags allowed is 300.",
           "items": {
@@ -49668,6 +49698,13 @@
           ],
           "type": "string"
         },
+        "candidateIpv6Subnets": {
+          "description": "Up to 16 candidate prefixes that control the allocation of cloudRouterIpv6Address and customerRouterIpv6Address for this attachment. Each prefix must be in the Global Unique Address (GUA) space. It is highly recommended that it be in a range owned by the requestor. A GUA in a range owned by Google will cause the request to fail. Google will select an available prefix from the supplied candidates or fail the request. If not supplied, a /125 from a Google-owned GUA block will be selected.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "candidateSubnets": {
           "description": "Up to 16 candidate prefixes that can be used to restrict the allocation of cloudRouterIpAddress and customerRouterIpAddress for this attachment. All prefixes must be within link-local address space (169.254.0.0/16) and must be /29 or shorter (/28, /27, etc). Google will attempt to select an unused /29 from the supplied candidate prefix(es). The request will fail if all possible /29s are in use on Google's edge. If not supplied, Google will randomly select an unused /29 from all of link-local space.",
           "items": {
@@ -49679,12 +49716,28 @@
           "description": "[Output Only] IPv4 address + prefix length to be configured on Cloud Router Interface for this interconnect attachment.",
           "type": "string"
         },
+        "cloudRouterIpv6Address": {
+          "description": "[Output Only] IPv6 address + prefix length to be configured on Cloud Router Interface for this interconnect attachment.",
+          "type": "string"
+        },
+        "cloudRouterIpv6InterfaceId": {
+          "description": "If supplied, the interface id (index within the subnet) to be used for the cloud router address. The id must be in the range of 1 to 6. If a subnet mask is supplied, it must be /125, and the subnet should either be 0 or match the selected subnet.",
+          "type": "string"
+        },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
           "type": "string"
         },
         "customerRouterIpAddress": {
           "description": "[Output Only] IPv4 address + prefix length to be configured on the customer router subinterface for this interconnect attachment.",
+          "type": "string"
+        },
+        "customerRouterIpv6Address": {
+          "description": "[Output Only] IPv6 address + prefix length to be configured on the customer router subinterface for this interconnect attachment.",
+          "type": "string"
+        },
+        "customerRouterIpv6InterfaceId": {
+          "description": "If supplied, the interface id (index within the subnet) to be used for the customer router address. The id must be in the range of 1 to 6. If a subnet mask is supplied, it must be /125, and the subnet should either be 0 or match the selected subnet.",
           "type": "string"
         },
         "dataplaneVersion": {
@@ -49736,7 +49789,7 @@
           "type": "string"
         },
         "ipsecInternalAddresses": {
-          "description": "URL of addresses that have been reserved for the interconnect attachment, Used only for interconnect attachment that has the encryption option as IPSEC. The addresses must be RFC 1918 IP address ranges. When creating HA VPN gateway over the interconnect attachment, if the attachment is configured to use an RFC 1918 IP address, then the VPN gateway?s IP address will be allocated from the IP address range specified here. For example, if the HA VPN gateway?s interface 0 is paired to this interconnect attachment, then an RFC 1918 IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this interconnect attachment. If this field is not specified for interconnect attachment that has encryption option as IPSEC, later on when creating HA VPN gateway on this interconnect attachment, the HA VPN gateway's IP address will be allocated from regional external IP address pool.\nNot currently available in all Interconnect locations.",
+          "description": "URL of addresses that have been reserved for the interconnect attachment, Used only for interconnect attachment that has the encryption option as IPSEC. The addresses must be RFC 1918 IP address ranges. When creating HA VPN gateway over the interconnect attachment, if the attachment is configured to use an RFC 1918 IP address, then the VPN gateway's IP address will be allocated from the IP address range specified here. For example, if the HA VPN gateway's interface 0 is paired to this interconnect attachment, then an RFC 1918 IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this interconnect attachment. If this field is not specified for interconnect attachment that has encryption option as IPSEC, later on when creating HA VPN gateway on this interconnect attachment, the HA VPN gateway's IP address will be allocated from regional external IP address pool.\nNot currently available in all Interconnect locations.",
           "items": {
             "type": "string"
           },
@@ -49812,6 +49865,18 @@
         },
         "selfLinkWithId": {
           "description": "[Output Only] Server-defined URL for this resource with the resource id.",
+          "type": "string"
+        },
+        "stackType": {
+          "description": "The stack type for this interconnect attachment to identify whether the IPv6 feature is enabled or not. If not specified, IPV4_ONLY will be used.\n\nThis field can be both set at interconnect attachments creation and update interconnect attachment operations.",
+          "enum": [
+            "IPV4_IPV6",
+            "IPV4_ONLY"
+          ],
+          "enumDescriptions": [
+            "",
+            ""
+          ],
           "type": "string"
         },
         "state": {
@@ -52363,6 +52428,24 @@
           "description": "[Output Only] Tag describing the version.",
           "type": "string"
         },
+        "targetStatus": {
+          "description": "[Output Only] The eventual status of the instance. The instance group manager will not be identified as stable till each managed instance reaches its targetStatus.",
+          "enum": [
+            "ABANDONED",
+            "DELETED",
+            "RUNNING",
+            "STOPPED",
+            "SUSPENDED"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        },
         "version": {
           "$ref": "ManagedInstanceVersion",
           "description": "[Output Only] Intended version of this instance."
@@ -52814,7 +52897,7 @@
         },
         "serverlessDeployment": {
           "$ref": "NetworkEndpointGroupServerlessDeployment",
-          "description": "Only valid when networkEndpointType is \"SERVERLESS\". Only one of cloudRun, appEngine cloudFunction or serverlessDeployment may be set."
+          "description": "Only valid when networkEndpointType is \"SERVERLESS\". Only one of cloudRun, appEngine, cloudFunction or serverlessDeployment may be set."
         },
         "size": {
           "description": "[Output only] Number of network endpoints in the network endpoint group.",
@@ -53158,23 +53241,23 @@
       "type": "object"
     },
     "NetworkEndpointGroupServerlessDeployment": {
-      "description": "Configuration for a Serverless Deployment network endpoint group (NEG). The platform must be provided.\n\nNote: The target backend service must be in the same project and located in the same region as the Serverless NEG.",
+      "description": "Configuration for a serverless network endpoint group (NEG). The platform must be provided.\n\nNote: The target backend service must be in the same project and located in the same region as the Serverless NEG.",
       "id": "NetworkEndpointGroupServerlessDeployment",
       "properties": {
         "platform": {
-          "description": "The platform of the backend target(s) of this NEG. Possible values include:\n\n \n- apigateway.googleapis.com \n- appengine.googleapies.com \n- cloudfunctions.googleapis.com \n- run.googleapis.com",
+          "description": "The platform of the backend target(s) of this NEG. Possible values include:\n\n \n- API Gateway: apigateway.googleapis.com \n- App Engine: appengine.googleapis.com \n- Cloud Functions: cloudfunctions.googleapis.com \n- Cloud Run: run.googleapis.com",
           "type": "string"
         },
         "resource": {
-          "description": "The user-defined name of the workload/instance. This value must be provided explicitly or in the urlMask. The resource identified by this value is platform-specific and is as follows:\n\n \n- API Gateway: The gateway id \n- AppEngine: The service name \n- Cloud Functions: The function name \n- Cloud Run: The service name",
+          "description": "The user-defined name of the workload/instance. This value must be provided explicitly or in the urlMask. The resource identified by this value is platform-specific and is as follows:\n\n \n- API Gateway: The gateway ID \n- App Engine: The service name \n- Cloud Functions: The function name \n- Cloud Run: The service name",
           "type": "string"
         },
         "urlMask": {
-          "description": "A template to parse platform-specific fields from a request URL. URL mask allows for routing to multiple services on the same serverless platform without having to create multiple Network Endpoint Groups and backend services. The fields parsed by this template is platform-specific and are as follows:\n\n \n- API Gateway: The gateway id \n- AppEngine: The service and version \n- Cloud Functions: The function \n- Cloud Run: The service and tag",
+          "description": "A template to parse platform-specific fields from a request URL. URL mask allows for routing to multiple resources on the same serverless platform without having to create multiple Network Endpoint Groups and backend resources. The fields parsed by this template are platform-specific and are as follows:\n\n \n- API Gateway: The gateway ID \n- App Engine: The service and version \n- Cloud Functions: The function name \n- Cloud Run: The service and tag",
           "type": "string"
         },
         "version": {
-          "description": "The optional resource version. The version identified by this value is as platform-specific and is follows:\n\n \n- API Gateway: Unused \n- AppEngine: The service version \n- Cloud Functions: Unused \n- Cloud Run: The service tag",
+          "description": "The optional resource version. The version identified by this value is platform-specific and is follows:\n\n \n- API Gateway: Unused \n- App Engine: The service version \n- Cloud Functions: Unused \n- Cloud Run: The service tag",
           "type": "string"
         }
       },
@@ -56016,10 +56099,6 @@
           "description": "[Output Only] Type of the resource. Always `compute#operation` for Operation resources.",
           "type": "string"
         },
-        "metadata": {
-          "$ref": "Any",
-          "description": "[Output Only] Service-specific metadata attached to this operation."
-        },
         "name": {
           "description": "[Output Only] Name of the operation.",
           "type": "string"
@@ -58546,6 +58625,7 @@
             "COMMITTED_LICENSES",
             "COMMITTED_LOCAL_SSD_TOTAL_GB",
             "COMMITTED_MEMORY_OPTIMIZED_CPUS",
+            "COMMITTED_N2A_CPUS",
             "COMMITTED_N2D_CPUS",
             "COMMITTED_N2_CPUS",
             "COMMITTED_NVIDIA_A100_GPUS",
@@ -58591,6 +58671,7 @@
             "M1_CPUS",
             "M2_CPUS",
             "MACHINE_IMAGES",
+            "N2A_CPUS",
             "N2D_CPUS",
             "N2_CPUS",
             "NETWORKS",
@@ -58654,6 +58735,8 @@
             "XPN_SERVICE_PROJECTS"
           ],
           "enumDescriptions": [
+            "",
+            "",
             "",
             "",
             "",
@@ -61569,6 +61652,18 @@
           "format": "uint64",
           "type": "string"
         },
+        "ilbRouteBehaviorOnUnhealthy": {
+          "description": "ILB route behavior when ILB is deemed unhealthy based on user specified threshold on the Backend Service of the internal load balancing.",
+          "enum": [
+            "DO_NOT_WITHDRAW_ROUTE_IF_ILB_UNHEALTHY",
+            "WITHDRAW_ROUTE_IF_ILB_UNHEALTHY"
+          ],
+          "enumDescriptions": [
+            "",
+            ""
+          ],
+          "type": "string"
+        },
         "kind": {
           "default": "compute#route",
           "description": "[Output Only] Type of this resource. Always compute#routes for Route resources.",
@@ -62199,12 +62294,20 @@
           ],
           "type": "string"
         },
+        "enableIpv6": {
+          "description": "Enable IPv6 traffic over BGP Peer. If not specified, it is disabled by default.",
+          "type": "boolean"
+        },
         "interfaceName": {
           "description": "Name of the interface the BGP peer is associated with.",
           "type": "string"
         },
         "ipAddress": {
           "description": "IP address of the interface inside Google Cloud Platform. Only IPv4 is supported.",
+          "type": "string"
+        },
+        "ipv6NexthopAddress": {
+          "description": "IPv6 address of the interface inside Google Cloud Platform.",
           "type": "string"
         },
         "managementType": {
@@ -62241,6 +62344,10 @@
         },
         "peerIpAddress": {
           "description": "IP address of the BGP interface outside Google Cloud Platform. Only IPv4 is supported.",
+          "type": "string"
+        },
+        "peerIpv6NexthopAddress": {
+          "description": "IPv6 address of the BGP interface outside Google Cloud Platform.",
           "type": "string"
         },
         "routerApplianceInstance": {
@@ -62496,6 +62603,10 @@
           },
           "type": "array"
         },
+        "enableDynamicPortAllocation": {
+          "description": "Enable Dynamic Port Allocation.\nIf not specified, it is disabled by default.\nIf set to true, \n- Dynamic Port Allocation will be enabled on this NAT config. \n- enableEndpointIndependentMapping cannot be set to true. \n- If minPorts is set, minPortsPerVm must be set to a power of two greater than or equal to 32. If minPortsPerVm is not set, a minimum of 32 ports will be allocated to a VM from this NAT config.",
+          "type": "boolean"
+        },
         "enableEndpointIndependentMapping": {
           "type": "boolean"
         },
@@ -62507,6 +62618,11 @@
         "logConfig": {
           "$ref": "RouterNatLogConfig",
           "description": "Configure logging on this NAT."
+        },
+        "maxPortsPerVm": {
+          "description": "Maximum number of ports allocated to a VM from this NAT config when Dynamic Port Allocation is enabled.\nIf Dynamic Port Allocation is not enabled, this field has no effect.\nIf Dynamic Port Allocation is enabled, and this field is set, it must be set to a power of two greater than minPortsPerVm, or 64 if minPortsPerVm is not set.\nIf Dynamic Port Allocation is enabled and this field is not set, a maximum of 65536 ports will be allocated to a VM from this NAT config.",
+          "format": "int32",
+          "type": "integer"
         },
         "minPortsPerVm": {
           "description": "Minimum number of ports allocated to a VM from this NAT config. If not set, a default number of ports is allocated to a VM. This is rounded up to the nearest power of 2. For example, if the value of this field is 50, at least 64 ports are allocated to a VM.",
@@ -62625,7 +62741,7 @@
           "type": "string"
         },
         "match": {
-          "description": "CEL expression that specifies the match condition that egress traffic from a VM is evaluated against. If it evaluates to true, the corresponding ?action? is enforced.\n\nThe following examples are valid match expressions:\n\n\"inIpRange(destination.ip, '1.1.0.0/16') || inIpRange(destination.ip, '2.2.0.0/16')\"\n\n\"destination.ip == '1.1.0.1' || destination.ip == '8.8.8.8'\"",
+          "description": "CEL expression that specifies the match condition that egress traffic from a VM is evaluated against. If it evaluates to true, the corresponding `action` is enforced.\n\nThe following examples are valid match expressions:\n\n\"inIpRange(destination.ip, '1.1.0.0/16') || inIpRange(destination.ip, '2.2.0.0/16')\"\n\n\"destination.ip == '1.1.0.1' || destination.ip == '8.8.8.8'\"",
           "type": "string"
         },
         "ruleNumber": {
@@ -62740,8 +62856,16 @@
         "bfdStatus": {
           "$ref": "BfdStatus"
         },
+        "enableIpv6": {
+          "description": "Enable IPv6 traffic over BGP Peer. If not specified, it is disabled by default.",
+          "type": "boolean"
+        },
         "ipAddress": {
           "description": "IP address of the local BGP interface.",
+          "type": "string"
+        },
+        "ipv6NexthopAddress": {
+          "description": "IPv6 address of the local BGP interface.",
           "type": "string"
         },
         "linkedVpnTunnel": {
@@ -62759,6 +62883,10 @@
         },
         "peerIpAddress": {
           "description": "IP address of the remote BGP interface.",
+          "type": "string"
+        },
+        "peerIpv6NexthopAddress": {
+          "description": "IPv6 address of the remote BGP interface.",
           "type": "string"
         },
         "routerApplianceInstance": {
@@ -63297,12 +63425,12 @@
           "type": "string"
         },
         "maintenanceFreezeDurationHours": {
-          "description": "Specifies the number of hours after instance creation where the instance won't be scheduled for maintenance.",
+          "description": "Specifies the number of hours after VM instance creation where the VM won't be scheduled for maintenance.",
           "format": "int32",
           "type": "integer"
         },
         "maintenanceInterval": {
-          "description": "Specifies whether this VM may be a stable fleet VM. Setting this to \"Periodic\" designates this VM as a Stable Fleet VM.\n\nSee go/stable-fleet-ug for more details.",
+          "description": "For more information about maintenance intervals, see Setting maintenance intervals.",
           "enum": [
             "PERIODIC"
           ],
@@ -63798,7 +63926,7 @@
       "id": "SecurityPolicyRuleHttpHeaderAction",
       "properties": {
         "requestHeadersToAdds": {
-          "description": "The list of request headers to add or overwrite if they?re already present.",
+          "description": "The list of request headers to add or overwrite if they're already present.",
           "items": {
             "$ref": "SecurityPolicyRuleHttpHeaderActionHttpHeaderOption"
           },
@@ -64108,6 +64236,13 @@
       "description": "Represents a ServiceAttachment resource.\n\nA service attachment represents a service that a producer has exposed. It encapsulates the load balancer which fronts the service runs and a list of NAT IP ranges that the producers uses to represent the consumers connecting to the service. next tag = 19",
       "id": "ServiceAttachment",
       "properties": {
+        "connectedEndpoints": {
+          "description": "[Output Only] An array of connections for all the consumers connected to this service attachment.",
+          "items": {
+            "$ref": "ServiceAttachmentConnectedEndpoint"
+          },
+          "type": "array"
+        },
         "connectionPreference": {
           "description": "The connection preference of service attachment. The value can be set to ACCEPT_AUTOMATIC. An ACCEPT_AUTOMATIC service attachment is one that always accepts the connection from consumer forwarding rules.",
           "enum": [
@@ -64190,6 +64325,10 @@
         "producerForwardingRule": {
           "description": "The URL of a forwarding rule with loadBalancingScheme INTERNAL* that is serving the endpoint identified by this service attachment.",
           "type": "string"
+        },
+        "pscServiceAttachmentId": {
+          "$ref": "Uint128",
+          "description": "[Output Only] An 128-bit global unique ID of the PSC service attachment."
         },
         "region": {
           "description": "[Output Only] URL of the region where the service attachment resides. This field applies only to the region resource. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
@@ -64330,12 +64469,55 @@
       },
       "type": "object"
     },
+    "ServiceAttachmentConnectedEndpoint": {
+      "description": "[Output Only] A connection connected to this service attachment.",
+      "id": "ServiceAttachmentConnectedEndpoint",
+      "properties": {
+        "endpoint": {
+          "description": "The url of a connected endpoint.",
+          "type": "string"
+        },
+        "forwardingRule": {
+          "description": "The url of a consumer forwarding rule. [Deprecated] Do not use.",
+          "type": "string"
+        },
+        "pscConnectionId": {
+          "description": "The PSC connection id of the connected endpoint.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "status": {
+          "description": "The status of a connected endpoint to this service attachment.",
+          "enum": [
+            "ACCEPTED",
+            "CLOSED",
+            "PENDING",
+            "REJECTED",
+            "STATUS_UNSPECIFIED"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ServiceAttachmentConsumerForwardingRule": {
       "description": "[Output Only] A consumer forwarding rule connected to this service attachment. [Deprecated] Do not use.",
       "id": "ServiceAttachmentConsumerForwardingRule",
       "properties": {
         "forwardingRule": {
           "description": "The url of a consumer forwarding rule.",
+          "type": "string"
+        },
+        "pscConnectionId": {
+          "description": "The PSC connection id of the PSC Forwarding Rule.",
+          "format": "uint64",
           "type": "string"
         },
         "status": {
@@ -66229,7 +66411,7 @@
           "type": "string"
         },
         "state": {
-          "description": "[Output Only] The state of the subnetwork, which can be one of the following values: READY: Subnetwork is created and ready to use DRAINING: only applicable to subnetworks that have the purpose set to INTERNAL_HTTPS_LOAD_BALANCER and indicates that connections to the load balancer are being drained. A subnetwork that is draining cannot be used or modified until it reaches a status of READY CREATING: Subnetwork is provisioning DELETING: Subnetwork is being deleted UPDATING: Subnetwork is being updated",
+          "description": "[Output Only] The state of the subnetwork, which can be one of the following values: READY: Subnetwork is created and ready to use DRAINING: only applicable to subnetworks that have the purpose set to INTERNAL_HTTPS_LOAD_BALANCER and indicates that connections to the load balancer are being drained. A subnetwork that is draining cannot be used or modified until it reaches a status of READY",
           "enum": [
             "DRAINING",
             "READY"
@@ -66684,7 +66866,7 @@
       "type": "object"
     },
     "Subsetting": {
-      "description": "Subsetting options to make L4 ILB support any number of backend instances",
+      "description": "Subsetting configuration for this BackendService. Currently this is applicable only for Internal TCP/UDP load balancing and Internal HTTP(S) load balancing.",
       "id": "Subsetting",
       "properties": {
         "policy": {
@@ -69767,6 +69949,20 @@
         },
         "response": {
           "description": "The bytes to match against the beginning of the response data. It is an error if this is empty. The response data can only be ASCII.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Uint128": {
+      "id": "Uint128",
+      "properties": {
+        "high": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "low": {
+          "format": "uint64",
           "type": "string"
         }
       },

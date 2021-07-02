@@ -29,7 +29,7 @@
   "description": "Creates and runs virtual machines on Google Cloud Platform.",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/compute/docs/reference/latest/",
-  "etag": "\"uWj2hSb4GVjzdDlAnRd2gbM1ZQ8/8NH5VUhg7eH5yLGqaLx2Dvdhj6E\"",
+  "etag": "\"uWj2hSb4GVjzdDlAnRd2gbM1ZQ8/OBbPSt4nx2XCXJ7QcTCU0NHp-eI\"",
   "icons": {
     "x16": "https://www.google.com/images/icons/product/compute_engine-16.png",
     "x32": "https://www.google.com/images/icons/product/compute_engine-32.png"
@@ -25257,6 +25257,53 @@
             "https://www.googleapis.com/auth/compute.readonly"
           ]
         },
+        "patch": {
+          "description": "Patches the specified ServiceAttachment resource with the data included in the request. This method supports PATCH semantics and uses JSON merge patch format and processing rules.",
+          "httpMethod": "PATCH",
+          "id": "compute.serviceAttachments.patch",
+          "parameterOrder": [
+            "project",
+            "region",
+            "serviceAttachment"
+          ],
+          "parameters": {
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "region": {
+              "description": "The region scoping this request and should conform to RFC1035.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            },
+            "serviceAttachment": {
+              "description": "The resource id of the ServiceAttachment to patch. It should conform to RFC1035 resource name or be a string form on an unsigned long number.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "projects/{project}/regions/{region}/serviceAttachments/{serviceAttachment}",
+          "request": {
+            "$ref": "ServiceAttachment"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
         "setIamPolicy": {
           "description": "Sets the access control policy on the specified resource. Replaces any existing policy.",
           "httpMethod": "POST",
@@ -31177,7 +31224,7 @@
       }
     }
   },
-  "revision": "20210322",
+  "revision": "20210415",
   "rootUrl": "https://compute.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -32130,6 +32177,11 @@
         "enableNestedVirtualization": {
           "description": "Whether to enable nested virtualization or not (default is false).",
           "type": "boolean"
+        },
+        "threadsPerCore": {
+          "description": "The number of threads per physical core. To disable simultaneous multithreading (SMT) set this to 1. If unset, the maximum number of threads supported per core by the underlying processor is assumed.",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -32196,6 +32248,21 @@
         },
         "machineType": {
           "description": "Specifies type of machine (name only) which has fixed number of vCPUs and fixed amount of memory. This also includes specifying custom machine type following custom-NUMBER_OF_CPUS-AMOUNT_OF_MEMORY pattern.",
+          "type": "string"
+        },
+        "maintenanceFreezeDurationHours": {
+          "description": "Specifies the number of hours after reservation creation where instances using the reservation won't be scheduled for maintenance.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "maintenanceInterval": {
+          "description": "For more information about maintenance intervals, see Setting maintenance intervals.",
+          "enum": [
+            "PERIODIC"
+          ],
+          "enumDescriptions": [
+            ""
+          ],
           "type": "string"
         },
         "minCpuPlatform": {
@@ -32500,7 +32567,7 @@
       "properties": {
         "autoscalingPolicy": {
           "$ref": "AutoscalingPolicy",
-          "description": "The configuration parameters for the autoscaling algorithm. You can define one or more of the policies for an autoscaler: cpuUtilization, customMetricUtilizations, and loadBalancingUtilization.\n\nIf none of these are specified, the default will be to autoscale based on cpuUtilization to 0.6 or 60%."
+          "description": "The configuration parameters for the autoscaling algorithm. You can define one or more signals for an autoscaler: cpuUtilization, customMetricUtilizations, and loadBalancingUtilization.\n\nIf none of these are specified, the default will be to autoscale based on cpuUtilization to 0.6 or 60%."
         },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
@@ -33323,6 +33390,10 @@
           },
           "type": "array"
         },
+        "cacheKeyPolicy": {
+          "$ref": "BackendBucketCdnPolicyCacheKeyPolicy",
+          "description": "The CacheKeyPolicy for this CdnPolicy."
+        },
         "cacheMode": {
           "description": "Specifies the cache setting for all responses from this backend. The possible values are:\n\nUSE_ORIGIN_HEADERS Requires the origin to set valid caching headers to cache content. Responses without these headers will not be cached at Google's edge, and will require a full trip to the origin on every request, potentially impacting performance and increasing load on the origin server.\n\nFORCE_CACHE_ALL Cache all content, ignoring any \"private\", \"no-store\" or \"no-cache\" directives in Cache-Control response headers. Warning: this may result in Cloud CDN caching private, per-user (user identifiable) content.\n\nCACHE_ALL_STATIC Automatically cache static content, including common image formats, media (video and audio), and web assets (JavaScript and CSS). Requests and responses that are marked as uncacheable, as well as dynamic content (including HTML), will not be cached.",
           "enum": [
@@ -33396,6 +33467,27 @@
         "headerName": {
           "description": "The header field name to match on when bypassing cache. Values are case-insensitive.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BackendBucketCdnPolicyCacheKeyPolicy": {
+      "description": "Message containing what to include in the cache key for a request for Cloud CDN.",
+      "id": "BackendBucketCdnPolicyCacheKeyPolicy",
+      "properties": {
+        "includeHttpHeaders": {
+          "description": "Allows HTTP request headers (by name) to be used in the cache key.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "queryStringWhitelist": {
+          "description": "Names of query string parameters to include in cache keys. All other parameters will be excluded. '\u0026' and '=' will be percent encoded and not treated as delimiters.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -34686,6 +34778,20 @@
         "includeHost": {
           "description": "If true, requests to different hosts will be cached separately.",
           "type": "boolean"
+        },
+        "includeHttpHeaders": {
+          "description": "Allows HTTP request headers (by name) to be used in the cache key.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includeNamedCookies": {
+          "description": "Allows HTTP cookies (by name) to be used in the cache key. The name=value pair will be used in the cache key Cloud CDN generates.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "includeProtocol": {
           "description": "If true, http and https requests will be cached separately.",
@@ -37611,13 +37717,6 @@
           },
           "type": "array"
         },
-        "targetSecureLabels": {
-          "description": "A list of secure labels that controls which instances the firewall rule applies to. If targetSecureLabel are specified, then the firewall rule applies only to instances in the VPC network that have one of those secure labels. targetSecureLabel may not be set at the same time as targetServiceAccounts. If neither targetServiceAccounts nor targetSecureLabel are specified, the firewall rule applies to all instances on the specified network. Maximum number of target label values allowed is 256.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "targetServiceAccounts": {
           "description": "A list of service accounts indicating the sets of instances that are applied with this rule.",
           "items": {
@@ -37648,13 +37747,6 @@
         },
         "srcIpRanges": {
           "description": "CIDR IP address range. Maximum number of source CIDR IP ranges allowed is 256.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "srcSecureLabels": {
-          "description": "List of firewall label values, which should be matched at the source of the traffic. Maximum number of source label values allowed is 256.",
           "items": {
             "type": "string"
           },
@@ -43843,7 +43935,7 @@
           "type": "string"
         },
         "ipsecInternalAddresses": {
-          "description": "URL of addresses that have been reserved for the interconnect attachment, Used only for interconnect attachment that has the encryption option as IPSEC. The addresses must be RFC 1918 IP address ranges. When creating HA VPN gateway over the interconnect attachment, if the attachment is configured to use an RFC 1918 IP address, then the VPN gateway?s IP address will be allocated from the IP address range specified here. For example, if the HA VPN gateway?s interface 0 is paired to this interconnect attachment, then an RFC 1918 IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this interconnect attachment. If this field is not specified for interconnect attachment that has encryption option as IPSEC, later on when creating HA VPN gateway on this interconnect attachment, the HA VPN gateway's IP address will be allocated from regional external IP address pool.\nNot currently available in all Interconnect locations.",
+          "description": "URL of addresses that have been reserved for the interconnect attachment, Used only for interconnect attachment that has the encryption option as IPSEC. The addresses must be RFC 1918 IP address ranges. When creating HA VPN gateway over the interconnect attachment, if the attachment is configured to use an RFC 1918 IP address, then the VPN gateway's IP address will be allocated from the IP address range specified here. For example, if the HA VPN gateway's interface 0 is paired to this interconnect attachment, then an RFC 1918 IP address for the VPN gateway interface 0 will be allocated from the IP address specified for this interconnect attachment. If this field is not specified for interconnect attachment that has encryption option as IPSEC, later on when creating HA VPN gateway on this interconnect attachment, the HA VPN gateway's IP address will be allocated from regional external IP address pool.\nNot currently available in all Interconnect locations.",
           "items": {
             "type": "string"
           },
@@ -51556,6 +51648,7 @@
             "COMMITTED_LICENSES",
             "COMMITTED_LOCAL_SSD_TOTAL_GB",
             "COMMITTED_MEMORY_OPTIMIZED_CPUS",
+            "COMMITTED_N2A_CPUS",
             "COMMITTED_N2D_CPUS",
             "COMMITTED_N2_CPUS",
             "COMMITTED_NVIDIA_A100_GPUS",
@@ -51595,6 +51688,7 @@
             "M1_CPUS",
             "M2_CPUS",
             "MACHINE_IMAGES",
+            "N2A_CPUS",
             "N2D_CPUS",
             "N2_CPUS",
             "NETWORKS",
@@ -51656,6 +51750,8 @@
             "XPN_SERVICE_PROJECTS"
           ],
           "enumDescriptions": [
+            "",
+            "",
             "",
             "",
             "",
@@ -55850,6 +55946,21 @@
           "description": "An opaque location hint used to place the instance close to other resources. This field is for use by internal tools that use the public API.",
           "type": "string"
         },
+        "maintenanceFreezeDurationHours": {
+          "description": "Specifies the number of hours after VM instance creation where the VM won't be scheduled for maintenance.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "maintenanceInterval": {
+          "description": "For more information about maintenance intervals, see Setting maintenance intervals.",
+          "enum": [
+            "PERIODIC"
+          ],
+          "enumDescriptions": [
+            ""
+          ],
+          "type": "string"
+        },
         "minNodeCpus": {
           "description": "The minimum number of virtual CPUs this instance will consume when running on a sole-tenant node.",
           "format": "int32",
@@ -56458,22 +56569,45 @@
       "description": "Represents a ServiceAttachment resource.\n\nA service attachment represents a service that a producer has exposed. It encapsulates the load balancer which fronts the service runs and a list of NAT IP ranges that the producers uses to represent the consumers connecting to the service. next tag = 19",
       "id": "ServiceAttachment",
       "properties": {
+        "connectedEndpoints": {
+          "description": "[Output Only] An array of connections for all the consumers connected to this service attachment.",
+          "items": {
+            "$ref": "ServiceAttachmentConnectedEndpoint"
+          },
+          "type": "array"
+        },
         "connectionPreference": {
           "description": "The connection preference of service attachment. The value can be set to ACCEPT_AUTOMATIC. An ACCEPT_AUTOMATIC service attachment is one that always accepts the connection from consumer forwarding rules.",
           "enum": [
             "ACCEPT_AUTOMATIC",
+            "ACCEPT_MANUAL",
             "CONNECTION_PREFERENCE_UNSPECIFIED"
           ],
           "enumDescriptions": [
+            "",
             "",
             ""
           ],
           "type": "string"
         },
+        "consumerAcceptLists": {
+          "description": "Projects that are allowed to connect to this service attachment.",
+          "items": {
+            "$ref": "ServiceAttachmentConsumerProjectLimit"
+          },
+          "type": "array"
+        },
         "consumerForwardingRules": {
           "description": "[Output Only] An array of forwarding rules for all the consumers connected to this service attachment.",
           "items": {
             "$ref": "ServiceAttachmentConsumerForwardingRule"
+          },
+          "type": "array"
+        },
+        "consumerRejectLists": {
+          "description": "Projects that are not allowed to connect to this service attachment. The project can be specified using its id or number.",
+          "items": {
+            "type": "string"
           },
           "type": "array"
         },
@@ -56488,6 +56622,11 @@
         "enableProxyProtocol": {
           "description": "If true, enable the proxy protocol which is for supplying client TCP/IP address data in TCP connections that traverse proxies on their way to destination servers.",
           "type": "boolean"
+        },
+        "fingerprint": {
+          "description": "Fingerprint of this resource. A hash of the contents stored in this object. This field is used in optimistic locking. This field will be ignored when inserting a ServiceAttachment. An up-to-date fingerprint must be provided in order to patch/update the ServiceAttachment; otherwise, the request will fail with error 412 conditionNotMet. To see the latest fingerprint, make a get() request to retrieve the ServiceAttachment.",
+          "format": "byte",
+          "type": "string"
         },
         "id": {
           "description": "[Output Only] The unique identifier for the resource type. The server generates this identifier.",
@@ -56519,6 +56658,10 @@
         "producerForwardingRule": {
           "description": "The URL of a forwarding rule with loadBalancingScheme INTERNAL* that is serving the endpoint identified by this service attachment.",
           "type": "string"
+        },
+        "pscServiceAttachmentId": {
+          "$ref": "Uint128",
+          "description": "[Output Only] An 128-bit global unique ID of the PSC service attachment."
         },
         "region": {
           "description": "[Output Only] URL of the region where the service attachment resides. This field applies only to the region resource. You must specify this field as part of the HTTP request URL. It is not settable as a field in the request body.",
@@ -56659,12 +56802,55 @@
       },
       "type": "object"
     },
+    "ServiceAttachmentConnectedEndpoint": {
+      "description": "[Output Only] A connection connected to this service attachment.",
+      "id": "ServiceAttachmentConnectedEndpoint",
+      "properties": {
+        "endpoint": {
+          "description": "The url of a connected endpoint.",
+          "type": "string"
+        },
+        "forwardingRule": {
+          "description": "The url of a consumer forwarding rule. [Deprecated] Do not use.",
+          "type": "string"
+        },
+        "pscConnectionId": {
+          "description": "The PSC connection id of the connected endpoint.",
+          "format": "uint64",
+          "type": "string"
+        },
+        "status": {
+          "description": "The status of a connected endpoint to this service attachment.",
+          "enum": [
+            "ACCEPTED",
+            "CLOSED",
+            "PENDING",
+            "REJECTED",
+            "STATUS_UNSPECIFIED"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ServiceAttachmentConsumerForwardingRule": {
       "description": "[Output Only] A consumer forwarding rule connected to this service attachment. [Deprecated] Do not use.",
       "id": "ServiceAttachmentConsumerForwardingRule",
       "properties": {
         "forwardingRule": {
           "description": "The url of a consumer forwarding rule.",
+          "type": "string"
+        },
+        "pscConnectionId": {
+          "description": "The PSC connection id of the PSC Forwarding Rule.",
+          "format": "uint64",
           "type": "string"
         },
         "status": {
@@ -56683,6 +56869,21 @@
             "",
             ""
           ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ServiceAttachmentConsumerProjectLimit": {
+      "id": "ServiceAttachmentConsumerProjectLimit",
+      "properties": {
+        "connectionLimit": {
+          "description": "The value of the limit to set.",
+          "format": "uint32",
+          "type": "integer"
+        },
+        "projectIdOrNum": {
+          "description": "The project id or number for the project to set the limit for.",
           "type": "string"
         }
       },
@@ -58394,7 +58595,7 @@
           "type": "string"
         },
         "state": {
-          "description": "[Output Only] The state of the subnetwork, which can be one of the following values: READY: Subnetwork is created and ready to use DRAINING: only applicable to subnetworks that have the purpose set to INTERNAL_HTTPS_LOAD_BALANCER and indicates that connections to the load balancer are being drained. A subnetwork that is draining cannot be used or modified until it reaches a status of READY CREATING: Subnetwork is provisioning DELETING: Subnetwork is being deleted UPDATING: Subnetwork is being updated",
+          "description": "[Output Only] The state of the subnetwork, which can be one of the following values: READY: Subnetwork is created and ready to use DRAINING: only applicable to subnetworks that have the purpose set to INTERNAL_HTTPS_LOAD_BALANCER and indicates that connections to the load balancer are being drained. A subnetwork that is draining cannot be used or modified until it reaches a status of READY",
           "enum": [
             "DRAINING",
             "READY"
@@ -58841,7 +59042,7 @@
       "type": "object"
     },
     "Subsetting": {
-      "description": "Subsetting options to make L4 ILB support any number of backend instances",
+      "description": "Subsetting configuration for this BackendService. Currently this is applicable only for Internal TCP/UDP load balancing and Internal HTTP(S) load balancing.",
       "id": "Subsetting",
       "properties": {
         "policy": {
@@ -61770,6 +61971,20 @@
             "type": "string"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Uint128": {
+      "id": "Uint128",
+      "properties": {
+        "high": {
+          "format": "uint64",
+          "type": "string"
+        },
+        "low": {
+          "format": "uint64",
+          "type": "string"
         }
       },
       "type": "object"

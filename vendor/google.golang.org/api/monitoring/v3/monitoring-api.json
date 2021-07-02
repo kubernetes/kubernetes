@@ -2541,7 +2541,7 @@
       }
     }
   },
-  "revision": "20210326",
+  "revision": "20210427",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -3005,8 +3005,8 @@
             "No content matcher type specified (maintained for backward compatibility, but deprecated for future use). Treated as CONTAINS_STRING.",
             "Selects substring matching. The match succeeds if the output contains the content string. This is the default value for checks without a matcher option, or where the value of matcher is CONTENT_MATCHER_OPTION_UNSPECIFIED.",
             "Selects negation of substring matching. The match succeeds if the output does NOT contain the content string.",
-            "Selects regular-expression matching. The match succeeds of the output matches the regular expression specified in the content string.",
-            "Selects negation of regular-expression matching. The match succeeds if the output does NOT match the regular expression specified in the content string."
+            "Selects regular-expression matching. The match succeeds of the output matches the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks.",
+            "Selects negation of regular-expression matching. The match succeeds if the output does NOT match the regular expression specified in the content string. Regex matching is only supported for HTTP/HTTPS checks."
           ],
           "type": "string"
         }
@@ -4764,7 +4764,7 @@
       "type": "object"
     },
     "SpanContext": {
-      "description": "The context of a span, attached to Exemplars in Distribution values during aggregation.It contains the name of a span with format: projects/[PROJECT_ID_OR_NUMBER]/traces/[TRACE_ID]/spans/[SPAN_ID] ",
+      "description": "The context of a span. This is attached to an Exemplar in Distribution values during aggregation.It contains the name of a span with format: projects/[PROJECT_ID_OR_NUMBER]/traces/[TRACE_ID]/spans/[SPAN_ID] ",
       "id": "SpanContext",
       "properties": {
         "spanName": {

@@ -793,6 +793,27 @@ func (g *Cloud) HasClusterID() bool {
 	return true
 }
 
+// GetBasePath returns the compute API endpoint with the `projects/` element
+// compute API v0.36 changed basepath and dropped the `projects/` suffix, therefore suffix
+// must be added back when generating compute resource urls.
+func (g *Cloud) GetBasePath() string {
+	basePath := g.ComputeServices().GA.BasePath
+	return GetProjectBasePath(basePath)
+}
+
+func GetProjectBasePath(basePath string) string {
+	if !strings.HasSuffix(basePath, "/") {
+		basePath += "/"
+	}
+	// Trim  the trailing /, so that split will not consider the last element as empty
+	elements := strings.Split(strings.TrimSuffix(basePath, "/"), "/")
+
+	if elements[len(elements)-1] != "projects" {
+		return fmt.Sprintf("%sprojects/", basePath)
+	}
+	return basePath
+}
+
 // Project IDs cannot have a digit for the first characeter. If the id contains a digit,
 // then it must be a project number.
 func isProjectNumber(idOrNumber string) bool {

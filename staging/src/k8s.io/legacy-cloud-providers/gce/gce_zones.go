@@ -90,5 +90,5 @@ func (g *Cloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 }
 
 func (g *Cloud) getRegionLink(region string) string {
-	return g.service.BasePath + strings.Join([]string{g.projectID, "regions", region}, "/")
+	return g.GetBasePath() + strings.Join([]string{g.projectID, "regions", region}, "/")
 }
