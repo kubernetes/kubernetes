@@ -33,6 +33,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -203,7 +204,7 @@ func ValidateDiscoveryKubeConfigPath(discoveryFile string, fldPath *field.Path) 
 }
 
 // ValidateBootstrapTokens validates a slice of BootstrapToken objects
-func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) field.ErrorList {
+func ValidateBootstrapTokens(bts []bootstraptokenv1.BootstrapToken, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, bt := range bts {
 		btPath := fldPath.Child(fmt.Sprintf("%d", i))
