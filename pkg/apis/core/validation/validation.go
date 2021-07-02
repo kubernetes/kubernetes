@@ -309,7 +309,7 @@ func ValidateSecretReference(secretRef *core.SecretReference, fldPath *field.Pat
 func ValidateSecretObjectReference(secretRef *core.ObjectReference, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if secretRef.Kind != "Secret" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), secretRef.Kind, "kind should be a secret"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), secretRef.Kind, "kind should be Secret"))
 	} else {
 		if len(secretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
