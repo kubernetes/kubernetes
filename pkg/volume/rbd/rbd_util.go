@@ -22,6 +22,7 @@ limitations under the License.
 package rbd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -56,6 +57,7 @@ const (
 	rbdImageWatcherFactor    = 1.4
 	rbdImageWatcherSteps     = 10
 	rbdImageSizeUnitMiB      = 1024 * 1024
+	rbdTimeout               = 60 * time.Second
 )
 
 // A struct contains rbd image info.
@@ -228,12 +230,31 @@ func execRbdMap(b rbdMounter, rbdCmd string, mon string) ([]byte, error) {
 	// Commandline: rbdCmd map imgPath ...
 	// do not change this format - some tools like rbd-nbd are strict about it.
 	imgPath := fmt.Sprintf("%s/%s", b.Pool, b.Image)
+	ctx, canclefn := context.WithTimeout(context.Background(), rbdTimeout)
+	defer canclefn()
 	if b.Secret != "" {
-		return b.exec.Command(rbdCmd,
+		return b.exec.CommandContext(ctx, rbdCmd,
 			"map", imgPath, "--id", b.ID, "-m", mon, "--key="+b.Secret).CombinedOutput()
 	}
-	return b.exec.Command(rbdCmd,
+	return b.exec.CommandContext(ctx, rbdCmd,
 		"map", imgPath, "--id", b.ID, "-m", mon, "-k", b.Keyring).CombinedOutput()
+}
+
+// Execute command to unmap a rbd device for mounter.
+func execRbdUnmap(exec utilexec.Interface, device string) ([]byte, error) {
+	// Commandline: rbdCmd unmap device ...
+	// do not change this format - some tools like rbd-nbd are strict about it.
+	var rbdCmd string
+	ctx, canclefn := context.WithTimeout(context.Background(), rbdTimeout)
+	defer canclefn()
+	// Unlike map, we cannot fallthrough for unmap
+	// the tool to unmap is based on device type
+	if strings.HasPrefix(device, "/dev/nbd") {
+		rbdCmd = "rbd-nbd"
+	} else {
+		rbdCmd = "rbd"
+	}
+	return exec.CommandContext(ctx, rbdCmd, "unmap", device).CombinedOutput()
 }
 
 // Check if rbd-nbd tools are installed.
@@ -442,6 +463,14 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 		output, err = execRbdMap(b, "rbd", mon)
 		if err != nil {
 			if !nbdToolsFound {
+				// try unmap image if map failed
+				devicePath, mapped = waitForPath(b.Pool, b.Image, 10 /*maxRetries*/, false /*useNbdDrive*/)
+				if mapped {
+					_, unerr := execRbdUnmap(b.exec, devicePath)
+					if unerr != nil {
+						return "", fmt.Errorf("rbd: unmap failed %v after map failed: %v, map output: %s", unerr, err, string(output))
+					}
+				}
 				klog.V(1).Infof("rbd: map error %v, rbd output: %s", err, string(output))
 				return "", fmt.Errorf("rbd: map failed %v, rbd output: %s", err, string(output))
 			}
@@ -474,19 +503,8 @@ func (util *rbdUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
-
-	var rbdCmd string
-
-	// Unlike map, we cannot fallthrough for unmap
-	// the tool to unmap is based on device type
-	if strings.HasPrefix(device, "/dev/nbd") {
-		rbdCmd = "rbd-nbd"
-	} else {
-		rbdCmd = "rbd"
-	}
-
 	// rbd unmap
-	output, err := exec.Command(rbdCmd, "unmap", device).CombinedOutput()
+	output, err := execRbdUnmap(exec, device)
 	if err != nil {
 		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %s", device, err, string(output)))
 	}
