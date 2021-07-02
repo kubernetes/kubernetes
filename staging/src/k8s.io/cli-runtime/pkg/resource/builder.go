@@ -39,7 +39,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
@@ -261,6 +262,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 				b.errs = append(b.errs, fmt.Errorf("file pattern %v is not valid: %v", s, err))
 				continue
 			}
+			klog.V(4).Infof("Processing path %q, matched with %q", s, matches)
 			if !recursive && len(matches) == 1 {
 				b.singleItemImplied = true
 			}
