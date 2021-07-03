@@ -69,7 +69,7 @@ type InitConfiguration struct {
 
 	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
 	// either via "kubeadm init" or "kubeadm join"
-	Timeouts InitTimeouts `json:"timeout,omitempty"`
+	Timeouts *InitTimeouts `json:"timeout,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
