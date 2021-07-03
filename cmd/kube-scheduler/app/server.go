@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -79,6 +80,15 @@ kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// Due to the default values may be changed by the feature gates,
+			// we need to update the ComponentConfig after the CLI flags are
+			// parsed.
+			cfg, err := latest.Default()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+			opts.ComponentConfig = *cfg
 			if err := runCommand(cmd, opts, registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
