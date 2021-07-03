@@ -1775,7 +1775,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 				defer cleanup()
 
-				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, false, false, false, false, false, true)
+				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
 					framework.Failf("Error creating metrics grabber : %v", err)
 				}

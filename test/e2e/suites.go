@@ -22,6 +22,7 @@ import (
 	"path"
 	"time"
 
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
@@ -55,13 +56,17 @@ func AfterSuiteActions() {
 
 func gatherTestSuiteMetrics() error {
 	framework.Logf("Gathering metrics")
-	c, err := framework.LoadClientset()
+	config, err := framework.LoadConfig()
 	if err != nil {
-		return fmt.Errorf("error loading client: %v", err)
+		return fmt.Errorf("error loading client config: %v", err)
+	}
+	c, err := clientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}
