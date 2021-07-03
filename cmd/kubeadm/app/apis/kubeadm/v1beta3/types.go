@@ -204,7 +204,6 @@ type APIEndpoint struct {
 // InitTimeouts holds timeout fields that relate to registering a new control-planeto the cluster,
 // via "kubeadm init"
 type InitTimeouts struct {
-
 	// ApiServerHealthCheck controls the timeout that we use for API server to appear
 	// +optional
 	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
