@@ -4733,6 +4733,399 @@ func TestCreateInitIPFields(t *testing.T) {
 	}
 }
 
+func TestCreateInitNodePorts(t *testing.T) {
+	testCases := []struct {
+		name                         string
+		svc                          *api.Service
+		expectError                  bool
+		expectNodePorts              bool
+		gateMixedProtocolLBService   bool
+		gateServiceLBNodePortControl bool
+	}{{
+		name:            "type:ExternalName",
+		svc:             svctest.MakeService("foo"),
+		expectNodePorts: false,
+	}, {
+		name: "type:ExternalName_with_NodePorts",
+		svc: svctest.MakeService("foo",
+			svctest.SetUniqueNodePorts),
+		expectError: true,
+	}, {
+		name:            "type:ClusterIP",
+		svc:             svctest.MakeService("foo"),
+		expectNodePorts: false,
+	}, {
+		name: "type:ClusterIP_with_NodePorts",
+		svc: svctest.MakeService("foo",
+			svctest.SetUniqueNodePorts),
+		expectError: true,
+	}, {
+		name: "type:NodePort_single_port_unspecified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_single_port_specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort, svctest.SetUniqueNodePorts),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_unspecified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetUniqueNodePorts),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_same",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetNodePorts(30080, 30080)),
+		expectError: true,
+	}, {
+		name: "type:NodePort_multiport_multiproto_unspecified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_multiproto_specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetUniqueNodePorts),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_multiproto_same",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetNodePorts(30053, 30053)),
+		expectNodePorts: true,
+	}, {
+		name: "type:NodePort_multiport_multiproto_conflict",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 93, intstr.FromInt(93), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt(76), api.ProtocolUDP)),
+			svctest.SetNodePorts(30093, 30093)),
+		expectError: true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_single_port_unspecified_gateServiceLBNodePortControl:off_alloc:nil",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_single_port_unspecified_gateServiceLBNodePortControl:off_alloc:false",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_single_port_unspecified_gateServiceLBNodePortControl:off_alloc:true",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_single_port_specified_gateServiceLBNodePortControl:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer, svctest.SetUniqueNodePorts),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_multiport_unspecified_gateServiceLBNodePortControl:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		// When the ServiceLBNodePortControl gate is locked, this can be removed.
+		name: "type:LoadBalancer_multiport_specified_gateServiceLBNodePortControl:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetUniqueNodePorts),
+		gateServiceLBNodePortControl: false,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_single_port_unspecified_gateServiceLBNodePortControl:on_alloc:false",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              false,
+	}, {
+		name: "type:LoadBalancer_single_port_unspecified_gateServiceLBNodePortControl:on_alloc:true",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_single_port_specified_gateServiceLBNodePortControl:on_alloc:false",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetUniqueNodePorts,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_single_port_specified_gateServiceLBNodePortControl:on_alloc:true",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetUniqueNodePorts,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_multiport_unspecified_gateServiceLBNodePortControl:on_alloc:false",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              false,
+	}, {
+		name: "type:LoadBalancer_multiport_unspecified_gateServiceLBNodePortControl:on_alloc:true",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_multiport_specified_gateServiceLBNodePortControl:on_alloc:false",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetUniqueNodePorts,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_multiport_specified_gateServiceLBNodePortControl:on_alloc:true",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetUniqueNodePorts,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		gateServiceLBNodePortControl: true,
+		expectNodePorts:              true,
+	}, {
+		name: "type:LoadBalancer_multiport_same",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetNodePorts(30080, 30080)),
+		expectError: true,
+	}, {
+		// When the MixedProtocolLBService gate is locked, this can be removed.
+		name: "type:LoadBalancer_multiport_multiproto_unspecified_MixedProtocolLBService:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+		gateMixedProtocolLBService: false,
+		expectError:                true,
+	}, {
+		// When the MixedProtocolLBService gate is locked, this can be removed.
+		name: "type:LoadBalancer_multiport_multiproto_specified_MixedProtocolLBService:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetUniqueNodePorts),
+		gateMixedProtocolLBService: false,
+		expectError:                true,
+	}, {
+		// When the MixedProtocolLBService gate is locked, this can be removed.
+		name: "type:LoadBalancer_multiport_multiproto_same_MixedProtocolLBService:off",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetNodePorts(30053, 30053)),
+		gateMixedProtocolLBService: false,
+		expectError:                true,
+	}, {
+		name: "type:LoadBalancer_multiport_multiproto_unspecified_MixedProtocolLBService:on",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+		gateMixedProtocolLBService: true,
+		expectNodePorts:            true,
+	}, {
+		name: "type:LoadBalancer_multiport_multiproto_specified_MixedProtocolLBService:on",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetUniqueNodePorts),
+		gateMixedProtocolLBService: true,
+		expectNodePorts:            true,
+	}, {
+		name: "type:LoadBalancer_multiport_multiproto_same_MixedProtocolLBService:on",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+			svctest.SetNodePorts(30053, 30053)),
+		gateMixedProtocolLBService: true,
+		expectNodePorts:            true,
+	}, {
+		name: "type:LoadBalancer_multiport_multiproto_conflict",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 93, intstr.FromInt(93), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt(76), api.ProtocolUDP)),
+			svctest.SetNodePorts(30093, 30093)),
+		expectError: true,
+	}}
+
+	// Do this in the outer scope for performance.
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, tc.gateServiceLBNodePortControl)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.gateMixedProtocolLBService)()
+
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tc.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			defer storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if tc.expectError && err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			createdSvc := createdObj.(*api.Service)
+			//FIXME: HACK!!  Delete above calls "inner" which doesn't
+			// yet call the allocators - no release = alloc errors!
+			defer func() {
+				for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
+					for _, ip := range createdSvc.Spec.ClusterIPs {
+						al.Release(netutils.ParseIPSloppy(ip))
+					}
+				}
+				for _, p := range createdSvc.Spec.Ports {
+					storage.alloc.serviceNodePorts.Release(int(p.NodePort))
+				}
+			}()
+
+			// Produce a map of port index to nodeport value, excluding zero.
+			ports := map[int]*api.ServicePort{}
+			for i := range createdSvc.Spec.Ports {
+				p := &createdSvc.Spec.Ports[i]
+				if p.NodePort != 0 {
+					ports[i] = p
+				}
+			}
+
+			if tc.expectNodePorts && len(ports) == 0 {
+				t.Fatalf("expected NodePorts to be allocated, found none")
+			}
+			if !tc.expectNodePorts && len(ports) > 0 {
+				t.Fatalf("expected NodePorts to not be allocated, found %v", ports)
+			}
+			if !tc.expectNodePorts {
+				return
+			}
+
+			// Make sure we got the right number of allocations
+			if want, got := len(ports), len(tc.svc.Spec.Ports); want != got {
+				t.Fatalf("expected %d NodePorts, found %d", want, got)
+			}
+
+			// Make sure they are all allocated
+			for _, p := range ports {
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to be allocated: %v", p)
+				}
+			}
+
+			// Make sure we got any specific allocations
+			for i, p := range tc.svc.Spec.Ports {
+				if p.NodePort != 0 {
+					if ports[i].NodePort != p.NodePort {
+						t.Errorf("expected Ports[%d].NodePort to be %d, got %d", i, p.NodePort, ports[i].NodePort)
+					}
+					// Remove requested ports from the set
+					delete(ports, i)
+				}
+			}
+
+			// Make sure any allocated ports are unique
+			seen := map[int32]int32{}
+			for i, p := range ports {
+				// We allow the same NodePort for different protocols of the
+				// same Port.
+				if prev, found := seen[p.NodePort]; found && prev != p.Port {
+					t.Errorf("found non-unique allocation in Ports[%d].NodePort: %d -> %d", i, p.NodePort, p.Port)
+				}
+				seen[p.NodePort] = p.Port
+			}
+		})
+	}
+}
+
 // Prove that a dry-run create doesn't actually allocate IPs or ports.
 func TestCreateDryRun(t *testing.T) {
 	testCases := []struct {
