@@ -69,6 +69,10 @@ type csiClient interface {
 		volID string,
 		targetPath string,
 	) error
+
+	// The caller is responsible for checking whether the driver supports
+	// applying FSGroup by calling NodeSupportsVolumeMountGroup().
+	// If the driver does not, fsGroup must be set to nil.
 	NodeStageVolume(ctx context.Context,
 		volID string,
 		publishVolumeInfo map[string]string,
@@ -431,18 +435,9 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 			FsType:     fsType,
 			MountFlags: mountOptions,
 		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
-			supported, err := c.NodeSupportsVolumeMountGroup(ctx)
-			if err != nil {
-				return err
-			}
-
-			if supported && fsGroup != nil {
-				mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
-			}
+		if fsGroup != nil {
+			mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
 		}
-
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
 			Mount: mountVolume,
 		}

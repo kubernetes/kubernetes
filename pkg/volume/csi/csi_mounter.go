@@ -244,6 +244,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		}
 
 		if driverSupportsCSIVolumeMountGroup {
+			klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodePublishVolume.", c.driverName)
 			nodePublishFSGroupArg = mounterArgs.FsGroup
 		}
 	}

@@ -1076,19 +1076,21 @@ func TestAttacherMountDevice(t *testing.T) {
 	transientError := volumetypes.NewTransientOperationFailure("")
 
 	testCases := []struct {
-		testName                 string
-		volName                  string
-		devicePath               string
-		deviceMountPath          string
-		stageUnstageSet          bool
-		fsGroup                  *int64
-		expectedVolumeMountGroup string
-		shouldFail               bool
-		createAttachment         bool
-		populateDeviceMountPath  bool
-		exitError                error
-		spec                     *volume.Spec
-		watchTimeout             time.Duration
+		testName                       string
+		volName                        string
+		devicePath                     string
+		deviceMountPath                string
+		stageUnstageSet                bool
+		fsGroup                        *int64
+		expectedVolumeMountGroup       string
+		delegateFSGroupFeatureGate     bool
+		driverSupportsVolumeMountGroup bool
+		shouldFail                     bool
+		createAttachment               bool
+		populateDeviceMountPath        bool
+		exitError                      error
+		spec                           *volume.Spec
+		watchTimeout                   time.Duration
 	}{
 		{
 			testName:         "normal PV",
@@ -1190,15 +1192,55 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
 		},
 		{
-			testName:                 "fsgroup set",
-			volName:                  "test-vol1",
-			devicePath:               "path1",
-			deviceMountPath:          "path2",
-			fsGroup:                  &testFSGroup,
-			expectedVolumeMountGroup: "3000",
-			stageUnstageSet:          true,
-			createAttachment:         true,
-			spec:                     volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
+			volName:                        "test-vol1",
+			devicePath:                     "path1",
+			deviceMountPath:                "path2",
+			fsGroup:                        &testFSGroup,
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: true,
+			expectedVolumeMountGroup:       "3000",
+			stageUnstageSet:                true,
+			createAttachment:               true,
+			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+		},
+		{
+			testName:                       "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			volName:                        "test-vol1",
+			devicePath:                     "path1",
+			deviceMountPath:                "path2",
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: true,
+			expectedVolumeMountGroup:       "",
+			stageUnstageSet:                true,
+			createAttachment:               true,
+			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+		},
+		{
+			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			volName:                        "test-vol1",
+			devicePath:                     "path1",
+			deviceMountPath:                "path2",
+			fsGroup:                        &testFSGroup,
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: false,
+			expectedVolumeMountGroup:       "",
+			stageUnstageSet:                true,
+			createAttachment:               true,
+			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+		},
+		{
+			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			volName:                        "test-vol1",
+			devicePath:                     "path1",
+			deviceMountPath:                "path2",
+			fsGroup:                        &testFSGroup,
+			delegateFSGroupFeatureGate:     false,
+			driverSupportsVolumeMountGroup: true,
+			expectedVolumeMountGroup:       "",
+			stageUnstageSet:                true,
+			createAttachment:               true,
+			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 	}
 
@@ -1214,6 +1256,8 @@ func TestAttacherMountDevice(t *testing.T) {
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
 
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
+
 			// Setup
 			// Create a new attacher
 			fakeClient := fakeclient.NewSimpleClientset()
@@ -1225,7 +1269,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, tc.watchTimeout)
-			csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, true /* volumeMountGroupSet */)
+			csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, tc.driverSupportsVolumeMountGroup)
 
 			if tc.deviceMountPath != "" {
 				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)

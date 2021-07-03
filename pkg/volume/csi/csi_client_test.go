@@ -246,18 +246,9 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 			FsType:     fsType,
 			MountFlags: mountOptions,
 		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
-			supported, err := c.NodeSupportsVolumeMountGroup(ctx)
-			if err != nil {
-				return err
-			}
-
-			if supported && fsGroup != nil {
-				mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
-			}
+		if fsGroup != nil {
+			mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
 		}
-
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
 			Mount: mountVolume,
 		}
@@ -596,73 +587,29 @@ func TestClientNodeStageVolume(t *testing.T) {
 	testPath := filepath.Join(tmpDir, "/test/path")
 
 	testCases := []struct {
-		name                           string
-		volID                          string
-		stagingTargetPath              string
-		fsType                         string
-		secrets                        map[string]string
-		mountOptions                   []string
-		fsGroup                        *int64
-		delegateFSGroupFeatureGate     bool
-		driverSupportsVolumeMountGroup bool
-		expectedFSGroupInNodeStage     string
-		mustFail                       bool
-		err                            error
+		name                     string
+		volID                    string
+		stagingTargetPath        string
+		fsType                   string
+		secrets                  map[string]string
+		mountOptions             []string
+		fsGroup                  *int64
+		expectedVolumeMountGroup string
+		mustFail                 bool
+		err                      error
 	}{
 		{name: "test ok", volID: "vol-test", stagingTargetPath: testPath, fsType: "ext4", mountOptions: []string{"unvalidated"}},
 		{name: "missing volID", stagingTargetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", stagingTargetPath: testPath, fsType: "badfs", mustFail: true},
 		{name: "grpc error", volID: "vol-test", stagingTargetPath: testPath, mustFail: true, err: errors.New("grpc error")},
-
-		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
-			volID:                          "vol-test",
-			stagingTargetPath:              testPath,
-			fsType:                         "ext4",
-			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
-			driverSupportsVolumeMountGroup: true,
-			expectedFSGroupInNodeStage:     "3000",
-		},
-		{
-			name:                           "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
-			volID:                          "vol-test",
-			stagingTargetPath:              testPath,
-			fsType:                         "ext4",
-			fsGroup:                        nil,
-			delegateFSGroupFeatureGate:     true,
-			driverSupportsVolumeMountGroup: true,
-			expectedFSGroupInNodeStage:     "",
-		},
-		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
-			volID:                          "vol-test",
-			stagingTargetPath:              testPath,
-			fsType:                         "ext4",
-			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
-			driverSupportsVolumeMountGroup: false,
-			expectedFSGroupInNodeStage:     "",
-		},
-		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
-			volID:                          "vol-test",
-			stagingTargetPath:              testPath,
-			fsType:                         "ext4",
-			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     false,
-			driverSupportsVolumeMountGroup: true,
-			expectedFSGroupInNodeStage:     "",
-		},
+		{name: "fsgroup", volID: "vol-test", stagingTargetPath: testPath, fsGroup: &testFSGroup, expectedVolumeMountGroup: "3000"},
 	}
 
 	for _, tc := range testCases {
 		t.Logf("Running test case: %s", tc.name)
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
-
-		nodeClient := fake.NewNodeClientWithVolumeMountGroup(true /* stagingCapable */, tc.driverSupportsVolumeMountGroup)
+		nodeClient := fake.NewNodeClientWithVolumeMountGroup(true /* stagingCapable */, true /* volumeMountGroupCapable */)
 		nodeClient.SetNextError(tc.err)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
@@ -687,8 +634,8 @@ func TestClientNodeStageVolume(t *testing.T) {
 		checkErr(t, tc.mustFail, err)
 
 		volumeMountGroup := nodeClient.GetNodeStagedVolumes()[tc.volID].VolumeMountGroup
-		if volumeMountGroup != tc.expectedFSGroupInNodeStage {
-			t.Errorf("expected VolumeMountGroup parameter in NodePublishVolumeRequest to be %q, got: %q", tc.expectedFSGroupInNodeStage, volumeMountGroup)
+		if volumeMountGroup != tc.expectedVolumeMountGroup {
+			t.Errorf("expected VolumeMountGroup parameter in NodePublishVolumeRequest to be %q, got: %q", tc.expectedVolumeMountGroup, volumeMountGroup)
 		}
 
 		if !tc.mustFail {
