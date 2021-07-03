@@ -75,6 +75,16 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 	if !ok {
 		return fmt.Errorf("unable to convert managed fields for %s to unstructured, expected map, got %T", fieldManager, u)
 	}
+	fmt.Printf("u = %+v\n", u)
+	fmt.Println("---")
+	fmt.Printf("typedObj = %+v\n", typedObj)
+	fmt.Println("---")
+	fmt.Printf("object = %+v\n", object)
+	fmt.Println("---")
+	fmt.Printf("m = %+v\n", m)
+	fmt.Println("---")
+	fmt.Printf("applyConfiguration = %+v\n", applyConfiguration)
+	fmt.Println("---")
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, applyConfiguration); err != nil {
 		return fmt.Errorf("error extracting into obj from unstructured: %w", err)
 	}

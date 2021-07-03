@@ -337,8 +337,12 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, 
 	}
 
 	gvk := obj.GetObjectKind().GroupVersionKind()
+	//goruntime.Breakpoint()
 	if len(gvk.Kind) == 0 {
-		return nil, &gvk, runtime.NewMissingKindErr(string(data))
+		//goruntime.Breakpoint()
+		//return nil, &gvk, runtime.NewMissingKindErr(string(data))
+		fmt.Println("MISSING KIND, ignoring err")
+		fmt.Printf("string(data) = %+v\n", string(data))
 	}
 
 	return obj, &gvk, nil
