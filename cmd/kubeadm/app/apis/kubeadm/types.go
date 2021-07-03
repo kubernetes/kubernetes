@@ -218,7 +218,7 @@ type JoinTimeouts struct {
 	// +optional
 	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
 
-	// kubeletTLSBootstrap specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
+	// kubeletTLSBootstrap specifies how long kubeadm should wait for the kubelet to perform TLS bootstrap.
 	KubeletTLSBootstrap *metav1.Duration `json:"kubeletTLSBootstrap,omitempty"`
 }
 
