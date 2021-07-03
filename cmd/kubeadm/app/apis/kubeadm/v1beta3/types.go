@@ -391,7 +391,8 @@ type JoinConfiguration struct {
 
 	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
 	// either via "kubeadm init" or "kubeadm join"
-	Timeouts JoinTimeouts `json:"timeout,omitempty"`
+	// +optional
+	Timeouts *JoinTimeouts `json:"timeouts,omitempty"`
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
