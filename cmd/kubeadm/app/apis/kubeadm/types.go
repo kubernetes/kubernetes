@@ -67,8 +67,8 @@ type InitConfiguration struct {
 	// "kubeadm init".
 	Patches *Patches
 
-	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
-	// either via "kubeadm init" or "kubeadm join"
+	// Timeouts holds fields controlling timeouts when registering a control plane node during
+	// "kubeadm init".
 	Timeouts *InitTimeouts `json:"timeout,omitempty"`
 }
 
