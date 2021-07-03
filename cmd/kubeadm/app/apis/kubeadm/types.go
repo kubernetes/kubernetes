@@ -213,7 +213,8 @@ type InitTimeouts struct {
 // JoinTimeouts holds timeout fields that relate to registering a new control-plane or node to the cluster,
 // via "kubeadm join
 type JoinTimeouts struct {
-	// ApiServerHealthCheck controls the timeout that we use for API server to appear
+	// ApiServerHealthCheck specifies how long kubeadm should check for the kube-apiserver to return
+	// status OK on the /healthz endpoint during "kubeadm join".
 	// +optional
 	ApiServerHealthCheck *metav1.Duration `json:"apiServerHealthCheck,omitempty"`
 
