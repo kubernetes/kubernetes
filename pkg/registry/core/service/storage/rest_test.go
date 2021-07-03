@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -285,79 +284,6 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 		t.Error(err)
 	}
 	return net
-}
-
-func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-
-	testCases := []struct {
-		svc             *api.Service
-		name            string
-		expectNodePorts []int
-	}{{
-		svc: svctest.MakeService("foo1",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6503), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 53, intstr.FromInt(6503), api.ProtocolUDP)),
-			svctest.SetNodePorts(30053, 30053)),
-		name:            "foo1",
-		expectNodePorts: []int{30053, 30053},
-	}, {
-		svc: svctest.MakeService("foo2",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 54, intstr.FromInt(6504), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 54, intstr.FromInt(6504), api.ProtocolUDP)),
-			svctest.SetNodePorts(30054, 30054)),
-		name:            "foo2",
-		expectNodePorts: []int{30054, 30054},
-	}, {
-		svc: svctest.MakeService("foo3",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 55, intstr.FromInt(6505), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 55, intstr.FromInt(6506), api.ProtocolUDP)),
-			svctest.SetNodePorts(30055, 30056)),
-		name:            "foo3",
-		expectNodePorts: []int{30055, 30056},
-	}}
-
-	ctx := genericapirequest.NewDefaultContext()
-	for _, test := range testCases {
-		createdSvc, err := storage.Create(ctx, test.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		createdService := createdSvc.(*api.Service)
-		objMeta, err := meta.Accessor(createdService)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
-			t.Errorf("storage did not populate object meta field values")
-		}
-		if createdService.Name != test.name {
-			t.Errorf("Expected %s, but got %s", test.name, createdService.Name)
-		}
-		serviceNodePorts := collectServiceNodePorts(createdService)
-		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
-			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
-		}
-		srv, err := getService(storage, ctx, test.name, &metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if srv == nil {
-			t.Fatalf("Failed to find service: %s", test.name)
-		}
-		for i := range serviceNodePorts {
-			nodePort := serviceNodePorts[i]
-			// Release the node port at the end of the test case.
-			storage.alloc.serviceNodePorts.Release(nodePort)
-		}
-	}
 }
 
 func TestServiceRegistryUpdate(t *testing.T) {
@@ -1262,90 +1188,6 @@ func TestServiceRegistryInternalTrafficPolicyLocalThenCluster(t *testing.T) {
 	updatedService := updatedSvc.(*api.Service)
 	if *updatedService.Spec.InternalTrafficPolicy != api.ServiceInternalTrafficPolicyCluster {
 		t.Errorf("Expected internalTrafficPolicy to be Cluster, got: %s", *updatedService.Spec.InternalTrafficPolicy)
-	}
-}
-
-func TestCreateInitNodePorts(t *testing.T) {
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	nodePortOp := portallocator.StartOperation(storage.alloc.serviceNodePorts, false)
-
-	testCases := []struct {
-		name                     string
-		service                  *api.Service
-		expectSpecifiedNodePorts []int
-	}{{
-		name:                     "Service doesn't have specified NodePort",
-		service:                  svctest.MakeService("foo", svctest.SetTypeNodePort),
-		expectSpecifiedNodePorts: []int{},
-	}, {
-		name: "Service has one specified NodePort",
-		service: svctest.MakeService("foo",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP)),
-			svctest.SetNodePorts(30053)),
-		expectSpecifiedNodePorts: []int{30053},
-	}, {
-		name: "Service has two same ports with different protocols and specifies same NodePorts",
-		service: svctest.MakeService("foo",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
-			svctest.SetNodePorts(30054, 30054)),
-		expectSpecifiedNodePorts: []int{30054, 30054},
-	}, {
-		name: "Service has two same ports with different protocols and specifies different NodePorts",
-		service: svctest.MakeService("foo",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
-			svctest.SetNodePorts(30055, 30056)),
-		expectSpecifiedNodePorts: []int{30055, 30056},
-	}, {
-		name: "Service has two different ports with different protocols and specifies different NodePorts",
-		service: svctest.MakeService("foo",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 54, intstr.FromInt(6502), api.ProtocolUDP)),
-			svctest.SetNodePorts(30057, 30058)),
-		expectSpecifiedNodePorts: []int{30057, 30058},
-	}, {
-		name: "Service has two same ports with different protocols but only specifies one NodePort",
-		service: svctest.MakeService("foo",
-			svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("port-tcp", 53, intstr.FromInt(6502), api.ProtocolTCP),
-				svctest.MakeServicePort("port-udp", 53, intstr.FromInt(6502), api.ProtocolUDP)),
-			svctest.SetNodePorts(30059)),
-		expectSpecifiedNodePorts: []int{30059, 30059},
-	}}
-
-	for _, test := range testCases {
-		err := initNodePorts(test.service, nodePortOp)
-		if err != nil {
-			t.Errorf("%q: unexpected error: %v", test.name, err)
-			continue
-		}
-
-		serviceNodePorts := collectServiceNodePorts(test.service)
-		if len(test.expectSpecifiedNodePorts) == 0 {
-			for _, nodePort := range serviceNodePorts {
-				if !storage.alloc.serviceNodePorts.Has(nodePort) {
-					t.Errorf("%q: unexpected NodePort %d, out of range", test.name, nodePort)
-				}
-			}
-		} else if !reflect.DeepEqual(serviceNodePorts, test.expectSpecifiedNodePorts) {
-			t.Errorf("%q: expected NodePorts %v, but got %v", test.name, test.expectSpecifiedNodePorts, serviceNodePorts)
-		}
-		for i := range serviceNodePorts {
-			nodePort := serviceNodePorts[i]
-			// Release the node port at the end of the test case.
-			storage.alloc.serviceNodePorts.Release(nodePort)
-		}
 	}
 }
 
