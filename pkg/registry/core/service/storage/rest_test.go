@@ -287,25 +287,6 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 	return net
 }
 
-func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
-	t.Helper()
-	ip := net.ParseIP(ipstr)
-	if ip == nil {
-		t.Errorf("error parsing IP %q", ipstr)
-		return false
-	}
-	return alloc.Has(ip)
-}
-
-func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bool {
-	t.Helper()
-	if port == 0 {
-		t.Errorf("port is 0")
-		return false
-	}
-	return alloc.Has(int(port))
-}
-
 func TestServiceRegistryCreate(t *testing.T) {
 	testCases := []struct {
 		svc             *api.Service

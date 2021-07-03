@@ -60,6 +60,25 @@ func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface
 	return al
 }
 
+func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
+	t.Helper()
+	ip := net.ParseIP(ipstr)
+	if ip == nil {
+		t.Errorf("error parsing IP %q", ipstr)
+		return false
+	}
+	return alloc.Has(ip)
+}
+
+func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bool {
+	t.Helper()
+	if port == 0 {
+		t.Errorf("port is 0")
+		return false
+	}
+	return alloc.Has(int(port))
+}
+
 func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
@@ -5133,7 +5152,7 @@ func TestCreateDryRun(t *testing.T) {
 
 			// Ensure the IP allocators are clean.
 			if !tc.enableDualStack {
-				if storage.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
+				if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol], createdSvc.Spec.ClusterIP) {
 					t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIP)
 				}
 			} else {
@@ -5143,7 +5162,7 @@ func TestCreateDryRun(t *testing.T) {
 					}
 				}
 				for i, fam := range createdSvc.Spec.IPFamilies {
-					if storage.alloc.serviceIPAllocatorsByFamily[fam].Has(net.ParseIP(createdSvc.Spec.ClusterIPs[i])) {
+					if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
 						t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIPs[i])
 					}
 				}
@@ -5151,10 +5170,7 @@ func TestCreateDryRun(t *testing.T) {
 
 			if tc.svc.Spec.Type != api.ServiceTypeClusterIP {
 				for _, p := range createdSvc.Spec.Ports {
-					if p.NodePort == 0 {
-						t.Errorf("expected a NodePort value")
-					}
-					if storage.alloc.serviceNodePorts.Has(int(p.NodePort)) {
+					if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
 						t.Errorf("expected port to not be allocated: %v", p.NodePort)
 					}
 				}
