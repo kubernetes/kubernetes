@@ -897,7 +897,10 @@ func TestImpersonateWithUID(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(
 		t,
 		nil,
-		nil,
+		[]string{
+			"--authorization-mode=RBAC",
+			"--anonymous-auth",
+		},
 		framework.SharedEtcd(),
 	)
 	t.Cleanup(server.TearDownFn)
@@ -978,7 +981,25 @@ func TestImpersonateWithUID(t *testing.T) {
 	})
 
 	t.Run("impersonating UID without authorization fails", func(t *testing.T) {
-		// TODO fix
+		clientConfig := rest.AnonymousClientConfig(server.ClientConfig)
+		clientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "bob",
+		}
+		clientConfig.Wrap(setUIDWrapper)
+
+		client := clientset.NewForConfigOrDie(clientConfig)
+		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+		if !errors.IsForbidden(err) {
+			t.Fatalf("expected forbidden error, got %T %v", err, err)
+		}
+		if diff := cmp.Diff(
+			`uids "1234" is forbidden: `+
+				`User "system:anonymous" cannot impersonate resource "uids" in API group "authy" at the cluster scope`,
+			err.Error(),
+		); diff != "" {
+			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
+		}
 	})
 }
 
