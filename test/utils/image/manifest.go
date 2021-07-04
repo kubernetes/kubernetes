@@ -38,9 +38,7 @@ type RegistryList struct {
 	GcEtcdRegistry           string `yaml:"gcEtcdRegistry"`
 	GcRegistry               string `yaml:"gcRegistry"`
 	SigStorageRegistry       string `yaml:"sigStorageRegistry"`
-	GcrReleaseRegistry       string `yaml:"gcrReleaseRegistry"`
 	PrivateRegistry          string `yaml:"privateRegistry"`
-	SampleRegistry           string `yaml:"sampleRegistry"`
 	MicrosoftRegistry        string `yaml:"microsoftRegistry"`
 	DockerLibraryRegistry    string `yaml:"dockerLibraryRegistry"`
 	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
@@ -99,8 +97,6 @@ var (
 		GcRegistry:               "k8s.gcr.io",
 		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
-		SampleRegistry:           "gcr.io/google-samples",
-		GcrReleaseRegistry:       "gcr.io/gke-release",
 		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
@@ -391,10 +387,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.SigStorageRegistry
 	case initRegistry.PrivateRegistry:
 		registryAndUser = reg.PrivateRegistry
-	case initRegistry.SampleRegistry:
-		registryAndUser = reg.SampleRegistry
-	case initRegistry.GcrReleaseRegistry:
-		registryAndUser = reg.GcrReleaseRegistry
 	case initRegistry.InvalidRegistry:
 		registryAndUser = reg.InvalidRegistry
 	case initRegistry.MicrosoftRegistry:
