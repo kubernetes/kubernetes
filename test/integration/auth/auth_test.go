@@ -46,6 +46,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -66,6 +67,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -981,9 +983,23 @@ func TestImpersonateWithUID(t *testing.T) {
 	})
 
 	t.Run("impersonating UID without authorization fails", func(t *testing.T) {
+		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+		if err := auth.WaitForNamedAuthorizationUpdate(
+			adminClient.AuthorizationV1(),
+			"system:anonymous",
+			"",
+			"impersonate",
+			"some-user-anonymous-can-impersonate",
+			schema.GroupResource{Resource: "users"},
+			true,
+		); err != nil {
+			t.Fatal(err)
+		}
+
 		clientConfig := rest.AnonymousClientConfig(server.ClientConfig)
 		clientConfig.Impersonate = rest.ImpersonationConfig{
-			UserName: "bob",
+			UserName: "some-user-anonymous-can-impersonate",
 		}
 		clientConfig.Wrap(setUIDWrapper)
 
