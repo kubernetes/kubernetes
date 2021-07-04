@@ -44,6 +44,7 @@ import (
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -67,7 +68,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -985,21 +986,18 @@ func TestImpersonateWithUID(t *testing.T) {
 	t.Run("impersonating UID without authorization fails", func(t *testing.T) {
 		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
-		if err := auth.WaitForNamedAuthorizationUpdate(
-			adminClient.AuthorizationV1(),
-			"system:anonymous",
-			"",
-			"impersonate",
-			"some-user-anonymous-can-impersonate",
-			schema.GroupResource{Resource: "users"},
-			true,
-		); err != nil {
-			t.Fatal(err)
-		}
+		grantRBACAccess(t, ctx, adminClient, rbacv1.PolicyRule{
+			Verbs:         []string{"impersonate"},
+			APIGroups:     []string{""},
+			Resources:     []string{"users"},
+			ResourceNames: []string{name},
+		})
+
+		const name = "some-user-anonymous-can-impersonate"
 
 		clientConfig := rest.AnonymousClientConfig(server.ClientConfig)
 		clientConfig.Impersonate = rest.ImpersonationConfig{
-			UserName: "some-user-anonymous-can-impersonate",
+			UserName: name,
 		}
 		clientConfig.Wrap(setUIDWrapper)
 
@@ -1017,6 +1015,53 @@ func TestImpersonateWithUID(t *testing.T) {
 			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
 		}
 	})
+}
+
+func grantRBACAccess(t *testing.T, ctx context.Context, adminClient clientset.Interface, rule rbacv1.PolicyRule) {
+	t.Helper()
+
+	e2eauth.BindClusterRole()
+
+	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: t.Name()},
+		Rules: []rbacv1.PolicyRule{
+			rule,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = adminClient.RbacV1().ClusterRoles().Delete(ctx, cr.Name, metav1.DeleteOptions{})
+	})
+
+	crb, err := adminClient.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: t.Name()},
+		Subjects:   []rbacv1.Subject{},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     cr.Name,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = adminClient.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{})
+	})
+
+	if err := e2eauth.WaitForNamedAuthorizationUpdate(
+		adminClient.AuthorizationV1(),
+		"system:anonymous",
+		"",
+		"impersonate",
+		name,
+		schema.GroupResource{Resource: "users"},
+		true,
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func csrPEM(t *testing.T) []byte {
