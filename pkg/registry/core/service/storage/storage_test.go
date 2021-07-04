@@ -54,6 +54,7 @@ func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTest
 
 func validService() *api.Service {
 	singleStack := api.IPFamilyPolicySingleStack
+	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
 	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -73,6 +74,7 @@ func validService() *api.Service {
 				Protocol:   api.ProtocolTCP,
 				TargetPort: intstr.FromInt(6502),
 			}},
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
 }
@@ -109,6 +111,8 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
+	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -130,6 +134,7 @@ func TestUpdate(t *testing.T) {
 					Protocol:   api.ProtocolTCP,
 					TargetPort: intstr.FromInt(6502),
 				}},
+				InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			}
 			return object
 		},
