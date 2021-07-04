@@ -10333,6 +10333,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 }
 
 func makeValidService() core.Service {
+	clusterInternalTrafficPolicy := core.ServiceInternalTrafficPolicyCluster
 	return core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
@@ -10342,10 +10343,11 @@ func makeValidService() core.Service {
 			ResourceVersion: "1",
 		},
 		Spec: core.ServiceSpec{
-			Selector:        map[string]string{"key": "val"},
-			SessionAffinity: "None",
-			Type:            core.ServiceTypeClusterIP,
-			Ports:           []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
+			Selector:              map[string]string{"key": "val"},
+			SessionAffinity:       "None",
+			Type:                  core.ServiceTypeClusterIP,
+			Ports:                 []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
 }
@@ -11285,6 +11287,22 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.InternalTrafficPolicy = &invalid
 			},
 			numErrs: 1,
+		},
+		{
+			name: "internalTrafficPolicy field set to Cluster",
+			tweakSvc: func(s *core.Service) {
+				cluster := core.ServiceInternalTrafficPolicyCluster
+				s.Spec.InternalTrafficPolicy = &cluster
+			},
+			numErrs: 0,
+		},
+		{
+			name: "internalTrafficPolicy field set to Local",
+			tweakSvc: func(s *core.Service) {
+				local := core.ServiceInternalTrafficPolicyLocal
+				s.Spec.InternalTrafficPolicy = &local
+			},
+			numErrs: 0,
 		},
 		{
 			name: "nagative healthCheckNodePort field",
@@ -14369,6 +14387,28 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
+		},
+		{
+			name: "update internalTrafficPolicy from Cluster to Local",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				cluster := core.ServiceInternalTrafficPolicyCluster
+				oldSvc.Spec.InternalTrafficPolicy = &cluster
+
+				local := core.ServiceInternalTrafficPolicyLocal
+				newSvc.Spec.InternalTrafficPolicy = &local
+			},
+			numErrs: 0,
+		},
+		{
+			name: "update internalTrafficPolicy from Local to Cluster",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				local := core.ServiceInternalTrafficPolicyLocal
+				oldSvc.Spec.InternalTrafficPolicy = &local
+
+				cluster := core.ServiceInternalTrafficPolicyCluster
+				newSvc.Spec.InternalTrafficPolicy = &cluster
+			},
+			numErrs: 0,
 		},
 	}
 
