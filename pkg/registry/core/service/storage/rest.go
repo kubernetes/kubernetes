@@ -226,10 +226,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
-	// TODO: This creates nodePorts if needed. In the future nodePorts may be cleared if *never* used.
-	// But for now we stick to the KEP "don't allocate new node ports but do not deallocate existing node ports if set"
-	if service.Spec.Type == api.ServiceTypeNodePort ||
-		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
 		if err := initNodePorts(service, nodePortOp); err != nil {
 			return nil, err
 		}
@@ -334,10 +331,16 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 }
 
 func shouldAllocateNodePorts(service *api.Service) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		return *service.Spec.AllocateLoadBalancerNodePorts
+	if service.Spec.Type == api.ServiceTypeNodePort {
+		return true
 	}
-	return true
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+			return *service.Spec.AllocateLoadBalancerNodePorts
+		}
+		return true
+	}
+	return false
 }
 
 // externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
@@ -477,8 +480,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		releaseNodePorts(oldService, nodePortOp)
 	}
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
-	if service.Spec.Type == api.ServiceTypeNodePort ||
-		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
 		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
 			return nil, false, err
 		}
@@ -1172,6 +1174,10 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 	svcPortToNodePort := map[int]int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort == 0 && !shouldAllocateNodePorts(service) {
+			// Don't allocate new ports, but do respect specific requests.
+			continue
+		}
 		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
 		if allocatedNodePort == 0 {
 			// This will only scan forward in the service.Spec.Ports list because any matches
@@ -1224,6 +1230,10 @@ func updateNodePorts(oldService, newService *api.Service, nodePortOp *portalloca
 
 	for i := range newService.Spec.Ports {
 		servicePort := &newService.Spec.Ports[i]
+		if servicePort.NodePort == 0 && !shouldAllocateNodePorts(newService) {
+			// Don't allocate new ports, but do respect specific requests.
+			continue
+		}
 		nodePort := ServiceNodePort{Protocol: servicePort.Protocol, NodePort: servicePort.NodePort}
 		if nodePort.NodePort != 0 {
 			if !containsNumber(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {
