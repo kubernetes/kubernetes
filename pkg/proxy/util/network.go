@@ -24,22 +24,16 @@ import (
 // code will forward to net library functions, and unit tests will override the methods
 // for testing purposes.
 type NetworkInterfacer interface {
-	Addrs(intf *net.Interface) ([]net.Addr, error)
-	Interfaces() ([]net.Interface, error)
+	InterfaceAddrs() ([]net.Addr, error)
 }
 
 // RealNetwork implements the NetworkInterfacer interface for production code, just
 // wrapping the underlying net library function calls.
 type RealNetwork struct{}
 
-// Addrs wraps net.Interface.Addrs(), it's a part of NetworkInterfacer interface.
-func (RealNetwork) Addrs(intf *net.Interface) ([]net.Addr, error) {
-	return intf.Addrs()
-}
-
-// Interfaces wraps net.Interfaces(), it's a part of NetworkInterfacer interface.
-func (RealNetwork) Interfaces() ([]net.Interface, error) {
-	return net.Interfaces()
+// InterfaceAddrs wraps net.InterfaceAddrs(), it's a part of NetworkInterfacer interface.
+func (RealNetwork) InterfaceAddrs() ([]net.Addr, error) {
+	return net.InterfaceAddrs()
 }
 
 var _ NetworkInterfacer = &RealNetwork{}
