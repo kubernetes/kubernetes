@@ -33,7 +33,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 )
 
 type testCase struct {
@@ -268,16 +267,16 @@ func TestPolicyCompatibility(t *testing.T) {
 			}
 
 			gotExtenders := sched.Extenders
-			var wantExtenders []*core.HTTPExtender
+			var wantExtenders []*HTTPExtender
 			for _, e := range tc.wantExtenders {
-				extender, err := core.NewHTTPExtender(&e)
+				extender, err := NewHTTPExtender(&e)
 				if err != nil {
 					t.Errorf("Error transforming extender: %+v", e)
 				}
-				wantExtenders = append(wantExtenders, extender.(*core.HTTPExtender))
+				wantExtenders = append(wantExtenders, extender.(*HTTPExtender))
 			}
 			for i := range gotExtenders {
-				if !core.Equal(wantExtenders[i], gotExtenders[i].(*core.HTTPExtender)) {
+				if !Equal(wantExtenders[i], gotExtenders[i].(*HTTPExtender)) {
 					t.Errorf("Got extender #%d %+v, want %+v", i, gotExtenders[i], wantExtenders[i])
 				}
 			}
