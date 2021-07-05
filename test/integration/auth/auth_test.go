@@ -47,7 +47,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -68,8 +67,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -919,6 +918,17 @@ func TestImpersonateWithUID(t *testing.T) {
 	}
 
 	t.Run("impersonation with uid header", func(t *testing.T) {
+		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+		authutil.GrantUserNamedAuthorization(t, ctx, adminClient, "alice",
+			rbacv1.PolicyRule{
+				Verbs:         []string{"create"},
+				APIGroups:     []string{"certificates.k8s.io"},
+				Resources:     []string{"certificatesigningrequests"},
+				ResourceNames: []string{"impersonated-csr"},
+			},
+		)
+
 		req := csrPEM(t)
 
 		clientConfig := rest.CopyConfig(server.ClientConfig)
@@ -986,18 +996,18 @@ func TestImpersonateWithUID(t *testing.T) {
 	t.Run("impersonating UID without authorization fails", func(t *testing.T) {
 		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
-		grantRBACAccess(t, ctx, adminClient, rbacv1.PolicyRule{
-			Verbs:         []string{"impersonate"},
-			APIGroups:     []string{""},
-			Resources:     []string{"users"},
-			ResourceNames: []string{name},
-		})
-
-		const name = "some-user-anonymous-can-impersonate"
+		authutil.GrantUserNamedAuthorization(t, ctx, adminClient, "system:anonymous",
+			rbacv1.PolicyRule{
+				Verbs:         []string{"impersonate"},
+				APIGroups:     []string{""},
+				Resources:     []string{"users"},
+				ResourceNames: []string{"some-user-anonymous-can-impersonate"},
+			},
+		)
 
 		clientConfig := rest.AnonymousClientConfig(server.ClientConfig)
 		clientConfig.Impersonate = rest.ImpersonationConfig{
-			UserName: name,
+			UserName: "some-user-anonymous-can-impersonate",
 		}
 		clientConfig.Wrap(setUIDWrapper)
 
@@ -1008,60 +1018,13 @@ func TestImpersonateWithUID(t *testing.T) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 		if diff := cmp.Diff(
-			`uids "1234" is forbidden: `+
-				`User "system:anonymous" cannot impersonate resource "uids" in API group "authy" at the cluster scope`,
+			`uids.authentication.k8s.io "1234" is forbidden: `+
+				`User "system:anonymous" cannot impersonate resource "uids" in API group "authentication.k8s.io" at the cluster scope`,
 			err.Error(),
 		); diff != "" {
 			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
 		}
 	})
-}
-
-func grantRBACAccess(t *testing.T, ctx context.Context, adminClient clientset.Interface, rule rbacv1.PolicyRule) {
-	t.Helper()
-
-	e2eauth.BindClusterRole()
-
-	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: t.Name()},
-		Rules: []rbacv1.PolicyRule{
-			rule,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = adminClient.RbacV1().ClusterRoles().Delete(ctx, cr.Name, metav1.DeleteOptions{})
-	})
-
-	crb, err := adminClient.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: t.Name()},
-		Subjects:   []rbacv1.Subject{},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     cr.Name,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = adminClient.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{})
-	})
-
-	if err := e2eauth.WaitForNamedAuthorizationUpdate(
-		adminClient.AuthorizationV1(),
-		"system:anonymous",
-		"",
-		"impersonate",
-		name,
-		schema.GroupResource{Resource: "users"},
-		true,
-	); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func csrPEM(t *testing.T) []byte {
