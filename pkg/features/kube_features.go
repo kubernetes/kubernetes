@@ -692,6 +692,12 @@ const (
 	// Enables the PodSecurity admission plugin
 	PodSecurity featuregate.Feature = "PodSecurity"
 
+	// owner: @mysunshine92
+	// alpha: v1.23
+	//
+	// Allows users to configure whether they want to delete all terminated pods or not.
+	PodGCDeleteAllTerminatedPods featuregate.Feature = "PodGCDeleteAllTerminatedPods"
+
 	// owner: @chrishenzie
 	// alpha: v1.22
 	//
@@ -862,6 +868,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandedDNSConfig:                              {Default: false, PreRelease: featuregate.Alpha},
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
 	PodSecurity:                                    {Default: false, PreRelease: featuregate.Alpha},
+	PodGCDeleteAllTerminatedPods:                   {Default: false, PreRelease: featuregate.Alpha},
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
 	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
 	DelegateFSGroupToCSIDriver:                     {Default: false, PreRelease: featuregate.Alpha},

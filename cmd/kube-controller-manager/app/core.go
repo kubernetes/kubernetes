@@ -409,6 +409,7 @@ func startPodGCController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		int(controllerContext.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
+		controllerContext.ComponentConfig.PodGCController.DeleteAllTerminatedPods,
 	).Run(ctx.Done())
 	return nil, true, nil
 }

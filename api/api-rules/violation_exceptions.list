@@ -595,6 +595,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,P
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,MinimumTimeoutNFS
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,PodTemplateFilePathHostPath
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,PodTemplateFilePathNFS
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PodGCControllerConfiguration,DeleteAllTerminatedPods
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PodGCControllerConfiguration,TerminatedPodGCThreshold
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ReplicaSetControllerConfiguration,ConcurrentRSSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ReplicationControllerConfiguration,ConcurrentRCSyncs

@@ -437,6 +437,9 @@ type PodGCControllerConfiguration struct {
 	// before the terminated pod garbage collector starts deleting terminated pods.
 	// If <= 0, the terminated pod garbage collector is disabled.
 	TerminatedPodGCThreshold int32
+	// When enable the feature gate PodGCDeleteAllTerminatedPods, and set DeleteAllTerminatedPods to true,
+	// TerminatedPodGCThreshold will be ignored，pod garbage collector will delete all terminated pods. [default=false]
+	DeleteAllTerminatedPods *bool
 }
 
 // ReplicaSetControllerConfiguration contains elements describing ReplicaSetController.

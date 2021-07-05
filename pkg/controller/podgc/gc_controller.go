@@ -29,12 +29,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/klog/v2"
 )
@@ -57,23 +59,25 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
-	deletePod              func(namespace, name string) error
-	terminatedPodThreshold int
+	deletePod               func(namespace, name string) error
+	terminatedPodThreshold  int
+	deleteAllTerminatedPods bool
 }
 
 func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, deleteAllTerminatedPods bool) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 	gcc := &PodGCController{
-		kubeClient:             kubeClient,
-		terminatedPodThreshold: terminatedPodThreshold,
-		podLister:              podInformer.Lister(),
-		podListerSynced:        podInformer.Informer().HasSynced,
-		nodeLister:             nodeInformer.Lister(),
-		nodeListerSynced:       nodeInformer.Informer().HasSynced,
-		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
+		kubeClient:              kubeClient,
+		terminatedPodThreshold:  terminatedPodThreshold,
+		deleteAllTerminatedPods: deleteAllTerminatedPods,
+		podLister:               podInformer.Lister(),
+		podListerSynced:         podInformer.Informer().HasSynced,
+		nodeLister:              nodeInformer.Lister(),
+		nodeListerSynced:        nodeInformer.Informer().HasSynced,
+		nodeQueue:               workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
 			klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
 			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
@@ -110,7 +114,7 @@ func (gcc *PodGCController) gc() {
 		klog.Errorf("Error while listing all nodes: %v", err)
 		return
 	}
-	if gcc.terminatedPodThreshold > 0 {
+	if gcc.terminatedPodThreshold > 0 || (utilfeature.DefaultFeatureGate.Enabled(features.PodGCDeleteAllTerminatedPods) && gcc.deleteAllTerminatedPods) {
 		gcc.gcTerminated(pods)
 	}
 	gcc.gcOrphaned(pods, nodes)
@@ -134,6 +138,10 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 
 	terminatedPodCount := len(terminatedPods)
 	deleteCount := terminatedPodCount - gcc.terminatedPodThreshold
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGCDeleteAllTerminatedPods) && gcc.deleteAllTerminatedPods {
+		deleteCount = terminatedPodCount
+	}
 
 	if deleteCount <= 0 {
 		return

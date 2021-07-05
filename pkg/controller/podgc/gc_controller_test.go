@@ -27,23 +27,26 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int, deleteAllTerminatedPods bool) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold, deleteAllTerminatedPods)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -67,65 +70,113 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		pods            []nameToPhase
-		threshold       int
-		deletedPodNames sets.String
+		name                    string
+		pods                    []nameToPhase
+		threshold               int
+		featureEnabled          bool
+		deleteAllTerminatedPods bool
+		deletedPodNames         sets.String
 	}{
 		{
-			name: "threshold = 0, disables terminated pod deletion",
+			name: "threshold = 0, featureGate disabled and deleteAllTerminatedPods = false, disables terminated pod deletion",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 			},
-			threshold: 0,
-			// threshold = 0 disables terminated pod deletion
-			deletedPodNames: sets.NewString(),
+			threshold:               0,
+			featureEnabled:          false,
+			deleteAllTerminatedPods: false,
+			deletedPodNames:         sets.NewString(),
 		},
 		{
-			name: "threshold = 1, delete pod a which is PodFailed and pod b which is PodSucceeded",
+			name: "threshold = 0, featureGate disabled and deleteAllTerminatedPods = true, disables terminated pod deletion",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed},
+				{name: "b", phase: v1.PodSucceeded},
+			},
+			threshold:               0,
+			featureEnabled:          false,
+			deleteAllTerminatedPods: true,
+			deletedPodNames:         sets.NewString(),
+		},
+		{
+			name: "threshold = 1, featureGate enabled and deleteAllTerminatedPods = true, will delete all terminated pods, and threshold will be ignored",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed},
+				{name: "b", phase: v1.PodSucceeded},
+			},
+			threshold:               1,
+			featureEnabled:          true,
+			deleteAllTerminatedPods: true,
+			deletedPodNames:         sets.NewString("a", "b"),
+		},
+		{
+			name: "threshold = 1, featureGate enabled and deleteAllTerminatedPods = false, delete pod a which is PodFailed and pod b which is PodSucceeded",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 				{name: "c", phase: v1.PodFailed},
 			},
-			threshold:       1,
+			threshold:               1,
+			featureEnabled:          true,
+			deleteAllTerminatedPods: false,
+			// featureGate enabled and deleteAllTerminatedPods = false, threshold will take effect
 			deletedPodNames: sets.NewString("a", "b"),
 		},
 		{
-			name: "threshold = 1, delete pod b which is PodSucceeded",
+			name: "threshold = 1, featureGate disabled and deleteAllTerminatedPods = true, delete pod a which is PodFailed and pod b which is PodSucceeded",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed},
+				{name: "b", phase: v1.PodSucceeded},
+				{name: "c", phase: v1.PodFailed},
+			},
+			threshold:               1,
+			featureEnabled:          false,
+			deleteAllTerminatedPods: true,
+			// featureGate disabled and deleteAllTerminatedPods = true, threshold will take effect
+			deletedPodNames: sets.NewString("a", "b"),
+		},
+		{
+			name: "threshold = 1, featureGate enabled and deleteAllTerminatedPods = false, delete pod b which is PodSucceeded",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodRunning},
 				{name: "b", phase: v1.PodSucceeded},
 				{name: "c", phase: v1.PodFailed},
 			},
-			threshold:       1,
-			deletedPodNames: sets.NewString("b"),
+			threshold:               1,
+			featureEnabled:          true,
+			deleteAllTerminatedPods: false,
+			deletedPodNames:         sets.NewString("b"),
 		},
 		{
-			name: "threshold = 1, delete pod a which is PodFailed",
+			name: "threshold = 1, featureGate enabled and deleteAllTerminatedPods = false, delete pod a which is PodFailed",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 			},
-			threshold:       1,
-			deletedPodNames: sets.NewString("a"),
+			threshold:               1,
+			featureEnabled:          true,
+			deleteAllTerminatedPods: false,
+			deletedPodNames:         sets.NewString("a"),
 		},
 		{
-			name: "threshold = 5, don't delete pod",
+			name: "threshold = 5, featureGate enabled and deleteAllTerminatedPods = false, don't delete pod",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 			},
-			threshold:       5,
-			deletedPodNames: sets.NewString(),
+			threshold:               5,
+			featureEnabled:          true,
+			deleteAllTerminatedPods: false,
+			deletedPodNames:         sets.NewString(),
 		},
 	}
 
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodGCDeleteAllTerminatedPods, test.featureEnabled)()
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			gcc, podInformer, _ := NewFromClient(client, test.threshold, test.deleteAllTerminatedPods)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {
@@ -314,7 +365,7 @@ func TestGCOrphaned(t *testing.T) {
 				nodeList.Items = append(nodeList.Items, *node)
 			}
 			client := fake.NewSimpleClientset(nodeList)
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			gcc, podInformer, nodeInformer := NewFromClient(client, -1, false)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
@@ -413,7 +464,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			gcc, podInformer, _ := NewFromClient(client, -1)
+			gcc, podInformer, _ := NewFromClient(client, -1, false)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {

@@ -372,6 +372,7 @@ func TestAddFlags(t *testing.T) {
 		PodGCController: &PodGCControllerOptions{
 			&podgcconfig.PodGCControllerConfiguration{
 				TerminatedPodGCThreshold: 12000,
+				DeleteAllTerminatedPods:  false,
 			},
 		},
 		ReplicaSetController: &ReplicaSetControllerOptions{
@@ -615,6 +616,7 @@ func TestApplyTo(t *testing.T) {
 			},
 			PodGCController: podgcconfig.PodGCControllerConfiguration{
 				TerminatedPodGCThreshold: 12000,
+				DeleteAllTerminatedPods:  false,
 			},
 			ReplicaSetController: replicasetconfig.ReplicaSetControllerConfiguration{
 				ConcurrentRSSyncs: 10,

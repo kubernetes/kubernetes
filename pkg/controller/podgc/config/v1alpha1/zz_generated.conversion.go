@@ -83,10 +83,16 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 
 func autoConvert_v1alpha1_PodGCControllerConfiguration_To_config_PodGCControllerConfiguration(in *v1alpha1.PodGCControllerConfiguration, out *config.PodGCControllerConfiguration, s conversion.Scope) error {
 	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+	if err := v1.Convert_Pointer_bool_To_bool(&in.DeleteAllTerminatedPods, &out.DeleteAllTerminatedPods, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(in *config.PodGCControllerConfiguration, out *v1alpha1.PodGCControllerConfiguration, s conversion.Scope) error {
 	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+	if err := v1.Convert_bool_To_Pointer_bool(&in.DeleteAllTerminatedPods, &out.DeleteAllTerminatedPods, s); err != nil {
+		return err
+	}
 	return nil
 }
