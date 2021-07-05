@@ -93,7 +93,7 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
 
-	if features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
+	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
 		if err := users.RemoveUsersAndGroups(); err != nil {
 			klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
