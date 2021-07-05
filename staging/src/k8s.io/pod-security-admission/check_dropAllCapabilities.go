@@ -31,21 +31,21 @@ func init() {
 }
 
 // CheckDropCapabilities returns a restricted level check
-// that ensures all capabilities are dropped in 1.22+
+// that ensures all capabilities are dropped in 1.0+
 func CheckDropCapabilities() Check {
 	return Check{
 		ID:    "dropCapabilities",
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 22),
-				CheckPod:       dropCapabilities_1_22,
+				MinimumVersion: api.MajorMinorVersion(1, 0),
+				CheckPod:       dropCapabilities_1_0,
 			},
 		},
 	}
 }
 
-func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func dropCapabilities_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	containers := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil || container.SecurityContext.Capabilities != nil {
