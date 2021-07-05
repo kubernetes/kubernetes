@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 )
 
-// Default creates a default configuration of the latset versioned type.
+// Default creates a default configuration of the latest versioned type.
 // This function needs to be updated whenever we bump the scheduler's component config version.
 func Default() (*config.KubeSchedulerConfiguration, error) {
 	versionedCfg := v1beta2.KubeSchedulerConfiguration{}
