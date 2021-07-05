@@ -267,16 +267,16 @@ func TestPolicyCompatibility(t *testing.T) {
 			}
 
 			gotExtenders := sched.Extenders
-			var wantExtenders []*HTTPExtender
+			var wantExtenders []*scheduler.HTTPExtender
 			for _, e := range tc.wantExtenders {
-				extender, err := NewHTTPExtender(&e)
+				extender, err := scheduler.NewHTTPExtender(&e)
 				if err != nil {
 					t.Errorf("Error transforming extender: %+v", e)
 				}
-				wantExtenders = append(wantExtenders, extender.(*HTTPExtender))
+				wantExtenders = append(wantExtenders, extender.(*scheduler.HTTPExtender))
 			}
 			for i := range gotExtenders {
-				if !Equal(wantExtenders[i], gotExtenders[i].(*HTTPExtender)) {
+				if !scheduler.Equal(wantExtenders[i], gotExtenders[i].(*scheduler.HTTPExtender)) {
 					t.Errorf("Got extender #%d %+v, want %+v", i, gotExtenders[i], wantExtenders[i])
 				}
 			}
