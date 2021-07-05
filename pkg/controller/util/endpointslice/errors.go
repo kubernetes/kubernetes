@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpointslicemirroring
+package endpointslice
 
 // StaleInformerCache errors indicate that the informer cache includes out of
 // date resources.
@@ -22,4 +22,14 @@ type StaleInformerCache struct {
 	msg string
 }
 
+// NewStaleInformerCache return StaleInformerCache with error mes
+func NewStaleInformerCache(msg string) *StaleInformerCache {
+	return &StaleInformerCache{msg}
+}
+
 func (e *StaleInformerCache) Error() string { return e.msg }
+
+func IsStaleInformerCacheErr(err error) bool {
+	_, ok := err.(*StaleInformerCache)
+	return ok
+}

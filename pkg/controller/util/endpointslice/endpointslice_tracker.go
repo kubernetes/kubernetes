@@ -28,36 +28,36 @@ const (
 	deletionExpected = -1
 )
 
-// generationsBySlice tracks expected EndpointSlice generations by EndpointSlice
+// GenerationsBySlice tracks expected EndpointSlice generations by EndpointSlice
 // uid. A value of deletionExpected (-1) may be used here to indicate that we
 // expect this EndpointSlice to be deleted.
-type generationsBySlice map[types.UID]int64
+type GenerationsBySlice map[types.UID]int64
 
-// endpointSliceTracker tracks EndpointSlices and their associated generation to
+// EndpointSliceTracker tracks EndpointSlices and their associated generation to
 // help determine if a change to an EndpointSlice has been processed by the
 // EndpointSlice controller.
-type endpointSliceTracker struct {
+type EndpointSliceTracker struct {
 	// lock protects generationsByService.
 	lock sync.Mutex
 	// generationsByService tracks the generations of EndpointSlices for each
 	// Service.
-	generationsByService map[types.NamespacedName]generationsBySlice
+	generationsByService map[types.NamespacedName]GenerationsBySlice
 }
 
-// newEndpointSliceTracker creates and initializes a new endpointSliceTracker.
-func newEndpointSliceTracker() *endpointSliceTracker {
-	return &endpointSliceTracker{
-		generationsByService: map[types.NamespacedName]generationsBySlice{},
+// NewEndpointSliceTracker creates and initializes a new endpointSliceTracker.
+func NewEndpointSliceTracker() *EndpointSliceTracker {
+	return &EndpointSliceTracker{
+		generationsByService: map[types.NamespacedName]GenerationsBySlice{},
 	}
 }
 
 // Has returns true if the endpointSliceTracker has a generation for the
 // provided EndpointSlice.
-func (est *endpointSliceTracker) Has(endpointSlice *discovery.EndpointSlice) bool {
+func (est *EndpointSliceTracker) Has(endpointSlice *discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	gfs, ok := est.generationsForSliceUnsafe(endpointSlice)
+	gfs, ok := est.GenerationsForSliceUnsafe(endpointSlice)
 	if !ok {
 		return false
 	}
@@ -68,11 +68,11 @@ func (est *endpointSliceTracker) Has(endpointSlice *discovery.EndpointSlice) boo
 // ShouldSync returns true if this endpointSliceTracker does not have a
 // generation for the provided EndpointSlice or it is greater than the
 // generation of the tracked EndpointSlice.
-func (est *endpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSlice) bool {
+func (est *EndpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	gfs, ok := est.generationsForSliceUnsafe(endpointSlice)
+	gfs, ok := est.GenerationsForSliceUnsafe(endpointSlice)
 	if !ok {
 		return true
 	}
@@ -86,7 +86,7 @@ func (est *endpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSli
 // 2. The tracker is expecting one or more of the provided EndpointSlices to be
 //    deleted.
 // 3. The tracker is tracking EndpointSlices that have not been provided.
-func (est *endpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices []*discovery.EndpointSlice) bool {
+func (est *EndpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices []*discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
@@ -117,21 +117,21 @@ func (est *endpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices
 
 // Update adds or updates the generation in this endpointSliceTracker for the
 // provided EndpointSlice.
-func (est *endpointSliceTracker) Update(endpointSlice *discovery.EndpointSlice) {
+func (est *EndpointSliceTracker) Update(endpointSlice *discovery.EndpointSlice) {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	gfs, ok := est.generationsForSliceUnsafe(endpointSlice)
+	gfs, ok := est.GenerationsForSliceUnsafe(endpointSlice)
 
 	if !ok {
-		gfs = generationsBySlice{}
+		gfs = GenerationsBySlice{}
 		est.generationsByService[getServiceNN(endpointSlice)] = gfs
 	}
 	gfs[endpointSlice.UID] = endpointSlice.Generation
 }
 
 // DeleteService removes the set of generations tracked for the Service.
-func (est *endpointSliceTracker) DeleteService(namespace, name string) {
+func (est *EndpointSliceTracker) DeleteService(namespace, name string) {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
@@ -141,14 +141,14 @@ func (est *endpointSliceTracker) DeleteService(namespace, name string) {
 
 // ExpectDeletion sets the generation to deletionExpected in this
 // endpointSliceTracker for the provided EndpointSlice.
-func (est *endpointSliceTracker) ExpectDeletion(endpointSlice *discovery.EndpointSlice) {
+func (est *EndpointSliceTracker) ExpectDeletion(endpointSlice *discovery.EndpointSlice) {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	gfs, ok := est.generationsForSliceUnsafe(endpointSlice)
+	gfs, ok := est.GenerationsForSliceUnsafe(endpointSlice)
 
 	if !ok {
-		gfs = generationsBySlice{}
+		gfs = GenerationsBySlice{}
 		est.generationsByService[getServiceNN(endpointSlice)] = gfs
 	}
 	gfs[endpointSlice.UID] = deletionExpected
@@ -157,11 +157,11 @@ func (est *endpointSliceTracker) ExpectDeletion(endpointSlice *discovery.Endpoin
 // HandleDeletion removes the generation in this endpointSliceTracker for the
 // provided EndpointSlice. This returns true if the tracker expected this
 // EndpointSlice to be deleted and false if not.
-func (est *endpointSliceTracker) HandleDeletion(endpointSlice *discovery.EndpointSlice) bool {
+func (est *EndpointSliceTracker) HandleDeletion(endpointSlice *discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	gfs, ok := est.generationsForSliceUnsafe(endpointSlice)
+	gfs, ok := est.GenerationsForSliceUnsafe(endpointSlice)
 
 	if ok {
 		g, ok := gfs[endpointSlice.UID]
@@ -174,10 +174,10 @@ func (est *endpointSliceTracker) HandleDeletion(endpointSlice *discovery.Endpoin
 	return true
 }
 
-// generationsForSliceUnsafe returns the generations for the Service
+// GenerationsForSliceUnsafe returns the generations for the Service
 // corresponding to the provided EndpointSlice, and a bool to indicate if it
 // exists. A lock must be applied before calling this function.
-func (est *endpointSliceTracker) generationsForSliceUnsafe(endpointSlice *discovery.EndpointSlice) (generationsBySlice, bool) {
+func (est *EndpointSliceTracker) GenerationsForSliceUnsafe(endpointSlice *discovery.EndpointSlice) (GenerationsBySlice, bool) {
 	serviceNN := getServiceNN(endpointSlice)
 	generations, ok := est.generationsByService[serviceNN]
 	return generations, ok
@@ -188,17 +188,4 @@ func (est *endpointSliceTracker) generationsForSliceUnsafe(endpointSlice *discov
 func getServiceNN(endpointSlice *discovery.EndpointSlice) types.NamespacedName {
 	serviceName, _ := endpointSlice.Labels[discovery.LabelServiceName]
 	return types.NamespacedName{Name: serviceName, Namespace: endpointSlice.Namespace}
-}
-
-// managedByChanged returns true if one of the provided EndpointSlices is
-// managed by the EndpointSlice controller while the other is not.
-func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) bool {
-	return managedByController(endpointSlice1) != managedByController(endpointSlice2)
-}
-
-// managedByController returns true if the controller of the provided
-// EndpointSlices is the EndpointSlice controller.
-func managedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
-	return managedBy == controllerName
 }

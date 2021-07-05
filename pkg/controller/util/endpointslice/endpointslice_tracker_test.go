@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpointslicemirroring
+package endpointslice
 
 import (
 	"testing"
@@ -86,7 +86,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewEndpointSliceTracker()
 			esTracker.Update(tc.updateParam)
 			if esTracker.Has(tc.checksParam) != tc.expectHas {
 				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
@@ -126,22 +126,22 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		tracker      *endpointSliceTracker
+		tracker      *EndpointSliceTracker
 		serviceParam *v1.Service
 		slicesParam  []*discovery.EndpointSlice
 		expectNewer  bool
 	}{{
 		name: "empty tracker",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{},
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{},
 		},
 		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
 		slicesParam:  []*discovery.EndpointSlice{},
 		expectNewer:  false,
 	}, {
 		name: "empty slices",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {},
 			},
 		},
@@ -150,8 +150,8 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		expectNewer:  false,
 	}, {
 		name: "matching slices",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {
 					epSlice1.UID: epSlice1.Generation,
 				},
@@ -162,8 +162,8 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		expectNewer:  false,
 	}, {
 		name: "newer slice in tracker",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {
 					epSlice1.UID: epSlice1NewerGen.Generation,
 				},
@@ -174,8 +174,8 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		expectNewer:  true,
 	}, {
 		name: "newer slice in params",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {
 					epSlice1.UID: epSlice1.Generation,
 				},
@@ -186,8 +186,8 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		expectNewer:  false,
 	}, {
 		name: "slice in params is expected to be deleted",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {
 					epSlice1.UID: deletionExpected,
 				},
@@ -198,8 +198,8 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		expectNewer:  true,
 	}, {
 		name: "slice in tracker but not in params",
-		tracker: &endpointSliceTracker{
-			generationsByService: map[types.NamespacedName]generationsBySlice{
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
 				{Name: "svc1", Namespace: "ns1"}: {
 					epSlice1.UID: epSlice1.Generation,
 				},
@@ -309,7 +309,7 @@ func TestEndpointSliceTrackerDeletion(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewEndpointSliceTracker()
 			esTracker.Update(epSlice1)
 
 			esTracker.ExpectDeletion(tc.expectDeletionParam)
@@ -373,7 +373,7 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewEndpointSliceTracker()
 			esTracker.Update(tc.updateParam)
 			esTracker.DeleteService(tc.deleteServiceParam.Namespace, tc.deleteServiceParam.Name)
 			if esTracker.Has(tc.updateParam) != tc.expectHas {
