@@ -118,7 +118,7 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		EmbeddedEncoder: embeddedEncoder,
 
 		Fixup: func(obj runtime.Object) runtime.Object {
-			result, err := transformObject(ctx, obj, options, mediaTypeOptions, scope, req, false)
+			result, err := transformObject(ctx, obj, options, mediaTypeOptions, scope, req, true)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
 				return obj
