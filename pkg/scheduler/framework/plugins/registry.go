@@ -54,6 +54,9 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodDisruptionBudget:          feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
 		EnablePodOverhead:                  feature.DefaultFeatureGate.Enabled(features.PodOverhead),
 		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableVolumeCapacityPriority:       feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		EnableCSIStorageCapacity:           feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
+		EnableGenericEphemeralVolume:       feature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}
 
 	return runtime.Registry{
@@ -81,7 +84,9 @@ func NewInTreeRegistry() runtime.Registry {
 		noderesources.RequestedToCapacityRatioName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return noderesources.NewRequestedToCapacityRatio(plArgs, fh, fts)
 		},
-		volumebinding.Name: volumebinding.New,
+		volumebinding.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return volumebinding.New(plArgs, fh, fts)
+		},
 		volumerestrictions.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return volumerestrictions.New(plArgs, fh, fts)
 		},

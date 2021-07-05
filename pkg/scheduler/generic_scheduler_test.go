@@ -606,7 +606,9 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return volumebinding.New(plArgs, fh, feature.Features{})
+				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -639,7 +641,9 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return volumebinding.New(plArgs, fh, feature.Features{})
+				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -688,7 +692,9 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return volumebinding.New(plArgs, fh, feature.Features{})
+				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},

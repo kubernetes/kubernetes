@@ -311,15 +311,27 @@ func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) e
 	return errors.Flatten(errors.NewAggregate(errs))
 }
 
+// VolumeBindingArgsValidationOptions contains the different settings for validation.
+type VolumeBindingArgsValidationOptions struct {
+	AllowVolumeCapacityPriority bool
+}
+
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
+	return ValidateVolumeBindingArgsWithOptions(path, args, VolumeBindingArgsValidationOptions{
+		AllowVolumeCapacityPriority: utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+	})
+}
+
+// ValidateVolumeBindingArgs validates that VolumeBindingArgs with scheduler features.
+func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeBindingArgs, opts VolumeBindingArgsValidationOptions) error {
 	var allErrs field.ErrorList
 
 	if args.BindTimeoutSeconds < 0 {
 		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+	if opts.AllowVolumeCapacityPriority {
 		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
 	} else if args.Shape != nil {
 		// When the feature is off, return an error if the config is not nil.
