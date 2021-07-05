@@ -11,13 +11,19 @@
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
       "rsc.io/quote": "refer to #102833",
       "rsc.io/sampler": "refer to #102833",
+      "github.com/hashicorp/golang-lru": "",
       "github.com/hashicorp/hcl": "",
-      "github.com/spf13/viper": "refer to #102598"
+      "github.com/json-iterator/go": "refer to #105030",
+      "github.com/spf13/viper": "refer to #102598",
+      "github.com/go-bindata/go-bindata ": "refer to #99829"
     }
   },
   "status": {
-    "indirectReferences": [
+    "references": [
+      "github.com/go-kit/kit",
+      "github.com/hashicorp/golang-lru",
       "github.com/hashicorp/hcl",
+      "github.com/json-iterator/go",
       "github.com/spf13/viper"
     ]
   }
