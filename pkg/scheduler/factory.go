@@ -36,7 +36,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -100,7 +99,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		var ignorableExtenders []framework.Extender
 		for ii := range c.extenders {
 			klog.V(2).InfoS("Creating extender", "extender", c.extenders[ii])
-			extender, err := core.NewHTTPExtender(&c.extenders[ii])
+			extender, err := NewHTTPExtender(&c.extenders[ii])
 			if err != nil {
 				return nil, err
 			}
