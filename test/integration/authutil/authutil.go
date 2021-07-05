@@ -63,7 +63,7 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 	}
 }
 
-func GrantUserNamedAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, username string, rule rbacv1.PolicyRule) {
+func GrantUserAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, username string, rule rbacv1.PolicyRule) {
 	t.Helper()
 
 	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
@@ -102,6 +102,11 @@ func GrantUserNamedAuthorization(t *testing.T, ctx context.Context, adminClient 
 		_ = adminClient.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{})
 	})
 
+	var resourceName string
+	if len(rule.ResourceNames) > 0 {
+		resourceName = rule.ResourceNames[0]
+	}
+
 	WaitForNamedAuthorizationUpdate(
 		t,
 		ctx,
@@ -109,7 +114,7 @@ func GrantUserNamedAuthorization(t *testing.T, ctx context.Context, adminClient 
 		username,
 		"",
 		rule.Verbs[0],
-		rule.ResourceNames[0],
+		resourceName,
 		schema.GroupResource{Group: rule.APIGroups[0], Resource: rule.Resources[0]},
 		true,
 	)

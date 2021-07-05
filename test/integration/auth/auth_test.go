@@ -920,12 +920,11 @@ func TestImpersonateWithUID(t *testing.T) {
 	t.Run("impersonation with uid header", func(t *testing.T) {
 		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
-		authutil.GrantUserNamedAuthorization(t, ctx, adminClient, "alice",
+		authutil.GrantUserAuthorization(t, ctx, adminClient, "alice",
 			rbacv1.PolicyRule{
-				Verbs:         []string{"create"},
-				APIGroups:     []string{"certificates.k8s.io"},
-				Resources:     []string{"certificatesigningrequests"},
-				ResourceNames: []string{"impersonated-csr"},
+				Verbs:     []string{"create"},
+				APIGroups: []string{"certificates.k8s.io"},
+				Resources: []string{"certificatesigningrequests"},
 			},
 		)
 
@@ -996,7 +995,7 @@ func TestImpersonateWithUID(t *testing.T) {
 	t.Run("impersonating UID without authorization fails", func(t *testing.T) {
 		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
-		authutil.GrantUserNamedAuthorization(t, ctx, adminClient, "system:anonymous",
+		authutil.GrantUserAuthorization(t, ctx, adminClient, "system:anonymous",
 			rbacv1.PolicyRule{
 				Verbs:         []string{"impersonate"},
 				APIGroups:     []string{""},
