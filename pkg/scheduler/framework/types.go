@@ -69,6 +69,8 @@ const (
 	Service               GVK = "Service"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
+	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
 	WildCard              GVK = "*"
 )
 
