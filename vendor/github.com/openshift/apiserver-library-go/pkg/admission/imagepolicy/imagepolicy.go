@@ -200,6 +200,15 @@ func (a *ImagePolicyPlugin) admit(ctx context.Context, attr admission.Attributes
 		return nil
 	}
 
+	if obj, ok := attr.GetObject().(metav1.Object); ok {
+		for _, ownerRef := range obj.GetOwnerReferences() {
+			if ownerRef.Controller != nil && *ownerRef.Controller {
+				klog.V(5).Infof("skipping image policy admission for %s:%s/%s, reason: has controller owner reference", attr.GetKind(), attr.GetNamespace(), attr.GetName())
+				return nil
+			}
+		}
+	}
+
 	klog.V(5).Infof("running image policy admission for %s:%s/%s", attr.GetKind(), attr.GetNamespace(), attr.GetName())
 	m, err := a.imageMutators.GetImageReferenceMutator(attr.GetObject(), attr.GetOldObject())
 	if err != nil {
@@ -222,7 +231,7 @@ func (a *ImagePolicyPlugin) admit(ctx context.Context, attr admission.Attributes
 		}
 	}
 
-	if err := accept(a.accepter, policy, a.resolver, m, annotations, attr, excluded); err != nil {
+	if err := accept(a.accepter, policy, a.resolver, m, annotations, attr, excluded, mutationAllowed); err != nil {
 		return err
 	}
 
