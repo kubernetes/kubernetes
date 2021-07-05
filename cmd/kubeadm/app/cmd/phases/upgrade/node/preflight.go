@@ -19,11 +19,13 @@ package node
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+
 	utilsexec "k8s.io/utils/exec"
+
+	"github.com/pkg/errors"
 )
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join

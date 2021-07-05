@@ -21,22 +21,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-
-	"net/http"
-	"os"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
 )
 
 var (

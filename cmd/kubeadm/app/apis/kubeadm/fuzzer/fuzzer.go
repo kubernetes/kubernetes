@@ -17,12 +17,14 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.

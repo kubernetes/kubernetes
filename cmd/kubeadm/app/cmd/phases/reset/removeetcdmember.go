@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	utilstaticpod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+
+	"k8s.io/klog/v2"
 )
 
 // NewRemoveETCDMemberPhase creates a kubeadm workflow phase for remove-etcd-member

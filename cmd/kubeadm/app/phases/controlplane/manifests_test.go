@@ -26,9 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -36,6 +33,10 @@ import (
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/lithammer/dedent"
 )
 
 const (
