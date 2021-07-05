@@ -24,7 +24,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -50,14 +50,10 @@ type UnwantedStatus struct {
 	// eliminating things from this list is good.
 	Vendored []string `json:"vendored"`
 
-	// TODO implement checks for add DirectReferences
+	// TODO implement checks for distinguishing direct/indirect
 	// unwanted modules we still directly reference from spec.roots, based on `go mod graph` content.
-	// eliminating things from this list is good.
-	DirectReferences []string `json:"directReferences"`
-
-	// unwanted modules indirectly referenced from modules other than spec.roots, based on `go mod graph` content.
-	// eliminating things from this list is good, but usually requires working with upstreams to do so.
-	IndirectReferences []string `json:"indirectReferences"`
+	// eliminating things from this list is good, and sometimes requires working with upstreams to do so.
+	References []string `json:"references"`
 }
 
 // Check all unwanted dependencies and update its status.
@@ -65,11 +61,13 @@ func (config *Unwanted) checkUpdateStatus(modeGraph map[string][]string) {
 	fmt.Println("Check all unwanted dependencies and update its status.")
 	for unwanted := range config.Spec.UnwantedModules {
 		if _, found := modeGraph[unwanted]; found {
-			if !stringInSlice(unwanted, config.Status.IndirectReferences) {
-				config.Status.IndirectReferences = append(config.Status.IndirectReferences, unwanted)
+			if !stringInSlice(unwanted, config.Status.References) {
+				config.Status.References = append(config.Status.References, unwanted)
 			}
 		}
 	}
+	// sort deps
+	sort.Strings(config.Status.References)
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
@@ -107,13 +105,13 @@ func convertToMap(modStr string) map[string][]string {
 		if len(deps) == 2 {
 			first := strings.Split(deps[0], "@")[0]
 			second := strings.Split(deps[1], "@")[0]
-			original, ok := modMap[first]
+			original, ok := modMap[second]
 			if !ok {
-				modMap[first] = []string{second}
-			} else if stringInSlice(second, original) {
+				modMap[second] = []string{first}
+			} else if stringInSlice(first, original) {
 				continue
 			} else {
-				modMap[first] = append(original, second)
+				modMap[second] = append(original, first)
 			}
 		} else {
 			// skip invalid line
@@ -122,6 +120,23 @@ func convertToMap(modStr string) map[string][]string {
 		}
 	}
 	return modMap
+}
+
+// difference returns a-b and b-a as a simple map.
+func difference(a, b []string) (map[string]bool, map[string]bool) {
+	aMinusB := map[string]bool{}
+	bMinusA := map[string]bool{}
+	for _, dependency := range a {
+		aMinusB[dependency] = true
+	}
+	for _, dependency := range b {
+		if _, found := aMinusB[dependency]; found {
+			delete(aMinusB, dependency)
+		} else {
+			bMinusA[dependency] = true
+		}
+	}
+	return aMinusB, bMinusA
 }
 
 // option1: dependencyverifier dependencies.json
@@ -168,12 +183,26 @@ func main() {
 	config.Spec.UnwantedModules = configFromFile.Spec.UnwantedModules
 	config.checkUpdateStatus(modeGraph)
 
-	// DeepEqual check current status with it in json file
-	// TODO sort array
-	if !reflect.DeepEqual(configFromFile.Status, config.Status) {
-		fmt.Println("Status in ./hack/unwanted-dependencies.json:\n", configFromFile.Status)
-		fmt.Println("Status detected:\n", config.Status)
-		log.Println("!!! Please update ./hack/unwanted-dependencies.json")
+	needUpdate := false
+	// Compare unwanted list from unwanted-dependencies.json with current status from `go mod graph`
+	removedReferences, unwantedReferences := difference(configFromFile.Status.References, config.Status.References)
+	if len(removedReferences) > 0 {
+		log.Println("Good news! The following unwanted dependencies are no longer referenced:")
+		for reference := range removedReferences {
+			log.Printf("   %s", reference)
+		}
+		log.Printf("!!! Remove the unwanted dependencies from status in %s to ensure they don't get reintroduced", dependenciesJSONPath)
+		needUpdate = true
+	}
+	if len(unwantedReferences) > 0 {
+		log.Printf("The following unwanted dependencies marked in %s are referenced:", dependenciesJSONPath)
+		for reference := range unwantedReferences {
+			log.Printf("   %s (referenced by %s)", reference, strings.Join(modeGraph[reference], ", "))
+		}
+		log.Printf("!!! Avoid updating referencing modules to versions that reintroduce use of unwanted dependencies\n")
+		needUpdate = true
+	}
+	if needUpdate {
 		os.Exit(1)
 	}
 }

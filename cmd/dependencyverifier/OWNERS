@@ -1,9 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - pacoxu
-  - gautierdelorme
+- dep-reviewers
+- pacoxu
+- gautierdelorme
 approvers:
-  - bentheelder
-  - pacoxu
-  - liggitt
+- dep-approvers
+- pacoxu
