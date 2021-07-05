@@ -254,6 +254,12 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
 	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
 
+	badPluginsConfig := validConfig.DeepCopy()
+	badPluginsConfig.Profiles[0].PluginConfig = append(badPluginsConfig.Profiles[0].PluginConfig, config.PluginConfig{
+		Name: "NodeResourcesLeastAllocated",
+		Args: &config.NodeResourcesLeastAllocatedArgs{},
+	})
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -383,6 +389,11 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"good-conflict-plugins-2": {
 			expectedToFail: false,
 			config:         goodConflictPlugins2,
+		},
+		"bad-plugins-config": {
+			expectedToFail: true,
+			config:         badPluginsConfig,
+			errorString:    "profiles[0].pluginConfig[1]: Invalid value: \"NodeResourcesLeastAllocated\": was removed in version \"kubescheduler.config.k8s.io/v1beta2\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta2\")",
 		},
 	}
 
