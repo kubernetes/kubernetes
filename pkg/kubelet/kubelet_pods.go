@@ -2092,3 +2092,10 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+func (kl *Kubelet) checkNeedKillContainers(podName string, podStatus *v1.PodStatus, containerName string) (containerID kubecontainer.ContainerID, err error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		cStatus, found = podutil.GetContainerStatus(podStatus.EphemeralContainerStatuses, containerName)
+	}
+	return
+}

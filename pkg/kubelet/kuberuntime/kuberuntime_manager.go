@@ -456,6 +456,10 @@ type podActions struct {
 	// EphemeralContainersToStart is a list of indexes for the ephemeral containers to start,
 	// where the index is the index of the specific container in pod.Spec.EphemeralContainers.
 	EphemeralContainersToStart []int
+	// EphemeralContainersToKill keeps a map of ephemeral containers that need to be killed, note that
+	// the key is the container ID of the container, while
+	// the value contains necessary information to kill a container.
+	EphemeralContainersToKill map[kubecontainer.ContainerID]ephemeralContainerToKillInfo
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -575,6 +579,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	// Ephemeral containers may be started even if initialization is not yet complete.
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		changes.EphemeralContainersToKill = make(map[kubecontainer.ContainerID]containerToKillInfo)
 		for i := range pod.Spec.EphemeralContainers {
 			c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 
@@ -582,6 +587,30 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			if podStatus.FindContainerStatusByName(c.Name) == nil {
 				changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 			}
+
+		}
+
+		// check the status of ephemeral containers.
+		// pod.Spec.EphemeralContainers vs podStatus.ContainerStatuses
+		var cStatus *kubecontainer.Status
+		for _, c := range podStatus.ContainerStatuses {
+			// running runtime-container status
+			if c.State == kubecontainer.ContainerStateRunning {
+				// is this right?
+				if c.Name not in Containers/EphemeralContainers {
+					changes.EphemeralContainersToKill = c
+				}
+			}
+		}
+
+		if cStatus == nil {
+			return false, "", nil
+		}
+
+		runningEpheralContainers := 
+		getRunningEphemeralContainers()
+		for idx, container := range pod.Spec.EphemeralContainers {
+			dd
 		}
 	}
 
