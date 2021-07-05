@@ -49,7 +49,7 @@ func MakeService(name string, tweaks ...Tweak) *api.Service {
 	// Default to 1 port
 	SetPorts(MakeServicePort("", 93, intstr.FromInt(76), api.ProtocolTCP))(svc)
 	// Default internalTrafficPolicy to "Cluster"
-	SetInternalTrafficPolicyCluster(svc)
+	SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)(svc)
 
 	for _, tweak := range tweaks {
 		tweak(svc)
@@ -99,18 +99,6 @@ func SetAllocateLBNodePortTrue(svc *api.Service) {
 // SetTypeExternalNameFalse sets the allocate LB node port to false.
 func SetAllocateLBNodePortFalse(svc *api.Service) {
 	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
-}
-
-// SetInternalTrafficPolicyCluster sets the internalTrafficPolicy field to "Cluster"
-func SetInternalTrafficPolicyCluster(svc *api.Service) {
-	policy := api.ServiceInternalTrafficPolicyCluster
-	svc.Spec.InternalTrafficPolicy = &policy
-}
-
-// SetInternalTrafficPolicyCluster sets the internalTrafficPolicy field to "Local"
-func SetInternalTrafficPolicyLocal(svc *api.Service) {
-	policy := api.ServiceInternalTrafficPolicyLocal
-	svc.Spec.InternalTrafficPolicy = &policy
 }
 
 // SetPorts sets the service ports list.
@@ -163,5 +151,12 @@ func SetNodePorts(values ...int) Tweak {
 			}
 			svc.Spec.Ports[i].NodePort = int32(values[i])
 		}
+	}
+}
+
+// SetInternalTrafficPolicy sets the internalTrafficPolicy field for a Service.
+func SetInternalTrafficPolicy(policy api.ServiceInternalTrafficPolicyType) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.InternalTrafficPolicy = &policy
 	}
 }

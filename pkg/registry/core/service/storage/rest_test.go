@@ -1457,7 +1457,7 @@ func TestServiceRegistryInternalTrafficPolicyClusterThenLocal(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	svc := svctest.MakeService("internal-traffic-policy-cluster",
-		svctest.SetInternalTrafficPolicyCluster,
+		svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster),
 	)
 	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if obj == nil || err != nil {
@@ -1489,7 +1489,7 @@ func TestServiceRegistryInternalTrafficPolicyLocalThenCluster(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	svc := svctest.MakeService("internal-traffic-policy-cluster",
-		svctest.SetInternalTrafficPolicyLocal,
+		svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal),
 	)
 	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if obj == nil || err != nil {
