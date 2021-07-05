@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -71,7 +70,7 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
-	Algorithm core.ScheduleAlgorithm
+	Algorithm ScheduleAlgorithm
 
 	Extenders []framework.Extender
 
@@ -548,7 +547,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// succeeds, the pod should get counted as a success the next time we try to
 			// schedule it. (hopefully)
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
-		} else if err == core.ErrNoNodesAvailable {
+		} else if err == ErrNoNodesAvailable {
 			// No nodes available is counted as unschedulable rather than an error.
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		} else {

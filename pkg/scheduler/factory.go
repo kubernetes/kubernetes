@@ -188,7 +188,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	)
 	debugger.ListenForSignal(c.StopEverything)
 
-	algo := core.NewGenericScheduler(
+	algo := NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
 		c.percentageOfNodesToScore,
@@ -374,7 +374,7 @@ func dedupPluginConfigs(pc []schedulerapi.PluginConfig) ([]schedulerapi.PluginCo
 func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
 		pod := podInfo.Pod
-		if err == core.ErrNoNodesAvailable {
+		if err == ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 		} else if fitError, ok := err.(*framework.FitError); ok {
 			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
