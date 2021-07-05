@@ -18,6 +18,7 @@ package quota
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -495,9 +497,21 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
 	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort2, metav1.CreateOptions{})
-	if err == nil {
-		t.Errorf("creating another loadbalancer Service with node ports should return error due to resource quota limits but got none")
+	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort2, metav1.CreateOptions{})
+		if apierrors.IsForbidden(err) {
+			return true, nil
+		}
+
+		if err == nil {
+			return false, errors.New("creating Service should have returned error but got nil")
+		}
+
+		return false, nil
+
+	})
+	if err != nil {
+		t.Errorf("creating another loadbalancer Service with node ports should return Forbidden due to resource quota limits but got: %v", err)
 	}
 
 	// Creating a loadbalancer Service without node ports should succeed
@@ -512,9 +526,21 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
 	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort2, metav1.CreateOptions{})
-	if err == nil {
-		t.Errorf("creating another loadbalancer Service without node ports should return error due to resource quota limits but got none")
+	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort2, metav1.CreateOptions{})
+		if apierrors.IsForbidden(err) {
+			return true, nil
+		}
+
+		if err == nil {
+			return false, errors.New("creating Service should have returned error but got nil")
+		}
+
+		return false, nil
+
+	})
+	if err != nil {
+		t.Errorf("creating another loadbalancer Service without node ports should return Forbidden due to resource quota limits but got: %v", err)
 	}
 
 	// Creating a ClusterIP Service should succeed
@@ -529,9 +555,21 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
 	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService2, metav1.CreateOptions{})
-	if err == nil {
-		t.Errorf("creating another cluster IP Service should have returned error due to resource quota limits but got none")
+	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService2, metav1.CreateOptions{})
+		if apierrors.IsForbidden(err) {
+			return true, nil
+		}
+
+		if err == nil {
+			return false, errors.New("creating Service should have returned error but got nil")
+		}
+
+		return false, nil
+
+	})
+	if err != nil {
+		t.Errorf("creating another clsuter IP Service should return Forbidden due to resource quota limits but got: %v", err)
 	}
 }
 
