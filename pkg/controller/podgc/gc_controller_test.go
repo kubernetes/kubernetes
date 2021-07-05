@@ -39,11 +39,11 @@ import (
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int, deleteAllTerminatedPods bool) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold, deleteAllTerminatedPods)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -67,21 +67,33 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		pods            []nameToPhase
-		threshold       int
-		deletedPodNames sets.String
+		name                    string
+		pods                    []nameToPhase
+		threshold               int
+		deleteAllTerminatedPods bool
+		deletedPodNames         sets.String
 	}{
 		{
-			name: "threshold = 0, disables terminated pod deletion",
-			pods: []nameToPhase{
-				{name: "a", phase: v1.PodFailed},
-				{name: "b", phase: v1.PodSucceeded},
-			},
-			threshold: 0,
-			// threshold = 0 disables terminated pod deletion
-			deletedPodNames: sets.NewString(),
-		},
+                        name: "threshold = 0 and deleteAllTerminatedPods = false, disables terminated pod deletion",
+                        pods: []nameToPhase{
+                                {name: "a", phase: v1.PodFailed},
+                                {name: "b", phase: v1.PodSucceeded},
+                        },
+                        threshold: 0,
+                        deleteAllTerminatedPods: false,
+                        // threshold = 0 and deleteAllTerminatedPods = false, disables terminated pod deletion
+                        deletedPodNames: sets.NewString(),
+                },
+		{
+                        name: "deleteAllTerminatedPods = true, will delete all terminated pods, and threshold will be ignored",
+                        pods: []nameToPhase{
+                                {name: "a", phase: v1.PodFailed},
+                                {name: "b", phase: v1.PodSucceeded},
+                        },
+                        threshold: 1,
+                        deleteAllTerminatedPods: true,
+                        deletedPodNames: sets.NewString("a", "b"),
+                },
 		{
 			name: "threshold = 1, delete pod a which is PodFailed and pod b which is PodSucceeded",
 			pods: []nameToPhase{
@@ -90,6 +102,8 @@ func TestGCTerminated(t *testing.T) {
 				{name: "c", phase: v1.PodFailed},
 			},
 			threshold:       1,
+			deleteAllTerminatedPods: false,
+			// deleteAllTerminatedPods = false, threshold will take effect
 			deletedPodNames: sets.NewString("a", "b"),
 		},
 		{
@@ -100,6 +114,7 @@ func TestGCTerminated(t *testing.T) {
 				{name: "c", phase: v1.PodFailed},
 			},
 			threshold:       1,
+			deleteAllTerminatedPods: false,
 			deletedPodNames: sets.NewString("b"),
 		},
 		{
@@ -109,6 +124,7 @@ func TestGCTerminated(t *testing.T) {
 				{name: "b", phase: v1.PodSucceeded},
 			},
 			threshold:       1,
+			deleteAllTerminatedPods: false,
 			deletedPodNames: sets.NewString("a"),
 		},
 		{
@@ -118,6 +134,7 @@ func TestGCTerminated(t *testing.T) {
 				{name: "b", phase: v1.PodSucceeded},
 			},
 			threshold:       5,
+			deleteAllTerminatedPods: false,
 			deletedPodNames: sets.NewString(),
 		},
 	}
@@ -125,7 +142,7 @@ func TestGCTerminated(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			gcc, podInformer, _ := NewFromClient(client, test.threshold, test.deleteAllTerminatedPods)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {

@@ -435,6 +435,7 @@ func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		int(ctx.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
+		ctx.ComponentConfig.PodGCController.DeleteAllTerminatedPods,
 	).Run(ctx.Stop)
 	return nil, true, nil
 }

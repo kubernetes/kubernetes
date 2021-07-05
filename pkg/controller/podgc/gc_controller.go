@@ -62,18 +62,19 @@ type PodGCController struct {
 }
 
 func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, deleteAllTerminatedPods bool) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 	gcc := &PodGCController{
-		kubeClient:             kubeClient,
-		terminatedPodThreshold: terminatedPodThreshold,
-		podLister:              podInformer.Lister(),
-		podListerSynced:        podInformer.Informer().HasSynced,
-		nodeLister:             nodeInformer.Lister(),
-		nodeListerSynced:       nodeInformer.Informer().HasSynced,
-		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
+		kubeClient:              kubeClient,
+		terminatedPodThreshold:  terminatedPodThreshold,
+		deleteAllTerminatedPods: deleteAllTerminatedPods,
+		podLister:               podInformer.Lister(),
+		podListerSynced:         podInformer.Informer().HasSynced,
+		nodeLister:              nodeInformer.Lister(),
+		nodeListerSynced:        nodeInformer.Informer().HasSynced,
+		nodeQueue:               workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
 			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
 			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
@@ -110,9 +111,11 @@ func (gcc *PodGCController) gc() {
 		klog.Errorf("Error while listing all nodes: %v", err)
 		return
 	}
-	if gcc.terminatedPodThreshold > 0 {
+
+	if gcc.terminatedPodThreshold > 0 || gcc.deleteAllTerminatedPods {
 		gcc.gcTerminated(pods)
 	}
+
 	gcc.gcOrphaned(pods, nodes)
 	gcc.gcUnscheduledTerminating(pods)
 }
@@ -130,6 +133,10 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		if isPodTerminated(pod) {
 			terminatedPods = append(terminatedPods, pod)
 		}
+	}
+
+	if gcc.deleteAllTerminatedPods {
+		gcc.terminatedPodThreshold == 0
 	}
 
 	terminatedPodCount := len(terminatedPods)
