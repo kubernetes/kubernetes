@@ -378,11 +378,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 
 func TestQuotaLimitService(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
-	type testCase struct {
-		description string
-		svc         *v1.Service
-		success     bool
-	}
+
 	// Set up an API server
 	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -477,56 +473,65 @@ func TestQuotaLimitService(t *testing.T) {
 			},
 		},
 	}
+
 	waitForQuota(t, quota, clientset)
 
-	tests := []testCase{
-		{
-			description: "node port service should be created successfully",
-			svc:         newService("np-svc", v1.ServiceTypeNodePort, true),
-			success:     true,
-		},
-		{
-			description: "first LB type service that allocates node port should be created successfully",
-			svc:         newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true),
-			success:     true,
-		},
-		{
-			description: "second LB type service that allocates node port creation should fail as node port quota is exceeded",
-			svc:         newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true),
-			success:     false,
-		},
-		{
-			description: "first LB type service that doesn't allocates node port should be created successfully",
-			svc:         newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false),
-			success:     true,
-		},
-		{
-			description: "second LB type service that doesn't allocates node port creation should fail as loadbalancer quota is exceeded",
-			svc:         newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false),
-			success:     false,
-		},
-		{
-			description: "forth service creation should be successful",
-			svc:         newService("clusterip-svc1", v1.ServiceTypeClusterIP, false),
-			success:     true,
-		},
-		{
-			description: "fifth service creation should fail as service quota is exceeded",
-			svc:         newService("clusterip-svc2", v1.ServiceTypeClusterIP, false),
-			success:     false,
-		},
+	// Creating the first node port service should succeed
+	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), nodePortService, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating first node port Service should not have returned error: %v", err)
 	}
 
-	for _, test := range tests {
-		t.Log(test.description)
-		_, err := clientset.CoreV1().Services(ns.Name).Create(context.TODO(), test.svc, metav1.CreateOptions{})
-		if (err == nil) != test.success {
-			if err != nil {
-				t.Fatalf("Error creating test service: %v, svc: %+v", err, test.svc)
-			} else {
-				t.Fatalf("Expect service creation to fail, but service %s is created", test.svc.Name)
-			}
-		}
+	// Creating the first loadbalancer service should succeed
+	lbServiceWithNodePort1 := newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating first loadbalancer Service should not have returned error: %v", err)
+	}
+
+	// add a delay for resource quota changes to propagate
+	time.Sleep(1 * time.Second)
+
+	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
+	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort2, metav1.CreateOptions{})
+	if err == nil {
+		t.Errorf("creating another loadbalancer Service with node ports should return error due to resource quota limits but got none")
+	}
+
+	// Creating a loadbalancer Service without node ports should succeed
+	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating another loadbalancer Service without node ports should not have returned error: %v", err)
+	}
+
+	// add a delay for resource quota changes to propagate
+	time.Sleep(1 * time.Second)
+
+	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
+	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort2, metav1.CreateOptions{})
+	if err == nil {
+		t.Errorf("creating another loadbalancer Service without node ports should return error due to resource quota limits but got none")
+	}
+
+	// Creating a ClusterIP Service should succeed
+	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating a cluster IP Service should not have returned error: %v", err)
+	}
+
+	// add a delay for resource quota changes to propagate
+	time.Sleep(1 * time.Second)
+
+	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
+	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService2, metav1.CreateOptions{})
+	if err == nil {
+		t.Errorf("creating another cluster IP Service should have returned error due to resource quota limits but got none")
 	}
 }
 
