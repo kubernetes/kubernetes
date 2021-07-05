@@ -14,18 +14,18 @@ import (
 type KeySerial uint32
 
 func JoinSessionKeyring(name string) (KeySerial, error) {
-	sessKeyID, err := unix.KeyctlJoinSessionKeyring(name)
+	sessKeyId, err := unix.KeyctlJoinSessionKeyring(name)
 	if err != nil {
 		return 0, errors.Wrap(err, "create session key")
 	}
-	return KeySerial(sessKeyID), nil
+	return KeySerial(sessKeyId), nil
 }
 
 // ModKeyringPerm modifies permissions on a keyring by reading the current permissions,
 // anding the bits with the given mask (clearing permissions) and setting
 // additional permission bits
-func ModKeyringPerm(ringID KeySerial, mask, setbits uint32) error {
-	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringID))
+func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
+	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringId))
 	if err != nil {
 		return err
 	}
@@ -43,5 +43,5 @@ func ModKeyringPerm(ringID KeySerial, mask, setbits uint32) error {
 
 	perm := (uint32(perm64) & mask) | setbits
 
-	return unix.KeyctlSetperm(int(ringID), perm)
+	return unix.KeyctlSetperm(int(ringId), perm)
 }

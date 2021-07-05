@@ -15,8 +15,8 @@ var (
 	checkAppArmor   sync.Once
 )
 
-// isEnabled returns true if apparmor is enabled for the host.
-func isEnabled() bool {
+// IsEnabled returns true if apparmor is enabled for the host.
+func IsEnabled() bool {
 	checkAppArmor.Do(func() {
 		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil {
 			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
@@ -57,10 +57,9 @@ func changeOnExec(name string) error {
 	return nil
 }
 
-// applyProfile will apply the profile with the specified name to the process after
-// the next exec. It is only supported on Linux and produces an error on other
-// platforms.
-func applyProfile(name string) error {
+// ApplyProfile will apply the profile with the specified name to the process after
+// the next exec.
+func ApplyProfile(name string) error {
 	if name == "" {
 		return nil
 	}

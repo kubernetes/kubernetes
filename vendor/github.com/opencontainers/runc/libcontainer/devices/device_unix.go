@@ -11,8 +11,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// ErrNotADevice denotes that a file is not a valid linux device.
-var ErrNotADevice = errors.New("not a device node")
+var (
+	// ErrNotADevice denotes that a file is not a valid linux device.
+	ErrNotADevice = errors.New("not a device node")
+)
 
 // Testing dependencies
 var (
@@ -27,9 +29,8 @@ func mkDev(d *Rule) (uint64, error) {
 	return unix.Mkdev(uint32(d.Major), uint32(d.Minor)), nil
 }
 
-// DeviceFromPath takes the path to a device and its cgroup_permissions (which
-// cannot be easily queried) to look up the information about a linux device
-// and returns that information as a Device struct.
+// Given the path to a device and its cgroup_permissions(which cannot be easily queried) look up the
+// information about a linux device and return that information as a Device struct.
 func DeviceFromPath(path, permissions string) (*Device, error) {
 	var stat unix.Stat_t
 	err := unixLstat(path, &stat)

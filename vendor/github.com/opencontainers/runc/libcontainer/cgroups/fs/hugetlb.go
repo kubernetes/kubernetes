@@ -11,7 +11,8 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type HugetlbGroup struct{}
+type HugetlbGroup struct {
+}
 
 func (s *HugetlbGroup) Name() string {
 	return "hugetlb"
@@ -23,7 +24,7 @@ func (s *HugetlbGroup) Apply(path string, d *cgroupData) error {
 
 func (s *HugetlbGroup) Set(path string, r *configs.Resources) error {
 	for _, hugetlb := range r.HugetlbLimit {
-		if err := cgroups.WriteFile(path, "hugetlb."+hugetlb.Pagesize+".limit_in_bytes", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
+		if err := fscommon.WriteFile(path, "hugetlb."+hugetlb.Pagesize+".limit_in_bytes", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}
 	}

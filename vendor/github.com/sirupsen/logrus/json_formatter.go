@@ -23,9 +23,6 @@ func (f FieldMap) resolve(key fieldKey) string {
 // JSONFormatter formats logs into parsable json
 type JSONFormatter struct {
 	// TimestampFormat sets the format used for marshaling timestamps.
-	// The format to use is the same than for time.Format or time.Parse from the standard
-	// library.
-	// The standard Library already provides a set of predefined format.
 	TimestampFormat string
 
 	// DisableTimestamp allows disabling automatic timestamps in output
@@ -121,7 +118,7 @@ func (f *JSONFormatter) Format(entry *Entry) ([]byte, error) {
 		encoder.SetIndent("", "  ")
 	}
 	if err := encoder.Encode(data); err != nil {
-		return nil, fmt.Errorf("failed to marshal fields to JSON, %w", err)
+		return nil, fmt.Errorf("failed to marshal fields to JSON, %v", err)
 	}
 
 	return b.Bytes(), nil

@@ -11,7 +11,9 @@ import (
 )
 
 func newRestoredProcess(cmd *exec.Cmd, fds []string) (*restoredProcess, error) {
-	var err error
+	var (
+		err error
+	)
 	pid := cmd.Process.Pid
 	stat, err := system.Stat(pid)
 	if err != nil {

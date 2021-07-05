@@ -402,7 +402,7 @@ func (f *MyJSONFormatter) Format(entry *Entry) ([]byte, error) {
   // source of the official loggers.
   serialized, err := json.Marshal(entry.Data)
     if err != nil {
-      return nil, fmt.Errorf("Failed to marshal fields to JSON, %w", err)
+      return nil, fmt.Errorf("Failed to marshal fields to JSON, %v", err)
     }
   return append(serialized, '\n'), nil
 }

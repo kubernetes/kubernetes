@@ -112,19 +112,9 @@ func populateProcessEnvironment(env []string) error {
 	for _, pair := range env {
 		p := strings.SplitN(pair, "=", 2)
 		if len(p) < 2 {
-			return fmt.Errorf("invalid environment variable: %q", pair)
+			return fmt.Errorf("invalid environment '%v'", pair)
 		}
-		name, val := p[0], p[1]
-		if name == "" {
-			return fmt.Errorf("environment variable name can't be empty: %q", pair)
-		}
-		if strings.IndexByte(name, 0) >= 0 {
-			return fmt.Errorf("environment variable name can't contain null(\\x00): %q", pair)
-		}
-		if strings.IndexByte(val, 0) >= 0 {
-			return fmt.Errorf("environment variable value can't contain null(\\x00): %q", pair)
-		}
-		if err := os.Setenv(name, val); err != nil {
+		if err := os.Setenv(p[0], p[1]); err != nil {
 			return err
 		}
 	}

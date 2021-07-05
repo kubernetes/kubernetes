@@ -32,7 +32,8 @@ const (
 	clockTicks uint64 = 100
 )
 
-type CpuacctGroup struct{}
+type CpuacctGroup struct {
+}
 
 func (s *CpuacctGroup) Name() string {
 	return "cpuacct"
@@ -90,7 +91,7 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	// Expected format:
 	// user <usage in ticks>
 	// system <usage in ticks>
-	data, err := cgroups.ReadFile(path, cgroupCpuacctStat)
+	data, err := fscommon.ReadFile(path, cgroupCpuacctStat)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -116,7 +117,7 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 
 func getPercpuUsage(path string) ([]uint64, error) {
 	percpuUsage := []uint64{}
-	data, err := cgroups.ReadFile(path, "cpuacct.usage_percpu")
+	data, err := fscommon.ReadFile(path, "cpuacct.usage_percpu")
 	if err != nil {
 		return percpuUsage, err
 	}
@@ -134,7 +135,7 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	usageKernelMode := []uint64{}
 	usageUserMode := []uint64{}
 
-	file, err := cgroups.OpenFile(path, cgroupCpuacctUsageAll, os.O_RDONLY)
+	file, err := fscommon.OpenFile(path, cgroupCpuacctUsageAll, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return usageKernelMode, usageUserMode, nil
 	} else if err != nil {
@@ -143,7 +144,7 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	scanner.Scan() // skipping header line
+	scanner.Scan() //skipping header line
 
 	for scanner.Scan() {
 		lineFields := strings.SplitN(scanner.Text(), " ", cuacctUsageAllColumnsNumber+1)
