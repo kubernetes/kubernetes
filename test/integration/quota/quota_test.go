@@ -497,22 +497,7 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
 	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
-	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort2, metav1.CreateOptions{})
-		if apierrors.IsForbidden(err) {
-			return true, nil
-		}
-
-		if err == nil {
-			return false, errors.New("creating Service should have returned error but got nil")
-		}
-
-		return false, nil
-
-	})
-	if err != nil {
-		t.Errorf("creating another loadbalancer Service with node ports should return Forbidden due to resource quota limits but got: %v", err)
-	}
+	testServiceForbidden(clientset, ns.Name, lbServiceWithNodePort2, t)
 
 	// Creating a loadbalancer Service without node ports should succeed
 	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
@@ -526,22 +511,7 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
 	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
-	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort2, metav1.CreateOptions{})
-		if apierrors.IsForbidden(err) {
-			return true, nil
-		}
-
-		if err == nil {
-			return false, errors.New("creating Service should have returned error but got nil")
-		}
-
-		return false, nil
-
-	})
-	if err != nil {
-		t.Errorf("creating another loadbalancer Service without node ports should return Forbidden due to resource quota limits but got: %v", err)
-	}
+	testServiceForbidden(clientset, ns.Name, lbServiceWithoutNodePort2, t)
 
 	// Creating a ClusterIP Service should succeed
 	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
@@ -555,8 +525,13 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
 	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
-	err = wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-		_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService2, metav1.CreateOptions{})
+	testServiceForbidden(clientset, ns.Name, clusterIPService2, t)
+}
+
+// testServiceForbidden attempts to create a Service expecting 403 Forbidden due to resource quota limits being exceeded.
+func testServiceForbidden(clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
+	pollErr := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+		_, err := clientset.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 		if apierrors.IsForbidden(err) {
 			return true, nil
 		}
@@ -568,8 +543,8 @@ func TestQuotaLimitService(t *testing.T) {
 		return false, nil
 
 	})
-	if err != nil {
-		t.Errorf("creating another clsuter IP Service should return Forbidden due to resource quota limits but got: %v", err)
+	if pollErr != nil {
+		t.Errorf("creating Service should return Forbidden due to resource quota limits but got: %v", pollErr)
 	}
 }
 
