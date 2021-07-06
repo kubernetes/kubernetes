@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/base:latest
+# The line below points to distroless/base as of 2021-06-29. The SHA should be
+# kept in sycn with distroless_base definition in the WORKSPACE file.
+FROM gcr.io/distroless/base@sha256:5e3fac1733c75e0e879a9770724e3960610a5cfbbfb5366559fbc334fe86c249
 
 COPY kubemark /kubemark
