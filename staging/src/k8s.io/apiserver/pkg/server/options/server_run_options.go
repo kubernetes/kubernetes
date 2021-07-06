@@ -54,6 +54,11 @@ type ServerRunOptions struct {
 	// apiserver library can wire it to a flag.
 	MaxRequestBodyBytes       int64
 	EnablePriorityAndFairness bool
+
+	// RetryWhenHasNotBeenReady once set will retry client's requests with 429 when the server hasn't been fully initialized.
+	// This option ensures that the system stays consistent even when requests are received before the server has been initialized.
+	// In particular it prevents child deletion in case of GC or/and orphaned content in case of the namespaces controller.
+	RetryWhenHasNotBeenReady bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -68,6 +73,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
 		EnablePriorityAndFairness:   true,
+		RetryWhenHasNotBeenReady:    false,
 	}
 }
 
@@ -86,6 +92,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
+	c.RetryWhenHasNotBeenReady = s.RetryWhenHasNotBeenReady
 
 	return nil
 }
@@ -244,6 +251,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
 		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
+
+	fs.BoolVar(&s.RetryWhenHasNotBeenReady, "retry-when-not-ready", s.RetryWhenHasNotBeenReady, ""+
+		"If true will retry client's requests with 429 when the server hasn't been fully initialized."+
+		"This option ensures that the system stays consistent even when requests are received before the server has been initialized"+
+		"In particular it prevents child deletion in case of GC or/and orphaned content in case of the namespaces controller")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
