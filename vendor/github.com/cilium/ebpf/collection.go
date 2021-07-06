@@ -3,7 +3,6 @@ package ebpf
 import (
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 	"strings"
@@ -90,8 +89,8 @@ func (cs *CollectionSpec) RewriteMaps(maps map[string]*Map) error {
 //
 // The constant must be defined like so in the C program:
 //
-//    volatile const type foobar;
-//    volatile const type foobar = default;
+//    static volatile const type foobar;
+//    static volatile const type foobar = default;
 //
 // Replacement values must be of the same length as the C sizeof(type).
 // If necessary, they are marshalled according to the same rules as
@@ -270,21 +269,11 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (*Co
 	}, nil
 }
 
-type handleCache struct {
-	btfHandles map[*btf.Spec]*btf.Handle
-	btfSpecs   map[io.ReaderAt]*btf.Spec
-}
+type btfHandleCache map[*btf.Spec]*btf.Handle
 
-func newHandleCache() *handleCache {
-	return &handleCache{
-		btfHandles: make(map[*btf.Spec]*btf.Handle),
-		btfSpecs:   make(map[io.ReaderAt]*btf.Spec),
-	}
-}
-
-func (hc handleCache) btfHandle(spec *btf.Spec) (*btf.Handle, error) {
-	if hc.btfHandles[spec] != nil {
-		return hc.btfHandles[spec], nil
+func (btfs btfHandleCache) load(spec *btf.Spec) (*btf.Handle, error) {
+	if btfs[spec] != nil {
+		return btfs[spec], nil
 	}
 
 	handle, err := btf.NewHandle(spec)
@@ -292,30 +281,14 @@ func (hc handleCache) btfHandle(spec *btf.Spec) (*btf.Handle, error) {
 		return nil, err
 	}
 
-	hc.btfHandles[spec] = handle
+	btfs[spec] = handle
 	return handle, nil
 }
 
-func (hc handleCache) btfSpec(rd io.ReaderAt) (*btf.Spec, error) {
-	if hc.btfSpecs[rd] != nil {
-		return hc.btfSpecs[rd], nil
-	}
-
-	spec, err := btf.LoadSpecFromReader(rd)
-	if err != nil {
-		return nil, err
-	}
-
-	hc.btfSpecs[rd] = spec
-	return spec, nil
-}
-
-func (hc handleCache) close() {
-	for _, handle := range hc.btfHandles {
+func (btfs btfHandleCache) close() {
+	for _, handle := range btfs {
 		handle.Close()
 	}
-	hc.btfHandles = nil
-	hc.btfSpecs = nil
 }
 
 func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
@@ -327,12 +300,12 @@ func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
 	var (
 		maps             = make(map[string]*Map)
 		progs            = make(map[string]*Program)
-		handles          = newHandleCache()
+		btfs             = make(btfHandleCache)
 		skipMapsAndProgs = false
 	)
 
 	cleanup = func() {
-		handles.close()
+		btfs.close()
 
 		if skipMapsAndProgs {
 			return
@@ -362,7 +335,7 @@ func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
 			return nil, fmt.Errorf("missing map %s", mapName)
 		}
 
-		m, err := newMapWithOptions(mapSpec, opts.Maps, handles)
+		m, err := newMapWithOptions(mapSpec, opts.Maps, btfs)
 		if err != nil {
 			return nil, fmt.Errorf("map %s: %w", mapName, err)
 		}
@@ -387,7 +360,7 @@ func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
 		for i := range progSpec.Instructions {
 			ins := &progSpec.Instructions[i]
 
-			if !ins.IsLoadFromMap() || ins.Reference == "" {
+			if ins.OpCode != asm.LoadImmOp(asm.DWord) || ins.Reference == "" {
 				continue
 			}
 
@@ -399,7 +372,7 @@ func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
 
 			m, err := loadMap(ins.Reference)
 			if err != nil {
-				return nil, fmt.Errorf("program %s: %w", progName, err)
+				return nil, fmt.Errorf("program %s: %s", progName, err)
 			}
 
 			fd := m.FD()
@@ -411,7 +384,7 @@ func lazyLoadCollection(coll *CollectionSpec, opts *CollectionOptions) (
 			}
 		}
 
-		prog, err := newProgramWithOptions(progSpec, opts.Programs, handles)
+		prog, err := newProgramWithOptions(progSpec, opts.Programs, btfs)
 		if err != nil {
 			return nil, fmt.Errorf("program %s: %w", progName, err)
 		}
@@ -561,7 +534,7 @@ func assignValues(to interface{}, valueOf func(reflect.Type, string) (reflect.Va
 			}
 
 			if err != nil {
-				return fmt.Errorf("field %s: %w", field.Name, err)
+				return fmt.Errorf("field %s: %s", field.Name, err)
 			}
 		}
 

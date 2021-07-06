@@ -8,19 +8,10 @@ import (
 	"math"
 	"strconv"
 	"strings"
-
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 var (
 	ErrNotValidFormat = errors.New("line is not a valid key value format")
-
-	// Deprecated: use cgroups.OpenFile instead.
-	OpenFile = cgroups.OpenFile
-	// Deprecated: use cgroups.ReadFile instead.
-	ReadFile = cgroups.ReadFile
-	// Deprecated: use cgroups.WriteFile instead.
-	WriteFile = cgroups.WriteFile
 )
 
 // ParseUint converts a string to an uint64 integer.
@@ -66,7 +57,7 @@ func ParseKeyValue(t string) (string, uint64, error) {
 // and returns a value of the specified key. ParseUint is used for value
 // conversion.
 func GetValueByKey(path, file, key string) (uint64, error) {
-	content, err := cgroups.ReadFile(path, file)
+	content, err := ReadFile(path, file)
 	if err != nil {
 		return 0, err
 	}
@@ -104,7 +95,7 @@ func GetCgroupParamUint(path, file string) (uint64, error) {
 // GetCgroupParamInt reads a single int64 value from specified cgroup file.
 // If the value read is "max", the math.MaxInt64 is returned.
 func GetCgroupParamInt(path, file string) (int64, error) {
-	contents, err := cgroups.ReadFile(path, file)
+	contents, err := ReadFile(path, file)
 	if err != nil {
 		return 0, err
 	}
@@ -122,7 +113,7 @@ func GetCgroupParamInt(path, file string) (int64, error) {
 
 // GetCgroupParamString reads a string from the specified cgroup file.
 func GetCgroupParamString(path, file string) (string, error) {
-	contents, err := cgroups.ReadFile(path, file)
+	contents, err := ReadFile(path, file)
 	if err != nil {
 		return "", err
 	}

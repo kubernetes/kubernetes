@@ -35,7 +35,7 @@ type Spec struct {
 	namedTypes map[string][]namedType
 	funcInfos  map[string]extInfo
 	lineInfos  map[string]extInfo
-	coreRelos  map[string]coreRelos
+	coreRelos  map[string]bpfCoreRelos
 	byteOrder  binary.ByteOrder
 }
 
@@ -53,7 +53,7 @@ type btfHeader struct {
 
 // LoadSpecFromReader reads BTF sections from an ELF.
 //
-// Returns ErrNotFound if the reader contains no BTF.
+// Returns a nil Spec and no error if no BTF was present.
 func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	file, err := internal.NewSafeELFFile(rd)
 	if err != nil {
@@ -67,7 +67,7 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	}
 
 	if btfSection == nil {
-		return nil, fmt.Errorf("btf: %w", ErrNotFound)
+		return nil, nil
 	}
 
 	symbols, err := file.Symbols()
@@ -438,13 +438,13 @@ func (s *Spec) Program(name string, length uint64) (*Program, error) {
 
 	funcInfos, funcOK := s.funcInfos[name]
 	lineInfos, lineOK := s.lineInfos[name]
-	relos, coreOK := s.coreRelos[name]
+	coreRelos, coreOK := s.coreRelos[name]
 
 	if !funcOK && !lineOK && !coreOK {
 		return nil, fmt.Errorf("no extended BTF info for section %s", name)
 	}
 
-	return &Program{s, length, funcInfos, lineInfos, relos}, nil
+	return &Program{s, length, funcInfos, lineInfos, coreRelos}, nil
 }
 
 // Datasec returns the BTF required to create maps which represent data sections.
@@ -491,8 +491,7 @@ func (s *Spec) FindType(name string, typ Type) error {
 		return fmt.Errorf("type %s: %w", name, ErrNotFound)
 	}
 
-	cpy, _ := copyType(candidate, nil)
-	value := reflect.Indirect(reflect.ValueOf(cpy))
+	value := reflect.Indirect(reflect.ValueOf(copyType(candidate)))
 	reflect.Indirect(reflect.ValueOf(typ)).Set(value)
 	return nil
 }
@@ -607,7 +606,7 @@ type Program struct {
 	spec                 *Spec
 	length               uint64
 	funcInfos, lineInfos extInfo
-	coreRelos            coreRelos
+	coreRelos            bpfCoreRelos
 }
 
 // ProgramSpec returns the Spec needed for loading function and line infos into the kernel.
@@ -666,21 +665,14 @@ func ProgramLineInfos(s *Program) (recordSize uint32, bytes []byte, err error) {
 	return s.lineInfos.recordSize, bytes, nil
 }
 
-// ProgramFixups returns the changes required to adjust the program to the target.
+// ProgramRelocations returns the CO-RE relocations required to adjust the
+// program to the target.
 //
 // This is a free function instead of a method to hide it from users
 // of package ebpf.
-func ProgramFixups(s *Program, target *Spec) (COREFixups, error) {
+func ProgramRelocations(s *Program, target *Spec) (map[uint64]Relocation, error) {
 	if len(s.coreRelos) == 0 {
 		return nil, nil
-	}
-
-	if target == nil {
-		var err error
-		target, err = LoadKernelSpec()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return coreRelocate(s.spec, target, s.coreRelos)

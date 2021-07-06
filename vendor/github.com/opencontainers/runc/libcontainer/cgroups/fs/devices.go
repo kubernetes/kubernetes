@@ -9,6 +9,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupdevices "github.com/opencontainers/runc/libcontainer/cgroups/devices"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/opencontainers/runc/libcontainer/userns"
@@ -35,7 +36,7 @@ func (s *DevicesGroup) Apply(path string, d *cgroupData) error {
 }
 
 func loadEmulator(path string) (*cgroupdevices.Emulator, error) {
-	list, err := cgroups.ReadFile(path, "devices.list")
+	list, err := fscommon.ReadFile(path, "devices.list")
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
 		if rule.Allow {
 			file = "devices.allow"
 		}
-		if err := cgroups.WriteFile(path, file, rule.CgroupString()); err != nil {
+		if err := fscommon.WriteFile(path, file, rule.CgroupString()); err != nil {
 			return err
 		}
 	}

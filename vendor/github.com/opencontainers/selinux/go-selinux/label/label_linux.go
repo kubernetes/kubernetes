@@ -25,8 +25,6 @@ var ErrIncompatibleLabel = errors.New("Bad SELinux option z and Z can not be use
 // the container.  A list of options can be passed into this function to alter
 // the labels.  The labels returned will include a random MCS String, that is
 // guaranteed to be unique.
-// If the disabled flag is passed in, the process label will not be set, but the mount label will be set
-// to the container_file label with the maximum category. This label is not usable by any confined label.
 func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 	if !selinux.GetEnabled() {
 		return "", "", nil
@@ -49,8 +47,7 @@ func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 		}
 		for _, opt := range options {
 			if opt == "disable" {
-				selinux.ReleaseLabel(mountLabel)
-				return "", selinux.PrivContainerMountLabel(), nil
+				return "", mountLabel, nil
 			}
 			if i := strings.Index(opt, ":"); i == -1 {
 				return "", "", errors.Errorf("Bad label option %q, valid options 'disable' or \n'user, role, level, type, filetype' followed by ':' and a value", opt)

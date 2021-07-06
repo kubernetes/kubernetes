@@ -29,10 +29,6 @@ type VerifierError struct {
 	log   string
 }
 
-func (le *VerifierError) Unwrap() error {
-	return le.cause
-}
-
 func (le *VerifierError) Error() string {
 	if le.log == "" {
 		return le.cause.Error()

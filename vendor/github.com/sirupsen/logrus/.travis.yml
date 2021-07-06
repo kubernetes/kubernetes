@@ -4,12 +4,14 @@ git:
   depth: 1
 env:
   - GO111MODULE=on
-go: 1.15.x
-os: linux
+go: [1.13.x, 1.14.x]
+os: [linux, osx]
 install:
   - ./travis/install.sh
 script:
-  - cd ci
-  - go run mage.go -v -w ../ crossBuild
-  - go run mage.go -v -w ../ lint
-  - go run mage.go -v -w ../ test
+  - ./travis/cross_build.sh
+  - ./travis/lint.sh
+  - export GOMAXPROCS=4
+  - export GORACE=halt_on_error=1
+  - go test -race -v ./...
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then go test -race -v -tags appengine ./... ; fi

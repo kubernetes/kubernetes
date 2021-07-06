@@ -12,7 +12,8 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type PidsGroup struct{}
+type PidsGroup struct {
+}
 
 func (s *PidsGroup) Name() string {
 	return "pids"
@@ -31,7 +32,7 @@ func (s *PidsGroup) Set(path string, r *configs.Resources) error {
 			limit = strconv.FormatInt(r.PidsLimit, 10)
 		}
 
-		if err := cgroups.WriteFile(path, "pids.max", limit); err != nil {
+		if err := fscommon.WriteFile(path, "pids.max", limit); err != nil {
 			return err
 		}
 	}

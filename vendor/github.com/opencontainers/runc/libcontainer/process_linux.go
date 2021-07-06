@@ -188,7 +188,7 @@ func (p *setnsProcess) start() (retErr error) {
 	}
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
-		_, _ = p.wait()
+		p.wait()
 		return ierr
 	}
 	return nil
@@ -201,16 +201,16 @@ func (p *setnsProcess) start() (retErr error) {
 func (p *setnsProcess) execSetns() error {
 	status, err := p.cmd.Process.Wait()
 	if err != nil {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return newSystemErrorWithCause(err, "waiting on setns process to finish")
 	}
 	if !status.Success() {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return newSystemError(&exec.ExitError{ProcessState: status})
 	}
 	var pid *pid
 	if err := json.NewDecoder(p.messageSockPair.parent).Decode(&pid); err != nil {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return newSystemErrorWithCause(err, "reading pid from init pipe")
 	}
 
@@ -292,7 +292,7 @@ func (p *initProcess) externalDescriptors() []string {
 func (p *initProcess) getChildPid() (int, error) {
 	var pid pid
 	if err := json.NewDecoder(p.messageSockPair.parent).Decode(&pid); err != nil {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return -1, err
 	}
 
@@ -309,11 +309,11 @@ func (p *initProcess) getChildPid() (int, error) {
 func (p *initProcess) waitForChildExit(childPid int) error {
 	status, err := p.cmd.Process.Wait()
 	if err != nil {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return err
 	}
 	if !status.Success() {
-		_ = p.cmd.Wait()
+		p.cmd.Wait()
 		return &exec.ExitError{ProcessState: status}
 	}
 
@@ -327,12 +327,12 @@ func (p *initProcess) waitForChildExit(childPid int) error {
 }
 
 func (p *initProcess) start() (retErr error) {
-	defer p.messageSockPair.parent.Close() //nolint: errcheck
+	defer p.messageSockPair.parent.Close()
 	err := p.cmd.Start()
 	p.process.ops = p
 	// close the write-side of the pipes (controlled by child)
-	_ = p.messageSockPair.child.Close()
-	_ = p.logFilePair.child.Close()
+	p.messageSockPair.child.Close()
+	p.logFilePair.child.Close()
 	if err != nil {
 		p.process.ops = nil
 		return newSystemErrorWithCause(err, "starting init process command")
@@ -371,9 +371,9 @@ func (p *initProcess) start() (retErr error) {
 				logrus.WithError(err).Warn("unable to terminate initProcess")
 			}
 
-			_ = p.manager.Destroy()
+			p.manager.Destroy()
 			if p.intelRdtManager != nil {
-				_ = p.intelRdtManager.Destroy()
+				p.intelRdtManager.Destroy()
 			}
 		}
 	}()
@@ -553,7 +553,7 @@ func (p *initProcess) start() (retErr error) {
 
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
-		_, _ = p.wait()
+		p.wait()
 		return ierr
 	}
 	return nil
@@ -563,7 +563,7 @@ func (p *initProcess) wait() (*os.ProcessState, error) {
 	err := p.cmd.Wait()
 	// we should kill all processes in cgroup when init is died if we use host PID namespace
 	if p.sharePidns {
-		_ = signalAllProcesses(p.manager, unix.SIGKILL)
+		signalAllProcesses(p.manager, unix.SIGKILL)
 	}
 	return p.cmd.ProcessState, err
 }
@@ -668,7 +668,7 @@ func (p *Process) InitializeIO(rootuid, rootgid int) (i *IO, err error) {
 	defer func() {
 		if err != nil {
 			for _, fd := range fds {
-				_ = unix.Close(int(fd))
+				unix.Close(int(fd))
 			}
 		}
 	}()

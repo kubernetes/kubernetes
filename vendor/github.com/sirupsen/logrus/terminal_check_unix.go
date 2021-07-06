@@ -1,4 +1,4 @@
-// +build linux aix zos
+// +build linux aix
 // +build !js
 
 package logrus

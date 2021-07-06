@@ -324,8 +324,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(sysno),
-						SkipTrue: uint8(baseJumpEnosys + 1),
-					},
+						SkipTrue: uint8(baseJumpEnosys + 1)},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}
@@ -354,20 +353,16 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				case libseccomp.ArchAMD64:
 					sectionTail = append([]bpf.Instruction{
 						// jset (1<<30),[len(tail)-1]
-						bpf.JumpIf{
-							Cond:     bpf.JumpBitsSet,
+						bpf.JumpIf{Cond: bpf.JumpBitsSet,
 							Val:      1 << 30,
-							SkipTrue: uint8(len(sectionTail) - 1),
-						},
+							SkipTrue: uint8(len(sectionTail) - 1)},
 					}, sectionTail...)
 				case libseccomp.ArchX32:
 					sectionTail = append([]bpf.Instruction{
 						// jset (1<<30),0,[len(tail)-1]
-						bpf.JumpIf{
-							Cond:     bpf.JumpBitsNotSet,
+						bpf.JumpIf{Cond: bpf.JumpBitsNotSet,
 							Val:      1 << 30,
-							SkipTrue: uint8(len(sectionTail) - 1),
-						},
+							SkipTrue: uint8(len(sectionTail) - 1)},
 					}, sectionTail...)
 				default:
 					return nil, errors.Errorf("unknown amd64 native architecture %#x", scmpArch)
@@ -407,14 +402,12 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x86sysno),
-						SkipTrue: uint8(baseJumpEnosys + 2), SkipFalse: 1,
-					},
+						SkipTrue: uint8(baseJumpEnosys + 2), SkipFalse: 1},
 					// jgt [x32 syscall],[baseJumpEnosys]
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x32sysno),
-						SkipTrue: uint8(baseJumpEnosys + 1),
-					},
+						SkipTrue: uint8(baseJumpEnosys + 1)},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}...)
@@ -433,14 +426,12 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x86sysno),
-						SkipTrue: 1, SkipFalse: 2,
-					},
+						SkipTrue: 1, SkipFalse: 2},
 					// jle [x32 syscall],[baseJumpEnosys]
 					bpf.JumpIf{
 						Cond:     bpf.JumpLessOrEqual,
 						Val:      uint32(x32sysno),
-						SkipTrue: 1,
-					},
+						SkipTrue: 1},
 					// ja [baseJumpEnosys+1]
 					bpf.Jump{Skip: baseJumpEnosys + 1},
 					// ja [baseJumpFilter]
@@ -487,8 +478,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				bpf.JumpIf{
 					Cond:     bpf.JumpEqual,
 					Val:      uint32(nativeArch),
-					SkipTrue: uint8(jump),
-				},
+					SkipTrue: uint8(jump)},
 			}, programTail...)
 		} else {
 			programTail = append([]bpf.Instruction{
@@ -496,8 +486,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				bpf.JumpIf{
 					Cond:     bpf.JumpNotEqual,
 					Val:      uint32(nativeArch),
-					SkipTrue: 1,
-				},
+					SkipTrue: 1},
 				// ja [jump]
 				bpf.Jump{Skip: jump},
 			}, programTail...)
