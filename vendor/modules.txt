@@ -212,6 +212,9 @@ github.com/coredns/corefile-migration/migration/corefile
 github.com/coreos/go-oidc
 # github.com/coreos/go-semver v0.3.0 => github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
+# github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+## explicit
+github.com/coreos/go-systemd/daemon
 # github.com/coreos/go-systemd/v22 v22.3.2 => github.com/coreos/go-systemd/v22 v22.3.2
 ## explicit
 github.com/coreos/go-systemd/v22/daemon
