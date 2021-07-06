@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,12 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
+	// minNodeScoresToDump is the number of nodes and plugins score to dump
+	// when the logging level ranged in [4, 6)
+	minNodeScoresToDump = 3
+	// minNodeScoresToDump is the number of nodes score to dump when the
+	// logging level ranged in [6, 10), and all plugins' score would be dumped
+	moreNodeScoresToDump = 10
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -79,6 +86,24 @@ type genericScheduler struct {
 	percentageOfNodesToScore int32
 	nextStartNodeIndex       int
 }
+
+type pluginScore struct {
+	Name  string
+	Score int64
+}
+
+type pluginScoreList []pluginScore
+
+// NodeToPluginScores declares a map from node name to its PluginScoreList.
+type nodeToPluginScores map[string]pluginScoreList
+
+type nshp []framework.NodeScore
+
+func (h nshp) Len() int            { return len(h) }
+func (h nshp) Less(i, j int) bool  { return h[i].Score < h[j].Score }
+func (h nshp) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *nshp) Push(v interface{}) { *h = append(*h, v.(framework.NodeScore)) }
+func (h *nshp) Pop() interface{}   { a := *h; v := a[len(a)-1]; *h = a[:len(a)-1]; return v }
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
@@ -428,14 +453,6 @@ func prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
-	if klog.V(10).Enabled() {
-		for plugin, nodeScoreList := range scoresMap {
-			for _, nodeScore := range nodeScoreList {
-				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
-			}
-		}
-	}
-
 	// Summarize all scores.
 	result := make(framework.NodeScoreList, 0, len(nodes))
 
@@ -445,6 +462,8 @@ func prioritizeNodes(
 			result[i].Score += scoresMap[j][i].Score
 		}
 	}
+
+	logNodeAndPluginScores(result, scoresMap, pod)
 
 	if len(extenders) != 0 && nodes != nil {
 		var mu sync.Mutex
@@ -504,4 +523,75 @@ func NewGenericScheduler(
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
+}
+
+func logNodeAndPluginScores(nodeScores framework.NodeScoreList, scoresMap framework.PluginToNodeScores, pod *v1.Pod) {
+	if !klog.V(4).Enabled() {
+		// No log dump if logging level < 4
+		return
+	}
+
+	if klog.V(10).Enabled() {
+		for plugin, nodeScoreList := range scoresMap {
+			for _, nodeScore := range nodeScoreList {
+				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+			}
+		}
+		return
+	}
+
+	var topM int8
+	if klog.V(6).Enabled() {
+		topM = moreNodeScoresToDump
+	} else {
+		//if klog.V(4).Enabled()
+		topM = minNodeScoresToDump
+	}
+
+	hp := make(nshp, topM)
+	for _, nodeScore := range nodeScores {
+		if len(hp) < int(topM) || nodeScore.Score < hp[0].Score {
+			if len(hp) == int(topM) {
+				hp.Pop()
+			}
+			hp.Push(nodeScore)
+		}
+	}
+
+	// Build a map of Nodes->PluginScores on that node
+	nodeToPluginScores := make(nodeToPluginScores, topM)
+	for _, nodeScore := range hp {
+		nodeToPluginScores[nodeScore.Name] = make(pluginScoreList, 0)
+	}
+
+	// Convert the scoresMap (which contains Plugins->NodeScores) to the Nodes->PluginScores map
+	for plugin, nodeScoreList := range scoresMap {
+		for _, nodeScore := range nodeScoreList {
+			// Get the top M nodes' plugin scores
+			if _, ok := nodeToPluginScores[nodeScore.Name]; ok {
+				nodeToPluginScores[nodeScore.Name] = append(nodeToPluginScores[nodeScore.Name], pluginScore{Name: plugin, Score: nodeScore.Score})
+			}
+		}
+	}
+
+	var topNPlugins int8 = -1
+	if !klog.V(6).Enabled() {
+		topNPlugins = minNodeScoresToDump
+	}
+	for name, pluginScores := range nodeToPluginScores {
+		//Get the PluginScore for logging level 4
+		sort.Slice(pluginScores, func(i int, j int) bool {
+			return pluginScores[i].Score > pluginScores[j].Score
+		})
+		if topNPlugins > 0 && len(pluginScores) > int(topNPlugins) {
+			nodeToPluginScores[name] = pluginScores[:topNPlugins]
+		}
+	}
+
+	for len(hp) > 0 {
+		nodeScore := hp.Pop().(framework.NodeScore)
+		pluginScores := nodeToPluginScores[nodeScore.Name]
+		klog.InfoS("Plugins scored node for pod", "pod", klog.KObj(pod), "node", nodeScore.Name, "score", nodeScore.Score, "plugins", pluginScores)
+	}
+
 }
