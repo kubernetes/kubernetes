@@ -1010,7 +1010,6 @@ func TestGenericScheduler(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			result, err := scheduler.Schedule(ctx, nil, fwk, framework.NewCycleState(), test.pod)
-			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -1070,7 +1069,6 @@ func TestFindFitAllError(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// TODO(#94696): use cmp.Diff() to compare `diagnosis`.
 	if diff := cmp.Diff(len(diagnosis.NodeToStatusMap), len(nodes)); diff != "" {
 		t.Errorf("Unexpected failed status map: (-want, +got): %s", diff)
 	}
