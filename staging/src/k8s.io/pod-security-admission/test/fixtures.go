@@ -170,8 +170,8 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 			if len(data.expectErrorSubstring) == 0 {
 				data.expectErrorSubstring = key.check
 			}
-			if len(data.pass) == 0 || len(data.fail) == 0 {
-				return fixtureData{}, fmt.Errorf("generatePass/generateFail for %#v must return at least one pod each", key)
+			if len(data.fail) == 0 {
+				return fixtureData{}, fmt.Errorf("generateFail for %#v must return at least one pod", key)
 			}
 			return data, nil
 		}

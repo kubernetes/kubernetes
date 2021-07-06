@@ -30,7 +30,8 @@ func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "host namespaces",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
-			return []*corev1.Pod{p} // minimal valid pod
+			// minimal valid pod already captures all valid combinations
+			return nil
 		},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			return []*corev1.Pod{
