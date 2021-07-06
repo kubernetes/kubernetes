@@ -18,6 +18,7 @@ package quota
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -49,6 +51,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/test/integration/framework"
+)
+
+const (
+	resourceQuotaTimeout = 10 * time.Second
 )
 
 // 1.2 code gets:
@@ -183,6 +189,39 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// waitForUsedResourceQuota polls a ResourceQuota status for an expected used value
+func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
+	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			actualValue, found := resourceQuota.Status.Used[k]
+			if !found {
+				t.Logf("resource %s was not found in ResourceQuota status", k)
+				return false, nil
+			}
+
+			if !actualValue.Equal(v) {
+				t.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("error waiting or ResourceQuota status: %v", err)
 	}
 }
 
@@ -378,11 +417,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 
 func TestQuotaLimitService(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
-	type testCase struct {
-		description string
-		svc         *v1.Service
-		success     bool
-	}
+
 	// Set up an API server
 	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -477,56 +512,91 @@ func TestQuotaLimitService(t *testing.T) {
 			},
 		},
 	}
+
 	waitForQuota(t, quota, clientset)
 
-	tests := []testCase{
-		{
-			description: "node port service should be created successfully",
-			svc:         newService("np-svc", v1.ServiceTypeNodePort, true),
-			success:     true,
-		},
-		{
-			description: "first LB type service that allocates node port should be created successfully",
-			svc:         newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true),
-			success:     true,
-		},
-		{
-			description: "second LB type service that allocates node port creation should fail as node port quota is exceeded",
-			svc:         newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true),
-			success:     false,
-		},
-		{
-			description: "first LB type service that doesn't allocates node port should be created successfully",
-			svc:         newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false),
-			success:     true,
-		},
-		{
-			description: "second LB type service that doesn't allocates node port creation should fail as loadbalancer quota is exceeded",
-			svc:         newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false),
-			success:     false,
-		},
-		{
-			description: "forth service creation should be successful",
-			svc:         newService("clusterip-svc1", v1.ServiceTypeClusterIP, false),
-			success:     true,
-		},
-		{
-			description: "fifth service creation should fail as service quota is exceeded",
-			svc:         newService("clusterip-svc2", v1.ServiceTypeClusterIP, false),
-			success:     false,
-		},
+	// Creating the first node port service should succeed
+	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), nodePortService, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating first node port Service should not have returned error: %v", err)
 	}
 
-	for _, test := range tests {
-		t.Log(test.description)
-		_, err := clientset.CoreV1().Services(ns.Name).Create(context.TODO(), test.svc, metav1.CreateOptions{})
-		if (err == nil) != test.success {
-			if err != nil {
-				t.Fatalf("Error creating test service: %v, svc: %+v", err, test.svc)
-			} else {
-				t.Fatalf("Expect service creation to fail, but service %s is created", test.svc.Name)
-			}
+	// Creating the first loadbalancer service should succeed
+	lbServiceWithNodePort1 := newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating first loadbalancer Service should not have returned error: %v", err)
+	}
+
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed := v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("2"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+
+	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
+	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
+	testServiceForbidden(clientset, ns.Name, lbServiceWithNodePort2, t)
+
+	// Creating a loadbalancer Service without node ports should succeed
+	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating another loadbalancer Service without node ports should not have returned error: %v", err)
+	}
+
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed = v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("3"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+
+	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
+	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
+	testServiceForbidden(clientset, ns.Name, lbServiceWithoutNodePort2, t)
+
+	// Creating a ClusterIP Service should succeed
+	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
+	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService1, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("creating a cluster IP Service should not have returned error: %v", err)
+	}
+
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed = v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("4"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+
+	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
+	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
+	testServiceForbidden(clientset, ns.Name, clusterIPService2, t)
+}
+
+// testServiceForbidden attempts to create a Service expecting 403 Forbidden due to resource quota limits being exceeded.
+func testServiceForbidden(clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
+	pollErr := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+		_, err := clientset.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+		if apierrors.IsForbidden(err) {
+			return true, nil
 		}
+
+		if err == nil {
+			return false, errors.New("creating Service should have returned error but got nil")
+		}
+
+		return false, nil
+
+	})
+	if pollErr != nil {
+		t.Errorf("creating Service should return Forbidden due to resource quota limits but got: %v", pollErr)
 	}
 }
 
