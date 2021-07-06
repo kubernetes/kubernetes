@@ -980,6 +980,36 @@ func TestRefreshCreds(t *testing.T) {
 			}`,
 			wantCreds: credentials{token: "foo-bar"},
 		},
+		{
+			name: "v1-basic-request",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "v1-with-missing-interactive-mode",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1",
+			},
+			wantErr:       true,
+			wantErrSubstr: `exec plugin cannot support interactive mode: unknown interactiveMode: ""`,
+		},
 	}
 
 	for _, test := range tests {
