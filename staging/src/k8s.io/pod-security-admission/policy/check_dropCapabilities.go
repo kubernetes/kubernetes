@@ -18,7 +18,6 @@ package policy
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
+)
+
+const (
+	CapabilityAll            = "ALL"
+	CapabilityNetBindService = "CAP_NET_BIND_SERVICE"
 )
 
 func init() {
@@ -49,7 +53,6 @@ func CheckDropCapabilities() Check {
 
 func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	containers := sets.NewString()
-	invalidCapabilities := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext == nil || container.SecurityContext.Capabilities == nil {
 			containers.Insert(container.Name)
@@ -57,17 +60,17 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 		}
 		found := false
 		for _, c := range container.SecurityContext.Capabilities.Drop {
-			if c == "all" {
+			if c == CapabilityAll {
 				found = true
 				break
 			}
 		}
 		if container.SecurityContext.Capabilities.Add != nil && len(container.SecurityContext.Capabilities.Add) > 0 {
 			for index, c := range container.SecurityContext.Capabilities.Add {
-				if c != "CAP_NET_BIND_SERVICE" {
-					capabilityPath := path.Child("securityContext", "capabilities", "add", strconv.Itoa(index))
+				if c != CapabilityNetBindService {
+					capabilityPath := path.Child("securityContext", "capabilities", "add").Index(index)
 					msg := fmt.Sprintf("%s=%s", capabilityPath.String(), string(c))
-					invalidCapabilities.Insert(msg)
+					containers.Insert(msg)
 				}
 			}
 		}
@@ -76,7 +79,6 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			return
 		}
 	})
-
 	if len(containers) > 0 {
 		return CheckResult{
 			Allowed:         false,
