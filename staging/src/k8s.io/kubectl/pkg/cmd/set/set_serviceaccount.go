@@ -38,14 +38,14 @@ import (
 )
 
 var (
-	serviceaccountResources = `
-	replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`
+	serviceaccountResources = i18n.T(`replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`)
 
 	serviceaccountLong = templates.LongDesc(i18n.T(`
 	Update ServiceAccount of pod template resources.
 
 	Possible resources (case insensitive) can be:
-	` + serviceaccountResources))
+
+	`) + serviceaccountResources)
 
 	serviceaccountExample = templates.Examples(i18n.T(`
 	# Set Deployment nginx-deployment's ServiceAccount to serviceaccount1

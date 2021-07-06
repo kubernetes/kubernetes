@@ -22,25 +22,35 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 TRANSLATIONS="staging/src/k8s.io/kubectl/pkg/util/i18n/translations"
-KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
+KUBECTL_FILES=()
+KUBECTL_DEFAULT_LOCATIONS=(
+  "pkg/kubectl/cmd"
+  "staging/src/k8s.io/kubectl/pkg/cmd"
+)
+KUBECTL_IGNORE_FILES_REGEX="cmd/kustomize/kustomize.go"
 
 generate_pot="false"
 generate_mo="false"
+fix_translations="false"
 
-while getopts "hf:xg" opt; do
+while getopts "hf:xkg" opt; do
   case ${opt} in
     h)
-      echo "$0 [-f files] [-x] [-g]"
+      echo "$0 [-f files] [-x] [-k] [-g]"
       echo " -f <file-path>: Files to process"
       echo " -x extract strings to a POT file"
+      echo " -k fix .po files; deprecate translations by marking them obsolete and supply default messages"
       echo " -g sort .po files and generate .mo files"
       exit 0
       ;;
     f)
-      KUBECTL_FILES="${OPTARG}"
+      KUBECTL_FILES+=("${OPTARG}")
       ;;
     x)
       generate_pot="true"
+      ;;
+    k)
+      fix_translations="true"
       ;;
     g)
       generate_mo="true"
@@ -51,6 +61,10 @@ while getopts "hf:xg" opt; do
       ;;
   esac
 done
+
+if [[ ${#KUBECTL_FILES} -eq 0 ]]; then
+  KUBECTL_FILES+=("${KUBECTL_DEFAULT_LOCATIONS[@]}")
+fi
 
 if ! which go-xgettext > /dev/null; then
   echo 'Can not find go-xgettext, install with:'
@@ -66,7 +80,8 @@ fi
 
 if [[ "${generate_pot}" == "true" ]]; then
   echo "Extracting strings to POT"
-  go-xgettext -k=i18n.T "${KUBECTL_FILES}" > tmp.pot
+  # shellcheck disable=SC2046
+  go-xgettext -k=i18n.T $(grep -lr "i18n.T" "${KUBECTL_FILES[@]}" | grep -vE "${KUBECTL_IGNORE_FILES_REGEX}") > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
   perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
@@ -78,6 +93,23 @@ if [[ "${generate_pot}" == "true" ]]; then
     echo "Failed to update template.pot"
     exit 1
   fi
+fi
+
+if [[ "${fix_translations}" == "true" ]]; then
+  echo "Fixing .po files"
+  kube::util::ensure-temp-dir
+  for PO_FILE in translations/kubectl/*/LC_MESSAGES/k8s.po; do
+    TMP="${KUBE_TEMP}/fix.po"
+    if [[ "${PO_FILE}" =~ .*/default/.* || "${PO_FILE}" =~ .*/en_US/.*  ]]; then
+      # mark obsolete, and set default values for english translations
+      msgen translations/kubectl/template.pot | \
+        msgmerge -s --no-fuzzy-matching "${PO_FILE}" - > "${TMP}"
+    else
+      # mark obsolete, but do not add untranslated messages
+      msgmerge -s --no-fuzzy-matching "${PO_FILE}" translations/kubectl/template.pot | msgattrib --translated - > "${TMP}"
+    fi
+    mv "${TMP}" "${PO_FILE}"
+  done
 fi
 
 if [[ "${generate_mo}" == "true" ]]; then
