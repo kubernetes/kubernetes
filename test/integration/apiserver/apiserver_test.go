@@ -1368,6 +1368,226 @@ func TestAPICRDProtobuf(t *testing.T) {
 	}
 }
 
+func TestGetSubresourcesAsTables(t *testing.T) {
+	testNamespace := "test-transform"
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	s, clientset, closeFn := setup(t)
+	defer closeFn()
+	fmt.Printf("%#v\n", clientset)
+
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fooWithSubresourceCRD := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foosubs.cr.bar.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "foosubs",
+				Kind:   "FooSub",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"replicas": {
+											Type: "integer",
+										},
+									},
+								},
+								"status": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"replicas": {
+											Type: "integer",
+										},
+									},
+								},
+							},
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fooWithSubresourceCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subresourcesCrdGVR := schema.GroupVersionResource{Group: fooWithSubresourceCRD.Spec.Group, Version: fooWithSubresourceCRD.Spec.Versions[0].Name, Resource: "foosubs"}
+	subresourcesCrclient := dynamicClient.Resource(subresourcesCrdGVR).Namespace(testNamespace)
+
+	testcases := []struct {
+		name        string
+		accept      string
+		object      func(*testing.T) (metav1.Object, string, string)
+		subresource string
+	}{
+		{
+			name:   "v1 verify status subresource returns a table for CRDs",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := subresourcesCrclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "FooSub", "metadata": map[string]interface{}{"name": "test-1"}, "spec": map[string]interface{}{"replicas": 2}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				return cr, subresourcesCrdGVR.Group, "foosubs"
+			},
+			subresource: "status",
+		},
+		{
+			name:   "v1 verify scale subresource returns a table for CRDs",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := subresourcesCrclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "FooSub", "metadata": map[string]interface{}{"name": "test-2"}, "spec": map[string]interface{}{"replicas": 2}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				return cr, subresourcesCrdGVR.Group, "foosubs"
+			},
+			subresource: "scale",
+		},
+		{
+			name:   "verify status subresource returns a table for replicationcontrollers",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				rc := &v1.ReplicationController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "replicationcontroller-1",
+					},
+					Spec: v1.ReplicationControllerSpec{
+						Replicas: int32Ptr(2),
+						Selector: map[string]string{
+							"label": "test-label",
+						},
+						Template: &v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"label": "test-label",
+								},
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{Name: "test-name", Image: "nonexistant-image"},
+								},
+							},
+						},
+					},
+				}
+				rc, err := clientset.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), rc, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create replicationcontroller: %v", err)
+				}
+				return rc, "", "replicationcontrollers"
+			},
+			subresource: "status",
+		},
+		{
+			name:   "verify scale subresource returns a table for replicationcontrollers",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				rc := &v1.ReplicationController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "replicationcontroller-2",
+					},
+					Spec: v1.ReplicationControllerSpec{
+						Replicas: int32Ptr(2),
+						Selector: map[string]string{
+							"label": "test-label",
+						},
+						Template: &v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"label": "test-label",
+								},
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{Name: "test-name", Image: "nonexistant-image"},
+								},
+							},
+						},
+					},
+				}
+				rc, err := clientset.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), rc, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create replicationcontroller: %v", err)
+				}
+				return rc, "", "replicationcontrollers"
+			},
+			subresource: "scale",
+		},
+	}
+
+	for i := range testcases {
+		tc := testcases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			obj, group, resource := tc.object(t)
+
+			cfg := dynamic.ConfigFor(config)
+			if len(group) == 0 {
+				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg.APIPath = "/api"
+			} else {
+				cfg.APIPath = "/apis"
+			}
+			cfg.GroupVersion = &schema.GroupVersion{Group: group, Version: "v1"}
+
+			client, err := restclient.RESTClientFor(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			res := client.Get().
+				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).
+				SetHeader("Accept", tc.accept).
+				Name(obj.GetName()).
+				SubResource(tc.subresource).
+				Do(context.TODO())
+
+			resObj, err := res.Get()
+			if err != nil {
+				t.Fatalf("failed to retrieve object from response: %v", err)
+			}
+			actualKind := resObj.GetObjectKind().GroupVersionKind().Kind
+			if actualKind != "Table" {
+				t.Fatalf("Expected Kind 'Table', got '%v'", actualKind)
+			}
+		})
+	}
+}
+
 func TestTransform(t *testing.T) {
 	testNamespace := "test-transform"
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
@@ -2482,4 +2702,8 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 	if len(obj.GetManagedFields()) == 0 {
 		t.Errorf("unexpected empty managed fields in object: %v", obj)
 	}
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }
