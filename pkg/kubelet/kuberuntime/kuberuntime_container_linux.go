@@ -97,6 +97,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		case kubelettypes.UnlimitedSwap:
 			// -1 = unlimited swap
 			lc.Resources.MemorySwapLimitInBytes = -1
+		case kubelettypes.LimitedSwap:
+			fallthrough
 		default:
 			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
 			// Some swapping is still possible.
