@@ -4781,7 +4781,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	localInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyLocal
+	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
 
 	serviceName := "svc1"
 	// Add initial service
@@ -4793,7 +4793,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-			InternalTrafficPolicy: &localInternalTrafficPolicy,
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -4957,7 +4957,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	localInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyLocal
+	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
 
 	// Add initial service
 	serviceName := "svc1"
@@ -4969,7 +4969,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-			InternalTrafficPolicy: &localInternalTrafficPolicy,
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
@@ -5130,7 +5130,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 	fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
 
-	localInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyLocal
+	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
 
 	// Add initial service
 	serviceName := "svc1"
@@ -5142,7 +5142,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 			Selector:              map[string]string{"foo": "bar"},
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-			InternalTrafficPolicy: &localInternalTrafficPolicy,
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			ExternalIPs: []string{
 				"1.2.3.4",
 			},
