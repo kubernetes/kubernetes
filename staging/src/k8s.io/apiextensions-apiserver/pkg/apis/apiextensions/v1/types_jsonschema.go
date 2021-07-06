@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1
 
-// JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
+// JSONSchemaProps is a JSON-Schema following Specification Draft 4. See http://json-schema.org/ for more details.
 type JSONSchemaProps struct {
 	ID          string        `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
 	Schema      JSONSchemaURL `json:"$schema,omitempty" protobuf:"bytes,2,opt,name=schema"`
