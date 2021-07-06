@@ -835,7 +835,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
 
-	CSIMigrationvSphere: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
+	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.Beta},
 
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
