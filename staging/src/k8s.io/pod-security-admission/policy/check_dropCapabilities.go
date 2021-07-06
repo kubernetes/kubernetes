@@ -38,20 +38,31 @@ func CheckDropCapabilities() Check {
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       dropCapabilities_1_0,
+				MinimumVersion: api.MajorMinorVersion(1, 22),
+				CheckPod:       dropCapabilities_1_22,
 			},
 		},
 	}
 }
 
-func dropCapabilities_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	containers := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
-		if container.SecurityContext != nil || container.SecurityContext.Capabilities != nil {
+		if container.SecurityContext == nil || container.SecurityContext.Capabilities == nil {
 			containers.Insert(container.Name)
+			return
 		}
-		return
+		found := false
+		for _, c := range container.SecurityContext.Capabilities.Drop {
+			if c == "all" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			containers.Insert(container.Name)
+			return
+		}
 	})
 
 	if len(containers) > 0 {
