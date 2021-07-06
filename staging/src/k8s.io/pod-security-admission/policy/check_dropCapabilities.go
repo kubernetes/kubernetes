@@ -17,6 +17,8 @@ limitations under the License.
 package policy
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +49,7 @@ func CheckDropCapabilities() Check {
 
 func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	containers := sets.NewString()
+	invalidCapabilities := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext == nil || container.SecurityContext.Capabilities == nil {
 			containers.Insert(container.Name)
@@ -57,6 +60,15 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			if c == "all" {
 				found = true
 				break
+			}
+		}
+		if container.SecurityContext.Capabilities.Add != nil && len(container.SecurityContext.Capabilities.Add) > 0 {
+			for index, c := range container.SecurityContext.Capabilities.Add {
+				if c != "CAP_NET_BIND_SERVICE" {
+					capabilityPath := path.Child("securityContext", "capabilities", "add", strconv.Itoa(index))
+					msg := fmt.Sprintf("%s=%s", capabilityPath.String(), string(c))
+					invalidCapabilities.Insert(msg)
+				}
 			}
 		}
 		if !found {
