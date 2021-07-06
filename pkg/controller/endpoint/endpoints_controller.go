@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	"k8s.io/kubernetes/pkg/features"
@@ -245,7 +245,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 				// pod cidr list order is same as service cidr list order). The expectation is
 				// this is *most probably* the case.
 
-				// if the family was incorrectly indentified then this will be corrected once the
+				// if the family was incorrectly identified then this will be corrected once the
 				// the upgrade is completed (controller connects to api-server that correctly defaults services)
 				if utilnet.IsIPv6String(pod.Status.PodIP) {
 					ipFamily = v1.IPv6Protocol

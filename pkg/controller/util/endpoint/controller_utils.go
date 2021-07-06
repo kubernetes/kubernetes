@@ -277,7 +277,7 @@ func (sl portsInOrder) Less(i, j int) bool {
 	return h1 < h2
 }
 
-// endpointsEqualBeyondHash returns true if endpoints have equal attributes
+// EndpointsEqualBeyondHash returns true if endpoints have equal attributes
 // but excludes equality checks that would have already been covered with
 // endpoint hashing (see hashEndpoint func for more info).
 func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
