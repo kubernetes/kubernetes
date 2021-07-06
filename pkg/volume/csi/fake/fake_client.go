@@ -69,12 +69,13 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 }
 
 type CSIVolume struct {
-	VolumeHandle    string
-	VolumeContext   map[string]string
-	Path            string
-	DeviceMountPath string
-	FSType          string
-	MountFlags      []string
+	VolumeHandle     string
+	VolumeContext    map[string]string
+	Path             string
+	DeviceMountPath  string
+	FSType           string
+	MountFlags       []string
+	VolumeMountGroup string
 }
 
 // NodeClient returns CSI node client
@@ -86,6 +87,7 @@ type NodeClient struct {
 	volumeStatsSet           bool
 	volumeConditionSet       bool
 	singleNodeMultiWriterSet bool
+	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
 	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
 	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
@@ -131,6 +133,15 @@ func NewNodeClientWithSingleNodeMultiWriter(singleNodeMultiWriterSet bool) *Node
 		stageUnstageSet:          true,
 		volumeStatsSet:           true,
 		singleNodeMultiWriterSet: singleNodeMultiWriterSet,
+	}
+}
+
+func NewNodeClientWithVolumeMountGroup(stageUnstageSet, volumeMountGroupSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]CSIVolume),
+		nodeStagedVolumes:    make(map[string]CSIVolume),
+		stageUnstageSet:      stageUnstageSet,
+		volumeMountGroupSet:  volumeMountGroupSet,
 	}
 }
 
@@ -217,6 +228,7 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	if req.GetVolumeCapability().GetMount() != nil {
 		publishedVolume.FSType = req.GetVolumeCapability().GetMount().FsType
 		publishedVolume.MountFlags = req.GetVolumeCapability().GetMount().MountFlags
+		publishedVolume.VolumeMountGroup = req.GetVolumeCapability().GetMount().VolumeMountGroup
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = publishedVolume
 	return &csipb.NodePublishVolumeResponse{}, nil
@@ -268,6 +280,7 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 	if mounted != nil {
 		fsType = mounted.GetFsType()
 		csiVol.MountFlags = mounted.GetMountFlags()
+		csiVol.VolumeMountGroup = mounted.VolumeMountGroup
 	}
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
@@ -381,6 +394,16 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 			Type: &csipb.NodeServiceCapability_Rpc{
 				Rpc: &csipb.NodeServiceCapability_RPC{
 					Type: csipb.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
+				},
+			},
+		})
+	}
+
+	if f.volumeMountGroupSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 				},
 			},
 		})
