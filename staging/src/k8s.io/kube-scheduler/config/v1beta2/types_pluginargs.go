@@ -116,6 +116,18 @@ type PodTopologySpreadArgs struct {
 	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
+type NodeResourcesBalancedAllocationArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Resources to be managed, the default is "cpu" and "memory" if not specified.
+	// +listType=map
+	// +listMapKey=name
+	Resources []ResourceSpec `json:"resources,omitempty"`
+}
+
 // UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
@@ -124,9 +136,9 @@ type UtilizationShapePoint struct {
 	Score int32 `json:"score"`
 }
 
-// ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
+// ResourceSpec represents a single resource.
 type ResourceSpec struct {
-	// Name of the resource to be managed by RequestedToCapacityRatio function.
+	// Name of the resource.
 	Name string `json:"name"`
 	// Weight of the resource.
 	Weight int64 `json:"weight,omitempty"`

@@ -34,6 +34,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta2.KubeSchedulerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta2.KubeSchedulerConfiguration))
 	})
+	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesBalancedAllocationArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*v1beta2.NodeResourcesBalancedAllocationArgs))
+	})
 	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*v1beta2.NodeResourcesFitArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta2.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta2.PodTopologySpreadArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta2.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1beta2.VolumeBindingArgs)) })
@@ -50,6 +53,10 @@ func SetObjectDefaults_InterPodAffinityArgs(in *v1beta2.InterPodAffinityArgs) {
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *v1beta2.KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
+}
+
+func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *v1beta2.NodeResourcesBalancedAllocationArgs) {
+	SetDefaults_NodeResourcesBalancedAllocationArgs(in)
 }
 
 func SetObjectDefaults_NodeResourcesFitArgs(in *v1beta2.NodeResourcesFitArgs) {

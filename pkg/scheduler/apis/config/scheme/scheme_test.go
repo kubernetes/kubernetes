@@ -87,6 +87,19 @@ profiles:
       resources:
       - name: memory
         weight: 1
+  - name: NodeResourcesBalancedAllocation
+    args:
+      resources:
+        - name: cpu       # default weight(1) will be set.
+        - name: memory    # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar0
+          weight: 1
+        - name: scalar1   # default weight(1) will be set for scalar1
+        - name: scalar2   # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar3
+          weight: 2
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
@@ -162,6 +175,18 @@ profiles:
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
 								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{
+									{Name: "cpu", Weight: 1},
+									{Name: "memory", Weight: 1},
+									{Name: "scalar0", Weight: 1},
+									{Name: "scalar1", Weight: 1},
+									{Name: "scalar2", Weight: 1},
+									{Name: "scalar3", Weight: 2}},
 							},
 						},
 						{
@@ -312,6 +337,8 @@ profiles:
     args:
   - name: NodeResourcesMostAllocated
     args:
+  - name: NodeResourcesBalancedAllocation
+    args:
   - name: VolumeBinding
     args:
   - name: PodTopologySpread
@@ -354,6 +381,12 @@ profiles:
 						{
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
 								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 							},
 						},
@@ -413,6 +446,19 @@ profiles:
             - key: foo
               operator: In
               values: ["bar"]
+  - name: NodeResourcesBalancedAllocation
+    args:
+      resources:
+        - name: cpu       # default weight(1) will be set.
+        - name: memory    # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar0
+          weight: 1
+        - name: scalar1   # default weight(1) will be set for scalar1
+        - name: scalar2   # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar3
+          weight: 2
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -475,6 +521,18 @@ profiles:
 								},
 							},
 						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{
+									{Name: "cpu", Weight: 1},
+									{Name: "memory", Weight: 1},
+									{Name: "scalar0", Weight: 1},
+									{Name: "scalar1", Weight: 1},
+									{Name: "scalar2", Weight: 1},
+									{Name: "scalar3", Weight: 2}},
+							},
+						},
 					},
 				},
 			},
@@ -510,6 +568,12 @@ profiles:
 						{
 							Name: "NodeAffinity",
 							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
 						},
 						{
 							Name: "NodeResourcesFit",
@@ -631,6 +695,7 @@ profiles:
     args:
   - name: PodTopologySpread
   - name: NodeAffinity
+  - name: NodeResourcesBalancedAllocation
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -675,6 +740,12 @@ profiles:
 						{
 							Name: "NodeAffinity",
 							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
 						},
 					},
 				},
@@ -770,6 +841,16 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: runtime.RawExtension{
+									Object: &v1beta1.NodeResourcesBalancedAllocationArgs{
+										Resources: []v1beta1.ResourceSpec{
+											{Name: "mem", Weight: 1},
+										},
+									},
+								},
+							},
+							{
 								Name: "PodTopologySpread",
 								Args: runtime.RawExtension{
 									Object: &v1beta1.PodTopologySpreadArgs{
@@ -837,6 +918,13 @@ profiles:
       - name: mem
         weight: 2
     name: NodeResourcesLeastAllocated
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      kind: NodeResourcesBalancedAllocationArgs
+      resources:
+      - name: mem
+        weight: 1
+    name: NodeResourcesBalancedAllocation
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       kind: PodTopologySpreadArgs

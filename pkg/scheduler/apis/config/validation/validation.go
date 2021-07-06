@@ -189,16 +189,17 @@ func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *
 func validatePluginConfig(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
 	var errs []error
 	m := map[string]interface{}{
-		"DefaultPreemption":           ValidateDefaultPreemptionArgs,
-		"InterPodAffinity":            ValidateInterPodAffinityArgs,
-		"NodeAffinity":                ValidateNodeAffinityArgs,
-		"NodeLabel":                   ValidateNodeLabelArgs,
-		"NodeResourcesFitArgs":        ValidateNodeResourcesFitArgs,
-		"NodeResourcesLeastAllocated": ValidateNodeResourcesLeastAllocatedArgs,
-		"NodeResourcesMostAllocated":  ValidateNodeResourcesMostAllocatedArgs,
-		"PodTopologySpread":           ValidatePodTopologySpreadArgs,
-		"RequestedToCapacityRatio":    ValidateRequestedToCapacityRatioArgs,
-		"VolumeBinding":               ValidateVolumeBindingArgs,
+		"DefaultPreemption":               ValidateDefaultPreemptionArgs,
+		"InterPodAffinity":                ValidateInterPodAffinityArgs,
+		"NodeAffinity":                    ValidateNodeAffinityArgs,
+		"NodeLabel":                       ValidateNodeLabelArgs,
+		"NodeResourcesBalancedAllocation": ValidateNodeResourcesBalancedAllocationArgs,
+		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
+		"NodeResourcesLeastAllocated":     ValidateNodeResourcesLeastAllocatedArgs,
+		"NodeResourcesMostAllocated":      ValidateNodeResourcesMostAllocatedArgs,
+		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
+		"RequestedToCapacityRatio":        ValidateRequestedToCapacityRatioArgs,
+		"VolumeBinding":                   ValidateVolumeBindingArgs,
 	}
 
 	seenPluginConfig := make(sets.String)

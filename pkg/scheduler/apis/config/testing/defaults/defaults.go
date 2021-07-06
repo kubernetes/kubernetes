@@ -124,6 +124,12 @@ var PluginConfigsV1beta1 = []config.PluginConfig{
 		Args: &config.NodeAffinityArgs{},
 	},
 	{
+		Name: "NodeResourcesBalancedAllocation",
+		Args: &config.NodeResourcesBalancedAllocationArgs{
+			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		},
+	},
+	{
 		Name: "NodeResourcesFit",
 		Args: &config.NodeResourcesFitArgs{
 			ScoringStrategy: &config.ScoringStrategy{
@@ -252,6 +258,12 @@ var PluginConfigsV1beta2 = []config.PluginConfig{
 	{
 		Name: "NodeAffinity",
 		Args: &config.NodeAffinityArgs{},
+	},
+	{
+		Name: "NodeResourcesBalancedAllocation",
+		Args: &config.NodeResourcesBalancedAllocationArgs{
+			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		},
 	},
 	{
 		Name: "NodeResourcesFit",
