@@ -44,6 +44,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -69,7 +70,7 @@ const (
 	decisionSkipFilter
 )
 
-var defaultRequestWidthEstimator = func(*http.Request) uint { return 1 }
+var defaultRequestWidthEstimator = func(*http.Request) fcrequest.Width { return fcrequest.Width{Seats: 1} }
 
 type fakeApfFilter struct {
 	mockDecision mockDecision
@@ -586,13 +587,15 @@ func TestApfWithRequestDigest(t *testing.T) {
 	reqDigestExpected := &utilflowcontrol.RequestDigest{
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
-		Width:       5,
+		Width: fcrequest.Width{
+			Seats: 5,
+		},
 	}
 
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request) uint { return reqDigestExpected.Width },
+		func(_ *http.Request) fcrequest.Width { return reqDigestExpected.Width },
 	)
 
 	w := httptest.NewRecorder()
