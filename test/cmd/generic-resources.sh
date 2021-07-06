@@ -315,8 +315,8 @@ run_recursive_resources_tests() {
   output_message=$(! kubectl autoscale --min=1 --max=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox replication controllers are autoscaled
   # with min. of 1 replica & max of 2 replicas, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert 'hpa busybox0' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '1 2 80'
-  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
+  kube::test::get_object_assert 'hpa busybox0' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}}" '1 2'
+  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}}" '1 2'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kubectl delete hpa busybox0 "${kube_flags[@]}"
   kubectl delete hpa busybox1 "${kube_flags[@]}"

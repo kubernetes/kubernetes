@@ -377,7 +377,6 @@ runTests() {
   export container_name_field="(index .spec.template.spec.containers 0).name"
   export hpa_min_field=".spec.minReplicas"
   export hpa_max_field=".spec.maxReplicas"
-  export hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
   export template_labels=".spec.template.metadata.labels.name"
   export statefulset_replicas_field=".spec.replicas"
   export statefulset_observed_generation=".status.observedGeneration"

@@ -1400,11 +1400,11 @@ run_rc_tests() {
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # autoscale 1~2 pods, CPU utilization 70%, rc specified by file
   kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
-  kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '1 2 70'
+  kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}}" '1 2'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}}" '2 3'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
   ! kubectl autoscale rc frontend "${kube_flags[@]}" || exit 1

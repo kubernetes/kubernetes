@@ -34,6 +34,7 @@ import (
 	authorizationapiv1 "k8s.io/api/authorization/v1"
 	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
@@ -651,6 +652,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authorizationapiv1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
+		autoscalingapiv2.SchemeGroupVersion,
 		autoscalingapiv2beta1.SchemeGroupVersion,
 		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,

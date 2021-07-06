@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2beta2_test
+package v2_test
 
 import (
 	"reflect"
@@ -25,11 +25,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	"github.com/stretchr/testify/assert"
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )

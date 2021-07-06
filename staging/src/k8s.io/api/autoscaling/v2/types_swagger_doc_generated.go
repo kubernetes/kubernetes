@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2beta2
+package v2
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -189,7 +189,7 @@ var map_MetricSpec = map[string]string{
 	"object":            "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
 	"pods":              "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
 	"resource":          "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-	"containerResource": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
+	"containerResource": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
 	"external":          "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
 }
 
@@ -235,9 +235,10 @@ func (MetricValueStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricSource = map[string]string{
-	"":       "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"target": "target specifies the target value for the given metric",
-	"metric": "metric identifies the target metric by name and selector",
+	"":                "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"describedObject": "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion",
+	"target":          "target specifies the target value for the given metric",
+	"metric":          "metric identifies the target metric by name and selector",
 }
 
 func (ObjectMetricSource) SwaggerDoc() map[string]string {
@@ -245,13 +246,24 @@ func (ObjectMetricSource) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricStatus = map[string]string{
-	"":        "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"metric":  "metric identifies the target metric by name and selector",
-	"current": "current contains the current value for the given metric",
+	"":                "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"metric":          "metric identifies the target metric by name and selector",
+	"current":         "current contains the current value for the given metric",
+	"describedObject": "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion",
 }
 
 func (ObjectMetricStatus) SwaggerDoc() map[string]string {
 	return map_ObjectMetricStatus
+}
+
+var map_PodResourceMetricSource = map[string]string{
+	"":       "PodResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+	"name":   "name is the name of the resource in question.",
+	"target": "target specifies the target value for the given metric",
+}
+
+func (PodResourceMetricSource) SwaggerDoc() map[string]string {
+	return map_PodResourceMetricSource
 }
 
 var map_PodsMetricSource = map[string]string{
@@ -272,16 +284,6 @@ var map_PodsMetricStatus = map[string]string{
 
 func (PodsMetricStatus) SwaggerDoc() map[string]string {
 	return map_PodsMetricStatus
-}
-
-var map_ResourceMetricSource = map[string]string{
-	"":       "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
-	"name":   "name is the name of the resource in question.",
-	"target": "target specifies the target value for the given metric",
-}
-
-func (ResourceMetricSource) SwaggerDoc() map[string]string {
-	return map_ResourceMetricSource
 }
 
 var map_ResourceMetricStatus = map[string]string{

@@ -287,7 +287,7 @@ run_deployment_tests() {
   kube::test::get_object_assert 'hpa' "{{range.items}}{{ if eq $id_field \\\"nginx-deployment\\\" }}found{{end}}{{end}}:" ':'
   # autoscale 2~3 pods, no CPU utilization specified
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]:?}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa nginx-deployment' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
+  kube::test::get_object_assert 'hpa nginx-deployment' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}}" '2 3'
   # Describe command should respect the chunk size parameter
   kube::test::describe_resource_chunk_size_assert horizontalpodautoscalers events
   # Clean up
@@ -709,11 +709,11 @@ run_rs_tests() {
     kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" 'frontend:'
     # autoscale 1~2 pods, CPU utilization 70%, replica set specified by file
     kubectl autoscale -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]:?}" --max=2 --cpu-percent=70
-    kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '1 2 70'
+    kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}}" '1 2'
     kubectl delete hpa frontend "${kube_flags[@]:?}"
     # autoscale 2~3 pods, no CPU utilization specified, replica set specified by name
     kubectl autoscale rs frontend "${kube_flags[@]:?}" --min=2 --max=3
-    kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
+    kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}}" '2 3'
     # HorizontalPodAutoscaler has field for kubectl autoscale field manager
     output_message=$(kubectl get hpa frontend -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
     kube::test::if_has_string "${output_message}" 'kubectl-autoscale'

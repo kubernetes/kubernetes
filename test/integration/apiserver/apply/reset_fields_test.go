@@ -110,6 +110,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("apps", "v1", "replicasets"):                                               `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container4"}]}}}}`,
 	gvr("apps", "v1", "statefulsets"):                                              `{"spec": {"selector": {"matchLabels": {"a2": "b2"}}}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):                           `{"spec": {"maxReplicas": 23}}`,
+	gvr("autoscaling", "v2", "horizontalpodautoscalers"):                           `{"spec": {"maxReplicas": 23}}`,
 	gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"):                      `{"spec": {"maxReplicas": 23}}`,
 	gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"):                      `{"spec": {"maxReplicas": 23}}`,
 	gvr("batch", "v1", "jobs"):                                                     `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container1"}]}}}}`,
