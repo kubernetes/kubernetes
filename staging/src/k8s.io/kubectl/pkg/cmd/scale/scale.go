@@ -38,7 +38,7 @@ import (
 
 var (
 	scaleLong = templates.LongDesc(i18n.T(`
-		Set a new size for a Deployment, ReplicaSet, Replication Controller, or StatefulSet.
+		Set a new size for a deployment, replica set, replication controller, or stateful set.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
 
@@ -47,19 +47,19 @@ var (
 		scale is sent to the server.`))
 
 	scaleExample = templates.Examples(i18n.T(`
-		# Scale a replicaset named 'foo' to 3.
+		# Scale a replica set named 'foo' to 3
 		kubectl scale --replicas=3 rs/foo
 
-		# Scale a resource identified by type and name specified in "foo.yaml" to 3.
+		# Scale a resource identified by type and name specified in "foo.yaml" to 3
 		kubectl scale --replicas=3 -f foo.yaml
 
-		# If the deployment named mysql's current size is 2, scale mysql to 3.
+		# If the deployment named mysql's current size is 2, scale mysql to 3
 		kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
 
-		# Scale multiple replication controllers.
+		# Scale multiple replication controllers
 		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
-		# Scale statefulset named 'web' to 3.
+		# Scale stateful set named 'web' to 3
 		kubectl scale --replicas=3 statefulset/web`))
 )
 
@@ -111,7 +111,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set a new size for a Deployment, ReplicaSet or Replication Controller"),
+		Short:                 i18n.T("Set a new size for a deployment, replica set, or replication controller"),
 		Long:                  scaleLong,
 		Example:               scaleExample,
 		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

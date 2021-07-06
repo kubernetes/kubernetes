@@ -56,7 +56,7 @@ type ResumeOptions struct {
 
 var (
 	resumeLong = templates.LongDesc(i18n.T(`
-		Resume a paused resource
+		Resume a paused resource.
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.

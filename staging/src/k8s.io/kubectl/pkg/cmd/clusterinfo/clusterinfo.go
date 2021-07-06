@@ -38,7 +38,7 @@ import (
 
 var (
 	longDescr = templates.LongDesc(i18n.T(`
-  Display addresses of the control plane and services with label kubernetes.io/cluster-service=true
+  Display addresses of the control plane and services with label kubernetes.io/cluster-service=true.
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`))
 
 	clusterinfoExample = templates.Examples(i18n.T(`
@@ -62,7 +62,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 	cmd := &cobra.Command{
 		Use:     "cluster-info",
-		Short:   i18n.T("Display cluster info"),
+		Short:   i18n.T("Display cluster information"),
 		Long:    longDescr,
 		Example: clusterinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {

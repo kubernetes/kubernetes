@@ -37,7 +37,7 @@ import (
 
 var (
 	describeLong = templates.LongDesc(i18n.T(`
-		Show details of a specific resource or group of resources
+		Show details of a specific resource or group of resources.
 
 		Print a detailed description of the selected resources, including related resources such
 		as events or controllers. You may select a single object by name, all objects of that
@@ -65,7 +65,7 @@ var (
 		kubectl describe po -l name=myLabel
 
 		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-		# get the name of the rc as a prefix in the pod the name).
+		# get the name of the rc as a prefix in the pod the name)
 		kubectl describe pods frontend`))
 )
 

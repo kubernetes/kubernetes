@@ -57,13 +57,13 @@ var (
 	restartLong = templates.LongDesc(i18n.T(`
 		Restart a resource.
 
-	        Resource will be rollout restarted.`))
+	        Resource rollout will be restarted.`))
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
 		kubectl rollout restart deployment/nginx
 
-		# Restart a daemonset
+		# Restart a daemon set
 		kubectl rollout restart daemonset/abc`)
 )
 
