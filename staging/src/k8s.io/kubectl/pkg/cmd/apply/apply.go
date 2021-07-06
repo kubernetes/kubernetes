@@ -460,7 +460,7 @@ are the ways you can resolve this warning:
 * You may co-own fields by updating your manifest to match the existing
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
-See http://k8s.io/docs/reference/using-api/server-side-apply/#conflicts`, err)
+See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`, err)
 			}
 			return err
 		}
