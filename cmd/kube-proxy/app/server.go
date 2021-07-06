@@ -50,7 +50,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
@@ -524,8 +524,8 @@ type ProxyServer struct {
 	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
 	Proxier                proxy.Provider
-	Broadcaster            record.EventBroadcaster
-	Recorder               record.EventRecorder
+	Broadcaster            events.EventBroadcaster
+	Recorder               events.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
@@ -654,7 +654,8 @@ func (s *ProxyServer) Run() error {
 	}
 
 	if s.Broadcaster != nil && s.EventClient != nil {
-		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+		stopCh := make(chan struct{})
+		s.Broadcaster.StartRecordingToSink(stopCh)
 	}
 
 	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
@@ -692,7 +693,7 @@ func (s *ProxyServer) Run() error {
 				// TODO(random-liu): Remove this when the docker bug is fixed.
 				const message = "CRI error: /sys is read-only: " +
 					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
-				s.Recorder.Eventf(s.NodeRef, api.EventTypeWarning, err.Error(), message)
+				s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, err.Error(), "StartKubeProxy", message)
 			}
 		}
 
@@ -776,7 +777,7 @@ func (s *ProxyServer) Run() error {
 }
 
 func (s *ProxyServer) birthCry() {
-	s.Recorder.Eventf(s.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
+	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
 }
 
 func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
