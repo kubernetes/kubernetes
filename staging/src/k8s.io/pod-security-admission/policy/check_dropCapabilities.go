@@ -31,15 +31,7 @@ func init() {
 }
 
 // CheckDropCapabilities returns a restricted level check
-<<<<<<< HEAD
-<<<<<<< HEAD
 // that ensures all capabilities are dropped in 1.22+
-=======
-// that ensures all capabilities are dropped in 1.0+
->>>>>>> 835971194b85605b9f06291eece5edc800e4b625
-=======
-// that ensures all capabilities are dropped in 1.0+
->>>>>>> 835971194b85605b9f06291eece5edc800e4b625
 func CheckDropCapabilities() Check {
 	return Check{
 		ID:    "dropCapabilities",
