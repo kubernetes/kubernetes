@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hello-world\n"
 "Report-Msgid-Bugs-To: EMAIL\n"
-"POT-Creation-Date: 2021-05-17 15:40+0200\n"
+"POT-Creation-Date: 2021-07-07 20:15+0200\n"
 "PO-Revision-Date: 2017-06-02 09:13+0800\n"
 "Last-Translator: William Chang <warmchang@outlook.com>\n"
 "Language-Team: \n"
@@ -19,16 +19,10 @@ msgstr ""
 "X-Poedit-SourceCharset: UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go:173
-msgid "Apply a configuration to a resource by filename or stdin"
-msgstr "通過檔案名或標準輸入流(stdin)對資源進行配置"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:41
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
 msgid "Delete the specified cluster from the kubeconfig"
 msgstr "刪除 kubeconfig 檔案中指定的叢集(cluster)"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:41
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42
 msgid "Delete the specified context from the kubeconfig"
 msgstr "刪除 kubeconfig 檔案中指定的 context"
@@ -45,41 +39,37 @@ msgstr "顯示 kubeconfig 檔案中定義的叢集(cluster)"
 msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr "顯示合併的 kubeconfig 配置或一個指定的 kubeconfig 檔案"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/current_context.go:51
-msgid "Displays the current-context"
-msgstr "顯示目前的 context"
-
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:42
 msgid "Modify kubeconfig files"
 msgstr "修改 kubeconfig 檔案"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_cluster.go:73
-msgid "Sets a cluster entry in kubeconfig"
-msgstr "設置 kubeconfig 檔案中的一個叢集(cluster)條目"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_context.go:61
-msgid "Sets a context entry in kubeconfig"
-msgstr "設置 kubeconfig 檔案中的一個 context 條目"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_authinfo.go:152
-msgid "Sets a user entry in kubeconfig"
-msgstr "設置 kubeconfig 檔案中的一個使用者條目"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/set.go:74
-msgid "Sets an individual value in a kubeconfig file"
-msgstr "設置 kubeconfig 檔案中的一個值"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/use_context.go:51
-msgid "Sets the current-context in a kubeconfig file"
-msgstr "設置 kubeconfig 檔案中的目前 context"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/unset.go:59
-msgid "Unsets an individual value in a kubeconfig file"
-msgstr "取消設置 kubeconfig 檔案中的一個值"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:134
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:135
 msgid "Update the annotations on a resource"
 msgstr "更新一個資源的注解(annotations)"
+
+#~ msgid "Apply a configuration to a resource by filename or stdin"
+#~ msgstr "通過檔案名或標準輸入流(stdin)對資源進行配置"
+
+#~ msgid "Displays the current-context"
+#~ msgstr "顯示目前的 context"
+
+#~ msgid "Sets a cluster entry in kubeconfig"
+#~ msgstr "設置 kubeconfig 檔案中的一個叢集(cluster)條目"
+
+#~ msgid "Sets a context entry in kubeconfig"
+#~ msgstr "設置 kubeconfig 檔案中的一個 context 條目"
+
+#~ msgid "Sets a user entry in kubeconfig"
+#~ msgstr "設置 kubeconfig 檔案中的一個使用者條目"
+
+#~ msgid "Sets an individual value in a kubeconfig file"
+#~ msgstr "設置 kubeconfig 檔案中的一個值"
+
+#~ msgid "Sets the current-context in a kubeconfig file"
+#~ msgstr "設置 kubeconfig 檔案中的目前 context"
+
+#~ msgid "Unsets an individual value in a kubeconfig file"
+#~ msgstr "取消設置 kubeconfig 檔案中的一個值"
 
 #~ msgid ""
 #~ "watch is only supported on individual resources and resource collections "

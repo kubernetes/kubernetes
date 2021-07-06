@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: EMAIL\n"
-"POT-Creation-Date: 2021-05-17 15:40+0200\n"
+"POT-Creation-Date: 2021-07-07 20:15+0200\n"
 "PO-Revision-Date: 2020-01-05 09:55+0900\n"
 "Last-Translator: Kohei Ota <kohei.ota@zozo.com>\n"
 "Language-Team: \n"
@@ -18,34 +18,6 @@ msgstr ""
 "X-Generator: Poedit 2.2.4\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:43
-msgid ""
-"\n"
-"\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the "
-"cluster-admin ClusterRole\n"
-"\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-"
-"admin --user=user1 --user=user2 --group=group1"
-msgstr ""
-"\n"
-"\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using the "
-"cluster-admin ClusterRole\n"
-"\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-"
-"admin --user=user1 --user=user2 --group=group1"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:43
-msgid ""
-"\n"
-"\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin "
-"ClusterRole\n"
-"\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
-"user=user2 --group=group1"
-msgstr ""
-"\n"
-"\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin "
-"ClusterRole\n"
-"\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
-"user=user2 --group=group1"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:62
 msgid ""
@@ -63,176 +35,6 @@ msgstr ""
 "\t\t  # Show metrics for a given node\n"
 "\t\t  kubectl top node NODE_NAME"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/autoscale/autoscale.go:48
-#, c-format
-msgid ""
-"\n"
-"\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and "
-"10, no target CPU utilization specified so a default autoscaling policy will "
-"be used:\n"
-"\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
-"\n"
-"\t\t# Auto scale a replication controller \"foo\", with the number of pods "
-"between 1 and 5, target CPU utilization at 80%:\n"
-"\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
-msgstr ""
-"\n"
-"\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and "
-"10, no target CPU utilization specified so a default autoscaling policy will "
-"be used:\n"
-"\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
-"\n"
-"\t\t# Auto scale a replication controller \"foo\", with the number of pods "
-"between 1 and 5, target CPU utilization at 80%:\n"
-"\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:44
-msgid ""
-"\n"
-"\t\t# Create a new resourcequota named my-quota\n"
-"\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,"
-"replicationcontrollers=2,resourcequotas=1,secrets=5,"
-"persistentvolumeclaims=10\n"
-"\n"
-"\t\t# Create a new resourcequota named best-effort\n"
-"\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
-msgstr ""
-"\n"
-"\t\t# Create a new resourcequota named my-quota\n"
-"\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,"
-"replicationcontrollers=2,resourcequotas=1,secrets=5,"
-"persistentvolumeclaims=10\n"
-"\n"
-"\t\t# Create a new resourcequota named best-effort\n"
-"\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:44
-#, c-format
-msgid ""
-"\n"
-"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
-"with the app=rails label\n"
-"\t\t# and require at least one of them being available at any point in "
-"time.\n"
-"\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
-"available=1\n"
-"\n"
-"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
-"with the app=nginx label\n"
-"\t\t# and require at least half of the pods selected to be available at any "
-"point in time.\n"
-"\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
-msgstr ""
-"\n"
-"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
-"with the app=rails label\n"
-"\t\t# and require at least one of them being available at any point in "
-"time.\n"
-"\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
-"available=1\n"
-"\n"
-"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
-"with the app=nginx label\n"
-"\t\t# and require at least half of the pods selected to be available at any "
-"point in time.\n"
-"\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:50
-msgid ""
-"\n"
-"\t\t# Describe a node\n"
-"\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n"
-"\n"
-"\t\t# Describe a pod\n"
-"\t\tkubectl describe pods/nginx\n"
-"\n"
-"\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
-"\t\tkubectl describe -f pod.json\n"
-"\n"
-"\t\t# Describe all pods\n"
-"\t\tkubectl describe pods\n"
-"\n"
-"\t\t# Describe pods by label name=myLabel\n"
-"\t\tkubectl describe po -l name=myLabel\n"
-"\n"
-"\t\t# Describe all pods managed by the 'frontend' replication controller (rc-"
-"created pods\n"
-"\t\t# get the name of the rc as a prefix in the pod the name).\n"
-"\t\tkubectl describe pods frontend"
-msgstr ""
-"\n"
-"\t\t# Describe a node\n"
-"\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n"
-"\n"
-"\t\t# Describe a pod\n"
-"\t\tkubectl describe pods/nginx\n"
-"\n"
-"\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
-"\t\tkubectl describe -f pod.json\n"
-"\n"
-"\t\t# Describe all pods\n"
-"\t\tkubectl describe pods\n"
-"\n"
-"\t\t# Describe pods by label name=myLabel\n"
-"\t\tkubectl describe po -l name=myLabel\n"
-"\n"
-"\t\t# Describe all pods managed by the 'frontend' replication controller (rc-"
-"created pods\n"
-"\t\t# get the name of the rc as a prefix in the pod the name).\n"
-"\t\tkubectl describe pods frontend"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:135
-msgid ""
-"\n"
-"\t\t# Drain node \"foo\", even if there are pods not managed by a "
-"ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n"
-"\t\t$ kubectl drain foo --force\n"
-"\n"
-"\t\t# As above, but abort if there are pods not managed by a "
-"ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a "
-"grace period of 15 minutes.\n"
-"\t\t$ kubectl drain foo --grace-period=900"
-msgstr ""
-"\n"
-"\t\t# Drain node \"foo\", even if there are pods not managed by a "
-"ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n"
-"\t\t$ kubectl drain foo --force\n"
-"\n"
-"\t\t# As above, but abort if there are pods not managed by a "
-"ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a "
-"grace period of 15 minutes.\n"
-"\t\t$ kubectl drain foo --grace-period=900"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:54
-msgid ""
-"\n"
-"\t\t# Edit the service named 'docker-registry':\n"
-"\t\tkubectl edit svc/docker-registry\n"
-"\n"
-"\t\t# Use an alternative editor\n"
-"\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
-"\n"
-"\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n"
-"\t\tkubectl edit job.v1.batch/myjob -o json\n"
-"\n"
-"\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
-"config in its annotation:\n"
-"\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
-msgstr ""
-"\n"
-"\t\t# Edit the service named 'docker-registry':\n"
-"\t\tkubectl edit svc/docker-registry\n"
-"\n"
-"\t\t# Use an alternative editor\n"
-"\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
-"\n"
-"\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n"
-"\t\tkubectl edit job.v1.batch/myjob -o json\n"
-"\n"
-"\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
-"config in its annotation:\n"
-"\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
-
 #: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:46
 msgid ""
 "\n"
@@ -248,27 +50,6 @@ msgstr ""
 "\n"
 "\t\t# Get the documentation of a specific field of a resource\n"
 "\t\tkubectl explain pods.spec.containers"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:85
-msgid ""
-"\n"
-"\t\t# Mark node \"foo\" as schedulable.\n"
-"\t\t$ kubectl uncordon foo"
-msgstr ""
-"\n"
-"\t\t# Mark node \"foo\" as schedulable.\n"
-"\t\t$ kubectl uncordon foo"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:57
-msgid ""
-"\n"
-"\t\t# Mark node \"foo\" as unschedulable.\n"
-"\t\tkubectl cordon foo"
-msgstr ""
-"\n"
-"\t\t# Mark node \"foo\" as unschedulable.\n"
-"\t\tkubectl cordon foo"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/options.go#L37
 #: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:29
@@ -302,67 +83,7 @@ msgstr ""
 "\t\t# Print the supported API versions\n"
 "\t\tkubectl api-versions"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/replace/replace.go:56
-msgid ""
-"\n"
-"\t\t# Replace a pod using the data in pod.json.\n"
-"\t\tkubectl replace -f ./pod.json\n"
-"\n"
-"\t\t# Replace a pod based on the JSON passed into stdin.\n"
-"\t\tcat pod.json | kubectl replace -f -\n"
-"\n"
-"\t\t# Update a single-container pod's image version (tag) to v4\n"
-"\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' | "
-"kubectl replace -f -\n"
-"\n"
-"\t\t# Force replace, delete and then re-create the resource\n"
-"\t\tkubectl replace --force -f ./pod.json"
-msgstr ""
-"\n"
-"\t\t# Replace a pod using the data in pod.json.\n"
-"\t\tkubectl replace -f ./pod.json\n"
-"\n"
-"\t\t# Replace a pod based on the JSON passed into stdin.\n"
-"\t\tcat pod.json | kubectl replace -f -\n"
-"\n"
-"\t\t# Update a single-container pod's image version (tag) to v4\n"
-"\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' | "
-"kubectl replace -f -\n"
-"\n"
-"\t\t# Force replace, delete and then re-create the resource\n"
-"\t\tkubectl replace --force -f ./pod.json"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:75
-msgid ""
-"\n"
-"\t\t# Set the last-applied-configuration of a resource to match the contents "
-"of a file.\n"
-"\t\tkubectl apply set-last-applied -f deploy.yaml\n"
-"\n"
-"\t\t# Execute set-last-applied against each configuration file in a "
-"directory.\n"
-"\t\tkubectl apply set-last-applied -f path/\n"
-"\n"
-"\t\t# Set the last-applied-configuration of a resource to match the contents "
-"of a file, will create the annotation if it does not already exist.\n"
-"\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n"
-"\t\t"
-msgstr ""
-"\n"
-"\t\t# Set the last-applied-configuration of a resource to match the contents "
-"of a file.\n"
-"\t\tkubectl apply set-last-applied -f deploy.yaml\n"
-"\n"
-"\t\t# Execute set-last-applied against each configuration file in a "
-"directory.\n"
-"\t\tkubectl apply set-last-applied -f path/\n"
-"\n"
-"\t\t# Set the last-applied-configuration of a resource to match the contents "
-"of a file, will create the annotation if it does not already exist.\n"
-"\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n"
-"\t\t"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:72
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:75
 msgid ""
 "\n"
 "\t\t# Show metrics for all pods in the default namespace\n"
@@ -389,66 +110,6 @@ msgstr ""
 "\n"
 "\t\t# Show metrics for the pods defined by label name=myLabel\n"
 "\t\tkubectl top pod -l name=myLabel"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:94
-msgid ""
-"\n"
-"\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
-"\t\tkubectl label pods foo unhealthy=true\n"
-"\n"
-"\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
-"overwriting any existing value.\n"
-"\t\tkubectl label --overwrite pods foo status=unhealthy\n"
-"\n"
-"\t\t# Update all pods in the namespace\n"
-"\t\tkubectl label pods --all status=unhealthy\n"
-"\n"
-"\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
-"\t\tkubectl label -f pod.json status=unhealthy\n"
-"\n"
-"\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
-"\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
-"\n"
-"\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
-"\t\t# Does not require the --overwrite flag.\n"
-"\t\tkubectl label pods foo bar-"
-msgstr ""
-"\n"
-"\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
-"\t\tkubectl label pods foo unhealthy=true\n"
-"\n"
-"\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
-"overwriting any existing value.\n"
-"\t\tkubectl label --overwrite pods foo status=unhealthy\n"
-"\n"
-"\t\t# Update all pods in the namespace\n"
-"\t\tkubectl label pods --all status=unhealthy\n"
-"\n"
-"\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
-"\t\tkubectl label -f pod.json status=unhealthy\n"
-"\n"
-"\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
-"\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
-"\n"
-"\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
-"\t\t# Does not require the --overwrite flag.\n"
-"\t\tkubectl label pods foo bar-"
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:53
-msgid ""
-"\n"
-"\t\t# View the last-applied-configuration annotations by type/name in YAML.\n"
-"\t\tkubectl apply view-last-applied deployment/nginx\n"
-"\n"
-"\t\t# View the last-applied-configuration annotations by file in JSON\n"
-"\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
-msgstr ""
-"\n"
-"\t\t# View the last-applied-configuration annotations by type/name in YAML.\n"
-"\t\tkubectl apply view-last-applied deployment/nginx\n"
-"\n"
-"\t\t# View the last-applied-configuration annotations by file in JSON\n"
-"\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
 
 #: pkg/kubectl/cmd/convert/convert.go:40
 msgid ""
@@ -480,69 +141,6 @@ msgstr ""
 "-o option\n"
 "\t\tto change to output destination."
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrole.go:38
-msgid ""
-"\n"
-"\t\tCreate a ClusterRole."
-msgstr ""
-"\n"
-"\t\tCreate a ClusterRole."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:40
-msgid ""
-"\n"
-"\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
-msgstr ""
-"\n"
-"\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:40
-msgid ""
-"\n"
-"\t\tCreate a RoleBinding for a particular Role or ClusterRole."
-msgstr ""
-"\n"
-"\t\tCreate a RoleBinding for a particular Role or ClusterRole."
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_configmap.go:46
-msgid ""
-"\n"
-"\t\tCreate a configmap based on a file, directory, or specified literal "
-"value.\n"
-"\n"
-"\t\tA single configmap may package one or more key/value pairs.\n"
-"\n"
-"\t\tWhen creating a configmap based on a file, the key will default to the "
-"basename of the file, and the value will\n"
-"\t\tdefault to the file content.  If the basename is an invalid key, you may "
-"specify an alternate key.\n"
-"\n"
-"\t\tWhen creating a configmap based on a directory, each file whose basename "
-"is a valid key in the directory will be\n"
-"\t\tpackaged into the configmap.  Any directory entries except regular files "
-"are ignored (e.g. subdirectories,\n"
-"\t\tsymlinks, devices, pipes, etc)."
-msgstr ""
-"\n"
-"\t\tCreate a configmap based on a file, directory, or specified literal "
-"value.\n"
-"\n"
-"\t\tA single configmap may package one or more key/value pairs.\n"
-"\n"
-"\t\tWhen creating a configmap based on a file, the key will default to the "
-"basename of the file, and the value will\n"
-"\t\tdefault to the file content.  If the basename is an invalid key, you may "
-"specify an alternate key.\n"
-"\n"
-"\t\tWhen creating a configmap based on a directory, each file whose basename "
-"is a valid key in the directory will be\n"
-"\t\tpackaged into the configmap.  Any directory entries except regular files "
-"are ignored (e.g. subdirectories,\n"
-"\t\tsymlinks, devices, pipes, etc)."
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:39
 msgid ""
@@ -551,28 +149,6 @@ msgid ""
 msgstr ""
 "\n"
 "\t\tCreate a namespace with the specified name."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:41
-msgid ""
-"\n"
-"\t\tCreate a pod disruption budget with the specified name, selector, and "
-"desired minimum available pods"
-msgstr ""
-"\n"
-"\t\tCreate a pod disruption budget with the specified name, selector, and "
-"desired minimum available pods"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:41
-msgid ""
-"\n"
-"\t\tCreate a resourcequota with the specified name, hard limits and optional "
-"scopes"
-msgstr ""
-"\n"
-"\t\tCreate a resourcequota with the specified name, hard limits and optional "
-"scopes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_role.go:43
@@ -592,80 +168,8 @@ msgstr ""
 "\n"
 "\t\tCreate a service account with the specified name."
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:30
-msgid ""
-"\n"
-"\t\tEdit a resource from the default editor.\n"
-"\n"
-"\t\tThe edit command allows you to directly edit any API resource you can "
-"retrieve via the\n"
-"\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, "
-"or EDITOR\n"
-"\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for "
-"Windows.\n"
-"\t\tYou can edit multiple objects, although changes are applied one at a "
-"time. The command\n"
-"\t\taccepts filenames as well as command line arguments, although the files "
-"you point to must\n"
-"\t\tbe previously saved versions of resources.\n"
-"\n"
-"\t\tEditing is done with the API version used to fetch the resource.\n"
-"\t\tTo edit using a specific API version, fully-qualify the resource, "
-"version, and group.\n"
-"\n"
-"\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
-"\n"
-"\t\tThe flag --windows-line-endings can be used to force Windows line "
-"endings,\n"
-"\t\totherwise the default for your operating system will be used.\n"
-"\n"
-"\t\tIn the event an error occurs while updating, a temporary file will be "
-"created on disk\n"
-"\t\tthat contains your unapplied changes. The most common error when "
-"updating a resource\n"
-"\t\tis another editor changing the resource on the server. When this occurs, "
-"you will have\n"
-"\t\tto apply your changes to the newer version of the resource, or update "
-"your temporary\n"
-"\t\tsaved copy to include the latest resource version."
-msgstr ""
-"\n"
-"\t\tEdit a resource from the default editor.\n"
-"\n"
-"\t\tThe edit command allows you to directly edit any API resource you can "
-"retrieve via the\n"
-"\t\tcommand line tools. It will open the editor defined by your KUBE_EDITOR, "
-"or EDITOR\n"
-"\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for "
-"Windows.\n"
-"\t\tYou can edit multiple objects, although changes are applied one at a "
-"time. The command\n"
-"\t\taccepts filenames as well as command line arguments, although the files "
-"you point to must\n"
-"\t\tbe previously saved versions of resources.\n"
-"\n"
-"\t\tEditing is done with the API version used to fetch the resource.\n"
-"\t\tTo edit using a specific API version, fully-qualify the resource, "
-"version, and group.\n"
-"\n"
-"\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
-"\n"
-"\t\tThe flag --windows-line-endings can be used to force Windows line "
-"endings,\n"
-"\t\totherwise the default for your operating system will be used.\n"
-"\n"
-"\t\tIn the event an error occurs while updating, a temporary file will be "
-"created on disk\n"
-"\t\tthat contains your unapplied changes. The most common error when "
-"updating a resource\n"
-"\t\tis another editor changing the resource on the server. When this occurs, "
-"you will have\n"
-"\t\tto apply your changes to the newer version of the resource, or update "
-"your temporary\n"
-"\t\tsaved copy to include the latest resource version."
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:82
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:84
 msgid ""
 "\n"
 "\t\tMark node as schedulable."
@@ -674,7 +178,7 @@ msgstr ""
 "\t\tMark node as schedulable."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:54
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:55
 msgid ""
 "\n"
 "\t\tMark node as unschedulable."
@@ -697,36 +201,6 @@ msgstr ""
 "\t\tThis results in the last-applied-configuration being updated as though "
 "'kubectl apply -f <file>' was run,\n"
 "\t\twithout updating any other parts of the object."
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:47
-msgid ""
-"\n"
-"\t\tView the latest last-applied-configuration annotations by type/name or "
-"file.\n"
-"\n"
-"\t\tThe default output will be printed to stdout in YAML format. One can use "
-"-o option\n"
-"\t\tto change output format."
-msgstr ""
-"\n"
-"\t\tView the latest last-applied-configuration annotations by type/name or "
-"file.\n"
-"\n"
-"\t\tThe default output will be printed to stdout in YAML format. One can use "
-"-o option\n"
-"\t\tto change output format."
-
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:47
-msgid ""
-"\n"
-"\t  # Create a new TLS secret named tls-secret with the given key pair:\n"
-"\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/"
-"to/tls.key"
-msgstr ""
-"\n"
-"\t  # Create a new TLS secret named tls-secret with the given key pair:\n"
-"\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/"
-"to/tls.key"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:42
 msgid ""
@@ -814,62 +288,6 @@ msgstr ""
 "    kubectl cluster-info dump --namespaces default,kube-system --output-"
 "directory=/path/to/cluster-state"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:94
-msgid ""
-"\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my "
-"frontend'.\n"
-"    # If the same annotation is set multiple times, only the last value will "
-"be applied\n"
-"    kubectl annotate pods foo description='my frontend'\n"
-"\n"
-"    # Update a pod identified by type and name in \"pod.json\"\n"
-"    kubectl annotate -f pod.json description='my frontend'\n"
-"\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my "
-"frontend running nginx', overwriting any existing value.\n"
-"    kubectl annotate --overwrite pods foo description='my frontend running "
-"nginx'\n"
-"\n"
-"    # Update all pods in the namespace\n"
-"    kubectl annotate pods --all description='my frontend running nginx'\n"
-"\n"
-"    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
-"    kubectl annotate pods foo description='my frontend running nginx' --"
-"resource-version=1\n"
-"\n"
-"    # Update pod 'foo' by removing an annotation named 'description' if it "
-"exists.\n"
-"    # Does not require the --overwrite flag.\n"
-"    kubectl annotate pods foo description-"
-msgstr ""
-"\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my "
-"frontend'.\n"
-"    # If the same annotation is set multiple times, only the last value will "
-"be applied\n"
-"    kubectl annotate pods foo description='my frontend'\n"
-"\n"
-"    # Update a pod identified by type and name in \"pod.json\"\n"
-"    kubectl annotate -f pod.json description='my frontend'\n"
-"\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my "
-"frontend running nginx', overwriting any existing value.\n"
-"    kubectl annotate --overwrite pods foo description='my frontend running "
-"nginx'\n"
-"\n"
-"    # Update all pods in the namespace\n"
-"    kubectl annotate pods --all description='my frontend running nginx'\n"
-"\n"
-"    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
-"    kubectl annotate pods foo description='my frontend running nginx' --"
-"resource-version=1\n"
-"\n"
-"    # Update pod 'foo' by removing an annotation named 'description' if it "
-"exists.\n"
-"    # Does not require the --overwrite flag.\n"
-"    kubectl annotate pods foo description-"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:308
 msgid ""
@@ -938,10 +356,6 @@ msgstr ""
 "is used to override the generated object. Requires that the object supply a "
 "valid apiVersion field."
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go:173
-msgid "Apply a configuration to a resource by filename or stdin"
-msgstr "ファイル名または標準入力でリソースにコンフィグを適用する"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
 #: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:125
 msgid "Approve a certificate signing request"
@@ -957,7 +371,7 @@ msgstr ""
 "loadbalancing)."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
-#: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:104
+#: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:105
 msgid "Attach to a running container"
 msgstr "Attach to a running container"
 
@@ -971,7 +385,7 @@ msgstr ""
 "set to 'None' to create a headless service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:100
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:101
 msgid "ClusterRole this ClusterRoleBinding should reference"
 msgstr "ClusterRole this ClusterRoleBinding should reference"
 
@@ -986,65 +400,24 @@ msgid "Convert config files between different API versions"
 msgstr "Convert config files between different API versions"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
-#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:104
-#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:105
+#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:106
 msgid "Copy files and directories to and from containers."
 msgstr "Copy files and directories to and from containers."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:86
-msgid "Create a ClusterRoleBinding for a particular ClusterRole"
-msgstr "Create a ClusterRoleBinding for a particular ClusterRole"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:323
-msgid "Create a LoadBalancer service."
-msgstr "Create a LoadBalancer service."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:286
-msgid "Create a NodePort service."
-msgstr "Create a NodePort service."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:89
-msgid "Create a RoleBinding for a particular Role or ClusterRole"
-msgstr "Create a RoleBinding for a particular Role or ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:94
 msgid "Create a TLS secret"
 msgstr "Create a TLS secret"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_configmap.go:124
-msgid "Create a configmap from a local file, directory or literal value"
-msgstr "Create a configmap from a local file, directory or literal value"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:83
 msgid "Create a namespace with the specified name"
 msgstr "Create a namespace with the specified name"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:95
-msgid "Create a pod disruption budget with the specified name."
-msgstr "Create a pod disruption budget with the specified name."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:91
-msgid "Create a quota with the specified name."
-msgstr "Create a quota with the specified name."
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:134
 msgid "Create a secret for use with a Docker registry"
 msgstr "Create a secret for use with a Docker registry"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:137
-msgid "Create a secret from a local file, directory or literal value"
-msgstr "Create a secret from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:49
@@ -1056,40 +429,18 @@ msgstr "Create a secret using specified subcommand"
 msgid "Create a service account with the specified name"
 msgstr "Create a service account with the specified name"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:48
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:49
-msgid "Create a service using specified subcommand."
-msgstr "Create a service using specified subcommand."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
-#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:363
-msgid "Create an ExternalName service."
-msgstr "Create an ExternalName service."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
-#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:135
-msgid ""
-"Delete resources by filenames, stdin, resources and names, or by resources "
-"and label selector"
-msgstr ""
-"Delete resources by filenames, stdin, resources and names, or by resources "
-"and label selector"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:41
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
 msgid "Delete the specified cluster from the kubeconfig"
 msgstr "指定したコンテキストをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:41
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42
 msgid "Delete the specified context from the kubeconfig"
 msgstr "指定したコンテキストをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L121
-#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:170
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:174
 msgid "Deny a certificate signing request"
 msgstr "Deny a certificate signing request"
 
@@ -1097,26 +448,6 @@ msgstr "Deny a certificate signing request"
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/get_contexts.go:72
 msgid "Describe one or many contexts"
 msgstr "1つまたは複数のコンテキストを記述する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
-#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:80
-msgid "Display Resource (CPU/Memory) usage of nodes"
-msgstr "Display Resource (CPU/Memory) usage of nodes"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
-#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:96
-msgid "Display Resource (CPU/Memory) usage of pods"
-msgstr "Display Resource (CPU/Memory) usage of pods"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
-#: staging/src/k8s.io/kubectl/pkg/cmd/top/top.go:50
-msgid "Display Resource (CPU/Memory) usage."
-msgstr "Display Resource (CPU/Memory) usage."
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
-#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo.go:65
-msgid "Display cluster info"
-msgstr "クラスターの情報を表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/get_clusters.go:41
@@ -1129,32 +460,17 @@ msgid "Display merged kubeconfig settings or a specified kubeconfig file"
 msgstr "マージされたkubeconfigの設定または指定されたkubeconfigを表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/get.go#L107
-#: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:161
+#: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:165
 msgid "Display one or many resources"
 msgstr "1つまたは複数のリソースを表示する"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/current_context.go:51
-msgid "Displays the current-context"
-msgstr "current-contextを表示する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
-#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:79
-msgid "Documentation of resources"
-msgstr "リソースの説明を表示する"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:181
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:184
 msgid "Drain node in preparation for maintenance"
 msgstr "Drain node in preparation for maintenance"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
-#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:74
-msgid "Dump lots of relevant info for debugging and diagnosis"
-msgstr "Dump lots of relevant info for debugging and diagnosis"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
-#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:76
+#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:77
 msgid "Edit a resource on the server"
 msgstr "Edit a resource on the server"
 
@@ -1164,7 +480,7 @@ msgid "Email for Docker registry"
 msgstr "Email for Docker registry"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
-#: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:88
+#: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:89
 msgid "Execute a command in a container"
 msgstr "Execute a command in a container"
 
@@ -1188,7 +504,7 @@ msgstr ""
 "values: 'None', 'ClientIP'"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L135
-#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:155
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:157
 msgid ""
 "If non-empty, the annotation update will only succeed if this is the current "
 "resource-version for the object. Only valid when specifying a single "
@@ -1199,7 +515,7 @@ msgstr ""
 "resource."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L132
-#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:152
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:154
 msgid ""
 "If non-empty, the labels update will only succeed if this is the current "
 "resource-version for the object. Only valid when specifying a single "
@@ -1210,17 +526,17 @@ msgstr ""
 "resource."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:96
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:98
 msgid "Mark node as schedulable"
 msgstr "Mark node as schedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:68
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:69
 msgid "Mark node as unschedulable"
 msgstr "Mark node as unschedulable"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_pause.go#L73
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_pause.go:82
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_pause.go:83
 msgid "Mark the provided resource as paused"
 msgstr "Mark the provided resource as paused"
 
@@ -1245,7 +561,7 @@ msgstr ""
 "traffic to. Optional."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
-#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:173
+#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:174
 msgid ""
 "Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
 "one of since-time / since may be used."
@@ -1254,7 +570,7 @@ msgstr ""
 "one of since-time / since may be used."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
-#: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:113
+#: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:112
 msgid "Output shell completion code for the specified shell (bash or zsh)"
 msgstr "Output shell completion code for the specified shell (bash or zsh)"
 
@@ -1274,7 +590,7 @@ msgid "Path to private key associated with given certificate."
 msgstr "Path to private key associated with given certificate."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L82
-#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:129
+#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:130
 msgid ""
 "Precondition for resource version. Requires that the current resource "
 "version match this value in order to scale."
@@ -1298,13 +614,8 @@ msgstr "Print the list of flags inherited by all commands"
 msgid "Print the logs for a container in a pod"
 msgstr "Print the logs for a container in a pod"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/replace.go#L70
-#: staging/src/k8s.io/kubectl/pkg/cmd/replace/replace.go:115
-msgid "Replace a resource by filename or stdin"
-msgstr "Replace a resource by filename or stdin"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_resume.go#L71
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_resume.go:86
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_resume.go:87
 msgid "Resume a paused resource"
 msgstr "Resume a paused resource"
 
@@ -1333,51 +644,18 @@ msgstr "Server location for Docker registry"
 msgid "Set specific features on objects"
 msgstr "Set specific features on objects"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:101
-msgid ""
-"Set the last-applied-configuration annotation on a live object to match the "
-"contents of a file."
-msgstr ""
-"Set the last-applied-configuration annotation on a live object to match the "
-"contents of a file."
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
 #: staging/src/k8s.io/kubectl/pkg/cmd/set/set_selector.go:104
 msgid "Set the selector on a resource"
 msgstr "リソースのセレクターを設定する"
 
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_cluster.go:73
-msgid "Sets a cluster entry in kubeconfig"
-msgstr "kubeconfigにクラスターエントリを設定する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_context.go:61
-msgid "Sets a context entry in kubeconfig"
-msgstr "kubeconfigにコンテキストエントリを設定する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_authinfo.go:152
-msgid "Sets a user entry in kubeconfig"
-msgstr "kubeconfigにユーザーエントリを設定する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/set.go:74
-msgid "Sets an individual value in a kubeconfig file"
-msgstr "kubeconfigに個別の変数を設定する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/use_context.go:51
-msgid "Sets the current-context in a kubeconfig file"
-msgstr "kubeconfigにcurrent-contextを設定する"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/describe.go#L80
-#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:106
+#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:107
 msgid "Show details of a specific resource or group of resources"
 msgstr "Show details of a specific resource or group of resources"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_status.go#L57
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_status.go:101
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_status.go:102
 msgid "Show the status of the rollout"
 msgstr "Show the status of the rollout"
 
@@ -1385,15 +663,6 @@ msgstr "Show the status of the rollout"
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:154
 msgid "Synonym for --target-port"
 msgstr "Synonym for --target-port"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:134
-msgid ""
-"Take a replication controller, service, deployment or pod and expose it as a "
-"new Kubernetes Service"
-msgstr ""
-"Take a replication controller, service, deployment or pod and expose it as a "
-"new Kubernetes Service"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
 #: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:174
@@ -1485,36 +754,26 @@ msgid "The type of secret to create"
 msgstr "The type of secret to create"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:86
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:87
 msgid "Undo a previous rollout"
 msgstr "現在のロールアウトを取り消す"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
-#: staging/src/k8s.io/kubectl/pkg/cmd/config/unset.go:59
-msgid "Unsets an individual value in a kubeconfig file"
-msgstr "kubeconfigから変数を個別に削除する"
-
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
-#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_image.go:110
-msgid "Update image of a pod template"
-msgstr "Update image of a pod template"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_resources.go#L101
 #: staging/src/k8s.io/kubectl/pkg/cmd/set/set_resources.go:116
 msgid "Update resource requests/limits on objects with pod templates"
 msgstr "Update resource requests/limits on objects with pod templates"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:134
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:135
 msgid "Update the annotations on a resource"
 msgstr "リソースのアノテーションを更新する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
-#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:132
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:133
 msgid "Update the labels on a resource"
 msgstr "リソースのラベルを更新する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
-#: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:108
+#: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:109
 msgid "Update the taints on one or more nodes"
 msgstr "Update the taints on one or more nodes"
 
@@ -1523,13 +782,8 @@ msgstr "Update the taints on one or more nodes"
 msgid "Username for Docker registry authentication"
 msgstr "Username for Docker registry authentication"
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:77
-msgid "View latest last-applied-configuration annotations of a resource/object"
-msgstr ""
-"View latest last-applied-configuration annotations of a resource/object"
-
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_history.go#L51
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_history.go:82
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_history.go:83
 msgid "View rollout history"
 msgstr "ロールアウトの履歴を表示する"
 
@@ -1547,12 +801,38 @@ msgid "dummy restart flag)"
 msgstr "dummy restart flag)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
-#: staging/src/k8s.io/kubectl/pkg/cmd/cmd.go:478
+#: staging/src/k8s.io/kubectl/pkg/cmd/cmd.go:227
 msgid "kubectl controls the Kubernetes cluster manager"
 msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using "
+#~ "the cluster-admin ClusterRole\n"
+#~ "\t\t  kubectl create clusterrolebinding cluster-admin --"
+#~ "clusterrole=cluster-admin --user=user1 --user=user2 --group=group1"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t  # Create a ClusterRoleBinding for user1, user2, and group1 using "
+#~ "the cluster-admin ClusterRole\n"
+#~ "\t\t  kubectl create clusterrolebinding cluster-admin --"
+#~ "clusterrole=cluster-admin --user=user1 --user=user2 --group=group1"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin "
+#~ "ClusterRole\n"
+#~ "\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
+#~ "user=user2 --group=group1"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t  # Create a RoleBinding for user1, user2, and group1 using the admin "
+#~ "ClusterRole\n"
+#~ "\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
+#~ "user=user2 --group=group1"
+
+#~ msgid ""
+#~ "\n"
 #~ "\t\t  # Create a new configmap named my-config based on folder bar\n"
 #~ "\t\t  kubectl create configmap my-config --from-file=path/to/bar\n"
 #~ "\n"
@@ -1632,6 +912,28 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/"
 #~ "v1/ConfigMap"
 
+#, c-format
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 "
+#~ "and 10, no target CPU utilization specified so a default autoscaling "
+#~ "policy will be used:\n"
+#~ "\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
+#~ "\n"
+#~ "\t\t# Auto scale a replication controller \"foo\", with the number of "
+#~ "pods between 1 and 5, target CPU utilization at 80%:\n"
+#~ "\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 "
+#~ "and 10, no target CPU utilization specified so a default autoscaling "
+#~ "policy will be used:\n"
+#~ "\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
+#~ "\n"
+#~ "\t\t# Auto scale a replication controller \"foo\", with the number of "
+#~ "pods between 1 and 5, target CPU utilization at 80%:\n"
+#~ "\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
+
 #~ msgid ""
 #~ "\n"
 #~ "\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n"
@@ -1702,6 +1004,55 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n"
 #~ "\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --"
 #~ "resource=pods --resource-name=readablepod"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Create a new resourcequota named my-quota\n"
+#~ "\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,"
+#~ "services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,"
+#~ "persistentvolumeclaims=10\n"
+#~ "\n"
+#~ "\t\t# Create a new resourcequota named best-effort\n"
+#~ "\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Create a new resourcequota named my-quota\n"
+#~ "\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,"
+#~ "services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,"
+#~ "persistentvolumeclaims=10\n"
+#~ "\n"
+#~ "\t\t# Create a new resourcequota named best-effort\n"
+#~ "\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
+
+#, c-format
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Create a pod disruption budget named my-pdb that will select all "
+#~ "pods with the app=rails label\n"
+#~ "\t\t# and require at least one of them being available at any point in "
+#~ "time.\n"
+#~ "\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
+#~ "available=1\n"
+#~ "\n"
+#~ "\t\t# Create a pod disruption budget named my-pdb that will select all "
+#~ "pods with the app=nginx label\n"
+#~ "\t\t# and require at least half of the pods selected to be available at "
+#~ "any point in time.\n"
+#~ "\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Create a pod disruption budget named my-pdb that will select all "
+#~ "pods with the app=rails label\n"
+#~ "\t\t# and require at least one of them being available at any point in "
+#~ "time.\n"
+#~ "\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
+#~ "available=1\n"
+#~ "\n"
+#~ "\t\t# Create a pod disruption budget named my-pdb that will select all "
+#~ "pods with the app=nginx label\n"
+#~ "\t\t# and require at least half of the pods selected to be available at "
+#~ "any point in time.\n"
+#~ "\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
 
 #~ msgid ""
 #~ "\n"
@@ -1839,6 +1190,99 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\t# Delete all pods\n"
 #~ "\t\tkubectl delete pods --all"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Describe a node\n"
+#~ "\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n"
+#~ "\n"
+#~ "\t\t# Describe a pod\n"
+#~ "\t\tkubectl describe pods/nginx\n"
+#~ "\n"
+#~ "\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
+#~ "\t\tkubectl describe -f pod.json\n"
+#~ "\n"
+#~ "\t\t# Describe all pods\n"
+#~ "\t\tkubectl describe pods\n"
+#~ "\n"
+#~ "\t\t# Describe pods by label name=myLabel\n"
+#~ "\t\tkubectl describe po -l name=myLabel\n"
+#~ "\n"
+#~ "\t\t# Describe all pods managed by the 'frontend' replication controller "
+#~ "(rc-created pods\n"
+#~ "\t\t# get the name of the rc as a prefix in the pod the name).\n"
+#~ "\t\tkubectl describe pods frontend"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Describe a node\n"
+#~ "\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n"
+#~ "\n"
+#~ "\t\t# Describe a pod\n"
+#~ "\t\tkubectl describe pods/nginx\n"
+#~ "\n"
+#~ "\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
+#~ "\t\tkubectl describe -f pod.json\n"
+#~ "\n"
+#~ "\t\t# Describe all pods\n"
+#~ "\t\tkubectl describe pods\n"
+#~ "\n"
+#~ "\t\t# Describe pods by label name=myLabel\n"
+#~ "\t\tkubectl describe po -l name=myLabel\n"
+#~ "\n"
+#~ "\t\t# Describe all pods managed by the 'frontend' replication controller "
+#~ "(rc-created pods\n"
+#~ "\t\t# get the name of the rc as a prefix in the pod the name).\n"
+#~ "\t\tkubectl describe pods frontend"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Drain node \"foo\", even if there are pods not managed by a "
+#~ "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n"
+#~ "\t\t$ kubectl drain foo --force\n"
+#~ "\n"
+#~ "\t\t# As above, but abort if there are pods not managed by a "
+#~ "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use "
+#~ "a grace period of 15 minutes.\n"
+#~ "\t\t$ kubectl drain foo --grace-period=900"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Drain node \"foo\", even if there are pods not managed by a "
+#~ "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.\n"
+#~ "\t\t$ kubectl drain foo --force\n"
+#~ "\n"
+#~ "\t\t# As above, but abort if there are pods not managed by a "
+#~ "ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use "
+#~ "a grace period of 15 minutes.\n"
+#~ "\t\t$ kubectl drain foo --grace-period=900"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Edit the service named 'docker-registry':\n"
+#~ "\t\tkubectl edit svc/docker-registry\n"
+#~ "\n"
+#~ "\t\t# Use an alternative editor\n"
+#~ "\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
+#~ "\n"
+#~ "\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n"
+#~ "\t\tkubectl edit job.v1.batch/myjob -o json\n"
+#~ "\n"
+#~ "\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
+#~ "config in its annotation:\n"
+#~ "\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Edit the service named 'docker-registry':\n"
+#~ "\t\tkubectl edit svc/docker-registry\n"
+#~ "\n"
+#~ "\t\t# Use an alternative editor\n"
+#~ "\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
+#~ "\n"
+#~ "\t\t# Edit the job 'myjob' in JSON using the v1 API format:\n"
+#~ "\t\tkubectl edit job.v1.batch/myjob -o json\n"
+#~ "\n"
+#~ "\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
+#~ "config in its annotation:\n"
+#~ "\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
 
 #~ msgid ""
 #~ "\n"
@@ -2053,6 +1497,25 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\t# Mark node \"foo\" as schedulable.\n"
+#~ "\t\t$ kubectl uncordon foo"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Mark node \"foo\" as schedulable.\n"
+#~ "\t\t$ kubectl uncordon foo"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Mark node \"foo\" as unschedulable.\n"
+#~ "\t\tkubectl cordon foo"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Mark node \"foo\" as unschedulable.\n"
+#~ "\t\tkubectl cordon foo"
+
+#~ msgid ""
+#~ "\n"
 #~ "\t\t# Partially update a node using strategic merge patch\n"
 #~ "\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":"
 #~ "true}}'\n"
@@ -2098,6 +1561,35 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\t# Print the address of the master and cluster services\n"
 #~ "\t\tkubectl cluster-info"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Replace a pod using the data in pod.json.\n"
+#~ "\t\tkubectl replace -f ./pod.json\n"
+#~ "\n"
+#~ "\t\t# Replace a pod based on the JSON passed into stdin.\n"
+#~ "\t\tcat pod.json | kubectl replace -f -\n"
+#~ "\n"
+#~ "\t\t# Update a single-container pod's image version (tag) to v4\n"
+#~ "\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' "
+#~ "| kubectl replace -f -\n"
+#~ "\n"
+#~ "\t\t# Force replace, delete and then re-create the resource\n"
+#~ "\t\tkubectl replace --force -f ./pod.json"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Replace a pod using the data in pod.json.\n"
+#~ "\t\tkubectl replace -f ./pod.json\n"
+#~ "\n"
+#~ "\t\t# Replace a pod based on the JSON passed into stdin.\n"
+#~ "\t\tcat pod.json | kubectl replace -f -\n"
+#~ "\n"
+#~ "\t\t# Update a single-container pod's image version (tag) to v4\n"
+#~ "\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' "
+#~ "| kubectl replace -f -\n"
+#~ "\n"
+#~ "\t\t# Force replace, delete and then re-create the resource\n"
+#~ "\t\tkubectl replace --force -f ./pod.json"
 
 #~ msgid ""
 #~ "\n"
@@ -2221,6 +1713,39 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\t# Scale job named 'cron' to 3.\n"
 #~ "\t\tkubectl scale --replicas=3 job/cron"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\t# Set the last-applied-configuration of a resource to match the "
+#~ "contents of a file.\n"
+#~ "\t\tkubectl apply set-last-applied -f deploy.yaml\n"
+#~ "\n"
+#~ "\t\t# Execute set-last-applied against each configuration file in a "
+#~ "directory.\n"
+#~ "\t\tkubectl apply set-last-applied -f path/\n"
+#~ "\n"
+#~ "\t\t# Set the last-applied-configuration of a resource to match the "
+#~ "contents of a file, will create the annotation if it does not already "
+#~ "exist.\n"
+#~ "\t\tkubectl apply set-last-applied -f deploy.yaml --create-"
+#~ "annotation=true\n"
+#~ "\t\t"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Set the last-applied-configuration of a resource to match the "
+#~ "contents of a file.\n"
+#~ "\t\tkubectl apply set-last-applied -f deploy.yaml\n"
+#~ "\n"
+#~ "\t\t# Execute set-last-applied against each configuration file in a "
+#~ "directory.\n"
+#~ "\t\tkubectl apply set-last-applied -f path/\n"
+#~ "\n"
+#~ "\t\t# Set the last-applied-configuration of a resource to match the "
+#~ "contents of a file, will create the annotation if it does not already "
+#~ "exist.\n"
+#~ "\t\tkubectl apply set-last-applied -f deploy.yaml --create-"
+#~ "annotation=true\n"
+#~ "\t\t"
 
 #~ msgid ""
 #~ "\n"
@@ -2375,6 +1900,49 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
+#~ "\t\tkubectl label pods foo unhealthy=true\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
+#~ "overwriting any existing value.\n"
+#~ "\t\tkubectl label --overwrite pods foo status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update all pods in the namespace\n"
+#~ "\t\tkubectl label pods --all status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
+#~ "\t\tkubectl label -f pod.json status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
+#~ "\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
+#~ "\t\t# Does not require the --overwrite flag.\n"
+#~ "\t\tkubectl label pods foo bar-"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
+#~ "\t\tkubectl label pods foo unhealthy=true\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
+#~ "overwriting any existing value.\n"
+#~ "\t\tkubectl label --overwrite pods foo status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update all pods in the namespace\n"
+#~ "\t\tkubectl label pods --all status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
+#~ "\t\tkubectl label -f pod.json status=unhealthy\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
+#~ "\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
+#~ "\n"
+#~ "\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
+#~ "\t\t# Does not require the --overwrite flag.\n"
+#~ "\t\tkubectl label pods foo bar-"
+
+#~ msgid ""
+#~ "\n"
 #~ "\t\t# Update pods of frontend-v1 using new replication controller data in "
 #~ "frontend-v2.json.\n"
 #~ "\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n"
@@ -2418,6 +1986,23 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\t# View the last-applied-configuration annotations by type/name in "
+#~ "YAML.\n"
+#~ "\t\tkubectl apply view-last-applied deployment/nginx\n"
+#~ "\n"
+#~ "\t\t# View the last-applied-configuration annotations by file in JSON\n"
+#~ "\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\t# View the last-applied-configuration annotations by type/name in "
+#~ "YAML.\n"
+#~ "\t\tkubectl apply view-last-applied deployment/nginx\n"
+#~ "\n"
+#~ "\t\t# View the last-applied-configuration annotations by file in JSON\n"
+#~ "\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
+
+#~ msgid ""
+#~ "\n"
 #~ "\t\tApply a configuration to a resource by filename or stdin.\n"
 #~ "\t\tThis resource will be created if it doesn't exist yet.\n"
 #~ "\t\tTo use 'apply', always create the resource initially with either "
@@ -2441,6 +2026,30 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "not use unless you are aware of what the current state is. See https://"
 #~ "issues.k8s.io/34274."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a ClusterRole."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a ClusterRole."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a RoleBinding for a particular Role or ClusterRole."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a RoleBinding for a particular Role or ClusterRole."
+
 #~ msgid ""
 #~ "\n"
 #~ "\t\tCreate a TLS secret from the given public/private key pair.\n"
@@ -2453,6 +2062,41 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\tThe public/private key pair must exist before hand. The public key "
 #~ "certificate must be .PEM encoded and match the given private key."
+
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a configmap based on a file, directory, or specified literal "
+#~ "value.\n"
+#~ "\n"
+#~ "\t\tA single configmap may package one or more key/value pairs.\n"
+#~ "\n"
+#~ "\t\tWhen creating a configmap based on a file, the key will default to "
+#~ "the basename of the file, and the value will\n"
+#~ "\t\tdefault to the file content.  If the basename is an invalid key, you "
+#~ "may specify an alternate key.\n"
+#~ "\n"
+#~ "\t\tWhen creating a configmap based on a directory, each file whose "
+#~ "basename is a valid key in the directory will be\n"
+#~ "\t\tpackaged into the configmap.  Any directory entries except regular "
+#~ "files are ignored (e.g. subdirectories,\n"
+#~ "\t\tsymlinks, devices, pipes, etc)."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a configmap based on a file, directory, or specified literal "
+#~ "value.\n"
+#~ "\n"
+#~ "\t\tA single configmap may package one or more key/value pairs.\n"
+#~ "\n"
+#~ "\t\tWhen creating a configmap based on a file, the key will default to "
+#~ "the basename of the file, and the value will\n"
+#~ "\t\tdefault to the file content.  If the basename is an invalid key, you "
+#~ "may specify an alternate key.\n"
+#~ "\n"
+#~ "\t\tWhen creating a configmap based on a directory, each file whose "
+#~ "basename is a valid key in the directory will be\n"
+#~ "\t\tpackaged into the configmap.  Any directory entries except regular "
+#~ "files are ignored (e.g. subdirectories,\n"
+#~ "\t\tsymlinks, devices, pipes, etc)."
 
 #~ msgid ""
 #~ "\n"
@@ -2500,6 +2144,16 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "credentials.  You can provide this information\n"
 #~ "\t\tby creating a dockercfg secret and attaching it to your service "
 #~ "account."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a pod disruption budget with the specified name, selector, and "
+#~ "desired minimum available pods"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a pod disruption budget with the specified name, selector, and "
+#~ "desired minimum available pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #~ msgid ""
@@ -2513,6 +2167,16 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\tJSON and YAML formats are accepted."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
+#~ msgid ""
+#~ "\n"
+#~ "\t\tCreate a resourcequota with the specified name, hard limits and "
+#~ "optional scopes"
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tCreate a resourcequota with the specified name, hard limits and "
+#~ "optional scopes"
+
 #~ msgid ""
 #~ "\n"
 #~ "\t\tCreate a secret based on a file, directory, or specified literal "
@@ -2824,6 +2488,77 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\tEdit a resource from the default editor.\n"
+#~ "\n"
+#~ "\t\tThe edit command allows you to directly edit any API resource you can "
+#~ "retrieve via the\n"
+#~ "\t\tcommand line tools. It will open the editor defined by your "
+#~ "KUBE_EDITOR, or EDITOR\n"
+#~ "\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' "
+#~ "for Windows.\n"
+#~ "\t\tYou can edit multiple objects, although changes are applied one at a "
+#~ "time. The command\n"
+#~ "\t\taccepts filenames as well as command line arguments, although the "
+#~ "files you point to must\n"
+#~ "\t\tbe previously saved versions of resources.\n"
+#~ "\n"
+#~ "\t\tEditing is done with the API version used to fetch the resource.\n"
+#~ "\t\tTo edit using a specific API version, fully-qualify the resource, "
+#~ "version, and group.\n"
+#~ "\n"
+#~ "\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
+#~ "\n"
+#~ "\t\tThe flag --windows-line-endings can be used to force Windows line "
+#~ "endings,\n"
+#~ "\t\totherwise the default for your operating system will be used.\n"
+#~ "\n"
+#~ "\t\tIn the event an error occurs while updating, a temporary file will be "
+#~ "created on disk\n"
+#~ "\t\tthat contains your unapplied changes. The most common error when "
+#~ "updating a resource\n"
+#~ "\t\tis another editor changing the resource on the server. When this "
+#~ "occurs, you will have\n"
+#~ "\t\tto apply your changes to the newer version of the resource, or update "
+#~ "your temporary\n"
+#~ "\t\tsaved copy to include the latest resource version."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tEdit a resource from the default editor.\n"
+#~ "\n"
+#~ "\t\tThe edit command allows you to directly edit any API resource you can "
+#~ "retrieve via the\n"
+#~ "\t\tcommand line tools. It will open the editor defined by your "
+#~ "KUBE_EDITOR, or EDITOR\n"
+#~ "\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' "
+#~ "for Windows.\n"
+#~ "\t\tYou can edit multiple objects, although changes are applied one at a "
+#~ "time. The command\n"
+#~ "\t\taccepts filenames as well as command line arguments, although the "
+#~ "files you point to must\n"
+#~ "\t\tbe previously saved versions of resources.\n"
+#~ "\n"
+#~ "\t\tEditing is done with the API version used to fetch the resource.\n"
+#~ "\t\tTo edit using a specific API version, fully-qualify the resource, "
+#~ "version, and group.\n"
+#~ "\n"
+#~ "\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
+#~ "\n"
+#~ "\t\tThe flag --windows-line-endings can be used to force Windows line "
+#~ "endings,\n"
+#~ "\t\totherwise the default for your operating system will be used.\n"
+#~ "\n"
+#~ "\t\tIn the event an error occurs while updating, a temporary file will be "
+#~ "created on disk\n"
+#~ "\t\tthat contains your unapplied changes. The most common error when "
+#~ "updating a resource\n"
+#~ "\t\tis another editor changing the resource on the server. When this "
+#~ "occurs, you will have\n"
+#~ "\t\tto apply your changes to the newer version of the resource, or update "
+#~ "your temporary\n"
+#~ "\t\tsaved copy to include the latest resource version."
+
+#~ msgid ""
+#~ "\n"
 #~ "\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
 #~ "\t\tThe shell code must be evaluated to provide interactive\n"
 #~ "\t\tcompletion of kubectl commands.  This can be done by sourcing it "
@@ -3060,6 +2795,23 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 
 #~ msgid ""
 #~ "\n"
+#~ "\t\tView the latest last-applied-configuration annotations by type/name "
+#~ "or file.\n"
+#~ "\n"
+#~ "\t\tThe default output will be printed to stdout in YAML format. One can "
+#~ "use -o option\n"
+#~ "\t\tto change output format."
+#~ msgstr ""
+#~ "\n"
+#~ "\t\tView the latest last-applied-configuration annotations by type/name "
+#~ "or file.\n"
+#~ "\n"
+#~ "\t\tThe default output will be printed to stdout in YAML format. One can "
+#~ "use -o option\n"
+#~ "\t\tto change output format."
+
+#~ msgid ""
+#~ "\n"
 #~ "\t    # !!!Important Note!!!\n"
 #~ "\t    # Requires that the 'tar' binary is present in your container\n"
 #~ "\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n"
@@ -3098,6 +2850,17 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n"
 #~ "\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar"
+
+#~ msgid ""
+#~ "\n"
+#~ "\t  # Create a new TLS secret named tls-secret with the given key pair:\n"
+#~ "\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --"
+#~ "key=path/to/tls.key"
+#~ msgstr ""
+#~ "\n"
+#~ "\t  # Create a new TLS secret named tls-secret with the given key pair:\n"
+#~ "\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --"
+#~ "key=path/to/tls.key"
 
 #~ msgid ""
 #~ "\n"
@@ -3171,6 +2934,61 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "\n"
 #~ "    # Create a new nodeport service named my-ns\n"
 #~ "    kubectl create service nodeport my-ns --tcp=5678:8080"
+
+#~ msgid ""
+#~ "\n"
+#~ "    # Update pod 'foo' with the annotation 'description' and the value "
+#~ "'my frontend'.\n"
+#~ "    # If the same annotation is set multiple times, only the last value "
+#~ "will be applied\n"
+#~ "    kubectl annotate pods foo description='my frontend'\n"
+#~ "\n"
+#~ "    # Update a pod identified by type and name in \"pod.json\"\n"
+#~ "    kubectl annotate -f pod.json description='my frontend'\n"
+#~ "\n"
+#~ "    # Update pod 'foo' with the annotation 'description' and the value "
+#~ "'my frontend running nginx', overwriting any existing value.\n"
+#~ "    kubectl annotate --overwrite pods foo description='my frontend "
+#~ "running nginx'\n"
+#~ "\n"
+#~ "    # Update all pods in the namespace\n"
+#~ "    kubectl annotate pods --all description='my frontend running nginx'\n"
+#~ "\n"
+#~ "    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
+#~ "    kubectl annotate pods foo description='my frontend running nginx' --"
+#~ "resource-version=1\n"
+#~ "\n"
+#~ "    # Update pod 'foo' by removing an annotation named 'description' if "
+#~ "it exists.\n"
+#~ "    # Does not require the --overwrite flag.\n"
+#~ "    kubectl annotate pods foo description-"
+#~ msgstr ""
+#~ "\n"
+#~ "    # Update pod 'foo' with the annotation 'description' and the value "
+#~ "'my frontend'.\n"
+#~ "    # If the same annotation is set multiple times, only the last value "
+#~ "will be applied\n"
+#~ "    kubectl annotate pods foo description='my frontend'\n"
+#~ "\n"
+#~ "    # Update a pod identified by type and name in \"pod.json\"\n"
+#~ "    kubectl annotate -f pod.json description='my frontend'\n"
+#~ "\n"
+#~ "    # Update pod 'foo' with the annotation 'description' and the value "
+#~ "'my frontend running nginx', overwriting any existing value.\n"
+#~ "    kubectl annotate --overwrite pods foo description='my frontend "
+#~ "running nginx'\n"
+#~ "\n"
+#~ "    # Update all pods in the namespace\n"
+#~ "    kubectl annotate pods --all description='my frontend running nginx'\n"
+#~ "\n"
+#~ "    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
+#~ "    kubectl annotate pods foo description='my frontend running nginx' --"
+#~ "resource-version=1\n"
+#~ "\n"
+#~ "    # Update pod 'foo' by removing an annotation named 'description' if "
+#~ "it exists.\n"
+#~ "    # Does not require the --overwrite flag.\n"
+#~ "    kubectl annotate pods foo description-"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #~ msgid ""
@@ -3252,6 +3070,9 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "empty, it is used to override the generated object. Requires that the "
 #~ "object supply a valid apiVersion field.  Only used if --expose is true."
 
+#~ msgid "Apply a configuration to a resource by filename or stdin"
+#~ msgstr "ファイル名または標準入力でリソースにコンフィグを適用する"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L55
 #~ msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
 #~ msgstr "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
@@ -3266,21 +3087,97 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "image is specified, ignored otherwise. Required when using --image on a "
 #~ "multi-container pod"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
+#~ msgid "Create a ClusterRoleBinding for a particular ClusterRole"
+#~ msgstr "Create a ClusterRoleBinding for a particular ClusterRole"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
+#~ msgid "Create a LoadBalancer service."
+#~ msgstr "Create a LoadBalancer service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
+#~ msgid "Create a NodePort service."
+#~ msgstr "Create a NodePort service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
+#~ msgid "Create a RoleBinding for a particular Role or ClusterRole"
+#~ msgstr "Create a RoleBinding for a particular Role or ClusterRole"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
 #~ msgid "Create a clusterIP service."
 #~ msgstr "Create a clusterIP service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
+#~ msgid "Create a configmap from a local file, directory or literal value"
+#~ msgstr "Create a configmap from a local file, directory or literal value"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #~ msgid "Create a deployment with the specified name."
 #~ msgstr "Create a deployment with the specified name."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
+#~ msgid "Create a pod disruption budget with the specified name."
+#~ msgstr "Create a pod disruption budget with the specified name."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
+#~ msgid "Create a quota with the specified name."
+#~ msgstr "Create a quota with the specified name."
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #~ msgid "Create a resource by filename or stdin"
 #~ msgstr "ファイル名または標準入力でリソースを作成する"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
+#~ msgid "Create a secret from a local file, directory or literal value"
+#~ msgstr "Create a secret from a local file, directory or literal value"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
+#~ msgid "Create a service using specified subcommand."
+#~ msgstr "Create a service using specified subcommand."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
+#~ msgid "Create an ExternalName service."
+#~ msgstr "Create an ExternalName service."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
+#~ msgid ""
+#~ "Delete resources by filenames, stdin, resources and names, or by "
+#~ "resources and label selector"
+#~ msgstr ""
+#~ "Delete resources by filenames, stdin, resources and names, or by "
+#~ "resources and label selector"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/stop.go#L58
 #~ msgid "Deprecated: Gracefully shut down a resource by name or filename"
 #~ msgstr "Deprecated: Gracefully shut down a resource by name or filename"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
+#~ msgid "Display Resource (CPU/Memory) usage of nodes"
+#~ msgstr "Display Resource (CPU/Memory) usage of nodes"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
+#~ msgid "Display Resource (CPU/Memory) usage of pods"
+#~ msgstr "Display Resource (CPU/Memory) usage of pods"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
+#~ msgid "Display Resource (CPU/Memory) usage."
+#~ msgstr "Display Resource (CPU/Memory) usage."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
+#~ msgid "Display cluster info"
+#~ msgstr "クラスターの情報を表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+#~ msgid "Displays the current-context"
+#~ msgstr "current-contextを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
+#~ msgid "Documentation of resources"
+#~ msgstr "リソースの説明を表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
+#~ msgid "Dump lots of relevant info for debugging and diagnosis"
+#~ msgstr "Dump lots of relevant info for debugging and diagnosis"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L102
 #~ msgid ""
@@ -3324,6 +3221,10 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ msgid "Perform a rolling update of the given ReplicationController"
 #~ msgstr "Perform a rolling update of the given ReplicationController"
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/replace.go#L70
+#~ msgid "Replace a resource by filename or stdin"
+#~ msgstr "Replace a resource by filename or stdin"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
 #~ msgid ""
 #~ "Set a new size for a Deployment, ReplicaSet, Replication Controller, or "
@@ -3331,6 +3232,41 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ msgstr ""
 #~ "Set a new size for a Deployment, ReplicaSet, Replication Controller, or "
 #~ "Job"
+
+#~ msgid ""
+#~ "Set the last-applied-configuration annotation on a live object to match "
+#~ "the contents of a file."
+#~ msgstr ""
+#~ "Set the last-applied-configuration annotation on a live object to match "
+#~ "the contents of a file."
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+#~ msgid "Sets a cluster entry in kubeconfig"
+#~ msgstr "kubeconfigにクラスターエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+#~ msgid "Sets a context entry in kubeconfig"
+#~ msgstr "kubeconfigにコンテキストエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+#~ msgid "Sets a user entry in kubeconfig"
+#~ msgstr "kubeconfigにユーザーエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+#~ msgid "Sets an individual value in a kubeconfig file"
+#~ msgstr "kubeconfigに個別の変数を設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+#~ msgid "Sets the current-context in a kubeconfig file"
+#~ msgstr "kubeconfigにcurrent-contextを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
+#~ msgid ""
+#~ "Take a replication controller, service, deployment or pod and expose it "
+#~ "as a new Kubernetes Service"
+#~ msgstr ""
+#~ "Take a replication controller, service, deployment or pod and expose it "
+#~ "as a new Kubernetes Service"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L100
 #~ msgid ""
@@ -3394,9 +3330,22 @@ msgstr "kubectl controls the Kubernetes cluster manager"
 #~ "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is "
 #~ "'ClusterIP'."
 
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+#~ msgid "Unsets an individual value in a kubeconfig file"
+#~ msgstr "kubeconfigから変数を個別に削除する"
+
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/patch.go#L91
 #~ msgid "Update field(s) of a resource using strategic merge patch"
 #~ msgstr "Update field(s) of a resource using strategic merge patch"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
+#~ msgid "Update image of a pod template"
+#~ msgstr "Update image of a pod template"
+
+#~ msgid ""
+#~ "View latest last-applied-configuration annotations of a resource/object"
+#~ msgstr ""
+#~ "View latest last-applied-configuration annotations of a resource/object"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L253
 #~ msgid "external name of service"
