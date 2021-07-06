@@ -29,7 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -447,8 +447,13 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 		PvAdd,
 		PvUpdate,
 		StorageClassAdd,
+		StorageClassUpdate,
 		CSINodeAdd,
 		CSINodeUpdate,
+		CSIDriverAdd,
+		CSIDriverUpdate,
+		CSIStorageCapacityAdd,
+		CSIStorageCapacityUpdate,
 	}
 
 	pluginNum := 20

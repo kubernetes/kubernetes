@@ -1673,9 +1673,9 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.8'
+$DEFAULT_NPD_VERSION = '0.8.9'
 $DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
-$DEFAULT_NPD_HASH = 'ff264e727fecf7114f00afb9b63755b47b62fc85bffb4a39062d4bbe105186d13cbd111431ae01e49cae3b6940c42934cac0fbbbcae2395df7a73507dc44bc80'
+$DEFAULT_NPD_HASH = 'f87a01d344e16d16511c5160d7d0f3b8a694e00452f50ffbb550deb10460a1ffa7e170233401ae11df5d58cf070e746feea3bd0407af95ba00d6362630da620c'
 
 # Install Node Problem Detector (NPD).
 # NPD analyzes the host for problems that can disrupt workloads.
@@ -1754,6 +1754,7 @@ function Configure-NodeProblemDetector {
         # Custom Plugin Monitors
         $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubelet.json")
         $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubeproxy.json")
+        $custom_plugin_monitors += @("${npd_dir}\config\windows-defender-monitor.json")
 
         # System Stats Monitors
         $system_stats_monitors += @("${npd_dir}\config\windows-system-stats-monitor.json")
@@ -1805,10 +1806,11 @@ $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
 
-$LOGGINGEXPORTER_VERSION = 'v0.16.2'
+$LOGGINGEXPORTER_VERSION = 'v0.17.0'
 $LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
 $LOGGINGEXPORTER_SERVICE = 'flb-exporter'
 $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
+$LOGGINGEXPORTER_HASH = 'c808c9645d84b06b89932bd707d51a9d1d0b451b5a702a5f9b2b4462c8be6502'
 
 # Restart Logging agent or starts it if it is not currently running
 function Restart-LoggingAgent {
@@ -1923,7 +1925,10 @@ function DownloadAndInstall-LoggingAgents {
       Log-Output 'Downloading logging exporter'
       New-Item $LOGGINGEXPORTER_ROOT -ItemType 'directory' -Force | Out-Null
       MustDownload-File `
-          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe -URLs $url
+          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe `
+          -URLs $url `
+          -Hash $LOGGINGEXPORTER_HASH `
+          -Algorithm SHA256
   }
 }
 

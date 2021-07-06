@@ -23,23 +23,26 @@ limitations under the License.
 // This version improves on the v1beta2 format by fixing some minor issues and adding a few new fields.
 //
 // A list of changes since v1beta2:
-// - The deprecated "ClusterConfiguration.useHyperKubeImage" field has been removed.
-// Kubeadm no longer supports the hyperkube image.
-// - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
-// DNS server type by kubeadm.
-// - Include "datapolicy" tags on the fields that hold secrets.
-// This would result in the field values to be omitted when API structures are printed with klog.
-// - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
-// a list of phases during kubeadm init/join command execution.
-// - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
-// to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
-// "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
-
+//	- The deprecated "ClusterConfiguration.useHyperKubeImage" field has been removed.
+//	Kubeadm no longer supports the hyperkube image.
+//	- The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
+//	DNS server type by kubeadm.
+//	- Include "datapolicy" tags on the fields that hold secrets.
+//	This would result in the field values to be omitted when API structures are printed with klog.
+//	- Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
+//	a list of phases during kubeadm init/join command execution.
+//	- Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
+//	to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
+//	"IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
+//	- Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
+//	the user to configure a directory from which to take patches for components deployed by kubeadm.
+//	- Move the BootstrapToken* API and related utilities out of the "kubeadm" API group to a new group
+//	"bootstraptoken". The kubeadm API version v1beta3 no longer contains the BootstrapToken* structures.
 //
 // Migration from old kubeadm config versions
 //
-// - kubeadm v1.15.x and newer can be used to migrate from the v1beta1 to v1beta2.
-// - kubeadm v1.22.x no longer supports v1beta1 and older APIs, but can be used to migrate v1beta2 to v1beta3.
+//	- kubeadm v1.15.x and newer can be used to migrate from v1beta1 to v1beta2.
+//	- kubeadm v1.22.x and newer no longer support v1beta1 and older APIs, but can be used to migrate v1beta2 to v1beta3.
 //
 // Basics
 //

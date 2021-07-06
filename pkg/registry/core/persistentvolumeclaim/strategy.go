@@ -72,7 +72,8 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj r
 
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
-	return validation.ValidatePersistentVolumeClaim(pvc)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(pvc, nil)
+	return validation.ValidatePersistentVolumeClaim(pvc, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -98,8 +99,11 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
-	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
+	newPvc := obj.(*api.PersistentVolumeClaim)
+	oldPvc := old.(*api.PersistentVolumeClaim)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
+	errorList := validation.ValidatePersistentVolumeClaim(newPvc, opts)
+	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

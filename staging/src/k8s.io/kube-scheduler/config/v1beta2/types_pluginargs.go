@@ -61,15 +61,19 @@ type NodeResourcesFitArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// IgnoredResources is the list of resources that NodeResources fit filter
-	// should ignore.
+	// should ignore. This doesn't apply to scoring.
 	// +listType=atomic
 	IgnoredResources []string `json:"ignoredResources,omitempty"`
 	// IgnoredResourceGroups defines the list of resource groups that NodeResources fit filter should ignore.
 	// e.g. if group is ["example.com"], it will ignore all resource names that begin
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
-	// A resource group name can't contain '/'.
+	// A resource group name can't contain '/'. This doesn't apply to scoring.
 	// +listType=atomic
 	IgnoredResourceGroups []string `json:"ignoredResourceGroups,omitempty"`
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	// The default strategy is LeastAllocated with an equal "cpu" and "memory" weight.
+	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -112,46 +116,6 @@ type PodTopologySpreadArgs struct {
 	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RequestedToCapacityRatioArgs holds arguments used to configure RequestedToCapacityRatio plugin.
-type RequestedToCapacityRatioArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Points defining priority function shape
-	// +listType=atomic
-	Shape []UtilizationShapePoint `json:"shape"`
-	// Resources to be managed
-	// +listType=atomic
-	Resources []ResourceSpec `json:"resources,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
-type NodeResourcesLeastAllocatedArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Resources to be managed, if no resource is provided, default resource set with both
-	// the weight of "cpu" and "memory" set to "1" will be applied.
-	// Resource with "0" weight will not accountable for the final score.
-	// +listType=atomic
-	Resources []ResourceSpec `json:"resources,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
-type NodeResourcesMostAllocatedArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Resources to be managed, if no resource is provided, default resource set with both
-	// the weight of "cpu" and "memory" set to "1" will be applied.
-	// Resource with "0" weight will not accountable for the final score.
-	// +listType=atomic
-	Resources []ResourceSpec `json:"resources,omitempty"`
-}
-
 // UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
@@ -178,6 +142,22 @@ type VolumeBindingArgs struct {
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value (600) will be used.
 	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds,omitempty"`
+
+	// Shape specifies the points defining the score function shape, which is
+	// used to score nodes based on the utilization of statically provisioned
+	// PVs. The utilization is calculated by dividing the total requested
+	// storage of the pod by the total capacity of feasible PVs on each node.
+	// Each point contains utilization (ranges from 0 to 100) and its
+	// associated score (ranges from 0 to 10). You can turn the priority by
+	// specifying different scores for different utilization numbers.
+	// The default shape points are:
+	// 1) 0 for 0 utilization
+	// 2) 10 for 100 utilization
+	// All points must be sorted in increasing order by utilization.
+	// +featureGate=VolumeCapacityPriority
+	// +optional
+	// +listType=atomic
+	Shape []UtilizationShapePoint `json:"shape,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -194,4 +174,41 @@ type NodeAffinityArgs struct {
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	// +optional
 	AddedAffinity *corev1.NodeAffinity `json:"addedAffinity,omitempty"`
+}
+
+// ScoringStrategyType the type of scoring strategy used in NodeResourcesFit plugin.
+type ScoringStrategyType string
+
+const (
+	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// RequestedToCapacityRatio strategy allows specifying a custom shape function
+	// to score nodes based on the request to capacity ratio.
+	RequestedToCapacityRatio ScoringStrategyType = "RequestedToCapacityRatio"
+)
+
+// ScoringStrategy define ScoringStrategyType for node resource plugin
+type ScoringStrategy struct {
+	// Type selects which strategy to run.
+	Type ScoringStrategyType `json:"type,omitempty"`
+
+	// Resources to consider when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	// Weight defaults to 1 if not specified or explicitly set to 0.
+	// +listType=map
+	// +listMapKey=topologyKey
+	Resources []ResourceSpec `json:"resources,omitempty"`
+
+	// Arguments specific to RequestedToCapacityRatio strategy.
+	RequestedToCapacityRatio *RequestedToCapacityRatioParam `json:"requestedToCapacityRatio,omitempty"`
+}
+
+// RequestedToCapacityRatioParam define RequestedToCapacityRatio parameters
+type RequestedToCapacityRatioParam struct {
+	// Shape is a list of points defining the scoring function shape.
+	// +listType=atomic
+	Shape []UtilizationShapePoint `json:"shape,omitempty"`
 }

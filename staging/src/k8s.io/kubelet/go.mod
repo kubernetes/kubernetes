@@ -6,7 +6,7 @@ go 1.16
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	google.golang.org/grpc v1.38.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

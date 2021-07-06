@@ -23,4 +23,5 @@ type Features struct {
 	EnablePodAffinityNamespaceSelector bool
 	EnablePodDisruptionBudget          bool
 	EnablePodOverhead                  bool
+	EnableReadWriteOncePod             bool
 }

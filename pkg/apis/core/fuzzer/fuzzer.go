@@ -31,6 +31,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the core group.
@@ -517,6 +518,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			case core.ServiceAffinityNone:
 				ss.SessionAffinityConfig = nil
+			}
+			if ss.AllocateLoadBalancerNodePorts == nil {
+				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {

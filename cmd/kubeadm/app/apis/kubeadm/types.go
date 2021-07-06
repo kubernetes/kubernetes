@@ -19,11 +19,12 @@ package kubeadm
 import (
 	"crypto/x509"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -41,7 +42,7 @@ type InitConfiguration struct {
 	ClusterConfiguration `json:"-"`
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
-	BootstrapTokens []BootstrapToken
+	BootstrapTokens []bootstraptokenv1.BootstrapToken
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions
@@ -62,6 +63,10 @@ type InitConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm init --help" command.
 	// The flag "--skip-phases" takes precedence over this field.
 	SkipPhases []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm init".
+	Patches *Patches
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -238,30 +243,6 @@ type Networking struct {
 	DNSDomain string
 }
 
-// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
-// TODO: The BootstrapToken object should move out to either k8s.io/client-go or k8s.io/api in the future
-// (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
-type BootstrapToken struct {
-	// Token is used for establishing bidirectional trust between nodes and control-planes.
-	// Used for joining nodes in the cluster.
-	Token *BootstrapTokenString
-	// Description sets a human-friendly message why this token exists and what it's used
-	// for, so other administrators can know its purpose.
-	Description string
-	// TTL defines the time to live for this token. Defaults to 24h.
-	// Expires and TTL are mutually exclusive.
-	TTL *metav1.Duration
-	// Expires specifies the timestamp when this token expires. Defaults to being set
-	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
-	Expires *metav1.Time
-	// Usages describes the ways in which this token can be used. Can by default be used
-	// for establishing bidirectional trust, but that can be changed here.
-	Usages []string
-	// Groups specifies the extra groups that this token will authenticate as when/if
-	// used for authentication
-	Groups []string
-}
-
 // Etcd contains elements describing Etcd configuration.
 type Etcd struct {
 
@@ -334,6 +315,10 @@ type JoinConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm join --help" command.
 	// The flag "--skip-phases" takes precedence over this field.
 	SkipPhases []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during
+	// "kubeadm join".
+	Patches *Patches
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -430,6 +415,18 @@ type HostPathMount struct {
 	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
+}
+
+// Patches contains options related to applying patches to components deployed by kubeadm.
+type Patches struct {
+	// Directory is a path to a directory that contains files named "target[suffix][+patchtype].extension".
+	// For example, "kube-apiserver0+merge.yaml" or just "etcd.json". "target" can be one of
+	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd". "patchtype" can be one
+	// of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
+	// The default "patchtype" is "strategic". "extension" must be either "json" or "yaml".
+	// "suffix" is an optional string that can be used to determine which patches are applied
+	// first alpha-numerically.
+	Directory string
 }
 
 // DocumentMap is a convenient way to describe a map between a YAML document and its GVK type

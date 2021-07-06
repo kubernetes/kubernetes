@@ -24,7 +24,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -134,6 +134,28 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
+	}, {
+		// Case[6]: all endpoints are terminating,, so getLocalReadyEndpointIPs should return 0 ready endpoints
+		endpointsMap: EndpointsMap{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+			},
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+				&BaseEndpointInfo{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+			},
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+			},
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+				&BaseEndpointInfo{Endpoint: "4.4.4.5:44", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+			},
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+			},
+		},
+		expected: make(map[types.NamespacedName]sets.String, 0),
 	}}
 
 	for tci, tc := range testCases {
@@ -1930,9 +1952,7 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 func newTestEp(ep, host string, ready, serving, terminating bool) *BaseEndpointInfo {
 	endpointInfo := &BaseEndpointInfo{Endpoint: ep, Ready: ready, Serving: serving, Terminating: terminating}
 	if host != "" {
-		endpointInfo.Topology = map[string]string{
-			"kubernetes.io/hostname": host,
-		}
+		endpointInfo.NodeName = host
 	}
 	return endpointInfo
 }

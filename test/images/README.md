@@ -193,7 +193,7 @@ will be triggered. The postsubmit job will push the images to the `gcr.io/k8s-st
 from the staging registry to do more testing if required. All the postsubmit jobs and their logs for all the images can be seen in
 [testgrid](https://testgrid.k8s.io/sig-testing-images) which is helpful for troubleshooting.  Note that these images are not the same as used by the e2e jobs and still need to be promoted to the final registry.
 1. The next step is to promote the image to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
-[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).  See this [pull request](https://github.com/kubernetes/k8s.io/pull/1804) for an example You will need the image manifest list's digest, which can be obtained by using [manifest-tool](https://github.com/estesp/manifest-tool):
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).  See this [pull request](https://github.com/kubernetes/k8s.io/pull/1804) for an example You will need the image manifest list's digest, which can be obtained by using [manifest-tool](https://github.com/estesp/manifest-tool):
 
     ```bash
     manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'

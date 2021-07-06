@@ -34,12 +34,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -210,7 +210,7 @@ type Proxier struct {
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilnet.PortOpener
-	recorder       record.EventRecorder
+	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -260,7 +260,7 @@ func NewProxier(ipt utiliptables.Interface,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
@@ -357,7 +357,7 @@ func NewDualStackProxier(
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP [2]net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
@@ -993,6 +993,11 @@ func (proxier *Proxier) syncProxyRules() {
 	//   slice = append(slice[:0], ...)
 	endpoints := make([]*endpointsInfo, 0)
 	endpointChains := make([]utiliptables.Chain, 0)
+	readyEndpoints := make([]*endpointsInfo, 0)
+	readyEndpointChains := make([]utiliptables.Chain, 0)
+	localReadyEndpointChains := make([]utiliptables.Chain, 0)
+	localServingTerminatingEndpointChains := make([]utiliptables.Chain, 0)
+
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
 	// Note that even if we go over 64, it will still be correct - it
@@ -1033,16 +1038,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service does not have conflicting configuration such as
 		// externalTrafficPolicy=Local.
 		allEndpoints = proxy.FilterEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
-
-		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
-		for _, endpoint := range allEndpoints {
-			if !endpoint.IsReady() {
-				continue
-			}
-
-			readyEndpoints = append(readyEndpoints, endpoint)
-		}
-		hasEndpoints := len(readyEndpoints) > 0
+		hasEndpoints := len(allEndpoints) > 0
 
 		svcChain := svcInfo.servicePortChainName
 		if hasEndpoints {
@@ -1125,7 +1121,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, v1.EventTypeWarning, err.Error(), msg)
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
@@ -1297,7 +1293,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, v1.EventTypeWarning, err.Error(), msg)
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
@@ -1365,7 +1361,7 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range readyEndpoints {
+		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep.String())
@@ -1401,16 +1397,33 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Now write loadbalancing & DNAT rules.
-		n := len(endpointChains)
-		localEndpointChains := make([]utiliptables.Chain, 0)
+		// Firstly, categorize each endpoint into three buckets:
+		//   1. all endpoints that are ready and NOT terminating.
+		//   2. all endpoints that are local, ready and NOT terminating, and externalTrafficPolicy=Local
+		//   3. all endpoints that are local, serving and terminating, and externalTrafficPolicy=Local
+		readyEndpointChains = readyEndpointChains[:0]
+		readyEndpoints := readyEndpoints[:0]
+		localReadyEndpointChains := localReadyEndpointChains[:0]
+		localServingTerminatingEndpointChains := localServingTerminatingEndpointChains[:0]
 		for i, endpointChain := range endpointChains {
-			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-			if svcInfo.NodeLocalExternal() && endpoints[i].IsLocal {
-				localEndpointChains = append(localEndpointChains, endpointChains[i])
+			if endpoints[i].Ready {
+				readyEndpointChains = append(readyEndpointChains, endpointChain)
+				readyEndpoints = append(readyEndpoints, endpoints[i])
 			}
 
-			epIP := endpoints[i].IP()
+			if svc.NodeLocalExternal() && endpoints[i].IsLocal {
+				if endpoints[i].Ready {
+					localReadyEndpointChains = append(localReadyEndpointChains, endpointChain)
+				} else if endpoints[i].Serving && endpoints[i].Terminating {
+					localServingTerminatingEndpointChains = append(localServingTerminatingEndpointChains, endpointChain)
+				}
+			}
+		}
+
+		// Now write loadbalancing & DNAT rules.
+		numReadyEndpoints := len(readyEndpointChains)
+		for i, endpointChain := range readyEndpointChains {
+			epIP := readyEndpoints[i].IP()
 			if epIP == "" {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
 				continue
@@ -1419,16 +1432,26 @@ func (proxier *Proxier) syncProxyRules() {
 			// Balancing rules in the per-service chain.
 			args = append(args[:0], "-A", string(svcChain))
 			args = proxier.appendServiceCommentLocked(args, svcNameString)
-			if i < (n - 1) {
+			if i < (numReadyEndpoints - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
 					"-m", "statistic",
 					"--mode", "random",
-					"--probability", proxier.probability(n-i))
+					"--probability", proxier.probability(numReadyEndpoints-i))
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
 			utilproxy.WriteLine(proxier.natRules, args...)
+		}
+
+		// Every endpoint gets a chain, regardless of its state. This is required later since we may
+		// want to jump to endpoint chains that are terminating.
+		for i, endpointChain := range endpointChains {
+			epIP := endpoints[i].IP()
+			if epIP == "" {
+				// Error parsing this endpoint has been logged. Skip to next endpoint.
+				continue
+			}
 
 			// Rules in the per-endpoint chain.
 			args = append(args[:0], "-A", string(endpointChain))
@@ -1473,6 +1496,12 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.WriteLine(proxier.natRules, append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
+
+		// Prefer local ready endpoint chains, but fall back to ready terminating if none exist
+		localEndpointChains := localReadyEndpointChains
+		if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) && len(localEndpointChains) == 0 {
+			localEndpointChains = localServingTerminatingEndpointChains
+		}
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {

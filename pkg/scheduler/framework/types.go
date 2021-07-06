@@ -69,6 +69,8 @@ const (
 	Service               GVK = "Service"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
+	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
 	WildCard              GVK = "*"
 )
 
@@ -387,6 +389,10 @@ type NodeInfo struct {
 	// state information.
 	ImageStates map[string]*ImageStateSummary
 
+	// PVCRefCounts contains a mapping of PVC names to the number of pods on the node using it.
+	// Keys are in the format "namespace/name".
+	PVCRefCounts map[string]int
+
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
@@ -512,6 +518,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		Generation:       nextGeneration(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -536,6 +543,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Allocatable:      n.Allocatable.Clone(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
+		PVCRefCounts:     n.PVCRefCounts,
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -595,6 +603,7 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 
 	// Consume ports when pods added.
 	n.updateUsedPorts(podInfo.Pod, true)
+	n.updatePVCRefCounts(podInfo.Pod, true)
 
 	n.Generation = nextGeneration()
 }
@@ -672,6 +681,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
+			n.updatePVCRefCounts(pod, false)
 
 			n.Generation = nextGeneration()
 			n.resetSlicesIfEmpty()
@@ -744,6 +754,25 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {
 				n.UsedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			}
+		}
+	}
+}
+
+// updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
+func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		if add {
+			n.PVCRefCounts[key] += 1
+		} else {
+			n.PVCRefCounts[key] -= 1
+			if n.PVCRefCounts[key] <= 0 {
+				delete(n.PVCRefCounts, key)
 			}
 		}
 	}

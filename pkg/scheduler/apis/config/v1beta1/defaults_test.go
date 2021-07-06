@@ -75,6 +75,10 @@ var pluginConfigs = []v1beta1.PluginConfig{
 				Kind:       "NodeResourcesFitArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1beta1",
 			},
+			ScoringStrategy: &v1beta1.ScoringStrategy{
+				Type:      v1beta1.LeastAllocated,
+				Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+			},
 		}},
 	},
 	{
@@ -283,6 +287,10 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "NodeResourcesFitArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
 									},
+									ScoringStrategy: &v1beta1.ScoringStrategy{
+										Type:      v1beta1.LeastAllocated,
+										Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
 								}},
 							},
 							{
@@ -329,6 +337,7 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []v1beta1.Plugin{
 									{Name: names.NodeResourcesFit},
 									{Name: names.NodePorts},
+									{Name: names.VolumeRestrictions},
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
@@ -666,6 +675,54 @@ func TestPluginArgsDefaults(t *testing.T) {
 			in: &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
 				DefaultingType: v1beta1.ListDefaulting,
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs not set",
+			in:   &v1beta1.NodeResourcesFitArgs{},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs Resources empty",
+			in: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type: v1beta1.MostAllocated,
+				},
+			},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority disabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority enabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+				Shape: []v1beta1.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
 			},
 		},
 	}

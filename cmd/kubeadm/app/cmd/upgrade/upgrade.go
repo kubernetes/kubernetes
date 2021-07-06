@@ -19,12 +19,12 @@ package upgrade
 import (
 	"io"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // applyPlanFlags holds the values for the common flags in `kubeadm upgrade apply` and `kubeadm upgrade plan`

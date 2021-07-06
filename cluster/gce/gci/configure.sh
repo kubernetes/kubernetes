@@ -26,8 +26,10 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v0.9.1'
 DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
-DEFAULT_NPD_VERSION='v0.8.7'
-DEFAULT_NPD_HASH='853576423077bf72e7bd8e96cd782cf272f7391379f8121650c1448531c0d3a0991dfbd0784a1157423976026806ceb14ca8fb35bac1249127dbf00af45b7eea'
+DEFAULT_NPD_VERSION='v0.8.8'
+DEFAULT_NPD_HASH_AMD64='ba8315a29368bfc33bdc602eb02d325b0b80e295c8739da35616de5b562c372bd297a2553f3ccd4daaecd67698b659b2c7068a2d2a0b9418ad29233fb75ff3f2'
+# TODO (SergeyKanzhelev): fill up for npd 0.8.9+
+DEFAULT_NPD_HASH_ARM64='N/A'
 DEFAULT_CRICTL_VERSION='v1.21.0'
 DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3bc3ea8642613df8542bf716fad903ed4d7528021ecb28b20c6330448cd2bd2b76bd776'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
@@ -177,10 +179,33 @@ function download-or-bust {
     for url in "$@"; do
       local file="${url##*/}"
       rm -f "${file}"
-      # if the url belongs to GCS API we should use oauth2_token in the headers
+      # if the url belongs to GCS API we should use oauth2_token in the headers if the VM service account has storage scopes
       local curl_headers=""
-      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
-        curl_headers="Authorization: Bearer $(get-credentials)"
+
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] ; then
+        local canUseCredentials=0
+
+        echo "Getting the scope of service account configured for VM."
+        if ! valid-storage-scope ; then
+          canUseCredentials=$?
+          # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
+          # and try to download without SA if scope does not exist on SA
+          echo "No service account or service account without storage scope. Attempt to download without service account token."
+        fi
+
+        if [[ "${canUseCredentials}" == "0" ]] ; then
+          echo "Getting the service account access token configured for VM."
+          local access_token="";
+          if access_token=$(get-credentials); then
+            echo "Service account access token is received. Downloading ${url} using this token."
+          else
+            local exit_code=$?
+            echo "Cannot get a service account token. Exiting."
+            exit ${exit_code}
+          fi
+
+          curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
+        fi
       fi
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
@@ -238,6 +263,18 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
+  if [[ "${HOST_ARCH}" == "amd64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
+  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
+  else
+    # no other architectures are supported currently.
+    # Assumption is that this script only runs on linux,
+    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+    # https://github.com/kubernetes/node-problem-detector/releases/
+    DEFAULT_NPD_HASH='N/A'
+  fi
+
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
@@ -245,7 +282,7 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_hash="${DEFAULT_NPD_HASH}"
   fi
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
     echo "${npd_tar} is preloaded."

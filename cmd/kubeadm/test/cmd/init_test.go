@@ -21,8 +21,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/lithammer/dedent"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/lithammer/dedent"
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {

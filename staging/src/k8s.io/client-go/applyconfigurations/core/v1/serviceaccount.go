@@ -51,7 +51,7 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // ExtractServiceAccount extracts the applied configuration owned by fieldManager from
 // serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
 // ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.

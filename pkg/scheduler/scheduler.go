@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -71,7 +70,7 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
-	Algorithm core.ScheduleAlgorithm
+	Algorithm ScheduleAlgorithm
 
 	Extenders []framework.Extender
 
@@ -413,17 +412,17 @@ func truncateMessage(message string) string {
 
 func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
 	klog.V(3).InfoS("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
-	podCopy := pod.DeepCopy()
+	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
-	if !podutil.UpdatePodCondition(&podCopy.Status, condition) &&
+	if !podutil.UpdatePodCondition(podStatusCopy, condition) &&
 		(len(nominatedNode) == 0 || pod.Status.NominatedNodeName == nominatedNode) {
 		return nil
 	}
 	if nominatedNode != "" {
-		podCopy.Status.NominatedNodeName = nominatedNode
+		podStatusCopy.NominatedNodeName = nominatedNode
 	}
-	return util.PatchPod(client, pod, podCopy)
+	return util.PatchPodStatus(client, pod, podStatusCopy)
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
@@ -548,7 +547,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// succeeds, the pod should get counted as a success the next time we try to
 			// schedule it. (hopefully)
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
-		} else if err == core.ErrNoNodesAvailable {
+		} else if err == ErrNoNodesAvailable {
 			// No nodes available is counted as unschedulable rather than an error.
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		} else {

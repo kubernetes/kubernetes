@@ -211,7 +211,7 @@ type testingMode interface {
 	Fatalf(format string, args ...interface{})
 }
 
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
+func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort, volumes []v1.Volume) *v1.Pod {
 	req := v1.ResourceList{}
 	if cpu != "" {
 		req = v1.ResourceList{
@@ -240,6 +240,7 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 				Ports: ports,
 			}},
 			NodeName: nodeName,
+			Volumes:  volumes,
 		},
 	}
 }
@@ -247,8 +248,8 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 func TestNewNodeInfo(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}, nil),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
 	}
 
 	expected := &NodeInfo{
@@ -274,7 +275,8 @@ func TestNewNodeInfo(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates: map[string]*ImageStateSummary{},
+		ImageStates:  map[string]*ImageStateSummary{},
+		PVCRefCounts: map[string]int{},
 		Pods: []*PodInfo{
 			{
 				Pod: &v1.Pod{
@@ -366,7 +368,8 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates: map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*ImageStateSummary{},
+				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
 					{
 						Pod: &v1.Pod{
@@ -439,7 +442,8 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates: map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*ImageStateSummary{},
+				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
 					{
 						Pod: &v1.Pod{
@@ -548,6 +552,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 				Overhead: v1.ResourceList{
 					v1.ResourceCPU: resource.MustParse("500m"),
 				},
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -577,6 +590,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 				Overhead: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("500m"),
 					v1.ResourceMemory: resource.MustParse("500"),
+				},
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -618,6 +640,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 					v1.ResourceCPU:    resource.MustParse("500m"),
 					v1.ResourceMemory: resource.MustParse("500"),
 				},
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-2",
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -649,7 +680,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates: map[string]*ImageStateSummary{},
+		ImageStates:  map[string]*ImageStateSummary{},
+		PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
 		Pods: []*PodInfo{
 			{
 				Pod: &v1.Pod{
@@ -679,6 +711,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 						NodeName: nodeName,
 						Overhead: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("500m"),
+						},
+						Volumes: []v1.Volume{
+							{
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-1",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -711,6 +752,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 						Overhead: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("500m"),
 							v1.ResourceMemory: resource.MustParse("500"),
+						},
+						Volumes: []v1.Volume{
+							{
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-1",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -754,6 +804,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 							v1.ResourceCPU:    resource.MustParse("500m"),
 							v1.ResourceMemory: resource.MustParse("500"),
 						},
+						Volumes: []v1.Volume{
+							{
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-2",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -779,9 +838,10 @@ func TestNodeInfoAddPod(t *testing.T) {
 func TestNodeInfoRemovePod(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
-
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "",
+			[]v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}},
+			[]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
 	}
 
 	// add pod Overhead
@@ -798,7 +858,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		expectedNodeInfo *NodeInfo
 	}{
 		{
-			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}),
+			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}, []v1.Volume{}),
 			errExpected: true,
 			expectedNodeInfo: &NodeInfo{
 				node: &v1.Node{
@@ -828,7 +888,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates: map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*ImageStateSummary{},
+				PVCRefCounts: map[string]int{"node_info_cache_test/pvc-1": 1},
 				Pods: []*PodInfo{
 					{
 						Pod: &v1.Pod{
@@ -859,6 +920,15 @@ func TestNodeInfoRemovePod(t *testing.T) {
 								Overhead: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("500m"),
 									v1.ResourceMemory: resource.MustParse("500"),
+								},
+								Volumes: []v1.Volume{
+									{
+										VolumeSource: v1.VolumeSource{
+											PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+												ClaimName: "pvc-1",
+											},
+										},
+									},
 								},
 							},
 						},
@@ -929,6 +999,15 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						v1.ResourceCPU:    resource.MustParse("500m"),
 						v1.ResourceMemory: resource.MustParse("500"),
 					},
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-1",
+								},
+							},
+						},
+					},
 				},
 			},
 			errExpected: false,
@@ -959,7 +1038,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates: map[string]*ImageStateSummary{},
+				ImageStates:  map[string]*ImageStateSummary{},
+				PVCRefCounts: map[string]int{},
 				Pods: []*PodInfo{
 					{
 						Pod: &v1.Pod{

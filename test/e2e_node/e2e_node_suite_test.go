@@ -27,6 +27,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+
 	"math/rand"
 	"os"
 	"os/exec"
@@ -44,8 +45,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
 
 	"github.com/onsi/ginkgo"
@@ -90,12 +91,8 @@ func registerNodeFlags(flags *flag.FlagSet) {
 }
 
 func init() {
-	// Enable bindata file lookup as fallback.
-	e2etestfiles.AddFileSource(e2etestfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
-
+	// Enable embedded FS file lookup as fallback
+	e2etestfiles.AddFileSource(e2enodetestingmanifests.GetE2ENodeTestingManifestsFS())
 }
 
 func TestMain(m *testing.M) {

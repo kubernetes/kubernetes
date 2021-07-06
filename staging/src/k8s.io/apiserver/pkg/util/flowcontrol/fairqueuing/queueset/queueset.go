@@ -406,15 +406,16 @@ func (qs *queueSet) syncTimeLocked() {
 	timeSinceLast := realNow.Sub(qs.lastRealTime).Seconds()
 	qs.lastRealTime = realNow
 	qs.virtualTime += timeSinceLast * qs.getVirtualTimeRatioLocked()
+	metrics.SetCurrentR(qs.qCfg.Name, qs.virtualTime)
 }
 
 // getVirtualTimeRatio calculates the rate at which virtual time has
 // been advancing, according to the logic in `doc.go`.
 func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	activeQueues := 0
-	reqs := 0
+	seatsInUse := 0
 	for _, queue := range qs.queues {
-		reqs += queue.requestsExecuting
+		seatsInUse += queue.seatsInUse
 		if queue.requests.Length() > 0 || queue.requestsExecuting > 0 {
 			activeQueues++
 		}
@@ -422,7 +423,7 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	if activeQueues == 0 {
 		return 0
 	}
-	return math.Min(float64(reqs), float64(qs.dCfg.ConcurrencyLimit)) / float64(activeQueues)
+	return math.Min(float64(seatsInUse), float64(qs.dCfg.ConcurrencyLimit)) / float64(activeQueues)
 }
 
 // timeoutOldRequestsAndRejectOrEnqueueLocked encapsulates the logic required
@@ -574,6 +575,7 @@ func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
 }
 
 func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, width uint, flowDistinguisher, fsName string, descr1, descr2 interface{}) *request {
+	// does not call metrics.SetDispatchMetrics because there is no queuing and thus no interesting virtual world
 	now := qs.clock.Now()
 	req := &request{
 		qs:                qs,
@@ -692,6 +694,10 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 // the oldest waiting request is minimal.
 func (qs *queueSet) selectQueueLocked() *queue {
 	minVirtualFinish := math.Inf(1)
+	sMin := math.Inf(1)
+	dsMin := math.Inf(1)
+	sMax := math.Inf(-1)
+	dsMax := math.Inf(-1)
 	var minQueue *queue
 	var minIndex int
 	nq := len(qs.queues)
@@ -699,6 +705,11 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
 		if queue.requests.Length() != 0 {
+			sMin = math.Min(sMin, queue.virtualStart)
+			sMax = math.Max(sMax, queue.virtualStart)
+			estimatedWorkInProgress := qs.estimatedServiceTime * float64(queue.seatsInUse)
+			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
+			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
 			// the virtual finish time of the oldest request is:
 			//   virtual start time + G
 			// we are not taking the width of the request into account when
@@ -758,6 +769,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		// per-queue virtual time should not fall behind the global
 		minQueue.virtualStart = qs.virtualTime + previouslyEstimatedServiceTime
 	}
+	metrics.SetDispatchMetrics(qs.qCfg.Name, qs.virtualTime, minQueue.virtualStart, sMin, sMax, dsMin, dsMax)
 	return minQueue
 }
 

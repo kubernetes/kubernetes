@@ -20,9 +20,11 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 const (
@@ -174,7 +176,7 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
-		obj.BootstrapTokens = []BootstrapToken{{}}
+		obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{{}}
 	}
 
 	for i := range obj.BootstrapTokens {
@@ -183,7 +185,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 }
 
 // SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+func SetDefaults_BootstrapToken(bt *bootstraptokenv1.BootstrapToken) {
 	if bt.TTL == nil {
 		bt.TTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,

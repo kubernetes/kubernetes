@@ -47,6 +47,7 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1beta2.Plugin{
 						{Name: names.NodeResourcesFit},
 						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
 						{Name: names.PodTopologySpread},
 						{Name: names.InterPodAffinity},
 						{Name: names.VolumeBinding},
@@ -90,7 +91,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
 						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
 						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeResourcesLeastAllocated, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
 						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
 						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
 						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
@@ -128,6 +129,7 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1beta2.Plugin{
 						{Name: names.NodeResourcesFit},
 						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
 						{Name: names.PodTopologySpread},
 						{Name: names.InterPodAffinity},
 						{Name: names.VolumeBinding},
@@ -172,7 +174,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
 						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
 						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeResourcesLeastAllocated, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
 						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
 						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
 						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},

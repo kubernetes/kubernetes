@@ -49,7 +49,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -110,11 +109,11 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 }
 
 type mockScheduler struct {
-	result core.ScheduleResult
+	result ScheduleResult
 	err    error
 }
 
-func (es mockScheduler) Schedule(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -311,7 +310,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		name                string
 		injectBindError     error
 		sendPod             *v1.Pod
-		algo                core.ScheduleAlgorithm
+		algo                ScheduleAlgorithm
 		registerPluginFuncs []st.RegisterPluginFunc
 		expectErrorPod      *v1.Pod
 		expectForgetPod     *v1.Pod
@@ -323,7 +322,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:    "error reserve pod",
 			sendPod: podWithID("foo", ""),
-			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			algo:    mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			registerPluginFuncs: []st.RegisterPluginFunc{
 				st.RegisterReservePlugin("FakeReserve", st.NewFakeReservePlugin(framework.NewStatus(framework.Error, "reserve error"))),
 			},
@@ -336,7 +335,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:    "error permit pod",
 			sendPod: podWithID("foo", ""),
-			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			algo:    mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			registerPluginFuncs: []st.RegisterPluginFunc{
 				st.RegisterPermitPlugin("FakePermit", st.NewFakePermitPlugin(framework.NewStatus(framework.Error, "permit error"), time.Minute)),
 			},
@@ -349,7 +348,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:    "error prebind pod",
 			sendPod: podWithID("foo", ""),
-			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			algo:    mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			registerPluginFuncs: []st.RegisterPluginFunc{
 				st.RegisterPreBindPlugin("FakePreBind", st.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
 			},
@@ -362,7 +361,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:             "bind assumed pod scheduled",
 			sendPod:          podWithID("foo", ""),
-			algo:             mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			algo:             mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			eventReason:      "Scheduled",
@@ -370,7 +369,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:           "error pod failed scheduling",
 			sendPod:        podWithID("foo", ""),
-			algo:           mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, errS},
+			algo:           mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, errS},
 			expectError:    errS,
 			expectErrorPod: podWithID("foo", ""),
 			eventReason:    "FailedScheduling",
@@ -378,7 +377,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:             "error bind forget pod failed scheduling",
 			sendPod:          podWithID("foo", ""),
-			algo:             mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			algo:             mockScheduler{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
@@ -390,7 +389,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		{
 			name:        "deleting pod",
 			sendPod:     deletingPod("foo"),
-			algo:        mockScheduler{core.ScheduleResult{}, nil},
+			algo:        mockScheduler{ScheduleResult{}, nil},
 			eventReason: "FailedScheduling",
 		},
 	}
@@ -928,7 +927,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 	)
 
-	algo := core.NewGenericScheduler(
+	algo := NewGenericScheduler(
 		scache,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore,
@@ -1274,7 +1273,7 @@ func TestSchedulerBinding(t *testing.T) {
 			stop := make(chan struct{})
 			defer close(stop)
 			scache := internalcache.New(100*time.Millisecond, stop)
-			algo := core.NewGenericScheduler(
+			algo := NewGenericScheduler(
 				scache,
 				nil,
 				0,

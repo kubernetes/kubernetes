@@ -1188,9 +1188,22 @@ fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${START_MODE}" != "nokubeproxy" ]]; then
-    start_kubeproxy
+    ## TODO remove this check if/when kubelet is supported on darwin
+    # Detect the OS name/arch and display appropriate error.
+    case "$(uname -s)" in
+      Darwin)
+        print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
+        ;;
+      Linux)
+        start_kubeproxy
+        ;;
+      *)
+        print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
+        ;;
+    esac
   fi
 fi
+
 if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi

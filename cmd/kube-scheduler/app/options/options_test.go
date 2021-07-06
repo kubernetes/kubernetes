@@ -408,7 +408,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -481,7 +481,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta1,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta1,
 					},
 				},
 			},
@@ -585,7 +585,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -657,7 +657,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -749,12 +749,11 @@ profiles:
 							},
 							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
-							},
-							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
-									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -867,7 +866,12 @@ profiles:
 							},
 							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
+								},
 							},
 							{
 								Name: "NodeResourcesLeastAllocated",
@@ -947,7 +951,7 @@ profiles:
 								},
 							},
 						},
-						PluginConfig: defaults.PluginConfigs,
+						PluginConfig: defaults.PluginConfigsV1beta2,
 					},
 					{
 						SchedulerName: "bar-profile",
@@ -984,12 +988,11 @@ profiles:
 							},
 							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
-							},
-							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
-									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -1064,7 +1067,7 @@ profiles:
 								},
 							},
 						},
-						PluginConfig: defaults.PluginConfigs,
+						PluginConfig: defaults.PluginConfigsV1beta1,
 					},
 					{
 						SchedulerName: "bar-profile",
@@ -1101,7 +1104,12 @@ profiles:
 							},
 							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
+								},
 							},
 							{
 								Name: "NodeResourcesLeastAllocated",

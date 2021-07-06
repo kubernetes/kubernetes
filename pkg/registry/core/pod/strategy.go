@@ -167,6 +167,11 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
 		period = 0
 	}
+
+	if period < 0 {
+		period = 1
+	}
+
 	// ensure the options and the pod are in sync
 	options.GracePeriodSeconds = &period
 	return true

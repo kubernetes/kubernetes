@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/annotate"
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -401,14 +402,19 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 //   2) Adds CommandHeaderRoundTripper as a wrapper around the standard
 //      RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
 //      to standard RoundTripper.
-// For alpha, these hooks are only updated if the KUBECTL_COMMAND_HEADERS
-// environment variable is set.
+// For beta, these hooks are updated unless the KUBECTL_COMMAND_HEADERS environment variable
+// is set, and the value of the env var is false (or zero).
 // See SIG CLI KEP 859 for more information:
 //   https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
-	if _, exists := os.LookupEnv(kubectlCmdHeaders); !exists {
-		return
+	// If the feature gate env var is set to "false", then do no add kubectl command headers.
+	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
+		if value == "false" || value == "0" {
+			klog.V(5).Infoln("kubectl command headers turned off")
+			return
+		}
 	}
+	klog.V(5).Infoln("kubectl command headers turned on")
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
 	existingPreRunE := cmds.PersistentPreRunE
 	// Add command parsing to the existing persistent pre-run function.

@@ -20,18 +20,19 @@ package winkernel
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilpointer "k8s.io/utils/pointer"
-	"net"
-	"strings"
-	"testing"
-	"time"
 )
 
 const (
@@ -810,7 +811,7 @@ func TestEndpointSlice(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "testhost2"},
+			NodeName:   utilpointer.StringPtr("testhost2"),
 		}},
 	}
 

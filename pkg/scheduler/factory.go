@@ -36,7 +36,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -100,7 +99,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		var ignorableExtenders []framework.Extender
 		for ii := range c.extenders {
 			klog.V(2).InfoS("Creating extender", "extender", c.extenders[ii])
-			extender, err := core.NewHTTPExtender(&c.extenders[ii])
+			extender, err := NewHTTPExtender(&c.extenders[ii])
 			if err != nil {
 				return nil, err
 			}
@@ -188,7 +187,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	)
 	debugger.ListenForSignal(c.StopEverything)
 
-	algo := core.NewGenericScheduler(
+	algo := NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
 		c.percentageOfNodesToScore,
@@ -374,7 +373,7 @@ func dedupPluginConfigs(pc []schedulerapi.PluginConfig) ([]schedulerapi.PluginCo
 func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
 		pod := podInfo.Pod
-		if err == core.ErrNoNodesAvailable {
+		if err == ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 		} else if fitError, ok := err.(*framework.FitError); ok {
 			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
