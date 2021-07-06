@@ -230,6 +230,10 @@ type Config struct {
 	// it's intentionally marked private as it should never be overridden.
 	lifecycleSignals lifecycleSignals
 
+	// StorageObjectCountTracker is used to keep track of the total number of objects
+	// in the storage per resource, so we can estimate width of incoming requests.
+	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -352,9 +356,10 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:       genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		RequestWidthEstimator: flowcontrolrequest.DefaultWidthEstimator,
-		lifecycleSignals:      newLifecycleSignals(),
+		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		RequestWidthEstimator:     flowcontrolrequest.DefaultWidthEstimator,
+		lifecycleSignals:          newLifecycleSignals(),
+		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
