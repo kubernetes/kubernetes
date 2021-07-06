@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+const maxStringLength = 100
+
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
 type printHandler struct {
@@ -208,7 +210,28 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				fmt.Fprint(output, "\t")
 			}
 			if cell != nil {
-				fmt.Fprint(output, cell)
+				switch val := cell.(type) {
+				case string:
+					print := val
+					more := 0
+					// cut to maxStringLength
+					if len(val) > maxStringLength {
+						more = len(print) - maxStringLength
+						print = print[:maxStringLength]
+					}
+					// and also check for newlines
+					newline := strings.Index(print, "\n")
+					if newline >= 0 {
+						more = more + len(print) - newline
+						print = print[:newline]
+					}
+					fmt.Fprint(output, print)
+					if more > 0 {
+						fmt.Fprintf(output, " + %d more...", more)
+					}
+				default:
+					fmt.Fprint(output, val)
+				}
 			}
 		}
 		fmt.Fprintln(output)
