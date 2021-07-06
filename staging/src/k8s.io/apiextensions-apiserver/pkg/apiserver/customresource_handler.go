@@ -903,7 +903,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			requestScopes[v.Name] = &reqScope
 		}
 
-		// override scaleSpec subresource values
+		scaleColumns, err := getScaleColumnsForVersion(crd, v.Name)
+		if err != nil {
+			return nil, fmt.Errorf("the server could not properly serve the CR scale subresource columns %w", err)
+		}
+		scaleTable, _ := tableconvertor.New(scaleColumns)
+
+		// override scale subresource values
 		// shallow copy
 		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
@@ -916,6 +922,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
+		scaleScope.TableConvertor = scaleTable
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && subresources != nil && subresources.Scale != nil {
 			scaleScope, err = scopeWithFieldManager(
