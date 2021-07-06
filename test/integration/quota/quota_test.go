@@ -53,6 +53,10 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+const (
+	resourceQuotaTimeout = 10 * time.Second
+)
+
 // 1.2 code gets:
 // 	quota_test.go:95: Took 4.218619579s to scale up without quota
 // 	quota_test.go:199: unexpected error: timed out waiting for the condition, ended with 342 pods (1 minute)
@@ -185,6 +189,39 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// waitForUsedResourceQuota polls a ResourceQuota status for an expected used value
+func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
+	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			actualValue, found := resourceQuota.Status.Used[k]
+			if !found {
+				t.Logf("resource %s was not found in ResourceQuota status", k)
+				return false, nil
+			}
+
+			if !actualValue.Equal(v) {
+				t.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("error waiting or ResourceQuota status: %v", err)
 	}
 }
 
@@ -492,8 +529,13 @@ func TestQuotaLimitService(t *testing.T) {
 		t.Errorf("creating first loadbalancer Service should not have returned error: %v", err)
 	}
 
-	// add a delay for resource quota changes to propagate
-	time.Sleep(1 * time.Second)
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed := v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("2"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
 	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
@@ -506,8 +548,13 @@ func TestQuotaLimitService(t *testing.T) {
 		t.Errorf("creating another loadbalancer Service without node ports should not have returned error: %v", err)
 	}
 
-	// add a delay for resource quota changes to propagate
-	time.Sleep(1 * time.Second)
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed = v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("3"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
 	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
@@ -520,8 +567,13 @@ func TestQuotaLimitService(t *testing.T) {
 		t.Errorf("creating a cluster IP Service should not have returned error: %v", err)
 	}
 
-	// add a delay for resource quota changes to propagate
-	time.Sleep(1 * time.Second)
+	// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+	expectedQuotaUsed = v1.ResourceList{
+		v1.ResourceServices:              resource.MustParse("4"),
+		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
+	}
+	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
 	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
