@@ -27,12 +27,16 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 
@@ -110,8 +114,68 @@ func newStep(fn func()) *step {
 	}
 }
 
+func TestRetryWhenHasNotBeenReady(t *testing.T) {
+	// setup
+	var currentUser string
+	thc := &testHealthChecker{}
+
+	config, _ := setUp(t)
+	config.RetryWhenHasNotBeenReady = true
+	//config.RequestInfoResolver = &fakeRequestInfoResolver{ri: &apirequest.RequestInfo{}}
+	config.Authentication = AuthenticationInfo{
+		APIAudiences: nil,
+		Authenticator: authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: currentUser}}, true, nil
+		}),
+	}
+	s := newGenericAPIServerFromCfg(t, config)
+	s.AddReadyzChecks(thc)
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+
+	doer := setupDoer(t, s.SecureServingInfo)
+	client := newClient(false)
+
+	//step 1: /readyz should return 500
+	resultGot := doer.Do(client, func(httptrace.GotConnInfo) {}, "/readyz?verbose=true", time.Second)
+	assertResponse(t, resultGot, http.StatusInternalServerError)
+
+	//step 2: /readyz/testHealthChecker should return 500
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/readyz/%s", thc.Name()), time.Second)
+	assertResponse(t, resultGot, http.StatusInternalServerError)
+
+	// step 3: since the server hasn't been ready we expect to get 429
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/echo?message=never-ready-server-returns-429", time.Second)
+	requestMustFailWithRetryHeader(t, resultGot, http.StatusTooManyRequests)
+
+	// step 4: a privileged user always has the power
+	currentUser = "system:apiserver"
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/echo?message=never-ready-server-returns-200-for-super-user", time.Second)
+	assertResponse(t, resultGot, http.StatusOK)
+
+	// step 5: become ready and fire a request
+	thc.healthy = true
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/readyz?verbose=true", time.Second)
+	assertResponse(t, resultGot, http.StatusOK)
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/echo?message=ready-server-returns-200", time.Second)
+	assertResponse(t, resultGot, http.StatusOK)
+
+	// step 5: become unready and verify we still get 200
+	thc.healthy = false
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/readyz?verbose=true", time.Second)
+	assertResponse(t, resultGot, http.StatusInternalServerError)
+	resultGot = doer.Do(client, func(httptrace.GotConnInfo) {}, "/echo?message=unready-server-returns-200", time.Second)
+	assertResponse(t, resultGot, http.StatusOK)
+}
+
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
-	s := newGenericAPIServer(t)
+	config, _ := setUp(t)
+	s := newGenericAPIServerFromCfg(t, config)
 
 	// record the termination events in the order they are signaled
 	var signalOrderLock sync.Mutex
@@ -143,9 +207,9 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		delayedStopVerificationStepExecuted = true
 		t.Log("Before ShutdownDelayDuration elapses new request(s) should be served")
 		resultGot := doer.Do(connReusingClient, shouldReuseConnection(t), "/echo?message=request-on-an-existing-connection-should-succeed", time.Second)
-		requestMustSucceed(t, resultGot)
+		assertResponse(t, resultGot, http.StatusOK)
 		resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
-		requestMustSucceed(t, resultGot)
+		assertResponse(t, resultGot, http.StatusOK)
 	})
 	steps := func(before bool, name string, e lifecycleSignal) {
 		// Before AfterShutdownDelayDuration event is signaled, the test
@@ -208,7 +272,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	case <-time.After(5 * time.Second):
 		t.Fatal("Expected the server to send a response")
 	}
-	requestMustSucceed(t, inFlightResultGot)
+	assertResponse(t, inFlightResultGot, http.StatusOK)
 
 	t.Log("Waiting for the apiserver Run method to return")
 	select {
@@ -248,13 +312,25 @@ func shouldUseNewConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	}
 }
 
-func requestMustSucceed(t *testing.T, resultGot result) {
+func assertResponse(t *testing.T, resultGot result, statusCodeExpected int) {
 	if resultGot.err != nil {
 		t.Errorf("Expected no error, but got: %v", resultGot.err)
 		return
 	}
-	if resultGot.response.StatusCode != http.StatusOK {
-		t.Errorf("Expected Status Code: %d, but got: %d", http.StatusOK, resultGot.response.StatusCode)
+	if resultGot.response.StatusCode != statusCodeExpected {
+		t.Errorf("Expected Status Code: %d, but got: %d", statusCodeExpected, resultGot.response.StatusCode)
+	}
+}
+
+func requestMustFailWithRetryHeader(t *testing.T, resultGot result, statusCodedExpected int) {
+	assertResponse(t, resultGot, statusCodedExpected)
+	retryAfterGotStr := resultGot.response.Header.Get("Retry-After")
+	retryAfterGot, err := strconv.Atoi(retryAfterGotStr)
+	if err != nil {
+		t.Errorf("Incorrect value for Retry-After Header, err = %v", err)
+	}
+	if !(retryAfterGot >= 4 && retryAfterGot < 12) {
+		t.Errorf("Expected Retry-After Header to be: [4, 12), but got: %d", retryAfterGot)
 	}
 }
 
@@ -351,11 +427,22 @@ func newClient(useNewConnection bool) *http.Client {
 	}
 }
 
-func newGenericAPIServer(t *testing.T) *GenericAPIServer {
-	config, _ := setUp(t)
+func newGenericAPIServerFromCfg(t *testing.T, config Config) *GenericAPIServer {
 	config.ShutdownDelayDuration = 100 * time.Millisecond
 	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		var handler http.Handler
+
+		if c.RetryWhenHasNotBeenReady {
+			failedHandler := genericapifilters.Unauthorized(c.Serializer)
+			handler = genericfilters.WithRetryAfter(apiHandler, []genericfilters.RetryConditionFn{genericfilters.WithRetryWhenHasNotBeenReady(c.lifecycleSignals.HasBeenReady.Signaled())}, genericfilters.WithoutRetryOnThePaths, genericapifilters.GetAuthorizerAttributes)
+			handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
+		}
+
+		if handler == nil {
+			handler = apiHandler
+		}
+
+		handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}
@@ -401,4 +488,27 @@ func (ln wrappedListener) Accept() (net.Conn, error) {
 		ln.t.Logf("[server] seen new connection: %#v", tc)
 	}
 	return c, err
+}
+
+type testHealthChecker struct {
+	healthy bool
+}
+
+func (thc *testHealthChecker) Name() string {
+	return "testHealthChecker"
+}
+
+func (thc *testHealthChecker) Check(_ *http.Request) error {
+	if thc.healthy {
+		return nil
+	}
+	return fmt.Errorf("unhealthy because i was told so")
+}
+
+type fakeRequestInfoResolver struct {
+	ri *apirequest.RequestInfo
+}
+
+func (f *fakeRequestInfoResolver) NewRequestInfo(_ *http.Request) (*apirequest.RequestInfo, error) {
+	return f.ri, nil
 }
