@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2beta2
+package v2
 
 import (
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -29,18 +29,18 @@ var (
 	scaleUpLimitMinimumPods     int32 = 4
 	scaleUpPeriod               int32 = 15
 	scaleUpStabilizationSeconds int32
-	maxPolicy                   = autoscalingv2beta2.MaxPolicySelect
-	defaultHPAScaleUpRules      = autoscalingv2beta2.HPAScalingRules{
+	maxPolicy                   = autoscalingv2.MaxChangePolicySelect
+	defaultHPAScaleUpRules      = autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: &scaleUpStabilizationSeconds,
 		SelectPolicy:               &maxPolicy,
-		Policies: []autoscalingv2beta2.HPAScalingPolicy{
+		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
-				Type:          autoscalingv2beta2.PodsScalingPolicy,
+				Type:          autoscalingv2.PodsScalingPolicy,
 				Value:         scaleUpLimitMinimumPods,
 				PeriodSeconds: scaleUpPeriod,
 			},
 			{
-				Type:          autoscalingv2beta2.PercentScalingPolicy,
+				Type:          autoscalingv2.PercentScalingPolicy,
 				Value:         scaleUpLimitPercent,
 				PeriodSeconds: scaleUpPeriod,
 			},
@@ -49,14 +49,13 @@ var (
 	scaleDownPeriod int32 = 15
 	// Currently we can set the downscaleStabilizationWindow from the command line
 	// So we can not rewrite the command line option from here
-	scaleDownStabilizationSeconds *int32 = nil
-	scaleDownLimitPercent         int32  = 100
-	defaultHPAScaleDownRules             = autoscalingv2beta2.HPAScalingRules{
-		StabilizationWindowSeconds: scaleDownStabilizationSeconds,
+	scaleDownLimitPercent    int32 = 100
+	defaultHPAScaleDownRules       = autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: nil,
 		SelectPolicy:               &maxPolicy,
-		Policies: []autoscalingv2beta2.HPAScalingPolicy{
+		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
-				Type:          autoscalingv2beta2.PercentScalingPolicy,
+				Type:          autoscalingv2.PercentScalingPolicy,
 				Value:         scaleDownLimitPercent,
 				PeriodSeconds: scaleDownPeriod,
 			},
@@ -68,7 +67,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAutoscaler) {
+func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutoscaler) {
 	if obj.Spec.MinReplicas == nil {
 		minReplicas := int32(1)
 		obj.Spec.MinReplicas = &minReplicas
@@ -76,13 +75,13 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAu
 
 	if len(obj.Spec.Metrics) == 0 {
 		utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
-		obj.Spec.Metrics = []autoscalingv2beta2.MetricSpec{
+		obj.Spec.Metrics = []autoscalingv2.MetricSpec{
 			{
-				Type: autoscalingv2beta2.ResourceMetricSourceType,
-				Resource: &autoscalingv2beta2.ResourceMetricSource{
+				Type: autoscalingv2.ResourceMetricSourceType,
+				Resource: &autoscalingv2.ResourceMetricSource{
 					Name: v1.ResourceCPU,
-					Target: autoscalingv2beta2.MetricTarget{
-						Type:               autoscalingv2beta2.UtilizationMetricType,
+					Target: autoscalingv2.MetricTarget{
+						Type:               autoscalingv2.UtilizationMetricType,
 						AverageUtilization: &utilizationDefaultVal,
 					},
 				},
@@ -93,7 +92,7 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAu
 }
 
 // SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it is not null
-func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2beta2.HorizontalPodAutoscaler) {
+func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPodAutoscaler) {
 	// if behavior is specified, we should fill all the 'nil' values with the default ones
 	if obj.Spec.Behavior != nil {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
@@ -103,7 +102,7 @@ func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2beta2.Horizon
 
 // GenerateHPAScaleUpRules returns a fully-initialized HPAScalingRules value
 // We guarantee that no pointer in the structure will have the 'nil' value
-func GenerateHPAScaleUpRules(scalingRules *autoscalingv2beta2.HPAScalingRules) *autoscalingv2beta2.HPAScalingRules {
+func GenerateHPAScaleUpRules(scalingRules *autoscalingv2.HPAScalingRules) *autoscalingv2.HPAScalingRules {
 	defaultScalingRules := defaultHPAScaleUpRules.DeepCopy()
 	return copyHPAScalingRules(scalingRules, defaultScalingRules)
 }
@@ -111,13 +110,13 @@ func GenerateHPAScaleUpRules(scalingRules *autoscalingv2beta2.HPAScalingRules) *
 // GenerateHPAScaleDownRules returns a fully-initialized HPAScalingRules value
 // We guarantee that no pointer in the structure will have the 'nil' value
 // EXCEPT StabilizationWindowSeconds, for reasoning check the comment for defaultHPAScaleDownRules
-func GenerateHPAScaleDownRules(scalingRules *autoscalingv2beta2.HPAScalingRules) *autoscalingv2beta2.HPAScalingRules {
+func GenerateHPAScaleDownRules(scalingRules *autoscalingv2.HPAScalingRules) *autoscalingv2.HPAScalingRules {
 	defaultScalingRules := defaultHPAScaleDownRules.DeepCopy()
 	return copyHPAScalingRules(scalingRules, defaultScalingRules)
 }
 
 // copyHPAScalingRules copies all non-`nil` fields in HPA constraint structure
-func copyHPAScalingRules(from, to *autoscalingv2beta2.HPAScalingRules) *autoscalingv2beta2.HPAScalingRules {
+func copyHPAScalingRules(from, to *autoscalingv2.HPAScalingRules) *autoscalingv2.HPAScalingRules {
 	if from == nil {
 		return to
 	}

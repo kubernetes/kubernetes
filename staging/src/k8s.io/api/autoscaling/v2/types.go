@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 // +k8s:openapi-gen=true
 
-package v2beta2
+package v2
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -26,8 +26,6 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.12
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
@@ -72,6 +70,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// increased, and vice-versa.  See the individual metric source types for
 	// more information about how each type of metric must respond.
 	// If not set, the default metric will be set to 80% average CPU utilization.
+	// +listType=atomic
 	// +optional
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 
@@ -118,7 +117,7 @@ type MetricSpec struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricSource `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
-	// container resource refers to a resource metric (such as those specified in
+	// containerResource refers to a resource metric (such as those specified in
 	// requests and limits) known to Kubernetes describing a single container in
 	// each pod of the current scale target (e.g. CPU or memory). Such metrics are
 	// built in to Kubernetes, and have special scaling options on top of those
@@ -157,10 +156,10 @@ type HorizontalPodAutoscalerBehavior struct {
 type ScalingPolicySelect string
 
 const (
-	// MaxPolicySelect selects the policy with the highest possible change.
-	MaxPolicySelect ScalingPolicySelect = "Max"
-	// MinPolicySelect selects the policy with the lowest possible change.
-	MinPolicySelect ScalingPolicySelect = "Min"
+	// MaxChangePolicySelect  selects the policy with the highest possible change.
+	MaxChangePolicySelect ScalingPolicySelect = "Max"
+	// MinChangePolicySelect selects the policy with the lowest possible change.
+	MinChangePolicySelect ScalingPolicySelect = "Min"
 	// DisabledPolicySelect disables the scaling in this direction.
 	DisabledPolicySelect ScalingPolicySelect = "Disabled"
 )
@@ -181,13 +180,14 @@ type HPAScalingRules struct {
 	// +optional
 	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds,omitempty" protobuf:"varint,3,opt,name=stabilizationWindowSeconds"`
 	// selectPolicy is used to specify which policy should be used.
-	// If not set, the default value MaxPolicySelect is used.
+	// If not set, the default value Max is used.
 	// +optional
 	SelectPolicy *ScalingPolicySelect `json:"selectPolicy,omitempty" protobuf:"bytes,1,opt,name=selectPolicy"`
 	// policies is a list of potential scaling polices which can be used during scaling.
 	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+	// +listType=atomic
 	// +optional
-	Policies []HPAScalingPolicy `json:"policies,omitempty" protobuf:"bytes,2,rep,name=policies"`
+	Policies []HPAScalingPolicy `json:"policies,omitempty" listType:"atomic" protobuf:"bytes,2,rep,name=policies"`
 }
 
 // HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
@@ -247,6 +247,7 @@ const (
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSource struct {
+	// describedObject specifies the descriptions of a object,such as kind,name apiVersion
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
@@ -361,19 +362,26 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// currentReplicas is current number of replicas of pods managed by this autoscaler,
 	// as last seen by the autoscaler.
-	CurrentReplicas int32 `json:"currentReplicas" protobuf:"varint,3,opt,name=currentReplicas"`
+	// +optional
+	CurrentReplicas int32 `json:"currentReplicas,omitempty" protobuf:"varint,3,opt,name=currentReplicas"`
 
 	// desiredReplicas is the desired number of replicas of pods managed by this autoscaler,
 	// as last calculated by the autoscaler.
 	DesiredReplicas int32 `json:"desiredReplicas" protobuf:"varint,4,opt,name=desiredReplicas"`
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
+	// +listType=atomic
 	// +optional
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
 	// and indicates whether or not those conditions are met.
-	Conditions []HorizontalPodAutoscalerCondition `json:"conditions" protobuf:"bytes,6,rep,name=conditions"`
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" listType:"map" protobuf:"bytes,6,rep,name=conditions"`
 }
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
@@ -459,7 +467,7 @@ type ObjectMetricStatus struct {
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
-
+	// DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,3,name=describedObject"`
 }
 
@@ -524,8 +532,6 @@ type MetricValueStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.12
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {

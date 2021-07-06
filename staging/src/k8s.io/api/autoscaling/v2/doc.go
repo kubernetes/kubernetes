@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,5 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
-// +k8s:prerelease-lifecycle-gen=true
 
-package v2beta2 // import "k8s.io/api/autoscaling/v2beta2"
+package v2 // import "k8s.io/api/autoscaling/v2"

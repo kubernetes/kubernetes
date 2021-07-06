@@ -131,6 +131,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/autoscaling/v2
+		gvr("autoscaling", "v2", "horizontalpodautoscalers"): {
+			Stub:             `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa4",
+			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1
 		gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,

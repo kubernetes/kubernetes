@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = "proto2";
 
-package k8s.io.api.autoscaling.v2beta2;
+package k8s.io.api.autoscaling.v2;
 
 import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v2beta2";
+option go_package = "v2";
 
 // ContainerResourceMetricSource indicates how to scale on a resource metric known to
 // Kubernetes, as specified in requests and limits, describing each pod in the
@@ -129,12 +129,13 @@ message HPAScalingRules {
   optional int32 stabilizationWindowSeconds = 3;
 
   // selectPolicy is used to specify which policy should be used.
-  // If not set, the default value MaxPolicySelect is used.
+  // If not set, the default value Max is used.
   // +optional
   optional string selectPolicy = 1;
 
   // policies is a list of potential scaling polices which can be used during scaling.
   // At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+  // +listType=atomic
   // +optional
   repeated HPAScalingPolicy policies = 2;
 }
@@ -237,6 +238,7 @@ message HorizontalPodAutoscalerSpec {
   // increased, and vice-versa.  See the individual metric source types for
   // more information about how each type of metric must respond.
   // If not set, the default metric will be set to 80% average CPU utilization.
+  // +listType=atomic
   // +optional
   repeated MetricSpec metrics = 4;
 
@@ -260,6 +262,7 @@ message HorizontalPodAutoscalerStatus {
 
   // currentReplicas is current number of replicas of pods managed by this autoscaler,
   // as last seen by the autoscaler.
+  // +optional
   optional int32 currentReplicas = 3;
 
   // desiredReplicas is the desired number of replicas of pods managed by this autoscaler,
@@ -267,11 +270,17 @@ message HorizontalPodAutoscalerStatus {
   optional int32 desiredReplicas = 4;
 
   // currentMetrics is the last read state of the metrics used by this autoscaler.
+  // +listType=atomic
   // +optional
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
   // and indicates whether or not those conditions are met.
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  // +optional
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 
@@ -315,7 +324,7 @@ message MetricSpec {
   // +optional
   optional ResourceMetricSource resource = 4;
 
-  // container resource refers to a resource metric (such as those specified in
+  // containerResource refers to a resource metric (such as those specified in
   // requests and limits) known to Kubernetes describing a single container in
   // each pod of the current scale target (e.g. CPU or memory). Such metrics are
   // built in to Kubernetes, and have special scaling options on top of those
@@ -420,6 +429,7 @@ message MetricValueStatus {
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 message ObjectMetricSource {
+  // describedObject specifies the descriptions of a object,such as kind,name apiVersion
   optional CrossVersionObjectReference describedObject = 1;
 
   // target specifies the target value for the given metric
@@ -438,6 +448,7 @@ message ObjectMetricStatus {
   // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 
+  // DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
   optional CrossVersionObjectReference describedObject = 3;
 }
 

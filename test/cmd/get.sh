@@ -108,7 +108,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/replicasets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/statefulsets 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
+  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v2/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_not_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/daemonsets 200 OK"
   kube::test::if_has_not_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"

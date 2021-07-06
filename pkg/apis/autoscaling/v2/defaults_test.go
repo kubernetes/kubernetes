@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2beta2_test
+package v2_test
 
 import (
 	"reflect"
@@ -25,11 +25,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	"github.com/stretchr/testify/assert"
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -48,8 +48,8 @@ func TestGenerateScaleDownRules(t *testing.T) {
 		expectedSelectPolicy  string
 		annotation            string
 	}
-	maxPolicy := autoscalingv2.MaxPolicySelect
-	minPolicy := autoscalingv2.MinPolicySelect
+	maxPolicy := autoscalingv2.MaxChangePolicySelect
+	minPolicy := autoscalingv2.MinChangePolicySelect
 	tests := []TestCase{
 		{
 			annotation: "Default values",
@@ -57,7 +57,7 @@ func TestGenerateScaleDownRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
 			},
 			expectedStabilization: nil,
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:                   "All parameters are specified",
@@ -72,7 +72,7 @@ func TestGenerateScaleDownRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 3, PeriodSeconds: 4},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(25),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:                   "Percent policy is specified",
@@ -83,7 +83,7 @@ func TestGenerateScaleDownRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 1, PeriodSeconds: 2},
 			},
 			expectedStabilization: nil,
-			expectedSelectPolicy:  string(autoscalingv2.MinPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MinChangePolicySelect),
 		},
 		{
 			annotation:                "Pods policy is specified",
@@ -93,7 +93,7 @@ func TestGenerateScaleDownRules(t *testing.T) {
 				{Type: autoscalingv2.PodsScalingPolicy, Value: 3, PeriodSeconds: 4},
 			},
 			expectedStabilization: nil,
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 	}
 	for _, tc := range tests {
@@ -138,8 +138,8 @@ func TestGenerateScaleUpRules(t *testing.T) {
 		expectedSelectPolicy  string
 		annotation            string
 	}
-	maxPolicy := autoscalingv2.MaxPolicySelect
-	minPolicy := autoscalingv2.MinPolicySelect
+	maxPolicy := autoscalingv2.MaxChangePolicySelect
+	minPolicy := autoscalingv2.MinChangePolicySelect
 	tests := []TestCase{
 		{
 			annotation: "Default values",
@@ -148,7 +148,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(0),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:                 "All parameters are specified",
@@ -163,7 +163,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 3, PeriodSeconds: 4},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(25),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:              "Pod policy is specified",
@@ -174,7 +174,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PodsScalingPolicy, Value: 1, PeriodSeconds: 2},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(0),
-			expectedSelectPolicy:  string(autoscalingv2.MinPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MinChangePolicySelect),
 		},
 		{
 			annotation:                 "Percent policy is specified",
@@ -184,7 +184,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 7, PeriodSeconds: 10},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(0),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:              "Pod policy and stabilization window are specified",
@@ -195,7 +195,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PodsScalingPolicy, Value: 4, PeriodSeconds: 2},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(25),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 		{
 			annotation:                 "Percent policy and stabilization window are specified",
@@ -206,7 +206,7 @@ func TestGenerateScaleUpRules(t *testing.T) {
 				{Type: autoscalingv2.PercentScalingPolicy, Value: 7, PeriodSeconds: 60},
 			},
 			expectedStabilization: utilpointer.Int32Ptr(25),
-			expectedSelectPolicy:  string(autoscalingv2.MaxPolicySelect),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
 	}
 	for _, tc := range tests {
