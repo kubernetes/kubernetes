@@ -361,6 +361,9 @@ func finishNothing(context.Context, bool) {}
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	// Make a copy so we never mutate the passed-in object (e.g. in tests)
+	obj = obj.DeepCopyObject()
+
 	var finishCreate FinishFunc = finishNothing
 
 	if e.BeginCreate != nil {
