@@ -65,6 +65,10 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 				break
 			}
 		}
+		if !found {
+			containers.Insert(container.Name)
+			return
+		}
 		if container.SecurityContext.Capabilities.Add != nil && len(container.SecurityContext.Capabilities.Add) > 0 {
 			for index, c := range container.SecurityContext.Capabilities.Add {
 				if c != CapabilityNetBindService {
@@ -73,10 +77,6 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 					containers.Insert(msg)
 				}
 			}
-		}
-		if !found {
-			containers.Insert(container.Name)
-			return
 		}
 	})
 	if len(containers) > 0 {
