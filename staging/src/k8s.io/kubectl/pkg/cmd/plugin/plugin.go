@@ -59,7 +59,7 @@ func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Provides utilities for interacting with plugins."),
+		Short:                 i18n.T("Provides utilities for interacting with plugins"),
 		Long:                  pluginLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
@@ -87,7 +87,7 @@ func NewCmdPluginList(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: i18n.T("list all visible plugin executables on a user's PATH"),
+		Short: i18n.T("List all visible plugin executables on a user's PATH"),
 		Long:  pluginListLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd))

@@ -48,7 +48,7 @@ var (
 		# image.  If 'tar' is not present, 'kubectl cp' will fail.
 		#
 		# For advanced use cases, such as symlinks, wildcard expansion or
-		# file mode preservation consider using 'kubectl exec'.
+		# file mode preservation, consider using 'kubectl exec'.
 
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		tar cf - /tmp/foo | kubectl exec -i -n <some-namespace> <some-pod> -- tar xf - -C /tmp/bar
@@ -102,7 +102,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "cp <file-spec-src> <file-spec-dest>",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Copy files and directories to and from containers."),
+		Short:                 i18n.T("Copy files and directories to and from containers"),
 		Long:                  i18n.T("Copy files and directories to and from containers."),
 		Example:               cpExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

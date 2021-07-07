@@ -38,10 +38,10 @@ import (
 
 var (
 	roleBindingLong = templates.LongDesc(i18n.T(`
-		Create a RoleBinding for a particular Role or ClusterRole.`))
+		Create a role binding for a particular role or cluster role.`))
 
 	roleBindingExample = templates.Examples(i18n.T(`
-		  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole
+		  # Create a role binding for user1, user2, and group1 using the admin cluster role
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
@@ -86,7 +86,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd := &cobra.Command{
 		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
+		Short:                 i18n.T("Create a role binding for a particular role or cluster role"),
 		Long:                  roleBindingLong,
 		Example:               roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {

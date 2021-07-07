@@ -43,9 +43,9 @@ import (
 
 var (
 	deleteLong = templates.LongDesc(i18n.T(`
-		Delete resources by filenames, stdin, resources and names, or by resources and label selector.
+		Delete resources by file names, stdin, resources and names, or by resources and label selector.
 
-		JSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,
+		JSON and YAML formats are accepted. Only one type of argument may be specified: file names,
 		resources and names, or resources and label selector.
 
 		Some resources, such as pods, support graceful deletion. These resources define a default period
@@ -54,7 +54,8 @@ var (
 		represent entities in the cluster, deletion may not be acknowledged immediately. If the node
 		hosting a pod is down or cannot reach the API server, termination may take significantly longer
 		than the grace period. To force delete a resource, you must specify the --force flag.
-		Note: only a subset of resources support graceful deletion. In absence of the support, --grace-period is ignored.
+		Note: only a subset of resources support graceful deletion. In absence of the support,
+		the --grace-period flag is ignored.
 
 		IMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been
 		terminated, which can leave those processes running until the node detects the deletion and
@@ -63,7 +64,7 @@ var (
 		multiple processes running on different machines using the same identification which may lead
 		to data corruption or inconsistency. Only force delete pods when you are sure the pod is
 		terminated, or if your application can tolerate multiple copies of the same pod running at once.
-		Also, if you force delete pods the scheduler may place new pods on those nodes before the node
+		Also, if you force delete pods, the scheduler may place new pods on those nodes before the node
 		has released those resources and causing those pods to be evicted immediately.
 
 		Note that the delete command does NOT do resource version checks, so if someone submits an
@@ -71,19 +72,19 @@ var (
 		rest of the resource.`))
 
 	deleteExample = templates.Examples(i18n.T(`
-		# Delete a pod using the type and name specified in pod.json.
+		# Delete a pod using the type and name specified in pod.json
 		kubectl delete -f ./pod.json
 
-		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl delete -k dir
 
-		# Delete a pod based on the type and name in the JSON passed into stdin.
+		# Delete a pod based on the type and name in the JSON passed into stdin
 		cat pod.json | kubectl delete -f -
 
 		# Delete pods and services with same names "baz" and "foo"
 		kubectl delete pod,service baz foo
 
-		# Delete pods and services with label name=myLabel.
+		# Delete pods and services with label name=myLabel
 		kubectl delete pods,services -l name=myLabel
 
 		# Delete a pod with minimal delay
@@ -133,7 +134,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   "delete ([-f FILENAME] | [-k DIRECTORY] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
+		Short:                 i18n.T("Delete resources by file names, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
 		Example:               deleteExample,
 		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),

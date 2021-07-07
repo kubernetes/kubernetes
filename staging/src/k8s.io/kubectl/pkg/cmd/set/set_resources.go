@@ -39,9 +39,9 @@ import (
 
 var (
 	resourcesLong = templates.LongDesc(i18n.T(`
-		Specify compute resource requirements (cpu, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
+		Specify compute resource requirements (CPU, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
 
-		for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
+		For each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
 
 		Possible resources include (case insensitive): %s.`))
 

@@ -66,7 +66,7 @@ var (
                 Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
 
                 If there are multiple pods matching the criteria, a pod will be selected automatically. The
-                forwarding session ends when the selected pod terminates, and rerun of the command is needed
+                forwarding session ends when the selected pod terminates, and a rerun of the command is needed
                 to resume forwarding.`))
 
 	portforwardExample = templates.Examples(i18n.T(`

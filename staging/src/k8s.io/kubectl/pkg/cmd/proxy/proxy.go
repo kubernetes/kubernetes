@@ -66,31 +66,31 @@ const (
 var (
 	proxyLong = templates.LongDesc(i18n.T(`
 		Creates a proxy server or application-level gateway between localhost and
-		the Kubernetes API Server. It also allows serving static content over specified
+		the Kubernetes API server. It also allows serving static content over specified
 		HTTP path. All incoming data enters through one port and gets forwarded to
-		the remote kubernetes API Server port, except for the path matching the static content path.`))
+		the remote Kubernetes API server port, except for the path matching the static content path.`))
 
 	proxyExample = templates.Examples(i18n.T(`
-		# To proxy all of the kubernetes api and nothing else.
+		# To proxy all of the Kubernetes API and nothing else
 		kubectl proxy --api-prefix=/
 
-		# To proxy only part of the kubernetes api and also some static files.
+		# To proxy only part of the Kubernetes API and also some static files
 		# You can get pods info with 'curl localhost:8001/api/v1/pods'
 		kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
 
-		# To proxy the entire kubernetes api at a different root.
+		# To proxy the entire Kubernetes API at a different root
 		# You can get pods info with 'curl localhost:8001/custom/api/v1/pods'
 		kubectl proxy --api-prefix=/custom/
 
-		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+		# Run a proxy to the Kubernetes API server on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
 
-		# Run a proxy to kubernetes apiserver on an arbitrary local port.
-		# The chosen port for the server will be output to stdout.
+		# Run a proxy to the Kubernetes API server on an arbitrary local port
+		# The chosen port for the server will be output to stdout
 		kubectl proxy --port=0
 
-		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
+		# Run a proxy to the Kubernetes API server, changing the API prefix to k8s-api
+		# This makes e.g. the pods API available at localhost:8001/k8s-api/v1/pods/
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 

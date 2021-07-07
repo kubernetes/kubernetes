@@ -56,7 +56,7 @@ var (
 		Mark node as unschedulable.`))
 
 	cordonExample = templates.Examples(i18n.T(`
-		# Mark node "foo" as unschedulable.
+		# Mark node "foo" as unschedulable
 		kubectl cordon foo`))
 )
 
@@ -85,8 +85,8 @@ var (
 		Mark node as schedulable.`))
 
 	uncordonExample = templates.Examples(i18n.T(`
-		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`))
+		# Mark node "foo" as schedulable
+		kubectl uncordon foo`))
 )
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
@@ -114,16 +114,16 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		'drain' evicts the pods if the APIServer supports
+		'drain' evicts the pods if the API server supports
 		[eviction](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/). Otherwise, it will use normal
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
-		the API server).  If there are DaemonSet-managed pods, drain will not proceed
+		the API server).  If there are daemon set-managed pods, drain will not proceed
 		without --ignore-daemonsets, and regardless it will not delete any
-		DaemonSet-managed pods, because those pods would be immediately replaced by the
-		DaemonSet controller, which ignores unschedulable markings.  If there are any
-		pods that are neither mirror pods nor managed by ReplicationController,
-		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
+		daemon set-managed pods, because those pods would be immediately replaced by the
+		daemon set controller, which ignores unschedulable markings.  If there are any
+		pods that are neither mirror pods nor managed by a replication controller,
+		replica set, daemon set, stateful set, or job, then drain will not delete any pods unless you
 		use --force.  --force will also allow deletion to proceed if the managing resource of one
 		or more pods is missing.
 
@@ -136,11 +136,11 @@ var (
 		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
 	drainExample = templates.Examples(i18n.T(`
-		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
-		$ kubectl drain foo --force
+		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set on it
+		kubectl drain foo --force
 
-		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.
-		$ kubectl drain foo --grace-period=900`))
+		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set, and use a grace period of 15 minutes
+		kubectl drain foo --grace-period=900`))
 )
 
 func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {

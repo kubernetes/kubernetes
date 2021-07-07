@@ -40,16 +40,16 @@ import (
 
 var (
 	autoscaleLong = templates.LongDesc(i18n.T(`
-		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
+		Creates an autoscaler that automatically chooses and sets the number of pods that run in a Kubernetes cluster.
 
-		Looks up a Deployment, ReplicaSet, StatefulSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		Looks up a deployment, replica set, stateful set, or replication controller by name and creates an autoscaler that uses the given resource as a reference.
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`))
 
 	autoscaleExample = templates.Examples(i18n.T(`
-		# Auto scale a deployment "foo", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used:
+		# Auto scale a deployment "foo", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used
 		kubectl autoscale deployment foo --min=2 --max=10
 
-		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%:
+		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
@@ -104,7 +104,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, StatefulSet, or ReplicationController"),
+		Short:                 i18n.T("Auto-scale a deployment, replica set, stateful set, or replication controller"),
 		Long:                  autoscaleLong,
 		Example:               autoscaleExample,
 		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

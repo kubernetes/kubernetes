@@ -57,10 +57,10 @@ var (
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`))
 
 	viewExample = templates.Examples(`
-		# Show merged kubeconfig settings.
+		# Show merged kubeconfig settings
 		kubectl config view
 
-		# Show merged kubeconfig settings and raw certificate data.
+		# Show merged kubeconfig settings and raw certificate data
 		kubectl config view --raw
 
 		# Get the password for the e2e user
