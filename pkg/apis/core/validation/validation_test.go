@@ -6044,6 +6044,8 @@ func TestValidateProbe(t *testing.T) {
 }
 
 func Test_validateProbe(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, true)()
+
 	fldPath := field.NewPath("test")
 	type args struct {
 		probe   *core.Probe
