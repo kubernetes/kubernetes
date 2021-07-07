@@ -19,3 +19,5 @@ spec:
         - CAP_CHOWN
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

@@ -13,4 +13,6 @@ spec:
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
-  securityContext: {}
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault

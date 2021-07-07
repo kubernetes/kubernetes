@@ -31,3 +31,5 @@ spec:
         - SYS_CHROOT
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

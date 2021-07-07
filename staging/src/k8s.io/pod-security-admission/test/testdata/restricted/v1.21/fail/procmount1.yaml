@@ -16,3 +16,5 @@ spec:
       procMount: Unmasked
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

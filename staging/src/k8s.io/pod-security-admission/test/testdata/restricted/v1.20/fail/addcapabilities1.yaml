@@ -19,3 +19,5 @@ spec:
         - NET_RAW
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

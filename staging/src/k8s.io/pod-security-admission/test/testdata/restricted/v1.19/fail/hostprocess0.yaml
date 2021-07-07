@@ -18,5 +18,7 @@ spec:
       windowsOptions: {}
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
     windowsOptions:
       hostProcess: true

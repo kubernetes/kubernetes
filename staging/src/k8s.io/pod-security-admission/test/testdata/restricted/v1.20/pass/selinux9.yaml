@@ -19,3 +19,5 @@ spec:
     runAsNonRoot: true
     seLinuxOptions:
       type: container_init_t
+    seccompProfile:
+      type: RuntimeDefault
