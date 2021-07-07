@@ -19,3 +19,5 @@ spec:
     runAsNonRoot: true
     seLinuxOptions:
       type: container_kvm_t
+    seccompProfile:
+      type: RuntimeDefault

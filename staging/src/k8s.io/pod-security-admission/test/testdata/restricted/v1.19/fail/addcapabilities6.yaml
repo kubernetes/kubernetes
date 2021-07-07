@@ -19,3 +19,5 @@ spec:
       capabilities: {}
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

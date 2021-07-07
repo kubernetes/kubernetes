@@ -67,13 +67,6 @@ func validSeccomp(t corev1.SeccompProfileType) bool {
 		t == corev1.SeccompProfileTypeRuntimeDefault
 }
 
-func validSeccompAnnotation(annotation string) bool {
-	return annotation == corev1.SeccompProfileRuntimeDefault ||
-		strings.HasPrefix(annotation, corev1.SeccompLocalhostProfileNamePrefix)
-}
-
-// baseline policy checks
-
 // seccomp_1_0_baseline checks baseline policy on seccomp alpha annotation
 func seccomp_1_0_baseline(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	forbidden := sets.NewString()

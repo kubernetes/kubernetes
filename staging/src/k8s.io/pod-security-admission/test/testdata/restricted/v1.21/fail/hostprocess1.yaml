@@ -20,4 +20,6 @@ spec:
         hostProcess: true
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
     windowsOptions: {}

@@ -15,4 +15,6 @@ spec:
     securityContext:
       allowPrivilegeEscalation: false
       runAsNonRoot: true
-  securityContext: {}
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault

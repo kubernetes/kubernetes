@@ -13,3 +13,5 @@ spec:
     name: initcontainer1
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

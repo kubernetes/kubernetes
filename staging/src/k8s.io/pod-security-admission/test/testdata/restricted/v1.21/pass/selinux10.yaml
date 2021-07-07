@@ -19,3 +19,5 @@ spec:
   securityContext:
     runAsNonRoot: true
     seLinuxOptions: {}
+    seccompProfile:
+      type: RuntimeDefault

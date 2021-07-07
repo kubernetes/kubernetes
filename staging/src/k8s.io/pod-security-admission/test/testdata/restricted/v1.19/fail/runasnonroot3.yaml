@@ -16,3 +16,5 @@ spec:
       runAsNonRoot: false
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

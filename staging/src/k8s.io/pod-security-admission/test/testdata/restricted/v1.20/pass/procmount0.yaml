@@ -17,3 +17,5 @@ spec:
       procMount: Default
   securityContext:
     runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
