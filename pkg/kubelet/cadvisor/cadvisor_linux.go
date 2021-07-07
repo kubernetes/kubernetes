@@ -58,10 +58,17 @@ const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
 func init() {
+	maxHouseKeeping := maxHousekeepingInterval.String()
+	if value := os.Getenv("OPENSHIFT_MAX_HOUSEKEEPING_INTERVAL_DURATION"); value != "" {
+		klog.Infof("Detected OPENSHIFT_MAX_HOUSEKEEPING_INTERVAL_DURATION: %v", value)
+		maxHouseKeeping = value
+	}
 	// Override cAdvisor flag defaults.
 	flagOverrides := map[string]string{
 		// Override the default cAdvisor housekeeping interval.
 		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Override the default max cAdvisor housekeeping interval.
+		"max_housekeeping_interval": maxHouseKeeping,
 		// Disable event storage by default.
 		"event_storage_event_limit": "default=0",
 		"event_storage_age_limit":   "default=0",
