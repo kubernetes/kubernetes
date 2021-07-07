@@ -5841,7 +5841,7 @@ func TestPrintScale(t *testing.T) {
 			},
 			expected: []metav1.TableRow{
 				{
-					Cells: []interface{}{"test-autoscaling", int32(2), int32(1)},
+					Cells: []interface{}{"test-autoscaling", int32(2), int32(1), string("0s")},
 				},
 			},
 		},
