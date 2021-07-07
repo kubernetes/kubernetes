@@ -33,25 +33,25 @@ const (
 )
 
 func init() {
-	addCheck(CheckDropCapabilities)
+	addCheck(CheckCapabilitiesRestricted)
 }
 
-// CheckDropCapabilities returns a restricted level check
-// that ensures all capabilities are dropped in 1.22+
-func CheckDropCapabilities() Check {
+// CheckCapabilitiesRestricted returns a restricted level check
+// that ensures ALL capabilities are dropped in 1.22+
+func CheckCapabilitiesRestricted() Check {
 	return Check{
-		ID:    "dropCapabilities",
+		ID:    "capabilities_restricted",
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 22),
-				CheckPod:       dropCapabilities_1_22,
+				CheckPod:       capabilitiesRestricted_1_22,
 			},
 		},
 	}
 }
 
-func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var (
 		containersMissingDropAll  []string
 		containersAddingForbidden []string

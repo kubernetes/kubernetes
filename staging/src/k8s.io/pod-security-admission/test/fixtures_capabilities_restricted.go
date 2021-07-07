@@ -90,7 +90,7 @@ func init() {
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelRestricted, version: api.MajorMinorVersion(1, 22), check: "dropCapabilities"},
+		fixtureKey{level: api.LevelRestricted, version: api.MajorMinorVersion(1, 22), check: "capabilities_restricted"},
 		fixtureData_1_22,
 	)
 }
