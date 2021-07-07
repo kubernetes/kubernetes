@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/kubernetes/pkg/api/service"
+	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
@@ -895,6 +896,100 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	}
 	if e, a := "foo", registry.UpdatedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
+	}
+}
+
+func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
+	testCases := []struct {
+		name  string
+		svc   *api.Service // Need a clusterIP, NodePort, and HealthCheckNodePort allocated
+		tweak func(*api.Service)
+	}{{
+		name: "single-port",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		tweak: nil,
+	}, {
+		name: "multi-port",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+		tweak: nil,
+	}, {
+		name: "shuffle-ports",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+		tweak: func(s *api.Service) {
+			s.Spec.Ports[0], s.Spec.Ports[1] = s.Spec.Ports[1], s.Spec.Ports[0]
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+
+			defer server.Terminate(t)
+
+			svc := tc.svc.DeepCopy()
+			obj, err := storage.Create(ctx, svc.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error: %v", err)
+			}
+			createdSvc := obj.(*api.Service)
+			if createdSvc.Spec.ClusterIP == "" {
+				t.Fatalf("expected ClusterIP to be set")
+			}
+			if len(createdSvc.Spec.ClusterIPs) == 0 {
+				t.Fatalf("expected ClusterIPs to be set")
+			}
+			for i := range createdSvc.Spec.Ports {
+				if createdSvc.Spec.Ports[i].NodePort == 0 {
+					t.Fatalf("expected NodePort[%d] to be set", i)
+				}
+			}
+			if createdSvc.Spec.HealthCheckNodePort == 0 {
+				t.Fatalf("expected HealthCheckNodePort to be set")
+			}
+
+			// Update from the original object - just change the selector.
+			svc.Spec.Selector = map[string]string{"bar": "baz2"}
+			svc.ResourceVersion = "1"
+
+			obj, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc.DeepCopy()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error: %v", err)
+			}
+			updatedSvc := obj.(*api.Service)
+
+			if want, got := createdSvc.Spec.ClusterIP, updatedSvc.Spec.ClusterIP; want != got {
+				t.Errorf("expected ClusterIP to not change: wanted %v, got %v", want, got)
+			}
+			if want, got := createdSvc.Spec.ClusterIPs, updatedSvc.Spec.ClusterIPs; !reflect.DeepEqual(want, got) {
+				t.Errorf("expected ClusterIPs to not change: wanted %v, got %v", want, got)
+			}
+			portmap := func(s *api.Service) map[string]int32 {
+				ret := map[string]int32{}
+				for _, p := range s.Spec.Ports {
+					ret[p.Name] = p.NodePort
+				}
+				return ret
+			}
+			if want, got := portmap(createdSvc), portmap(updatedSvc); !reflect.DeepEqual(want, got) {
+				t.Errorf("expected NodePort to not change: wanted %v, got %v", want, got)
+			}
+			if want, got := createdSvc.Spec.HealthCheckNodePort, updatedSvc.Spec.HealthCheckNodePort; want != got {
+				t.Errorf("expected HealthCheckNodePort to not change: wanted %v, got %v", want, got)
+			}
+		})
 	}
 }
 
