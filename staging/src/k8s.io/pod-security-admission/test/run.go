@@ -110,6 +110,7 @@ func (t *testWarningHandler) HandleWarningHeader(code int, agent string, warning
 	defer t.lock.Unlock()
 	t.warnings = append(t.warnings, warning)
 }
+
 func (t *testWarningHandler) FlushWarnings() []string {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -251,8 +252,12 @@ func Run(t *testing.T, opts Options) {
 						return
 					}
 				}
+
 				if expectSuccess && len(warningText) > 0 {
-					t.Errorf("%d: unexpected warning creating %s: %v", i, toJSON(pod), warningText)
+					if (len(expectErrorSubstring) > 0 && strings.Contains(warningText, expectErrorSubstring)) ||
+						strings.Contains(warningText, policy.UnknownForbiddenReason) {
+						t.Errorf("%d: unexpected warning creating %s: %v", i, toJSON(pod), warningText)
+					}
 				}
 			}
 
