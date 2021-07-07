@@ -361,6 +361,58 @@ func TestMergePlugins(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "CustomPluginOverrideDefaultPlugin",
+			customPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
+					},
+				},
+			},
+			defaultPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin1"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
+					},
+				},
+			},
+		},
+		{
+			name: "OrderPreserveAfterOverride",
+			customPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+					},
+				},
+			},
+			defaultPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin1"},
+						{Name: "Plugin2"},
+						{Name: "Plugin3"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta2.Plugins{
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: "Plugin1"},
+						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin3"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

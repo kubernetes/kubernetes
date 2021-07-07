@@ -148,19 +148,34 @@ func mergePlugins(defaultPlugins, customPlugins *v1beta2.Plugins) *v1beta2.Plugi
 	return defaultPlugins
 }
 
+type pluginIndex struct {
+	index  int
+	plugin v1beta2.Plugin
+}
+
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta2.PluginSet) v1beta2.PluginSet {
 	disabledPlugins := sets.NewString()
+	enabledCustomPlugins := make(map[string]pluginIndex)
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
-
+	for index, enabledPlugin := range customPluginSet.Enabled {
+		enabledCustomPlugins[enabledPlugin.Name] = pluginIndex{index, enabledPlugin}
+	}
 	var enabledPlugins []v1beta2.Plugin
 	if !disabledPlugins.Has("*") {
 		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
 			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
 				continue
 			}
-
+			// The default plugin is explicitly re-configured, update the default plugin accordingly.
+			if customPlugin, ok := enabledCustomPlugins[defaultEnabledPlugin.Name]; ok {
+				klog.InfoS("Defaut plugin is explicitly re-configured and is overriding.", "plugin", defaultEnabledPlugin.Name)
+				// update the default plugin in place to preserve order
+				defaultEnabledPlugin = customPlugin.plugin
+				// kick the plugin from the enabled list of custom plugins
+				customPluginSet.Enabled = append(customPluginSet.Enabled[:customPlugin.index], customPluginSet.Enabled[customPlugin.index+1:]...)
+			}
 			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
 		}
 	}
