@@ -58,6 +58,8 @@ type GarbageCollectionDeleteStrategy interface {
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
+	// NOTE: if return true, `options.GracePeriodSeconds` must be non-nil (nil will fail),
+	// that's what tells the deletion how "graceful" to be.
 	CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
@@ -136,9 +138,15 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, true, nil
 	}
 
+	// `CheckGracefulDelete` will be implemented by specific strategy
 	if !gracefulStrategy.CheckGracefulDelete(ctx, obj, options) {
 		return false, false, nil
 	}
+
+	if options.GracePeriodSeconds == nil {
+		return false, false, errors.NewInternalError(fmt.Errorf("options.GracePeriodSeconds should not be nil"))
+	}
+
 	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
 	objectMeta.SetDeletionTimestamp(&now)
 	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
@@ -149,6 +157,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 	if objectMeta.GetGeneration() > 0 {
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
+
 	return true, false, nil
 }
 
