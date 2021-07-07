@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package policy
 
 import (
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -74,6 +75,53 @@ func TestCheckAppArmor(t *testing.T) {
 			if result.Allowed != testCase.expectedResult.Allowed {
 				t.Errorf("Expected result was Allowed=%v for annotations %v",
 					testCase.expectedResult.Allowed, testCase.metaData.Annotations)
+			}
+		})
+	}
+}
+
+func TestAppArmorProfile(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *corev1.Pod
+		expectReason string
+		expectDetail string
+	}{
+		{
+			name: "multiple containers",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						`container.apparmor.security.beta.kubernetes.io/`:  `bogus`,
+						`container.apparmor.security.beta.kubernetes.io/a`: ``,
+						`container.apparmor.security.beta.kubernetes.io/b`: `runtime/default`,
+						`container.apparmor.security.beta.kubernetes.io/c`: `localhost/`,
+						`container.apparmor.security.beta.kubernetes.io/d`: `localhost/foo`,
+						`container.apparmor.security.beta.kubernetes.io/e`: `unconfined`,
+						`container.apparmor.security.beta.kubernetes.io/f`: `unknown`,
+					},
+				},
+			},
+			expectReason: `forbidden AppArmor profiles`,
+			expectDetail: strings.Join([]string{
+				`container.apparmor.security.beta.kubernetes.io/="bogus"`,
+				`container.apparmor.security.beta.kubernetes.io/e="unconfined"`,
+				`container.apparmor.security.beta.kubernetes.io/f="unknown"`,
+			}, ", "),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := appArmorProfile_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			if result.Allowed {
+				t.Fatal("expected disallowed")
+			}
+			if e, a := tc.expectReason, result.ForbiddenReason; e != a {
+				t.Errorf("expected\n%s\ngot\n%s", e, a)
+			}
+			if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
+				t.Errorf("expected\n%s\ngot\n%s", e, a)
 			}
 		})
 	}

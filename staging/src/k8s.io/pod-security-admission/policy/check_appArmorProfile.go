@@ -18,11 +18,11 @@ package policy
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -34,7 +34,7 @@ profile, or restrict overrides to an allowed set of profiles.
 **Restricted Fields:**
 metadata.annotations['container.apparmor.security.beta.kubernetes.io/*']
 
-**Allowed Values:** 'runtime/default', undefined
+**Allowed Values:** 'runtime/default', 'localhost/*', empty, undefined
 */
 func init() {
 	addCheck(CheckAppArmorProfile)
@@ -56,31 +56,24 @@ func CheckAppArmorProfile() Check {
 }
 
 func allowedProfile(profile string) bool {
-	return profile == corev1.AppArmorBetaProfileRuntimeDefault ||
+	return len(profile) == 0 ||
+		profile == corev1.AppArmorBetaProfileRuntimeDefault ||
 		strings.HasPrefix(profile, corev1.AppArmorBetaProfileNamePrefix)
 }
 
 func appArmorProfile_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	forbiddenValues := sets.NewString()
-
-	// undefined is an allowed value for 'container.apparmor.security.beta.kubernetes.io/*'
-	if len(podMetadata.Annotations) == 0 {
-		return CheckResult{Allowed: true}
-	}
-
+	var forbiddenValues []string
 	for k, v := range podMetadata.Annotations {
 		if strings.HasPrefix(k, corev1.AppArmorBetaContainerAnnotationKeyPrefix) && !allowedProfile(v) {
-			forbiddenValues.Insert(fmt.Sprintf("%s:%s", k, v))
+			forbiddenValues = append(forbiddenValues, fmt.Sprintf("%s=%q", k, v))
 		}
 	}
-
 	if len(forbiddenValues) > 0 {
+		sort.Strings(forbiddenValues)
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "forbidden AppArmor profile",
-			ForbiddenDetail: fmt.Sprintf("forbidden AppArmor annotations %q",
-				forbiddenValues,
-			),
+			ForbiddenReason: pluralize("forbidden AppArmor profile", "forbidden AppArmor profiles", len(forbiddenValues)),
+			ForbiddenDetail: strings.Join(forbiddenValues, ", "),
 		}
 	}
 
