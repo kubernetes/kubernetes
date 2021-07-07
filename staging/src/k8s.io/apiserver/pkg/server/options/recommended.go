@@ -30,6 +30,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 )
 
@@ -111,6 +112,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		if err := o.Traces.ApplyTo(config.Config.EgressSelector, &config.Config); err != nil {
 			return err
 		}
+		wrapper := traces.WrapperFor(config.TracerProvider)
+		o.Authentication.WithCustomRoundTripper(wrapper)
+		o.Authorization.WithCustomRoundTripper(wrapper)
 	}
 	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err

@@ -229,8 +229,9 @@ func (s *DelegatingAuthenticationOptions) WithRequestTimeout(timeout time.Durati
 }
 
 // WithCustomRoundTripper allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
+// Multiple calls to wrappers causes wrappers to be called in the order they were added with WithCustomRoundTripper.
 func (s *DelegatingAuthenticationOptions) WithCustomRoundTripper(rt transport.WrapperFunc) {
-	s.CustomRoundTripperFn = rt
+	s.CustomRoundTripperFn = transport.Wrappers(s.CustomRoundTripperFn, rt)
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
