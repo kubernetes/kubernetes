@@ -752,6 +752,10 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
+	// memorySwap configures swap memory available to container workloads.
+	// +featureGate=NodeSwapEnabled
+	// +optional
+	MemorySwap MemorySwapConfiguration `json:"memorySwap,omitempty"`
 	// containerLogMaxSize is a quantity defining the maximum size of the container log
 	// file before it is rotated. For example: "5Mi" or "256Ki".
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -1034,4 +1038,13 @@ type SerializedNodeConfigSource struct {
 type MemoryReservation struct {
 	NumaNode int32           `json:"numaNode"`
 	Limits   v1.ResourceList `json:"limits"`
+}
+
+type MemorySwapConfiguration struct {
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwapEnabled
+	// +optional
+	SwapBehavior string `json:"swapBehavior,omitempty"`
 }

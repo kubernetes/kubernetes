@@ -33,6 +33,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
@@ -364,6 +365,95 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
 			}
+		})
+	}
+}
+
+func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwapEnabled, true)()
+	_, _, m, err := createTestRuntimeManager()
+	if err != nil {
+		t.Fatalf("error creating test RuntimeManager: %v", err)
+	}
+	m.machineInfo.MemoryCapacity = 1000000
+	containerName := "test"
+
+	for _, tc := range []struct {
+		name        string
+		swapSetting string
+		pod         *v1.Pod
+		expected    int64
+	}{
+		{
+			name: "config unset, memory limit set",
+			// no swap setting
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: containerName,
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+							Requests: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+						},
+					}},
+				},
+			},
+			expected: 1000,
+		},
+		{
+			name: "config unset, no memory limit",
+			// no swap setting
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: containerName},
+					},
+				},
+			},
+			expected: 0,
+		},
+		{
+			// Note: behaviour will be the same as previous two cases
+			name:        "config set to LimitedSwap, memory limit set",
+			swapSetting: kubelettypes.LimitedSwap,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: containerName,
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+							Requests: v1.ResourceList{
+								"memory": resource.MustParse("1000"),
+							},
+						},
+					}},
+				},
+			},
+			expected: 1000,
+		},
+		{
+			name:        "UnlimitedSwap enabled",
+			swapSetting: kubelettypes.UnlimitedSwap,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: containerName},
+					},
+				},
+			},
+			expected: -1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m.memorySwapBehavior = tc.swapSetting
+			actual := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil)
+			assert.Equal(t, tc.expected, actual.Resources.MemorySwapLimitInBytes, "memory swap config for %s", tc.name)
 		})
 	}
 }
