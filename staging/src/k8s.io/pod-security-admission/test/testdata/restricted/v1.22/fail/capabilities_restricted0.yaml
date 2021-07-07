@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: addcapabilities1
+  name: capabilities_restricted0
 spec:
   containers:
   - image: k8s.gcr.io/pause
@@ -14,21 +14,7 @@ spec:
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
-      capabilities:
-        add:
-        - AUDIT_WRITE
-        - CHOWN
-        - DAC_OVERRIDE
-        - FOWNER
-        - FSETID
-        - KILL
-        - MKNOD
-        - NET_BIND_SERVICE
-        - SETFCAP
-        - SETGID
-        - SETPCAP
-        - SETUID
-        - SYS_CHROOT
+      capabilities: {}
   securityContext:
     runAsNonRoot: true
     seccompProfile:

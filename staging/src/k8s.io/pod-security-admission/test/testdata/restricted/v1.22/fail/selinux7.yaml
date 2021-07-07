@@ -8,6 +8,9 @@ spec:
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       seLinuxOptions:
         role: somevalue
   initContainers:
@@ -15,6 +18,9 @@ spec:
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       seLinuxOptions: {}
   securityContext:
     runAsNonRoot: true
