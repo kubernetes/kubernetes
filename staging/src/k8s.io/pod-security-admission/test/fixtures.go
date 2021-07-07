@@ -66,6 +66,13 @@ func init() {
 		}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 19)] = restricted_1_19
+
+	// 1.22+: capabilities.drop=["ALL"]
+	restricted_1_22 := tweak(restricted_1_19, func(p *corev1.Pod) {
+		p.Spec.Containers[0].SecurityContext.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
+		p.Spec.InitContainers[0].SecurityContext.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
+	})
+	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 22)] = restricted_1_22
 }
 
 // getValidPod returns a minimal valid pod for the specified level and version.

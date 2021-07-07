@@ -29,7 +29,7 @@ import (
 
 const (
 	capabilityAll            = "ALL"
-	capabilityNetBindService = "CAP_NET_BIND_SERVICE"
+	capabilityNetBindService = "NET_BIND_SERVICE"
 )
 
 func init() {
@@ -52,12 +52,18 @@ func CheckDropCapabilities() Check {
 }
 
 func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	containers := sets.NewString()
+	var (
+		containersMissingDropAll  []string
+		containersAddingForbidden []string
+		forbiddenCapabilities     = sets.NewString()
+	)
+
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext == nil || container.SecurityContext.Capabilities == nil {
-			containers.Insert(container.Name)
+			containersMissingDropAll = append(containersMissingDropAll, container.Name)
 			return
 		}
+
 		found := false
 		for _, c := range container.SecurityContext.Capabilities.Drop {
 			if c == capabilityAll {
@@ -66,23 +72,29 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			}
 		}
 		if !found {
-			containers.Insert(container.Name)
-			return
+			containersMissingDropAll = append(containersMissingDropAll, container.Name)
 		}
-		for index, c := range container.SecurityContext.Capabilities.Add {
+
+		for _, c := range container.SecurityContext.Capabilities.Add {
 			if c != capabilityNetBindService {
-				capabilityPath := path.Child("securityContext", "capabilities", "add").Index(index)
-				msg := fmt.Sprintf("%s=%s", capabilityPath.String(), string(c))
-				containers.Insert(msg)
+				containersAddingForbidden = append(containersAddingForbidden, container.Name)
+				forbiddenCapabilities.Insert(string(c))
 			}
 		}
 
 	})
-	if len(containers) > 0 {
+	var forbiddenDetails []string
+	if len(containersMissingDropAll) > 0 {
+		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf("containers %q must drop ALL", containersMissingDropAll))
+	}
+	if len(containersAddingForbidden) > 0 {
+		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf("containers %q must not add %q", containersAddingForbidden, forbiddenCapabilities.List()))
+	}
+	if len(forbiddenDetails) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "containers must drop ALL capability",
-			ForbiddenDetail: strings.Join(containers.List(), ", "),
+			ForbiddenReason: "containers must restrict capabilities",
+			ForbiddenDetail: strings.Join(forbiddenDetails, "; "),
 		}
 	}
 	return CheckResult{Allowed: true}
