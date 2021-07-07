@@ -119,6 +119,7 @@ type nonCSILimits struct {
 	randomVolumeIDPrefix string
 }
 
+var _ framework.PreFilterPlugin = &nonCSILimits{}
 var _ framework.FilterPlugin = &nonCSILimits{}
 var _ framework.EnqueueExtensions = &nonCSILimits{}
 
@@ -208,18 +209,51 @@ func (pl *nonCSILimits) EventsToRegister() []framework.ClusterEvent {
 	}
 }
 
+const (
+	Name              = "NonCSILimits"
+	preFilterStateKey = "PreFilter" + Name
+)
+
+type preFilterState struct {
+	newVolumes sets.String
+}
+
+// Clone just returns the same state because it is not affected by pod additions or deletions.
+func (s *preFilterState) Clone() framework.StateData {
+	return s
+}
+
+func (pl *nonCSILimits) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+	newVolumes := make(sets.String)
+	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
+		return framework.AsStatus(err)
+	}
+	pfState := &preFilterState{newVolumes: newVolumes}
+	state.Write(preFilterStateKey, pfState)
+	return nil
+}
+
+func (pl *nonCSILimits) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
-func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *nonCSILimits) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
 	}
 
-	newVolumes := make(sets.String)
-	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
-		return framework.AsStatus(err)
+	s, err := getPreFilterState(state)
+	if err != nil {
+		newVolumes := make(sets.String)
+		if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
+			return framework.AsStatus(err)
+		}
+		s = &preFilterState{newVolumes: newVolumes}
 	}
+	newVolumes := s.newVolumes
 
 	// quick return
 	if len(newVolumes) == 0 {
@@ -232,7 +266,6 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	var csiNode *storage.CSINode
-	var err error
 	if pl.csiNodeLister != nil {
 		csiNode, err = pl.csiNodeLister.Get(node.Name)
 		if err != nil {
@@ -272,6 +305,19 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 	}
 	return nil
+}
+
+func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+	c, err := cycleState.Read(preFilterStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q from cycleState: %v", preFilterStateKey, err)
+	}
+
+	s, ok := c.(*preFilterState)
+	if !ok {
+		return nil, fmt.Errorf("invalid PreFilter state, got type %T", c)
+	}
+	return s, nil
 }
 
 func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.String) error {
