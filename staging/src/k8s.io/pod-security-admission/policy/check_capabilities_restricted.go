@@ -32,6 +32,25 @@ const (
 	capabilityNetBindService = "NET_BIND_SERVICE"
 )
 
+/*
+Containers must drop ALL, and may only add NET_BIND_SERVICE.
+
+**Restricted Fields:**
+spec.containers[*].securityContext.capabilities.drop
+spec.initContainers[*].securityContext.capabilities.drop
+
+**Allowed Values:**
+Must include "ALL"
+
+**Restricted Fields:**
+spec.containers[*].securityContext.capabilities.add
+spec.initContainers[*].securityContext.capabilities.add
+
+**Allowed Values:**
+undefined / empty
+"NET_BIND_SERVICE"
+*/
+
 func init() {
 	addCheck(CheckCapabilitiesRestricted)
 }
@@ -64,36 +83,46 @@ func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1
 			return
 		}
 
-		found := false
+		droppedAll := false
 		for _, c := range container.SecurityContext.Capabilities.Drop {
 			if c == capabilityAll {
-				found = true
+				droppedAll = true
 				break
 			}
 		}
-		if !found {
+		if !droppedAll {
 			containersMissingDropAll = append(containersMissingDropAll, container.Name)
 		}
 
+		addedForbidden := false
 		for _, c := range container.SecurityContext.Capabilities.Add {
 			if c != capabilityNetBindService {
-				containersAddingForbidden = append(containersAddingForbidden, container.Name)
+				addedForbidden = true
 				forbiddenCapabilities.Insert(string(c))
 			}
 		}
-
+		if addedForbidden {
+			containersAddingForbidden = append(containersAddingForbidden, container.Name)
+		}
 	})
 	var forbiddenDetails []string
 	if len(containersMissingDropAll) > 0 {
-		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf("containers %q must drop ALL", containersMissingDropAll))
+		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf(
+			`%s %s must set securityContext.capabilities.drop=["ALL"]`,
+			pluralize("container", "containers", len(containersMissingDropAll)),
+			joinQuote(containersMissingDropAll)))
 	}
 	if len(containersAddingForbidden) > 0 {
-		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf("containers %q must not add %q", containersAddingForbidden, forbiddenCapabilities.List()))
+		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf(
+			`%s %s must not include %s in securityContext.capabilities.add`,
+			pluralize("container", "containers", len(containersAddingForbidden)),
+			joinQuote(containersAddingForbidden),
+			joinQuote(forbiddenCapabilities.List())))
 	}
 	if len(forbiddenDetails) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "containers must restrict capabilities",
+			ForbiddenReason: "unrestricted capabilities",
 			ForbiddenDetail: strings.Join(forbiddenDetails, "; "),
 		}
 	}
