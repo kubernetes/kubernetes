@@ -107,6 +107,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
+	patchAllocatedValues(newService, oldService)
 	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
@@ -271,6 +272,48 @@ func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // ValidateUpdate is the default update validation for an end user updating status
 func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
+// patchAllocatedValues allows clients to avoid a read-modify-write cycle while
+// preserving values that we allocated on their behalf.  For example, they
+// might create a Service without specifying the ClusterIP, in which case we
+// allocate one.  If they resubmit that same YAML, we want it to succeed.
+func patchAllocatedValues(newSvc, oldSvc *api.Service) {
+	if needsClusterIP(oldSvc) && needsClusterIP(newSvc) {
+		if newSvc.Spec.ClusterIP == "" {
+			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
+		}
+		if len(newSvc.Spec.ClusterIPs) == 0 {
+			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
+		}
+	}
+
+	if needsNodePort(oldSvc) && needsNodePort(newSvc) {
+		// Map NodePorts by name.  The user may have changed other properties
+		// of the port, but we won't see that here.
+		np := map[string]int32{}
+		for i := range oldSvc.Spec.Ports {
+			p := &oldSvc.Spec.Ports[i]
+			np[p.Name] = p.NodePort
+		}
+		for i := range newSvc.Spec.Ports {
+			p := &newSvc.Spec.Ports[i]
+			if p.NodePort == 0 {
+				p.NodePort = np[p.Name]
+			}
+		}
+	}
+
+	if needsHCNodePort(oldSvc) && needsHCNodePort(newSvc) {
+		if newSvc.Spec.HealthCheckNodePort == 0 {
+			newSvc.Spec.HealthCheckNodePort = oldSvc.Spec.HealthCheckNodePort
+		}
+	}
 }
 
 // NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not

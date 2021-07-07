@@ -15,6 +15,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/service:go_default_library",
+        "//pkg/api/service/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/registry/core/endpoint/storage:go_default_library",
