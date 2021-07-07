@@ -472,18 +472,20 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 // using the given hashValue and the shuffle sharding parameters of the queueSet.
 func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 interface{}) int {
 	bestQueueIdx := -1
-	bestQueueWidth := int(math.MaxInt32)
+	bestQueueSeatsSum := int(math.MaxInt32)
 	// the dealer uses the current desired number of queues, which is no larger than the number in `qs.queues`.
 	qs.dealer.Deal(hashValue, func(queueIdx int) {
 		// TODO: Consider taking into account `additional latency` of requests
 		// in addition to their widths.
-		thisWidth := qs.queues[queueIdx].requests.Width()
-		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of width %d", qs.qCfg.Name, descr1, descr2, queueIdx, thisWidth)
-		if thisWidth < bestQueueWidth {
-			bestQueueIdx, bestQueueWidth = queueIdx, thisWidth
+		// Ideally, this should be based on projected completion time in the
+		// virtual world of the youngest request in the queue.
+		thisSeatsSum := qs.queues[queueIdx].requests.SeatsSum()
+		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of seatsSum %d", qs.qCfg.Name, descr1, descr2, queueIdx, thisSeatsSum)
+		if thisSeatsSum < bestQueueSeatsSum {
+			bestQueueIdx, bestQueueSeatsSum = queueIdx, thisSeatsSum
 		}
 	})
-	klog.V(6).Infof("QS(%s) at r=%s v=%.9fs: For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueWidth, qs.queues[bestQueueIdx].requestsExecuting)
+	klog.V(6).Infof("QS(%s) at r=%s v=%.9fs: For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueSeatsSum, qs.queues[bestQueueIdx].requestsExecuting)
 	return bestQueueIdx
 }
 
@@ -533,7 +535,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 // Otherwise enqueues and returns true.
 func (qs *queueSet) rejectOrEnqueueLocked(request *request) bool {
 	queue := request.queue
-	curQueueLength := queue.requests.Width()
+	curQueueLength := queue.requests.Length()
 	// rejects the newly arrived request if resource criteria not met
 	if qs.totSeatsInUse >= qs.dCfg.ConcurrencyLimit &&
 		curQueueLength >= qs.qCfg.QueueLengthLimit {
