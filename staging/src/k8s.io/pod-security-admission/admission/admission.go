@@ -190,8 +190,8 @@ func (a *Admission) ValidateConfiguration() error {
 
 // Validate admits an API request.
 // The objects in admission attributes are expected to be external v1 objects that we care about.
-func (a *Admission) Validate(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
-	var response admissionv1.AdmissionResponse
+func (a *Admission) Validate(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
+	var response *admissionv1.AdmissionResponse
 	switch attrs.GetResource().GroupResource() {
 	case corev1.Resource("namespaces"):
 		response = a.ValidateNamespace(ctx, attrs)
@@ -206,7 +206,7 @@ func (a *Admission) Validate(ctx context.Context, attrs Attributes) admissionv1.
 	return response
 }
 
-func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
 		return allowedResponse()
@@ -219,7 +219,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) adm
 	namespace, ok := obj.(*corev1.Namespace)
 	if !ok {
 		klog.InfoS("failed to assert namespace type", "type", reflect.TypeOf(obj))
-		return internalErrorResponse("failed to get namespace")
+		return badRequestResponse("failed to decode namespace")
 	}
 
 	newPolicy, newErr := a.PolicyToEvaluate(namespace.Labels)
@@ -236,13 +236,13 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) adm
 		// if update, check if policy labels changed
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
-			klog.ErrorS(err, "failed to get old object")
-			return internalErrorResponse("failed to get old object")
+			klog.ErrorS(err, "failed to decode old object")
+			return badRequestResponse("failed to decode old object")
 		}
 		oldNamespace, ok := oldObj.(*corev1.Namespace)
 		if !ok {
 			klog.InfoS("failed to assert old namespace type", "type", reflect.TypeOf(oldObj))
-			return internalErrorResponse("failed to get old namespace")
+			return badRequestResponse("failed to decode old namespace")
 		}
 		oldPolicy, oldErr := a.PolicyToEvaluate(oldNamespace.Labels)
 
@@ -292,7 +292,7 @@ var ignoredPodSubresources = map[string]bool{
 	"status":      true,
 }
 
-func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
 		return allowedResponse()
@@ -304,35 +304,34 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) admission
 
 	obj, err := attrs.GetObject()
 	if err != nil {
-		klog.ErrorS(err, "failed to get object")
-		return internalErrorResponse("failed to get object")
+		klog.ErrorS(err, "failed to decode object")
+		return badRequestResponse("failed to decode object")
 	}
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
-		return internalErrorResponse("failed to get pod")
+		return badRequestResponse("failed to decode pod")
 	}
-	enforce := true
 	if attrs.GetOperation() == admissionv1.Update {
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
-			klog.ErrorS(err, "failed to get old object")
-			return internalErrorResponse("failed to get old object")
+			klog.ErrorS(err, "failed to decode old object")
+			return badRequestResponse("failed to decode old object")
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
 			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
-			return internalErrorResponse("failed to get old pod")
+			return badRequestResponse("failed to decode old pod")
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
 			return allowedResponse()
 		}
 	}
-	return a.EvaluatePod(ctx, attrs.GetNamespace(), &pod.ObjectMeta, &pod.Spec, enforce)
+	return a.EvaluatePod(ctx, attrs.GetNamespace(), &pod.ObjectMeta, &pod.Spec, true)
 }
 
-func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes) admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
 		return allowedResponse()
@@ -344,13 +343,13 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 
 	obj, err := attrs.GetObject()
 	if err != nil {
-		klog.ErrorS(err, "failed to get object")
-		return internalErrorResponse("failed to get object")
+		klog.ErrorS(err, "failed to decode object")
+		return badRequestResponse("failed to decode object")
 	}
 	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
-		return internalErrorResponse("failed to get pod template")
+		return badRequestResponse("failed to extract pod template")
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
@@ -361,7 +360,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 
 // EvaluatePod looks up the policy for the pods namespace, and checks it against the given pod(-like) object.
 // The enforce policy is only checked if enforce=true.
-func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) admissionv1.AdmissionResponse {
+func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		return allowedResponse()
@@ -379,6 +378,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMe
 		klog.V(2).InfoS("failed to parse PodSecurity namespace labels", "err", err)
 		auditAnnotations["error"] = fmt.Sprintf("Failed to parse policy: %v", err)
 	}
+	// TODO: log nsPolicy evaluation with context (op, resource, namespace, name) for the request.
 
 	response := allowedResponse()
 	if enforce {
@@ -456,48 +456,41 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, erro
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
 }
 
-// allowResponse is the response used when the admission decision is allow.
-func allowedResponse() admissionv1.AdmissionResponse {
-	return admissionv1.AdmissionResponse{Allowed: true}
+// allowedResponse is the response used when the admission decision is allow.
+func allowedResponse() *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{Allowed: true}
+}
+
+func failureResponse(msg string, reason metav1.StatusReason, code int32) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed: false,
+		Result: &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Reason:  reason,
+			Message: msg,
+			Code:    code,
+		},
+	}
 }
 
 // forbiddenResponse is the response used when the admission decision is deny for policy violations.
-func forbiddenResponse(msg string) admissionv1.AdmissionResponse {
-	return admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Reason:  metav1.StatusReasonForbidden,
-			Message: msg,
-			Code:    http.StatusForbidden,
-		},
-	}
+func forbiddenResponse(msg string) *admissionv1.AdmissionResponse {
+	return failureResponse(msg, metav1.StatusFailure, http.StatusForbidden)
 }
 
 // invalidResponse is the response used for namespace requests when namespace labels are invalid.
-func invalidResponse(msg string) admissionv1.AdmissionResponse {
-	return admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Reason:  metav1.StatusReasonInvalid,
-			Message: msg,
-			Code:    422,
-		},
-	}
+func invalidResponse(msg string) *admissionv1.AdmissionResponse {
+	return failureResponse(msg, metav1.StatusReasonInvalid, 422)
+}
+
+// badRequestResponse is the response used when a request cannot be processed.
+func badRequestResponse(msg string) *admissionv1.AdmissionResponse {
+	return failureResponse(msg, metav1.StatusReasonBadRequest, http.StatusBadRequest)
 }
 
 // internalErrorResponse is the response used for unexpected errors
-func internalErrorResponse(msg string) admissionv1.AdmissionResponse {
-	return admissionv1.AdmissionResponse{
-		Allowed: false,
-		Result: &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Reason:  metav1.StatusReasonInternalError,
-			Message: msg,
-			Code:    http.StatusInternalServerError,
-		},
-	}
+func internalErrorResponse(msg string) *admissionv1.AdmissionResponse {
+	return failureResponse(msg, metav1.StatusReasonInternalError, http.StatusInternalServerError)
 }
 
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.
