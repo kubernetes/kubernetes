@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/policy"
@@ -371,10 +370,10 @@ func TestValidateNamespace(t *testing.T) {
 					Labels: tc.newLabels,
 				},
 			}
-			var operation = admission.Create
+			var operation = admissionv1.Create
 			var oldObject runtime.Object
 			if tc.oldLabels != nil {
-				operation = admission.Update
+				operation = admissionv1.Update
 				oldObject = &corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "test",
@@ -383,19 +382,14 @@ func TestValidateNamespace(t *testing.T) {
 				}
 			}
 
-			attrs := admission.NewAttributesRecord(
-				newObject,
-				oldObject,
-				schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"},
-				newObject.Name,
-				newObject.Name,
-				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"},
-				tc.subresource,
-				operation,
-				nil,
-				false,
-				nil,
-			)
+			attrs := &AttributesRecord{
+				Object:      newObject,
+				OldObject:   oldObject,
+				Namespace:   newObject.Name,
+				Resource:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"},
+				Subresource: tc.subresource,
+				Operation:   operation,
+			}
 
 			defaultPolicy := api.Policy{
 				Enforce: api.LevelVersion{
