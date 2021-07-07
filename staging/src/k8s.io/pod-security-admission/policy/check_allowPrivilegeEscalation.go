@@ -17,7 +17,7 @@ limitations under the License.
 package policy
 
 import (
-	"strings"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,18 +58,22 @@ func CheckAllowPrivilegeEscalation() Check {
 }
 
 func allowPrivilegeEscalation_1_8(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var forbiddenPaths []string
+	var badContainers []string
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext == nil || container.SecurityContext.AllowPrivilegeEscalation == nil || *container.SecurityContext.AllowPrivilegeEscalation {
-			forbiddenPaths = append(forbiddenPaths, path.Child("securityContext", "allowPrivilegeEscalation").String())
+			badContainers = append(badContainers, container.Name)
 		}
 	})
 
-	if len(forbiddenPaths) > 0 {
+	if len(badContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "allowPrivilegeEscalation != false",
-			ForbiddenDetail: strings.Join(forbiddenPaths, ", "),
+			ForbiddenDetail: fmt.Sprintf(
+				"%s %s must set securityContext.allowPrivilegeEscalation=false",
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+			),
 		}
 	}
 	return CheckResult{Allowed: true}
