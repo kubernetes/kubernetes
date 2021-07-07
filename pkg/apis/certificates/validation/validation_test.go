@@ -378,7 +378,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			el := ValidateCertificateSigningRequestCreate(&test.csr, test.gv)
-			if !reflect.DeepEqual(el, test.errs) {
+			if !reflect.DeepEqual(el.ToAggregate(), test.errs.ToAggregate()) {
 				t.Errorf("returned and expected errors did not match - expected\n%v\nbut got\n%v", test.errs.ToAggregate(), el.ToAggregate())
 			}
 		})
