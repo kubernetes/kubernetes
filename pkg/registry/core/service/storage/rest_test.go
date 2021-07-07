@@ -360,7 +360,7 @@ func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 			defer server.Terminate(t)
 
 			svc := tc.svc.DeepCopy()
-			obj, err := storage.Create(ctx, svc.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Expected no error: %v", err)
 			}
