@@ -76,6 +76,8 @@ type fakeApfFilter struct {
 	mockDecision mockDecision
 	postEnqueue  func()
 	postDequeue  func()
+
+	utilflowcontrol.WatchTracker
 }
 
 func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
@@ -147,6 +149,7 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 		mockDecision: decision,
 		postEnqueue:  postEnqueue,
 		postDequeue:  postDequeue,
+		WatchTracker: utilflowcontrol.NewWatchTracker(),
 	}
 	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
 }
@@ -352,6 +355,15 @@ type fakeWatchApfFilter struct {
 	lock     sync.Mutex
 	inflight int
 	capacity int
+
+	utilflowcontrol.WatchTracker
+}
+
+func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
+	return &fakeWatchApfFilter{
+		capacity:     capacity,
+		WatchTracker: utilflowcontrol.NewWatchTracker(),
+	}
 }
 
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
@@ -432,9 +444,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	allRunning := sync.WaitGroup{}
 	allRunning.Add(2 * concurrentRequests)
 
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: concurrentRequests,
-	}
+	fakeFilter := newFakeWatchApfFilter(concurrentRequests)
 
 	onExecuteFunc := func() {
 		firstRunning.Done()
@@ -479,9 +489,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: 0,
-	}
+	fakeFilter := newFakeWatchApfFilter(0)
 
 	onExecuteFunc := func() {
 		t.Errorf("Request unexepectedly executing")
@@ -497,9 +505,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfWatchPanic(t *testing.T) {
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: 1,
-	}
+	fakeFilter := newFakeWatchApfFilter(1)
 
 	onExecuteFunc := func() {
 		panic("test panic")
