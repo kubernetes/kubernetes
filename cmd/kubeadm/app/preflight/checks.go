@@ -835,9 +835,6 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	policy := ipc.imagePullPolicy
-	if len(policy) == 0 {
-		policy = v1.PullIfNotPresent // Default behavior if the policy is unset
-	}
 	klog.V(1).Infof("using image pull policy: %s", policy)
 	for _, image := range ipc.imageList {
 		switch policy {

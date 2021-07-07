@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -923,7 +924,7 @@ func TestImagePullCheck(t *testing.T) {
 	check := ImagePullCheck{
 		runtime:         containerRuntime,
 		imageList:       []string{"img1", "img2", "img3"},
-		imagePullPolicy: "", // should be defaulted to v1.PullIfNotPresent
+		imagePullPolicy: corev1.PullIfNotPresent,
 	}
 	warnings, errors := check.Check()
 	if len(warnings) != 0 {
@@ -939,6 +940,17 @@ func TestImagePullCheck(t *testing.T) {
 	}
 	if len(errors) != 2 {
 		t.Fatalf("expected 2 errors but got %d: %q", len(errors), errors)
+	}
+
+	// Test with unknown policy
+	check = ImagePullCheck{
+		runtime:         containerRuntime,
+		imageList:       []string{"img1", "img2", "img3"},
+		imagePullPolicy: "",
+	}
+	_, errors = check.Check()
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 error but got %d: %q", len(errors), errors)
 	}
 }
 

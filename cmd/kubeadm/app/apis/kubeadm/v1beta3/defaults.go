@@ -20,11 +20,12 @@ import (
 	"net/url"
 	"time"
 
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 )
 
 const (
@@ -55,6 +56,9 @@ const (
 	DefaultProxyBindAddressv6 = "::"
 	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
+
+	// DefaultImagePullPolicy is the default image pull policy in kubeadm
+	DefaultImagePullPolicy = corev1.PullIfNotPresent
 )
 
 var (
@@ -71,6 +75,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
+	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
@@ -132,6 +137,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 
 	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
+	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
@@ -204,5 +210,12 @@ func SetDefaults_BootstrapToken(bt *bootstraptokenv1.BootstrapToken) {
 func SetDefaults_APIEndpoint(obj *APIEndpoint) {
 	if obj.BindPort == 0 {
 		obj.BindPort = DefaultAPIBindPort
+	}
+}
+
+// SetDefaults_NodeRegistration sets the defaults for the NodeRegistrationOptions object
+func SetDefaults_NodeRegistration(obj *NodeRegistrationOptions) {
+	if len(obj.ImagePullPolicy) == 0 {
+		obj.ImagePullPolicy = DefaultImagePullPolicy
 	}
 }
