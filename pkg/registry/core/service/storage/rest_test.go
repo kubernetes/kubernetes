@@ -993,7 +993,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
-	isValidClusterIPFields(t, storage, svc, svc)
+	isValidClusterIPFields(t, storage, svc, createdSvc)
 
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -1371,7 +1371,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		t.Errorf("Unexpected error deleting service: %v", err)
 	}
 
-	svc2 := svctest.MakeService("bar", svctest.SetClusterIPs(svc1.Spec.ClusterIP))
+	svc2 := svctest.MakeService("bar", svctest.SetClusterIPs(createdSvc1.Spec.ClusterIP))
 	ctx = genericapirequest.NewDefaultContext()
 	obj, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -3585,6 +3585,8 @@ func TestDefaultingValidation(t *testing.T) {
 // validates that the service created, updated by REST
 // has correct ClusterIPs related fields
 func isValidClusterIPFields(t *testing.T, storage *REST, pre *api.Service, post *api.Service) {
+	t.Helper()
+
 	// valid for gate off/on scenarios
 	// ClusterIP
 	if len(post.Spec.ClusterIP) == 0 {
