@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -347,6 +347,10 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	} else {
 		p.unschedulableQ.addOrUpdate(pInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
+		var val = pInfo.UnschedulablePlugins.List()
+		for _, plugin := range val {
+			metrics.UnschedulableReason(plugin, pod.Spec.SchedulerName).Inc()
+		}
 	}
 
 	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
@@ -568,6 +572,10 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
+				var val = pInfo.UnschedulablePlugins.List()
+				for _, plugin := range val {
+					metrics.UnschedulableReason(plugin, pod.Spec.SchedulerName).Dec()
+				}
 				p.unschedulableQ.delete(pod)
 			}
 		}
