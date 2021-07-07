@@ -39,41 +39,16 @@ func init() {
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Volumes = []corev1.Volume{
 						{
-							Name: "volume-hostpath",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/dev/null",
-								},
-							},
-						},
-						{
 							Name: "volume-emptydir",
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 						{
-							Name: "volume-configmap",
+							Name: "volume-hostpath",
 							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: "configmap",
-									},
-									Items: []corev1.KeyToPath{
-										{
-											Key:  "log_level",
-											Path: "log_level",
-										},
-									},
-								},
-							},
-						},
-						{
-							Name: "configmap",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "hello",
-									ReadOnly:  true,
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/a",
 								},
 							},
 						},
@@ -83,26 +58,18 @@ func init() {
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Volumes = []corev1.Volume{
 						{
-							Name: "volume-hostpath-null",
+							Name: "volume-hostpath-a",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/dev/null",
+									Path: "/a",
 								},
 							},
 						},
 						{
-							Name: "volume-hostpath-docker",
+							Name: "volume-hostpath-b",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/var/lib/docker",
-								},
-							},
-						},
-						{
-							Name: "volume-hostpath-sys",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/sys",
+									Path: "/b",
 								},
 							},
 						},
@@ -113,7 +80,7 @@ func init() {
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "hostPath"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "hostPathVolumes"},
 		fixtureData_1_0,
 	)
 }

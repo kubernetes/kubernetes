@@ -21,7 +21,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -32,34 +31,34 @@ HostPath volumes must be forbidden.
 
 spec.volumes[*].hostPath
 
-**Allowed Values:** undefined/nil
+**Allowed Values:** undefined/null
 */
 
 func init() {
-	addCheck(CheckHostPath)
+	addCheck(CheckHostPathVolumes)
 }
 
-// CheckHostPath returns a baseline level check
-// that requires hostPath=undefined/nil in 1.0+
-func CheckHostPath() Check {
+// CheckHostPathVolumes returns a baseline level check
+// that requires hostPath=undefined/null in 1.0+
+func CheckHostPathVolumes() Check {
 	return Check{
-		ID:    "hostPath",
+		ID:    "hostPathVolumes",
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       hostPath_1_0,
+				CheckPod:       hostPathVolumes_1_0,
 			},
 		},
 	}
 }
 
-func hostPath_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	hostVolumes := sets.NewString()
+func hostPathVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	var hostVolumes []string
 
 	for _, volume := range podSpec.Volumes {
 		if volume.HostPath != nil {
-			hostVolumes.Insert(volume.Name)
+			hostVolumes = append(hostVolumes, volume.Name)
 		}
 	}
 
@@ -67,7 +66,7 @@ func hostPath_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Check
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "hostPath volumes",
-			ForbiddenDetail: fmt.Sprintf("volumes %q", hostVolumes.List()),
+			ForbiddenDetail: fmt.Sprintf("%s %s", pluralize("volume", "volumes", len(hostVolumes)), joinQuote(hostVolumes)),
 		}
 	}
 
