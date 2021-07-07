@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: seccomp_restricted1
+  name: capabilities_restricted1
 spec:
   containers:
   - image: k8s.gcr.io/pause
@@ -9,6 +9,8 @@ spec:
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
+        add:
+        - NET_BIND_SERVICE
         drop:
         - ALL
   initContainers:
@@ -17,9 +19,11 @@ spec:
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
+        add:
+        - NET_BIND_SERVICE
         drop:
         - ALL
   securityContext:
     runAsNonRoot: true
     seccompProfile:
-      type: Unconfined
+      type: RuntimeDefault

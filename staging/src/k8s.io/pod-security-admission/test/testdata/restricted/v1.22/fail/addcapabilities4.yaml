@@ -11,12 +11,16 @@ spec:
       capabilities:
         add:
         - bogus
+        drop:
+        - ALL
   initContainers:
   - image: k8s.gcr.io/pause
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
-      capabilities: {}
+      capabilities:
+        drop:
+        - ALL
   securityContext:
     runAsNonRoot: true
     seccompProfile:

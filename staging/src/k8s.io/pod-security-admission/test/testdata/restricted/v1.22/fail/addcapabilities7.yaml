@@ -8,7 +8,9 @@ spec:
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
-      capabilities: {}
+      capabilities:
+        drop:
+        - ALL
   initContainers:
   - image: k8s.gcr.io/pause
     name: initcontainer1
@@ -17,6 +19,8 @@ spec:
       capabilities:
         add:
         - CAP_CHOWN
+        drop:
+        - ALL
   securityContext:
     runAsNonRoot: true
     seccompProfile:

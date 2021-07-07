@@ -49,6 +49,15 @@ func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "forbidden capabilities",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+			// don't generate fixtures if minimal valid pod drops ALL
+			if p.Spec.Containers[0].SecurityContext != nil && p.Spec.Containers[0].SecurityContext.Capabilities != nil {
+				for _, capability := range p.Spec.Containers[0].SecurityContext.Capabilities.Drop {
+					if capability == corev1.Capability("ALL") {
+						return nil
+					}
+				}
+			}
+
 			p = ensureCapabilities(p)
 			return []*corev1.Pod{
 				// all allowed capabilities

@@ -8,12 +8,18 @@ spec:
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       seLinuxOptions: {}
   initContainers:
   - image: k8s.gcr.io/pause
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       seLinuxOptions:
         user: somevalue
   securityContext:

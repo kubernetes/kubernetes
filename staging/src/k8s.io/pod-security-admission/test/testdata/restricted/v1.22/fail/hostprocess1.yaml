@@ -8,6 +8,9 @@ spec:
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       windowsOptions:
         hostProcess: true
   hostNetwork: true
@@ -16,6 +19,9 @@ spec:
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
       windowsOptions:
         hostProcess: true
   securityContext:
