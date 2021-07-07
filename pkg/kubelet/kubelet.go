@@ -171,10 +171,6 @@ const (
 	// the cache.
 	runtimeCacheRefreshPeriod = housekeepingPeriod + housekeepingWarningDuration
 
-	// Period for performing eviction monitoring.
-	// ensure this is kept in sync with internal cadvisor housekeeping.
-	evictionMonitoringPeriod = time.Second * 10
-
 	// The path in containers' filesystems where the hosts file is mounted.
 	linuxEtcHostsPath   = "/etc/hosts"
 	windowsEtcHostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
@@ -251,7 +247,20 @@ var (
 
 	// This is exposed for unit tests.
 	goos = sysruntime.GOOS
+
+	// Period for performing eviction monitoring.
+	// ensure this is kept in sync with internal cadvisor housekeeping.
+	evictionMonitoringPeriod = time.Second * 10
 )
+
+func init() {
+	if value := os.Getenv("OPENSHIFT_EVICTION_MONITORING_PERIOD_DURATION"); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			klog.Infof("Detected OPENSHIFT_EVICTION_MONITORING_PERIOD_DURATION: %v", value)
+			evictionMonitoringPeriod = duration
+		}
+	}
+}
 
 func getContainerEtcHostsPath() string {
 	if goos == "windows" {
