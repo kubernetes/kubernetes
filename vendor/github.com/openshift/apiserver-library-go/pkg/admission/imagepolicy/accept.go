@@ -27,7 +27,7 @@ type policyDecision struct {
 	resolutionErr error
 }
 
-func accept(accepter rules.Accepter, policy imageResolutionPolicy, resolver imageResolver, m imagereferencemutators.ImageReferenceMutator, annotations imagereferencemutators.AnnotationAccessor, attr admission.Attributes, excludedRules sets.String) error {
+func accept(accepter rules.Accepter, policy imageResolutionPolicy, resolver imageResolver, m imagereferencemutators.ImageReferenceMutator, annotations imagereferencemutators.AnnotationAccessor, attr admission.Attributes, excludedRules sets.String, mutationAllowed bool) error {
 	decisions := policyDecisions{}
 
 	t := attr.GetResource().GroupResource()
@@ -58,13 +58,22 @@ func accept(accepter rules.Accepter, policy imageResolutionPolicy, resolver imag
 					decision.resolutionErr = err
 
 				case err == nil:
+					oldDecissionAttributes := decision.attrs
 					// if we resolved properly, assign the attributes and rewrite the pull spec if we need to
 					decision.attrs = resolvedAttrs
 
 					if policy.RewriteImagePullSpec(resolvedAttrs, attr.GetOperation() == admission.Update, gr) {
-						ref.Namespace = ""
-						ref.Name = decision.attrs.Name.Exact()
-						ref.Kind = "DockerImage"
+						refUpdate := kapi.ObjectReference{Kind: "DockerImage", Name: resolvedAttrs.Name.Exact()}
+
+						// check if we are mutating object in validate phase and discard the update
+						// this allows creation of objects like imagestreams in between admit and validate
+						if !mutationAllowed && (ref.Namespace != refUpdate.Namespace || ref.Name != refUpdate.Name || ref.Kind != refUpdate.Kind) {
+							klog.V(5).Infof("image resolution changed between admit and verify: falling back to the old image attributes (attributes=%#v)", oldDecissionAttributes)
+						} else {
+							ref.Namespace = refUpdate.Namespace
+							ref.Name = refUpdate.Name
+							ref.Kind = refUpdate.Kind
+						}
 					}
 				}
 			}
