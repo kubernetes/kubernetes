@@ -11,9 +11,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"go.opencensus.io/plugin/ochttp"
 	"golang.org/x/oauth2"
@@ -22,6 +25,12 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport/cert"
 	"google.golang.org/api/transport/http/internal/propagation"
+)
+
+const (
+	mTLSModeAlways = "always"
+	mTLSModeNever  = "never"
+	mTLSModeAuto   = "auto"
 )
 
 // NewClient returns an HTTP client for use communicating with a Google cloud
@@ -89,9 +98,14 @@ func newTransport(ctx context.Context, base http.RoundTripper, settings *interna
 		if paramTransport.quotaProject == "" {
 			paramTransport.quotaProject = internal.QuotaProjectFromCreds(creds)
 		}
+
+		ts := creds.TokenSource
+		if settings.TokenSource != nil {
+			ts = settings.TokenSource
+		}
 		trans = &oauth2.Transport{
 			Base:   trans,
-			Source: creds.TokenSource,
+			Source: ts,
 		}
 	}
 	return trans, nil
@@ -150,23 +164,49 @@ var appengineUrlfetchHook func(context.Context) http.RoundTripper
 
 // defaultBaseTransport returns the base HTTP transport.
 // On App Engine, this is urlfetch.Transport.
-// If TLSCertificate is available, return a custom Transport with TLSClientConfig.
-// Otherwise, return http.DefaultTransport.
+// Otherwise, use a default transport, taking most defaults from
+// http.DefaultTransport.
+// If TLSCertificate is available, set TLSClientConfig as well.
 func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source) http.RoundTripper {
 	if appengineUrlfetchHook != nil {
 		return appengineUrlfetchHook(ctx)
 	}
 
+	// Copy http.DefaultTransport except for MaxIdleConnsPerHost setting,
+	// which is increased due to reported performance issues under load in the GCS
+	// client. Transport.Clone is only available in Go 1.13 and up.
+	trans := clonedTransport(http.DefaultTransport)
+	if trans == nil {
+		trans = fallbackBaseTransport()
+	}
+	trans.MaxIdleConnsPerHost = 100
+
 	if clientCertSource != nil {
-		// TODO (cbro): copy default transport settings from http.DefaultTransport
-		return &http.Transport{
-			TLSClientConfig: &tls.Config{
-				GetClientCertificate: clientCertSource,
-			},
+		trans.TLSClientConfig = &tls.Config{
+			GetClientCertificate: clientCertSource,
 		}
 	}
 
-	return http.DefaultTransport
+	return trans
+}
+
+// fallbackBaseTransport is used in <go1.13 as well as in the rare case if
+// http.DefaultTransport has been reassigned something that's not a
+// *http.Transport.
+func fallbackBaseTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 }
 
 func addOCTransport(trans http.RoundTripper, settings *internal.DialSettings) http.RoundTripper {
@@ -202,17 +242,24 @@ func addOCTransport(trans http.RoundTripper, settings *internal.DialSettings) ht
 // We would like to avoid introducing client-side logic that parses whether the
 // endpoint override is an mTLS url, since the url pattern may change at anytime.
 func getClientCertificateSource(settings *internal.DialSettings) (cert.Source, error) {
-	if settings.ClientCertSource != nil {
+	if settings.HTTPClient != nil {
+		return nil, nil // HTTPClient is incompatible with ClientCertificateSource
+	} else if settings.ClientCertSource != nil {
 		return settings.ClientCertSource, nil
+	} else {
+		return cert.DefaultSource()
 	}
-	return cert.DefaultSource()
+
 }
 
 // getEndpoint returns the endpoint for the service, taking into account the
 // user-provided endpoint override "settings.Endpoint"
 //
-// If no endpoint override is specified, we will return the default endpoint (or
-// the default mTLS endpoint if a client certificate is available).
+// If no endpoint override is specified, we will either return the default endpoint or
+// the default mTLS endpoint if a client certificate is available.
+//
+// You can override the default endpoint (mtls vs. regular) by setting the
+// GOOGLE_API_USE_MTLS environment variable.
 //
 // If the endpoint override is an address (host:port) rather than full base
 // URL (ex. https://...), then the user-provided address will be merged into
@@ -220,8 +267,9 @@ func getClientCertificateSource(settings *internal.DialSettings) (cert.Source, e
 // WithDefaultEndpoint("https://foo.com/bar/baz") will return "https://myhost:8080/bar/baz"
 func getEndpoint(settings *internal.DialSettings, clientCertSource cert.Source) (string, error) {
 	if settings.Endpoint == "" {
-		if clientCertSource != nil {
-			return generateDefaultMtlsEndpoint(settings.DefaultEndpoint), nil
+		mtlsMode := getMTLSMode()
+		if mtlsMode == mTLSModeAlways || (clientCertSource != nil && mtlsMode == mTLSModeAuto) {
+			return settings.DefaultMTLSEndpoint, nil
 		}
 		return settings.DefaultEndpoint, nil
 	}
@@ -237,6 +285,15 @@ func getEndpoint(settings *internal.DialSettings, clientCertSource cert.Source) 
 	return mergeEndpoints(settings.DefaultEndpoint, settings.Endpoint)
 }
 
+func getMTLSMode() string {
+	mode := os.Getenv("GOOGLE_API_USE_MTLS")
+	if mode == "" {
+		// TODO(shinfan): Update this to "auto" when the mTLS feature is fully released.
+		return mTLSModeNever
+	}
+	return strings.ToLower(mode)
+}
+
 func mergeEndpoints(base, newHost string) (string, error) {
 	u, err := url.Parse(base)
 	if err != nil {
@@ -244,27 +301,4 @@ func mergeEndpoints(base, newHost string) (string, error) {
 	}
 	u.Host = newHost
 	return u.String(), nil
-}
-
-// generateDefaultMtlsEndpoint attempts to derive the mTLS version of the
-// defaultEndpoint via regex, and returns defaultEndpoint if unsuccessful.
-//
-// We need to applying the following 2 transformations:
-// 1. pubsub.googleapis.com to pubsub.mtls.googleapis.com
-// 2. pubsub.sandbox.googleapis.com to pubsub.mtls.sandbox.googleapis.com
-//
-// TODO(andyzhao): In the future, the mTLS endpoint will be read from the Discovery Document
-// and passed in as defaultMtlsEndpoint instead of generated from defaultEndpoint,
-// and this function will be removed.
-func generateDefaultMtlsEndpoint(defaultEndpoint string) string {
-	var domains = []string{
-		".sandbox.googleapis.com", // must come first because .googleapis.com is a substring
-		".googleapis.com",
-	}
-	for _, domain := range domains {
-		if strings.Contains(defaultEndpoint, domain) {
-			return strings.Replace(defaultEndpoint, domain, ".mtls"+domain, -1)
-		}
-	}
-	return defaultEndpoint
 }

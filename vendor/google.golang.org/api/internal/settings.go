@@ -18,24 +18,27 @@ import (
 // DialSettings holds information needed to establish a connection with a
 // Google API service.
 type DialSettings struct {
-	Endpoint          string
-	DefaultEndpoint   string
-	Scopes            []string
-	TokenSource       oauth2.TokenSource
-	Credentials       *google.Credentials
-	CredentialsFile   string // if set, Token Source is ignored.
-	CredentialsJSON   []byte
-	UserAgent         string
-	APIKey            string
-	Audiences         []string
-	HTTPClient        *http.Client
-	GRPCDialOpts      []grpc.DialOption
-	GRPCConn          *grpc.ClientConn
-	GRPCConnPool      ConnPool
-	GRPCConnPoolSize  int
-	NoAuth            bool
-	TelemetryDisabled bool
-	ClientCertSource  func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
+	Endpoint            string
+	DefaultEndpoint     string
+	DefaultMTLSEndpoint string
+	Scopes              []string
+	TokenSource         oauth2.TokenSource
+	Credentials         *google.Credentials
+	CredentialsFile     string // if set, Token Source is ignored.
+	CredentialsJSON     []byte
+	UserAgent           string
+	APIKey              string
+	Audiences           []string
+	HTTPClient          *http.Client
+	GRPCDialOpts        []grpc.DialOption
+	GRPCConn            *grpc.ClientConn
+	GRPCConnPool        ConnPool
+	GRPCConnPoolSize    int
+	NoAuth              bool
+	TelemetryDisabled   bool
+	ClientCertSource    func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
+	CustomClaims        map[string]interface{}
+	SkipValidation      bool
 
 	// Google API system parameters. For more information please read:
 	// https://cloud.google.com/apis/docs/system-parameters
@@ -45,6 +48,9 @@ type DialSettings struct {
 
 // Validate reports an error if ds is invalid.
 func (ds *DialSettings) Validate() error {
+	if ds.SkipValidation {
+		return nil
+	}
 	hasCreds := ds.APIKey != "" || ds.TokenSource != nil || ds.CredentialsFile != "" || ds.Credentials != nil
 	if ds.NoAuth && hasCreds {
 		return errors.New("options.WithoutAuthentication is incompatible with any option that provides credentials")

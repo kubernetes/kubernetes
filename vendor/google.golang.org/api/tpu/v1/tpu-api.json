@@ -22,6 +22,7 @@
   },
   "id": "tpu:v1",
   "kind": "discovery#restDescription",
+  "mtlsRootUrl": "https://tpu.mtls.googleapis.com/",
   "name": "tpu",
   "ownerDomain": "google.com",
   "ownerName": "Google",
@@ -658,7 +659,7 @@
       }
     }
   },
-  "revision": "20200116",
+  "revision": "20200601",
   "rootUrl": "https://tpu.googleapis.com/",
   "schemas": {
     "AcceleratorType": {
@@ -1054,9 +1055,11 @@
       "type": "object"
     },
     "SchedulingConfig": {
+      "description": "Sets the scheduling options for this node.",
       "id": "SchedulingConfig",
       "properties": {
         "preemptible": {
+          "description": "Defines whether the node is preemptible.",
           "type": "boolean"
         },
         "reserved": {

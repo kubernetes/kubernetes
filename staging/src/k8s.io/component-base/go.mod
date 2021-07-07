@@ -13,7 +13,7 @@ require (
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.26.0
+	github.com/prometheus/common v0.28.0
 	github.com/prometheus/procfs v0.6.0
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
