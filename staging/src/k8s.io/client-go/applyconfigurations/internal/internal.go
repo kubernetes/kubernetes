@@ -9951,32 +9951,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
-- name: io.k8s.api.scheduling.v1alpha1.PriorityClass
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: description
-      type:
-        scalar: string
-    - name: globalDefault
-      type:
-        scalar: boolean
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: preemptionPolicy
-      type:
-        scalar: string
-    - name: value
-      type:
-        scalar: numeric
-      default: 0
 - name: io.k8s.api.scheduling.v1beta1.PriorityClass
   map:
     fields:

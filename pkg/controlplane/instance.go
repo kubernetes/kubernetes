@@ -660,6 +660,10 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
+<<<<<<< 6b21e064be76ab7449eee274e01ce071bf6f4adf
+=======
+		rbacv1alpha1.SchemeGroupVersion,
+>>>>>>> Remove PriorityClass resource scheduling.k8s.io/v1alpha1 version
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
 	)

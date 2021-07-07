@@ -80,7 +80,6 @@ rules:
       - k8s.io/kubernetes/pkg/apis/rbac/v1beta1
       - k8s.io/kubernetes/pkg/apis/scheduling
       - k8s.io/kubernetes/pkg/apis/scheduling/install
-      - k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
       - k8s.io/kubernetes/pkg/apis/settings
       - k8s.io/kubernetes/pkg/apis/settings/install
       - k8s.io/kubernetes/pkg/apis/settings/v1alpha1
