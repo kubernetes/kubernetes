@@ -2046,6 +2046,27 @@ func ValidatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim, opts Persist
 	return allErrs
 }
 
+// validateDataSource validates a DataSource/DataSourceRef in a PersistentVolumeClaimSpec
+func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(dataSource.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	if len(dataSource.Kind) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+	}
+	apiGroup := ""
+	if dataSource.APIGroup != nil {
+		apiGroup = *dataSource.APIGroup
+	}
+	if len(apiGroup) == 0 && dataSource.Kind != "PersistentVolumeClaim" {
+		allErrs = append(allErrs, field.Invalid(fldPath, dataSource.Kind, ""))
+	}
+
+	return allErrs
+}
+
 // ValidatePersistentVolumeClaimSpec validates a PersistentVolumeClaimSpec
 func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fldPath *field.Path, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2096,18 +2117,15 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	}
 
 	if spec.DataSource != nil {
-		if len(spec.DataSource.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
-		}
-		if len(spec.DataSource.Kind) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "kind"), ""))
-		}
-		apiGroup := ""
-		if spec.DataSource.APIGroup != nil {
-			apiGroup = *spec.DataSource.APIGroup
-		}
-		if len(apiGroup) == 0 && spec.DataSource.Kind != "PersistentVolumeClaim" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.Kind, ""))
+		allErrs = append(allErrs, validateDataSource(spec.DataSource, fldPath.Child("dataSource"))...)
+	}
+	if spec.DataSourceRef != nil {
+		allErrs = append(allErrs, validateDataSource(spec.DataSourceRef, fldPath.Child("dataSourceRef"))...)
+	}
+	if spec.DataSource != nil && spec.DataSourceRef != nil {
+		if !apiequality.Semantic.DeepEqual(spec.DataSource, spec.DataSourceRef) {
+			allErrs = append(allErrs, field.Invalid(fldPath, fldPath.Child("dataSource"),
+				"must match dataSourceRef"))
 		}
 	}
 

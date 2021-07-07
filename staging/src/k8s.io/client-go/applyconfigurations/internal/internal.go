@@ -4916,6 +4916,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: dataSource
       type:
         namedType: io.k8s.api.core.v1.TypedLocalObjectReference
+    - name: dataSourceRef
+      type:
+        namedType: io.k8s.api.core.v1.TypedLocalObjectReference
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
