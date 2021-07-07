@@ -64,6 +64,8 @@ func init() {
 	flagOverrides := map[string]string{
 		// Override the default cAdvisor housekeeping interval.
 		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Override the default max cAdvisor housekeeping interval.
+		"max_housekeeping_interval": maxHousekeepingInterval.String(),
 		// Disable event storage by default.
 		"event_storage_event_limit": "default=0",
 		"event_storage_age_limit":   "default=0",
