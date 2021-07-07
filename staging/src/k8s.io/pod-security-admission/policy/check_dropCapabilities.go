@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	CapabilityAll            = "ALL"
-	CapabilityNetBindService = "CAP_NET_BIND_SERVICE"
+	capabilityAll            = "ALL"
+	capabilityNetBindService = "CAP_NET_BIND_SERVICE"
 )
 
 func init() {
@@ -60,7 +60,7 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 		}
 		found := false
 		for _, c := range container.SecurityContext.Capabilities.Drop {
-			if c == CapabilityAll {
+			if c == capabilityAll {
 				found = true
 				break
 			}
@@ -69,15 +69,14 @@ func dropCapabilities_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			containers.Insert(container.Name)
 			return
 		}
-		if container.SecurityContext.Capabilities.Add != nil && len(container.SecurityContext.Capabilities.Add) > 0 {
-			for index, c := range container.SecurityContext.Capabilities.Add {
-				if c != CapabilityNetBindService {
-					capabilityPath := path.Child("securityContext", "capabilities", "add").Index(index)
-					msg := fmt.Sprintf("%s=%s", capabilityPath.String(), string(c))
-					containers.Insert(msg)
-				}
+		for index, c := range container.SecurityContext.Capabilities.Add {
+			if c != capabilityNetBindService {
+				capabilityPath := path.Child("securityContext", "capabilities", "add").Index(index)
+				msg := fmt.Sprintf("%s=%s", capabilityPath.String(), string(c))
+				containers.Insert(msg)
 			}
 		}
+
 	})
 	if len(containers) > 0 {
 		return CheckResult{
