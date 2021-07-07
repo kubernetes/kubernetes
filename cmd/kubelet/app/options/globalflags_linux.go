@@ -42,6 +42,7 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 
 	// e2e node tests rely on this
 	register(global, local, "housekeeping_interval")
+	register(global, local, "max_housekeeping_interval")
 
 	// These flags were implicit from cadvisor, and are mistakes that should be registered deprecated:
 	const deprecated = "This is a cadvisor flag that was mistakenly registered with the Kubelet. Due to legacy concerns, it will follow the standard CLI deprecation timeline before being removed."
