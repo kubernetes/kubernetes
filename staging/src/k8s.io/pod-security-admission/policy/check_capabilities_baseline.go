@@ -26,20 +26,32 @@ import (
 	"k8s.io/pod-security-admission/api"
 )
 
+/*
+Adding NET_RAW or capabilities beyond the default set must be disallowed.
+
+**Restricted Fields:**
+spec.containers[*].securityContext.capabilities.add
+spec.initContainers[*].securityContext.capabilities.add
+
+**Allowed Values:**
+undefined / empty
+values from the default set "AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE","FOWNER", "FSETID", "KILL", "MKNOD", "NET_BIND_SERVICE", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT"
+*/
+
 func init() {
-	addCheck(CheckAddCapabilities)
+	addCheck(CheckCapabilitiesBaseline)
 }
 
-// CheckAddCapabilities returns a baseline level check
+// CheckCapabilitiesBaseline returns a baseline level check
 // that limits the capabilities that can be added in 1.0+
-func CheckAddCapabilities() Check {
+func CheckCapabilitiesBaseline() Check {
 	return Check{
-		ID:    "addCapabilities",
+		ID:    "capabilities_baseline",
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       addCapabilities_1_0,
+				CheckPod:       capabilitiesBaseline_1_0,
 			},
 		},
 	}
@@ -63,28 +75,33 @@ var (
 	)
 )
 
-func addCapabilities_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	forbiddenContainers := sets.NewString()
-	forbiddenCapabilities := sets.NewString()
+func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	var badContainers []string
+	nonDefaultCapabilities := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
+			valid := true
 			for _, c := range container.SecurityContext.Capabilities.Add {
 				if !capabilities_allowed_1_0.Has(string(c)) {
-					forbiddenContainers.Insert(container.Name)
-					forbiddenCapabilities.Insert(string(c))
+					valid = false
+					nonDefaultCapabilities.Insert(string(c))
 				}
+			}
+			if !valid {
+				badContainers = append(badContainers, container.Name)
 			}
 		}
 	})
 
-	if len(forbiddenCapabilities) > 0 {
+	if len(badContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "forbidden capabilities",
+			ForbiddenReason: "non-default capabilities",
 			ForbiddenDetail: fmt.Sprintf(
-				"containers %q added %q",
-				forbiddenContainers.List(),
-				forbiddenCapabilities.List(),
+				"%s %s must not include %s in securityContext.capabilities.add",
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+				joinQuote(nonDefaultCapabilities.List()),
 			),
 		}
 	}

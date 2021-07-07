@@ -47,7 +47,7 @@ func ensureCapabilities(p *corev1.Pod) *corev1.Pod {
 
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
-		expectErrorSubstring: "forbidden capabilities",
+		expectErrorSubstring: "non-default capabilities",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod drops ALL
 			if p.Spec.Containers[0].SecurityContext != nil && p.Spec.Containers[0].SecurityContext.Capabilities != nil {
@@ -65,8 +65,6 @@ func init() {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{
 						"AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "MKNOD", "NET_BIND_SERVICE", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT",
 					}
-				}),
-				tweak(p, func(p *corev1.Pod) {
 					p.Spec.InitContainers[0].SecurityContext.Capabilities.Add = []corev1.Capability{
 						"AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "MKNOD", "NET_BIND_SERVICE", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT",
 					}
@@ -80,6 +78,7 @@ func init() {
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"NET_RAW"}
 				}),
+				// ensure init container is enforced
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.InitContainers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"NET_RAW"}
 				}),
@@ -87,29 +86,16 @@ func init() {
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"chown"}
 				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"chown"}
-				}),
-				// unknown capability
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"bogus"}
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"bogus"}
-				}),
 				// CAP_ prefix
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"CAP_CHOWN"}
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.Capabilities.Add = []corev1.Capability{"CAP_CHOWN"}
 				}),
 			}
 		},
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "addCapabilities"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "capabilities_baseline"},
 		fixtureData_1_0,
 	)
 }
