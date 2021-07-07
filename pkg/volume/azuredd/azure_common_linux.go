@@ -78,7 +78,7 @@ func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
-			if err = io.WriteFile(name, data, 0666); err != nil {
+			if err = io.WriteFile(name, data, 0600); err != nil {
 				klog.Warningf("failed to rescan scsi host %s", name)
 			}
 		}
