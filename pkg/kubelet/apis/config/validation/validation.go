@@ -155,13 +155,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
-	if localFeatureGate.Enabled(features.NodeSwapEnabled) {
+	if localFeatureGate.Enabled(features.NodeSwap) {
 		if kc.MemorySwap.SwapBehavior != "" && kc.MemorySwap.SwapBehavior != kubetypes.LimitedSwap && kc.MemorySwap.SwapBehavior != kubetypes.UnlimitedSwap {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
 		}
 	}
-	if !localFeatureGate.Enabled(features.NodeSwapEnabled) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwapEnabled feature flag is disabled"))
+	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
