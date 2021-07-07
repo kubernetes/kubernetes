@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -78,6 +79,7 @@ type GetOptions struct {
 	AllNamespaces     bool
 	Namespace         string
 	ExplicitNamespace bool
+	Subresource       string
 
 	ServerPrint bool
 
@@ -132,13 +134,18 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names
-		kubectl get rc/web service/frontend pods/web-pod-13je7`))
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		# List status subresource for a single pod.
+		kubectl get pod web-pod-13je7 --subresource status`))
 )
 
 const (
 	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
 	useServerPrintColumns          = "server-print"
 )
+
+var supportedSubresources = []string{"status", "scale"}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
@@ -197,6 +204,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.", supportedSubresources...)
 	return cmd
 }
 
@@ -330,6 +338,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
+	}
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 	return nil
 }
@@ -484,6 +495,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
+		Subresource(o.Subresource).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().

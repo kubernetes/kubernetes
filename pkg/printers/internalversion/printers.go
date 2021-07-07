@@ -588,6 +588,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Desired", Type: "integer", Description: autoscalingv1.ScaleSpec{}.SwaggerDoc()["replicas"]},
 		{Name: "Available", Type: "integer", Description: autoscalingv1.ScaleStatus{}.SwaggerDoc()["replicas"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(scaleColumnDefinitions, printScale)
 }
@@ -2627,7 +2628,7 @@ func printScale(obj *autoscaling.Scale, options printers.GenerateOptions) ([]met
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Replicas, obj.Status.Replicas)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Replicas, obj.Status.Replicas, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
 }
 

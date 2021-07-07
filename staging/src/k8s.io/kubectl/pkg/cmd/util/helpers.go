@@ -468,6 +468,10 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 }
 
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
+}
+
 type ValidateOptions struct {
 	EnableValidation bool
 }

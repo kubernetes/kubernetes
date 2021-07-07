@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -67,6 +68,8 @@ var (
 		kubectl replace --force -f ./pod.json`))
 )
 
+var supportedSubresources = []string{"status", "scale"}
+
 type ReplaceOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
@@ -91,6 +94,8 @@ type ReplaceOptions struct {
 	Raw              string
 
 	Recorder genericclioptions.Recorder
+
+	Subresource string
 
 	genericclioptions.IOStreams
 
@@ -132,6 +137,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, replace will operate on the subresource of the requested object.", supportedSubresources...)
 
 	return cmd
 }
@@ -238,6 +244,10 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		}
 	}
 
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
+	}
+
 	return nil
 }
 
@@ -262,6 +272,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.Subresource).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -295,6 +306,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
+			WithSubresource(o.Subresource).
 			Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
@@ -330,6 +342,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.Subresource).
 		Flatten()
 	if stdinInUse {
 		b = b.StdinInUse()
@@ -369,6 +382,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		Subresource(o.Subresource).
 		Flatten()
 	if stdinInUse {
 		b = b.StdinInUse()
