@@ -743,34 +743,6 @@ func TestStringPrinting(t *testing.T) {
 test1   20h   This is first line + 56 more...
 `,
 		},
-		// lengthy string
-		{
-			columns: []metav1.TableColumnDefinition{
-				{Name: "Name", Type: "string"},
-				{Name: "Age", Type: "string"},
-				{Name: "Description", Type: "string"},
-			},
-			rows: []metav1.TableRow{
-				{Cells: []interface{}{"test1", "20h", "This is first line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
-			},
-			expected: `NAME    AGE   DESCRIPTION
-test1   20h   This is first line which is long and goes for on and on and on an on and on and on and on and on and + 38 more...
-`,
-		},
-		// lengthy string + newline
-		{
-			columns: []metav1.TableColumnDefinition{
-				{Name: "Name", Type: "string"},
-				{Name: "Age", Type: "string"},
-				{Name: "Description", Type: "string"},
-			},
-			rows: []metav1.TableRow{
-				{Cells: []interface{}{"test1", "20h", "This is first\n line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
-			},
-			expected: `NAME    AGE   DESCRIPTION
-test1   20h   This is first + 126 more...
-`,
-		},
 	}
 
 	for _, test := range tests {
