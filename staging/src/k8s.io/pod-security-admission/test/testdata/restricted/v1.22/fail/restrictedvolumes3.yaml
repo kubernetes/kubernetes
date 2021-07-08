@@ -24,7 +24,7 @@ spec:
     seccompProfile:
       type: RuntimeDefault
   volumes:
-  - name: volume-nfs
+  - name: volume1
     nfs:
-      path: /testing
-      server: testing
+      path: /test
+      server: test

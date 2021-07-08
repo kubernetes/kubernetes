@@ -392,10 +392,18 @@ func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMe
 		auditAnnotations["audit"] = result.ForbiddenDetail()
 	}
 
-	// TODO: reuse previous evaluation if warn level+version is the same as audit or enforce level+version
-	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
-		// TODO: Craft a better user-facing warning message
-		response.Warnings = append(response.Warnings, fmt.Sprintf("Pod violates PodSecurity profile %s: %s", nsPolicy.Warn.String(), result.ForbiddenDetail()))
+	// avoid adding warnings to a request we're already going to reject with an error
+	if response.Allowed {
+		// TODO: reuse previous evaluation if warn level+version is the same as audit or enforce level+version
+		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
+			// TODO: Craft a better user-facing warning message
+			response.Warnings = append(response.Warnings, fmt.Sprintf(
+				"would violate %q version of %q PodSecurity profile: %s",
+				nsPolicy.Warn.Version.String(),
+				nsPolicy.Warn.Level,
+				result.ForbiddenDetail(),
+			))
+		}
 	}
 
 	response.AuditAnnotations = auditAnnotations

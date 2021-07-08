@@ -16,23 +16,24 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - configMap:
-      name: volume-configmap-test
-    name: volume-configmap
+  - name: volume0
+  - emptyDir: {}
+    name: volume1
+  - name: volume2
+    secret:
+      secretName: test
+  - name: volume3
+    persistentVolumeClaim:
+      claimName: test
   - downwardAPI:
       items:
       - fieldRef:
           fieldPath: metadata.labels
         path: labels
-    name: volume-downwardapi
-  - emptyDir: {}
-    name: volume-emptydir
-  - name: volume-pvc
-    persistentVolumeClaim:
-      claimName: test
-  - name: volume-projects
+    name: volume4
+  - configMap:
+      name: test
+    name: volume5
+  - name: volume6
     projected:
       sources: []
-  - name: volume-secret
-    secret:
-      secretName: test

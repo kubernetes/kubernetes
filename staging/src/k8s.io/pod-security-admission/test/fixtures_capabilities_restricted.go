@@ -30,14 +30,10 @@ containerFields: []string{
 
 func init() {
 	fixtureData_1_22 := fixtureGenerator{
-		expectErrorSubstring: "restrict capabilities",
+		expectErrorSubstring: "unrestricted capabilities",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureCapabilities(p)
 			return []*corev1.Pod{
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
-					p.Spec.InitContainers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
-				}),
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
 					p.Spec.InitContainers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{"ALL"}
@@ -49,10 +45,15 @@ func init() {
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureCapabilities(p)
 			return []*corev1.Pod{
+				// test container
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{}
+				}),
+				// test initContainer
+				tweak(p, func(p *corev1.Pod) {
 					p.Spec.InitContainers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{}
 				}),
+				// dropping all individual capabilities is not sufficient
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Capabilities.Drop = []corev1.Capability{
 						"SYS_TIME", "SYS_MODULE", "SYS_RAWIO", "SYS_PACCT", "SYS_ADMIN", "SYS_NICE",

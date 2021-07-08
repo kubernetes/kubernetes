@@ -12,9 +12,9 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-scaleio
+  - name: volume1
     scaleIO:
       gateway: localhost
       secretRef: null
-      system: testing
-      volumeName: testing
+      system: test
+      volumeName: test

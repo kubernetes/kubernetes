@@ -25,6 +25,26 @@ import (
 	"k8s.io/pod-security-admission/api"
 )
 
+/*
+
+Sysctls can disable security mechanisms or affect all containers on a host,
+and should be disallowed except for an allowed "safe" subset.
+
+A sysctl is considered safe if it is namespaced in the container or the Pod,
+and it is isolated from other Pods or processes on the same Node.
+
+**Restricted Fields:**
+spec.securityContext.sysctls[*].name
+
+**Allowed Values:**
+'kernel.shm_rmid_forced'
+'net.ipv4.ip_local_port_range'
+'net.ipv4.tcp_syncookies'
+'net.ipv4.ping_group_range'
+'net.ipv4.ip_unprivileged_port_start'
+
+*/
+
 func init() {
 	addCheck(CheckSysctls)
 }
@@ -38,7 +58,7 @@ func CheckSysctls() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       checkSysctls_1_0,
+				CheckPod:       sysctls_1_0,
 			},
 		},
 	}
@@ -54,7 +74,7 @@ var (
 	)
 )
 
-func checkSysctls_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func sysctls_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var forbiddenSysctls []string
 
 	if podSpec.SecurityContext != nil {
