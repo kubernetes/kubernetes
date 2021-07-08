@@ -78,11 +78,12 @@ func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.A
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
-// alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+// unsecuredUser simulates requests to the unsecured endpoint for old tests
+func unsecuredUser(req *http.Request) (*authauthenticator.Response, bool, error) {
 	return &authauthenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "",
+			Name:   "system:unsecured",
+			Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
 		},
 	}, true, nil
 }
@@ -174,7 +175,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, controlPlaneConfig.GenericConfig.Authentication.APIAudiences)
 	if controlPlaneConfig.GenericConfig.Authentication.Authenticator == nil {
-		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(unsecuredUser))
 	} else {
 		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, controlPlaneConfig.GenericConfig.Authentication.Authenticator)
 	}
