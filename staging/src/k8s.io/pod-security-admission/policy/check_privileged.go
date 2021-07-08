@@ -17,7 +17,7 @@ limitations under the License.
 package policy
 
 import (
-	"strings"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,7 @@ Restricted Fields:
 spec.containers[*].securityContext.privileged
 spec.initContainers[*].securityContext.privileged
 
-Allowed Values: false, undefined/nil
+Allowed Values: false, undefined/null
 */
 
 func init() {
@@ -40,7 +40,7 @@ func init() {
 }
 
 // CheckPrivileged returns a baseline level check
-// that requires privileged=false in 1.0+
+// that forbids privileged=true in 1.0+
 func CheckPrivileged() Check {
 	return Check{
 		ID:    "privileged",
@@ -55,17 +55,21 @@ func CheckPrivileged() Check {
 }
 
 func privileged_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var forbiddenPaths []string
+	var badContainers []string
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged {
-			forbiddenPaths = append(forbiddenPaths, path.Child("securityContext", "privileged").String())
+			badContainers = append(badContainers, container.Name)
 		}
 	})
-	if len(forbiddenPaths) > 0 {
+	if len(badContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "privileged == true",
-			ForbiddenDetail: strings.Join(forbiddenPaths, ", "),
+			ForbiddenReason: "privileged",
+			ForbiddenDetail: fmt.Sprintf(
+				`%s %s must not set securityContext.privileged=true`,
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+			),
 		}
 	}
 	return CheckResult{Allowed: true}
