@@ -32,6 +32,12 @@ type CredentialProviderRequest struct {
 	// credential provider plugin request. Plugins may optionally parse the image
 	// to extract any information required to fetch credentials.
 	Image string `json:"image"`
+
+	// serviceAccountToken is a JWT token for the Kubernetes service
+	// account that the Pod requesting this image is running as. The credential
+	// provider plugin may, for example, exchange this token with the target
+	// registry provider for a token that can authenticate to that registry.
+	ServiceAccountToken string `json:"serviceAccountToken"`
 }
 
 type PluginCacheKeyType string

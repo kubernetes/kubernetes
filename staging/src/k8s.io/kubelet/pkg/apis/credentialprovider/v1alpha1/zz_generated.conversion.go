@@ -93,6 +93,7 @@ func Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in *credential
 
 func autoConvert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in *CredentialProviderRequest, out *credentialprovider.CredentialProviderRequest, s conversion.Scope) error {
 	out.Image = in.Image
+	out.ServiceAccountToken = in.ServiceAccountToken
 	return nil
 }
 
@@ -103,6 +104,7 @@ func Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_Credential
 
 func autoConvert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *credentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s conversion.Scope) error {
 	out.Image = in.Image
+	out.ServiceAccountToken = in.ServiceAccountToken
 	return nil
 }
 
