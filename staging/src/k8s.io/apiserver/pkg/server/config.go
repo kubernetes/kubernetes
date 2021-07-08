@@ -209,6 +209,8 @@ type Config struct {
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
+	// ExemptPathsRequestsInFlight is the list of paths which are exempt from rate limit
+	ExemptPathsRequestsInFlight []string
 
 	// GoawayChance is the probability that send a GOAWAY to HTTP/2 clients. When client received
 	// GOAWAY, the in-flight requests will not be affected and new requests will use
@@ -342,6 +344,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		EnableMetrics:               true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
+		ExemptPathsRequestsInFlight: make([]string, 0),
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
 		LivezGracePeriod:            time.Duration(0),
@@ -763,7 +766,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc, c.ExemptPathsRequestsInFlight)
 	}
 
 	handler = filterlatency.TrackCompleted(handler)

@@ -124,6 +124,7 @@ func WithMaxInFlightLimit(
 	nonMutatingLimit int,
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
+	exemptPathsRequestsInFlight []string,
 ) http.Handler {
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
@@ -151,6 +152,14 @@ func WithMaxInFlightLimit(
 		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
 			handler.ServeHTTP(w, r)
 			return
+		}
+
+		// Skip exempt paths
+		for _, exemptPath := range exemptPathsRequestsInFlight {
+			if exemptPath == requestInfo.Path {
+				handler.ServeHTTP(w, r)
+				return
+			}
 		}
 
 		var c chan bool

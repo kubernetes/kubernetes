@@ -40,6 +40,7 @@ type ServerRunOptions struct {
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
+	ExemptPathsRequestsInFlight []string
 	RequestTimeout              time.Duration
 	GoawayChance                float64
 	LivezGracePeriod            time.Duration
@@ -68,16 +69,17 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
-		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
-		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
-		RequestTimeout:              defaults.RequestTimeout,
-		LivezGracePeriod:            defaults.LivezGracePeriod,
-		MinRequestTimeout:           defaults.MinRequestTimeout,
-		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
-		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
-		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
-		EnablePriorityAndFairness:   true,
-		ShutdownSendRetryAfter:      false,
+		MaxRequestsInFlight:             defaults.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight:     defaults.MaxMutatingRequestsInFlight,
+		RequestTimeout:                  defaults.RequestTimeout,
+		LivezGracePeriod:                defaults.LivezGracePeriod,
+		MinRequestTimeout:               defaults.MinRequestTimeout,
+		ShutdownDelayDuration:           defaults.ShutdownDelayDuration,
+		JSONPatchMaxCopyBytes:           defaults.JSONPatchMaxCopyBytes,
+		MaxRequestBodyBytes:             defaults.MaxRequestBodyBytes,
+		EnablePriorityAndFairness:       true,
+		ShutdownSendRetryAfter:          false,
+		StartupSendRetryAfterUntilReady: false,
 	}
 }
 
@@ -88,6 +90,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.ExemptPathsRequestsInFlight = s.ExemptPathsRequestsInFlight
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
@@ -225,6 +228,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"(which must be positive) if --enable-priority-and-fairness is true. "+
 		"Otherwise, this flag limits the maximum number of mutating requests in flight, "+
 		"or a zero value disables the limit completely.")
+
+	fs.StringSliceVar(&s.ExemptPathsRequestsInFlight, "exempt-paths-requests-inflight", s.ExemptPathsRequestsInFlight, ""+
+		"List of API server HTTP paths, comma separated. If this list is not empty, then each path will be ignored in "+
+		"--max-requests-inflight limit and served immediately.")
 
 	fs.DurationVar(&s.RequestTimeout, "request-timeout", s.RequestTimeout, ""+
 		"An optional field indicating the duration a handler must keep a request open before timing "+
