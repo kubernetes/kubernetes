@@ -17,5 +17,5 @@ spec:
     runAsNonRoot: true
   volumes:
   - flocker:
-      datasetName: testing
-    name: volume-flocker
+      datasetName: test
+    name: volume1

@@ -16,7 +16,7 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-quobyte
+  - name: volume1
     quobyte:
       registry: localhost:1234
-      volume: testing
+      volume: test

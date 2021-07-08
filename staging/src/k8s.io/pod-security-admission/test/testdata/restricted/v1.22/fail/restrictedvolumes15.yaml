@@ -25,6 +25,6 @@ spec:
       type: RuntimeDefault
   volumes:
   - azureDisk:
-      diskName: testing
+      diskName: test
       diskURI: https://test.blob.core.windows.net/test/test.vhd
-    name: volume-azuredisk
+    name: volume1

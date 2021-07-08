@@ -16,8 +16,8 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-rbd
+  - name: volume1
     rbd:
-      image: testing
+      image: test
       monitors:
-      - testing
+      - test

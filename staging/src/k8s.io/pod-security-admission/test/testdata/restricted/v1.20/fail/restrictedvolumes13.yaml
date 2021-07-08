@@ -18,6 +18,6 @@ spec:
     seccompProfile:
       type: RuntimeDefault
   volumes:
-  - name: volume-vsphere
+  - name: volume1
     vsphereVolume:
-      volumePath: testing
+      volumePath: test
