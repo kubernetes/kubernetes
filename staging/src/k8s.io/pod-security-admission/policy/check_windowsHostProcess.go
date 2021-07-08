@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -59,7 +58,7 @@ func CheckWindowsHostProcess() Check {
 
 func windowsHostProcess_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var badContainers []string
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
+	visitContainers(podSpec, func(container *corev1.Container) {
 		if container.SecurityContext != nil &&
 			container.SecurityContext.WindowsOptions != nil &&
 			container.SecurityContext.WindowsOptions.HostProcess != nil &&

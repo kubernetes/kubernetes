@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -81,7 +80,7 @@ func seccompProfileRestricted_1_19(podMetadata *metav1.ObjectMeta, podSpec *core
 	// containers that didn't set seccompProfile and aren't caught by a pod-level seccompProfile
 	var implicitlyBadContainers []string
 
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(c *corev1.Container, path *field.Path) {
+	visitContainers(podSpec, func(c *corev1.Container) {
 		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != nil {
 			// container explicitly set seccompProfile
 			if !validSeccomp(c.SecurityContext.SeccompProfile.Type) {

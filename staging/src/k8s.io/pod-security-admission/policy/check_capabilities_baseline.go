@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -78,7 +77,7 @@ var (
 func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var badContainers []string
 	nonDefaultCapabilities := sets.NewString()
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
+	visitContainers(podSpec, func(container *corev1.Container) {
 		if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
 			valid := true
 			for _, c := range container.SecurityContext.Capabilities.Add {

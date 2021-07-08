@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -94,7 +93,7 @@ func seccompProfileBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.
 		}
 	}
 
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(c *corev1.Container, path *field.Path) {
+	visitContainers(podSpec, func(c *corev1.Container) {
 		annotation := annotationKeyContainerPrefix + c.Name
 		if val, ok := podMetadata.Annotations[annotation]; ok {
 			if !validSeccompAnnotationValue(val) {
@@ -134,7 +133,7 @@ func seccompProfileBaseline_1_19(podMetadata *metav1.ObjectMeta, podSpec *corev1
 	// containers that explicitly set seccompProfile.type to a bad value
 	var explicitlyBadContainers []string
 
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(c *corev1.Container, path *field.Path) {
+	visitContainers(podSpec, func(c *corev1.Container) {
 		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != nil {
 			// container explicitly set seccompProfile
 			if !validSeccomp(c.SecurityContext.SeccompProfile.Type) {
