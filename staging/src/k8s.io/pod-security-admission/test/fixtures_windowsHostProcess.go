@@ -42,6 +42,7 @@ func init() {
 			// minimal valid pod already captures all valid combinations
 			return nil
 		},
+		expectErrorSubstring: "hostProcess",
 		failRequiresFeatures: []featuregate.Feature{"WindowsHostProcessContainers"},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
@@ -75,7 +76,7 @@ func init() {
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "hostProcess"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "windowsHostProcess"},
 		fixtureData_1_0,
 	)
 	// TODO: register another set of fixtures with passing test cases that explicitly set hostProcess=false at pod and container level once hostProcess is GA
