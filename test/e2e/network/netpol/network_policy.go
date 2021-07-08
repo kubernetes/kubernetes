@@ -1133,7 +1133,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 80}, Protocol: &protocolSCTP})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-sctp-ingress-on-port-80", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
-			nsX, _, _, model, k8s := getK8SModel(f)
+			rootNs, nsX, _, _, k8s := getK8sNamespaces(f)
+			model := modelMap[rootNs]
 			CreatePolicy(k8s, policy, nsX)
 
 			ginkgo.By("Trying to connect to TCP port 81, which should be blocked by implicit isolation.")
