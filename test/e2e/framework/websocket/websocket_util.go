@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/gorilla/websocket"
 	restclient "k8s.io/client-go/rest"
-
-	"golang.org/x/net/websocket"
 )
 
 type extractRT struct {
@@ -51,14 +51,20 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load http headers: %v", err)
 	}
-	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
+
+	dialer := websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		TLSClientConfig:  tlsConfig,
+		HandshakeTimeout: 45 * time.Second,
+		Subprotocols:     protocols,
 	}
-	cfg.Header = headers
-	cfg.TlsConfig = tlsConfig
-	cfg.Protocol = protocols
-	return websocket.DialConfig(cfg)
+
+	conn, _, err := dialer.Dial(url.String(), headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial websocket: %v", err)
+	}
+
+	return conn, nil
 }
 
 // headersForConfig extracts any http client logic necessary for the provided

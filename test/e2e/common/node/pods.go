@@ -17,18 +17,13 @@ limitations under the License.
 package node
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"k8s.io/client-go/util/retry"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/net/websocket"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +38,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -578,15 +574,11 @@ var _ = SIGDescribe("Pods", func() {
 		}
 		defer ws.Close()
 
-		buf := &bytes.Buffer{}
 		gomega.Eventually(func() error {
 			for {
-				var msg []byte
-				if err := websocket.Message.Receive(ws, &msg); err != nil {
-					if err == io.EOF {
-						break
-					}
-					framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+				_, msg, err := ws.ReadMessage()
+				if err != nil {
+					framework.Failf("Failed to read from websocket %s: %v", url.String(), err)
 				}
 				if len(msg) == 0 {
 					continue
@@ -598,15 +590,13 @@ var _ = SIGDescribe("Pods", func() {
 					} else {
 						framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
 					}
-
 				}
-				buf.Write(msg[1:])
-			}
-			if buf.Len() == 0 {
-				return fmt.Errorf("unexpected output from server")
-			}
-			if !strings.Contains(buf.String(), "remote execution test") {
-				return fmt.Errorf("expected to find 'remote execution test' in %q", buf.String())
+
+				if strings.Contains(string(msg[1:]), "remote execution test") {
+					break
+				} else {
+					return fmt.Errorf("expected to find 'remote execution test' in %q", string(msg[1:]))
+				}
 			}
 			return nil
 		}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -650,28 +640,25 @@ var _ = SIGDescribe("Pods", func() {
 			Param("container", pod.Spec.Containers[0].Name)
 
 		url := req.URL()
-
 		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
 		if err != nil {
 			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
 		defer ws.Close()
-		buf := &bytes.Buffer{}
+
 		for {
-			var msg []byte
-			if err := websocket.Message.Receive(ws, &msg); err != nil {
-				if err == io.EOF {
-					break
-				}
-				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+			_, msg, err := ws.ReadMessage()
+			if err != nil {
+				framework.Failf("Failed to read from websocket %s: %v", url.String(), err)
 			}
 			if len(strings.TrimSpace(string(msg))) == 0 {
 				continue
 			}
-			buf.Write(msg)
-		}
-		if buf.String() != "container is alive\n" {
-			framework.Failf("Unexpected websocket logs:\n%s", buf.String())
+			if string(msg) == "container is alive\n" {
+				break
+			} else {
+				framework.Failf("Unexpected websocket logs:\n%s", string(msg))
+			}
 		}
 	})
 

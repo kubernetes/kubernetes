@@ -32,7 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/net/websocket"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,6 +42,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
+	"github.com/gorilla/websocket"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 )
@@ -420,7 +420,6 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	}
 
 	ginkgo.By("Reading data from the local port")
-	buf := bytes.Buffer{}
 	expectedData := bytes.Repeat([]byte("x"), 100)
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
@@ -430,9 +429,8 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		if channel != 0 {
 			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
 		}
-		buf.Write(msg)
-		if bytes.Equal(expectedData, buf.Bytes()) {
-			return fmt.Errorf("expected %q from server, got %q", expectedData, buf.Bytes())
+		if bytes.Equal(expectedData, msg) {
+			return fmt.Errorf("expected %q from server, got %q", expectedData, msg)
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -495,8 +493,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 func wsRead(conn *websocket.Conn) (byte, []byte, error) {
 	for {
-		var data []byte
-		err := websocket.Message.Receive(conn, &data)
+		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return 0, nil, err
 		}
@@ -516,6 +513,6 @@ func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {
 	frame := make([]byte, len(data)+1)
 	frame[0] = channel
 	copy(frame[1:], data)
-	err := websocket.Message.Send(conn, frame)
+	err := conn.WriteMessage(websocket.BinaryMessage, frame)
 	return err
 }

@@ -24,10 +24,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/websocket"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 )
@@ -109,7 +108,7 @@ func TestServeWSPortForward(t *testing.T) {
 				url = fmt.Sprintf("ws://%s/portForward/%s/%s?port=%s", fw.testHTTPServer.Listener.Addr().String(), podNamespace, podName, test.port)
 			}
 
-			ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
+			ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 			assert.Equal(t, test.shouldError, err != nil, "websocket dial")
 			if test.shouldError {
 				return
@@ -196,7 +195,7 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 		url = url + fmt.Sprintf("port=%s&", port)
 	}
 
-	ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 	require.NoError(t, err, "websocket dial")
 
 	defer ws.Close()
@@ -237,14 +236,14 @@ func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {
 	frame := make([]byte, len(data)+1)
 	frame[0] = channel
 	copy(frame[1:], data)
-	err := websocket.Message.Send(conn, frame)
+
+	err := conn.WriteMessage(websocket.BinaryMessage, frame)
 	return err
 }
 
 func wsRead(conn *websocket.Conn) (byte, []byte, error) {
 	for {
-		var data []byte
-		err := websocket.Message.Receive(conn, &data)
+		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return 0, nil, err
 		}
