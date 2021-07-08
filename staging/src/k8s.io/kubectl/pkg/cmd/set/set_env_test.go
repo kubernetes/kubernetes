@@ -435,16 +435,20 @@ func TestSetEnvRemote(t *testing.T) {
 			args:         []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
-			name: "test batchv1 Job",
-			object: &batchv1.Job{
+			name: "set image batchv1 CronJob",
+			object: &batchv1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{
+											Name:  "nginx",
+											Image: "nginx",
+										},
+									},
 								},
 							},
 						},
@@ -452,8 +456,8 @@ func TestSetEnvRemote(t *testing.T) {
 				},
 			},
 			groupVersion: batchv1.SchemeGroupVersion,
-			path:         "/namespaces/test/jobs/nginx",
-			args:         []string{"job", "nginx", "env=prod"},
+			path:         "/namespaces/test/cronjobs/nginx",
+			args:         []string{"cronjob", "nginx", "env=prod"},
 		},
 		{
 			name: "test corev1 replication controller",

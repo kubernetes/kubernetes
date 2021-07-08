@@ -265,6 +265,15 @@ const (
 	// Allows Job controller to manage Pod completions per completion index.
 	IndexedJob featuregate.Feature = "IndexedJob"
 
+	// owner: @alculquicondor
+	// alpha: v1.22
+	//
+	// Track Job completion without relying on Pod remaining in the cluster
+	// indefinitely. Pod finalizers, in addition to a field in the Job status
+	// allow the Job controller to keep track of Pods that it didn't account for
+	// yet.
+	JobTrackingWithFinalizers featuregate.Feature = "JobTrackingWithFinalizers"
+
 	// owner: @dashpole
 	// alpha: v1.13
 	// beta: v1.15
@@ -830,6 +839,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.Beta},
 	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
+	JobTrackingWithFinalizers:                      {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},

@@ -155,6 +155,13 @@ func SetInternalTrafficPolicy(policy api.ServiceInternalTrafficPolicyType) Tweak
 	}
 }
 
+// SetExternalTrafficPolicy sets the externalTrafficPolicy field for a Service.
+func SetExternalTrafficPolicy(policy api.ServiceExternalTrafficPolicyType) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.ExternalTrafficPolicy = policy
+	}
+}
+
 // SetAllocateLoadBalancerNodePorts sets the allocate LB node port field.
 func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 	return func(svc *api.Service) {

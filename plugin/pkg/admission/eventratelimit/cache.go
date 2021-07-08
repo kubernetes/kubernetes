@@ -17,9 +17,8 @@ limitations under the License.
 package eventratelimit
 
 import (
-	"github.com/hashicorp/golang-lru"
-
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/utils/lru"
 )
 
 // cache is an interface for caching the limits of a particular type
