@@ -27,6 +27,18 @@ import (
 	"k8s.io/pod-security-admission/api"
 )
 
+/*
+
+The default /proc masks are set up to reduce attack surface, and should be required.
+
+**Restricted Fields:**
+spec.containers[*].securityContext.procMount
+spec.initContainers[*].securityContext.procMount
+
+**Allowed Values:** undefined/null, "Default"
+
+*/
+
 func init() {
 	addCheck(CheckProcMount)
 }
@@ -41,14 +53,14 @@ func CheckProcMount() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       checkProcMount_1_0,
+				CheckPod:       procMount_1_0,
 			},
 		},
 	}
 }
 
-func checkProcMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	forbiddenContainers := sets.NewString()
+func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	var badContainers []string
 	forbiddenProcMountTypes := sets.NewString()
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		// allow if the security context is nil.
@@ -61,18 +73,19 @@ func checkProcMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec)
 		}
 		// check if the value of the proc mount type is valid.
 		if *container.SecurityContext.ProcMount != v1.DefaultProcMount {
-			forbiddenContainers.Insert(container.Name)
+			badContainers = append(badContainers, container.Name)
 			forbiddenProcMountTypes.Insert(string(*container.SecurityContext.ProcMount))
 		}
 	})
-	if len(forbiddenContainers) > 0 {
+	if len(badContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "forbidden procMount",
+			ForbiddenReason: "procMount",
 			ForbiddenDetail: fmt.Sprintf(
-				"containers %q have forbidden procMount types %q",
-				forbiddenContainers.List(),
-				forbiddenProcMountTypes.List(),
+				"%s %s must not set securityContext.procMount to %s",
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+				joinQuote(forbiddenProcMountTypes.List()),
 			),
 		}
 	}
