@@ -112,7 +112,7 @@ func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kube
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *Mock) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, saInfo *kubecontainer.ServiceAccountInfo) (string, error) {
 	args := r.Called(image, pullSecrets)
 	return image.Image, args.Error(0)
 }

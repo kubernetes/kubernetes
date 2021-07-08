@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -155,6 +156,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Memory throttling factor for MemoryQoS
 	memoryThrottlingFactor float64
+
+	// tokenManager is for getting service account tokens for Pods
+	tokenManager *token.Manager
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -200,6 +204,7 @@ func NewKubeGenericRuntimeManager(
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
+	tokenManager *token.Manager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
@@ -223,6 +228,7 @@ func NewKubeGenericRuntimeManager(
 		memorySwapBehavior:     memorySwapBehavior,
 		getNodeAllocatable:     getNodeAllocatable,
 		memoryThrottlingFactor: memoryThrottlingFactor,
+		tokenManager:           tokenManager,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()

@@ -109,6 +109,11 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		})
 	}
 
+	saInfo := &kubecontainer.ServiceAccountInfo{
+		Name:   pod.Spec.ServiceAccountName,
+		Tokens: pod.Spec.ImagePullTokens,
+	}
+
 	spec := kubecontainer.ImageSpec{
 		Image:       image,
 		Annotations: podAnnotations,
@@ -141,7 +146,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig, saInfo)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)

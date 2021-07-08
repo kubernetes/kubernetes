@@ -17,7 +17,9 @@ limitations under the License.
 package kuberuntime
 
 import (
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
@@ -28,7 +30,8 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig,
+	saInfo *kubecontainer.ServiceAccountInfo) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
@@ -45,6 +48,16 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	opts := &credentialprovider.Options{
 		Image: repoToPull,
 	}
+	if saInfo != nil {
+		// TODO(mtaufen): It would be more efficient to get these tokens
+		// in SyncPod or something, and cache between Pod restarts...
+		imagePullTokens, err := m.getImagePullTokens(saInfo)
+		if err != nil {
+			return err
+		}
+		opts.ImagePullTokens = imagePullTokens
+	}
+
 	creds, withCredentials := keyring.Lookup(opts)
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
@@ -144,4 +157,40 @@ func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, err
 		stats.TotalStorageBytes += img.Size_
 	}
 	return stats, nil
+}
+
+func (m *kubeGenericRuntimeManager) getImagePullTokens(saInfo *kubecontainer.ServiceAccountInfo) ([]ImagePullToken, error) {
+	// get the token, and pass through MatchImages to
+	imagePullTokens := make([]credentialprovider.ImagePullToken,
+		len(saInfo.ImagePullTokens))
+
+	for i, tokenSpec := range saInfo.ImagePullTokens {
+		// TODO(mtaufen): Go back and update kube API to have MatchImages
+		imagePullTokens[i].MatchImages = tokenSpec.MatchImages
+
+		// TODO(mtaufen): not sure if we _should_ be getting this off
+		// the podSandboxConfig, but it's there so...
+
+		tr, err := m.tokenManager.GetServiceAccountToken(
+			podSandboxConfig.Metadata.Namespace,
+			saInfo.Name,
+			&authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
+					Audiences:         []string{tokenSpec.Audience},
+					ExpirationSeconds: tokenSpec.ExpirationSeconds,
+					BoundObjectRef: &authenticationv1.BoundObjectReference{
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       podSandboxConfig.Metadata.Name,
+						UID:        types.UID(podSandboxConfig.Metadata.Uid),
+					},
+				},
+			})
+		if err != nil {
+			return nil, err
+		}
+
+		imagePullTokens[i].Token = tr.Status.Token
+	}
+	return imagePullTokens, nil
 }

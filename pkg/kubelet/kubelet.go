@@ -658,6 +658,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		backOffPeriod,
 		klet.podCache,
 	)
+	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
@@ -688,6 +689,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
+		tokenManager,
 	)
 	if err != nil {
 		return nil, err
@@ -770,8 +772,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.startupManager,
 		klet.runner,
 		kubeDeps.Recorder)
-
-	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
 	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
