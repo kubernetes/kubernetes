@@ -33,6 +33,9 @@ const (
 	RT_FILTER_GW
 	RT_FILTER_TABLE
 	RT_FILTER_HOPLIMIT
+	RT_FILTER_PRIORITY
+	RT_FILTER_MARK
+	RT_FILTER_MASK
 )
 
 const (
@@ -639,18 +642,69 @@ func (h *Handle) routeHandle(route *Route, req *nl.NetlinkRequest, msg *nl.RtMsg
 	}
 
 	var metrics []*nl.RtAttr
-	// TODO: support other rta_metric values
 	if route.MTU > 0 {
 		b := nl.Uint32Attr(uint32(route.MTU))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_MTU, b))
+	}
+	if route.Window > 0 {
+		b := nl.Uint32Attr(uint32(route.Window))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_WINDOW, b))
+	}
+	if route.Rtt > 0 {
+		b := nl.Uint32Attr(uint32(route.Rtt))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_RTT, b))
+	}
+	if route.RttVar > 0 {
+		b := nl.Uint32Attr(uint32(route.RttVar))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_RTTVAR, b))
+	}
+	if route.Ssthresh > 0 {
+		b := nl.Uint32Attr(uint32(route.Ssthresh))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_SSTHRESH, b))
+	}
+	if route.Cwnd > 0 {
+		b := nl.Uint32Attr(uint32(route.Cwnd))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_CWND, b))
 	}
 	if route.AdvMSS > 0 {
 		b := nl.Uint32Attr(uint32(route.AdvMSS))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_ADVMSS, b))
 	}
+	if route.Reordering > 0 {
+		b := nl.Uint32Attr(uint32(route.Reordering))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_REORDERING, b))
+	}
 	if route.Hoplimit > 0 {
 		b := nl.Uint32Attr(uint32(route.Hoplimit))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_HOPLIMIT, b))
+	}
+	if route.InitCwnd > 0 {
+		b := nl.Uint32Attr(uint32(route.InitCwnd))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_INITCWND, b))
+	}
+	if route.Features > 0 {
+		b := nl.Uint32Attr(uint32(route.Features))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_FEATURES, b))
+	}
+	if route.RtoMin > 0 {
+		b := nl.Uint32Attr(uint32(route.RtoMin))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_RTO_MIN, b))
+	}
+	if route.InitRwnd > 0 {
+		b := nl.Uint32Attr(uint32(route.InitRwnd))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_INITRWND, b))
+	}
+	if route.QuickACK > 0 {
+		b := nl.Uint32Attr(uint32(route.QuickACK))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_QUICKACK, b))
+	}
+	if route.Congctl != "" {
+		b := nl.ZeroTerminated(route.Congctl)
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_CC_ALGO, b))
+	}
+	if route.FastOpenNoCookie > 0 {
+		b := nl.Uint32Attr(uint32(route.FastOpenNoCookie))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_FASTOPEN_NO_COOKIE, b))
 	}
 
 	if metrics != nil {
@@ -903,10 +957,36 @@ func deserializeRoute(m []byte) (Route, error) {
 				switch metric.Attr.Type {
 				case unix.RTAX_MTU:
 					route.MTU = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_WINDOW:
+					route.Window = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_RTT:
+					route.Rtt = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_RTTVAR:
+					route.RttVar = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_SSTHRESH:
+					route.Ssthresh = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_CWND:
+					route.Cwnd = int(native.Uint32(metric.Value[0:4]))
 				case unix.RTAX_ADVMSS:
 					route.AdvMSS = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_REORDERING:
+					route.Reordering = int(native.Uint32(metric.Value[0:4]))
 				case unix.RTAX_HOPLIMIT:
 					route.Hoplimit = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_INITCWND:
+					route.InitCwnd = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_FEATURES:
+					route.Features = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_RTO_MIN:
+					route.RtoMin = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_INITRWND:
+					route.InitRwnd = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_QUICKACK:
+					route.QuickACK = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_CC_ALGO:
+					route.Congctl = nl.BytesToString(metric.Value)
+				case unix.RTAX_FASTOPEN_NO_COOKIE:
+					route.FastOpenNoCookie = int(native.Uint32(metric.Value[0:4]))
 				}
 			}
 		}
@@ -938,15 +1018,27 @@ func deserializeRoute(m []byte) (Route, error) {
 	return route, nil
 }
 
+// RouteGetOptions contains a set of options to use with
+// RouteGetWithOptions
+type RouteGetOptions struct {
+	VrfName string
+}
+
+// RouteGetWithOptions gets a route to a specific destination from the host system.
+// Equivalent to: 'ip route get <> vrf <VrfName>'.
+func RouteGetWithOptions(destination net.IP, options *RouteGetOptions) ([]Route, error) {
+	return pkgHandle.RouteGetWithOptions(destination, options)
+}
+
 // RouteGet gets a route to a specific destination from the host system.
 // Equivalent to: 'ip route get'.
 func RouteGet(destination net.IP) ([]Route, error) {
 	return pkgHandle.RouteGet(destination)
 }
 
-// RouteGet gets a route to a specific destination from the host system.
-// Equivalent to: 'ip route get'.
-func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
+// RouteGetWithOptions gets a route to a specific destination from the host system.
+// Equivalent to: 'ip route get <> vrf <VrfName>'.
+func (h *Handle) RouteGetWithOptions(destination net.IP, options *RouteGetOptions) ([]Route, error) {
 	req := h.newNetlinkRequest(unix.RTM_GETROUTE, unix.NLM_F_REQUEST)
 	family := nl.GetIPFamily(destination)
 	var destinationData []byte
@@ -966,6 +1058,20 @@ func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
 	rtaDst := nl.NewRtAttr(unix.RTA_DST, destinationData)
 	req.AddData(rtaDst)
 
+	if options != nil {
+		link, err := LinkByName(options.VrfName)
+		if err != nil {
+			return nil, err
+		}
+		var (
+			b      = make([]byte, 4)
+			native = nl.NativeEndian()
+		)
+		native.PutUint32(b, uint32(link.Attrs().Index))
+
+		req.AddData(nl.NewRtAttr(unix.RTA_OIF, b))
+	}
+
 	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWROUTE)
 	if err != nil {
 		return nil, err
@@ -980,7 +1086,12 @@ func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
 		res = append(res, route)
 	}
 	return res, nil
+}
 
+// RouteGet gets a route to a specific destination from the host system.
+// Equivalent to: 'ip route get'.
+func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
+	return h.RouteGetWithOptions(destination, nil)
 }
 
 // RouteSubscribe takes a chan down which notifications will be sent

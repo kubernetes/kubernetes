@@ -90,7 +90,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	}
 
 	if warnafter != 0 {
-		pc.Kubernetes.WarnAfter = jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
+		pc.Kubernetes.WarnAfter = *jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
 	}
 
 	return sc, pc

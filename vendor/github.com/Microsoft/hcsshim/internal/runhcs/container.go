@@ -51,7 +51,7 @@ func GetErrorFromPipe(pipe io.Reader, p *os.Process) error {
 
 	extra := ""
 	if p != nil {
-		p.Kill()
+		_ = p.Kill()
 		state, err := p.Wait()
 		if err != nil {
 			panic(err)

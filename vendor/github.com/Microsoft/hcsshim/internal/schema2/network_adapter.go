@@ -11,6 +11,7 @@ package hcsschema
 
 type NetworkAdapter struct {
 	EndpointId string `json:"EndpointId,omitempty"`
-
 	MacAddress string `json:"MacAddress,omitempty"`
+	// The I/O virtualization (IOV) offloading configuration.
+	IovSettings *IovSettings `json:"IovSettings,omitempty"`
 }

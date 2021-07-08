@@ -21,6 +21,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -28,14 +29,18 @@ import (
 )
 
 // Present the ARM instruction set architecture, eg: v7, v8
-var cpuVariant string
+// Don't use this value directly; call cpuVariant() instead.
+var cpuVariantValue string
 
-func init() {
-	if isArmArch(runtime.GOARCH) {
-		cpuVariant = getCPUVariant()
-	} else {
-		cpuVariant = ""
-	}
+var cpuVariantOnce sync.Once
+
+func cpuVariant() string {
+	cpuVariantOnce.Do(func() {
+		if isArmArch(runtime.GOARCH) {
+			cpuVariantValue = getCPUVariant()
+		}
+	})
+	return cpuVariantValue
 }
 
 // For Linux, the kernel has already detected the ABI, ISA and Features.
@@ -96,14 +101,18 @@ func getCPUVariant() string {
 		return ""
 	}
 
+	// handle edge case for Raspberry Pi ARMv6 devices (which due to a kernel quirk, report "CPU architecture: 7")
+	// https://www.raspberrypi.org/forums/viewtopic.php?t=12614
+	if runtime.GOARCH == "arm" && variant == "7" {
+		model, err := getCPUInfo("model name")
+		if err == nil && strings.HasPrefix(strings.ToLower(model), "armv6-compatible") {
+			variant = "6"
+		}
+	}
+
 	switch strings.ToLower(variant) {
 	case "8", "aarch64":
-		// special case: if running a 32-bit userspace on aarch64, the variant should be "v7"
-		if runtime.GOARCH == "arm" {
-			variant = "v7"
-		} else {
-			variant = "v8"
-		}
+		variant = "v8"
 	case "7", "7m", "?(12)", "?(13)", "?(14)", "?(15)", "?(16)", "?(17)":
 		variant = "v7"
 	case "6", "6tej":

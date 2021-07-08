@@ -160,50 +160,6 @@ func createLoadBalancer(settings string) (*HostComputeLoadBalancer, error) {
 	return &outputLoadBalancer, nil
 }
 
-func modifyLoadBalancer(loadBalancerId string, settings string) (*HostComputeLoadBalancer, error) {
-	loadBalancerGuid, err := guid.FromString(loadBalancerId)
-	if err != nil {
-		return nil, errInvalidLoadBalancerID
-	}
-	// Open loadBalancer.
-	var (
-		loadBalancerHandle hcnLoadBalancer
-		resultBuffer       *uint16
-		propertiesBuffer   *uint16
-	)
-	hr := hcnOpenLoadBalancer(&loadBalancerGuid, &loadBalancerHandle, &resultBuffer)
-	if err := checkForErrors("hcnOpenLoadBalancer", hr, resultBuffer); err != nil {
-		return nil, err
-	}
-	// Modify loadBalancer.
-	hr = hcnModifyLoadBalancer(loadBalancerHandle, settings, &resultBuffer)
-	if err := checkForErrors("hcnModifyLoadBalancer", hr, resultBuffer); err != nil {
-		return nil, err
-	}
-	// Query loadBalancer.
-	hcnQuery := defaultQuery()
-	query, err := json.Marshal(hcnQuery)
-	if err != nil {
-		return nil, err
-	}
-	hr = hcnQueryLoadBalancerProperties(loadBalancerHandle, string(query), &propertiesBuffer, &resultBuffer)
-	if err := checkForErrors("hcnQueryLoadBalancerProperties", hr, resultBuffer); err != nil {
-		return nil, err
-	}
-	properties := interop.ConvertAndFreeCoTaskMemString(propertiesBuffer)
-	// Close loadBalancer.
-	hr = hcnCloseLoadBalancer(loadBalancerHandle)
-	if err := checkForErrors("hcnCloseLoadBalancer", hr, nil); err != nil {
-		return nil, err
-	}
-	// Convert output to LoadBalancer
-	var outputLoadBalancer HostComputeLoadBalancer
-	if err := json.Unmarshal([]byte(properties), &outputLoadBalancer); err != nil {
-		return nil, err
-	}
-	return &outputLoadBalancer, nil
-}
-
 func deleteLoadBalancer(loadBalancerId string) error {
 	loadBalancerGuid, err := guid.FromString(loadBalancerId)
 	if err != nil {

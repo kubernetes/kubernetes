@@ -21,6 +21,13 @@ const (
 	FRA_TABLE  /* Extended table id */
 	FRA_FWMASK /* mask for netfilter mark */
 	FRA_OIFNAME
+	FRA_PAD
+	FRA_L3MDEV      /* iif or oif is l3mdev goto its table */
+	FRA_UID_RANGE   /* UID range */
+	FRA_PROTOCOL    /* Originator of the rule */
+	FRA_IP_PROTO    /* ip proto */
+	FRA_SPORT_RANGE /* sport */
+	FRA_DPORT_RANGE /* dport */
 )
 
 // ip rule netlink request types

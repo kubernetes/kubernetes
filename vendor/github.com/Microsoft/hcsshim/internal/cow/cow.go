@@ -80,4 +80,6 @@ type Container interface {
 	// container to be terminated by some error condition (including calling
 	// Close).
 	Wait() error
+	// Modify sends a request to modify container resources
+	Modify(ctx context.Context, config interface{}) error
 }

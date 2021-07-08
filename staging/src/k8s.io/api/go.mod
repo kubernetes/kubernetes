@@ -11,6 +11,11 @@ require (
 )
 
 replace (
+	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
+	k8s.io/client-go => ../client-go
+	k8s.io/component-base => ../component-base
+	k8s.io/cri-api => ../cri-api
 )

@@ -6,6 +6,7 @@ go 1.16
 
 require (
 	github.com/google/go-cmp v0.5.5
+	google.golang.org/appengine v1.6.5 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0

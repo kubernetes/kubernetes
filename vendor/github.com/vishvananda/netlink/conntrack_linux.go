@@ -318,18 +318,25 @@ func parseRawData(data []byte) *ConntrackFlow {
 //   --mask-src ip                 Source mask address
 //   --mask-dst ip                 Destination mask address
 
+// Layer 4 Protocol common parameters and options:
+// TCP, UDP, SCTP, UDPLite and DCCP
+//    --sport, --orig-port-src port    Source port in original direction
+//    --dport, --orig-port-dst port    Destination port in original direction
+
 // Filter types
 type ConntrackFilterType uint8
 
 const (
-	ConntrackOrigSrcIP  = iota                // -orig-src ip    Source address from original direction
-	ConntrackOrigDstIP                        // -orig-dst ip    Destination address from original direction
-	ConntrackReplySrcIP                       // --reply-src ip  Reply Source IP
-	ConntrackReplyDstIP                       // --reply-dst ip  Reply Destination IP
-	ConntrackReplyAnyIP                       // Match source or destination reply IP
-	ConntrackNatSrcIP   = ConntrackReplySrcIP // deprecated use instead ConntrackReplySrcIP
-	ConntrackNatDstIP   = ConntrackReplyDstIP // deprecated use instead ConntrackReplyDstIP
-	ConntrackNatAnyIP   = ConntrackReplyAnyIP // deprecated use instaed ConntrackReplyAnyIP
+	ConntrackOrigSrcIP   = iota                // -orig-src ip    Source address from original direction
+	ConntrackOrigDstIP                         // -orig-dst ip    Destination address from original direction
+	ConntrackReplySrcIP                        // --reply-src ip  Reply Source IP
+	ConntrackReplyDstIP                        // --reply-dst ip  Reply Destination IP
+	ConntrackReplyAnyIP                        // Match source or destination reply IP
+	ConntrackOrigSrcPort                       // --orig-port-src port    Source port in original direction
+	ConntrackOrigDstPort                       // --orig-port-dst port    Destination port in original direction
+	ConntrackNatSrcIP    = ConntrackReplySrcIP // deprecated use instead ConntrackReplySrcIP
+	ConntrackNatDstIP    = ConntrackReplyDstIP // deprecated use instead ConntrackReplyDstIP
+	ConntrackNatAnyIP    = ConntrackReplyAnyIP // deprecated use instead ConntrackReplyAnyIP
 )
 
 type CustomConntrackFilter interface {
@@ -339,7 +346,9 @@ type CustomConntrackFilter interface {
 }
 
 type ConntrackFilter struct {
-	ipFilter map[ConntrackFilterType]net.IP
+	ipFilter    map[ConntrackFilterType]net.IP
+	portFilter  map[ConntrackFilterType]uint16
+	protoFilter uint8
 }
 
 // AddIP adds an IP to the conntrack filter
@@ -354,38 +363,89 @@ func (f *ConntrackFilter) AddIP(tp ConntrackFilterType, ip net.IP) error {
 	return nil
 }
 
+// AddPort adds a Port to the conntrack filter if the Layer 4 protocol allows it
+func (f *ConntrackFilter) AddPort(tp ConntrackFilterType, port uint16) error {
+	switch f.protoFilter {
+	// TCP, UDP, DCCP, SCTP, UDPLite
+	case 6, 17, 33, 132, 136:
+	default:
+		return fmt.Errorf("Filter attribute not available without a valid Layer 4 protocol: %d", f.protoFilter)
+	}
+
+	if f.portFilter == nil {
+		f.portFilter = make(map[ConntrackFilterType]uint16)
+	}
+	if _, ok := f.portFilter[tp]; ok {
+		return errors.New("Filter attribute already present")
+	}
+	f.portFilter[tp] = port
+	return nil
+}
+
+// AddProtocol adds the Layer 4 protocol to the conntrack filter
+func (f *ConntrackFilter) AddProtocol(proto uint8) error {
+	if f.protoFilter != 0 {
+		return errors.New("Filter attribute already present")
+	}
+	f.protoFilter = proto
+	return nil
+}
+
 // MatchConntrackFlow applies the filter to the flow and returns true if the flow matches the filter
 // false otherwise
 func (f *ConntrackFilter) MatchConntrackFlow(flow *ConntrackFlow) bool {
-	if len(f.ipFilter) == 0 {
+	if len(f.ipFilter) == 0 && len(f.portFilter) == 0 && f.protoFilter == 0 {
 		// empty filter always not match
 		return false
 	}
 
+	// -p, --protonum proto          Layer 4 Protocol, eg. 'tcp'
+	if f.protoFilter != 0 && flow.Forward.Protocol != f.protoFilter {
+		// different Layer 4 protocol always not match
+		return false
+	}
+
 	match := true
-	// -orig-src ip   Source address from original direction
-	if elem, found := f.ipFilter[ConntrackOrigSrcIP]; found {
-		match = match && elem.Equal(flow.Forward.SrcIP)
+
+	// IP conntrack filter
+	if len(f.ipFilter) > 0 {
+		// -orig-src ip   Source address from original direction
+		if elem, found := f.ipFilter[ConntrackOrigSrcIP]; found {
+			match = match && elem.Equal(flow.Forward.SrcIP)
+		}
+
+		// -orig-dst ip   Destination address from original direction
+		if elem, found := f.ipFilter[ConntrackOrigDstIP]; match && found {
+			match = match && elem.Equal(flow.Forward.DstIP)
+		}
+
+		// -src-nat ip    Source NAT ip
+		if elem, found := f.ipFilter[ConntrackReplySrcIP]; match && found {
+			match = match && elem.Equal(flow.Reverse.SrcIP)
+		}
+
+		// -dst-nat ip    Destination NAT ip
+		if elem, found := f.ipFilter[ConntrackReplyDstIP]; match && found {
+			match = match && elem.Equal(flow.Reverse.DstIP)
+		}
+
+		// Match source or destination reply IP
+		if elem, found := f.ipFilter[ConntrackReplyAnyIP]; match && found {
+			match = match && (elem.Equal(flow.Reverse.SrcIP) || elem.Equal(flow.Reverse.DstIP))
+		}
 	}
 
-	// -orig-dst ip   Destination address from original direction
-	if elem, found := f.ipFilter[ConntrackOrigDstIP]; match && found {
-		match = match && elem.Equal(flow.Forward.DstIP)
-	}
+	// Layer 4 Port filter
+	if len(f.portFilter) > 0 {
+		// -orig-port-src port	Source port from original direction
+		if elem, found := f.portFilter[ConntrackOrigSrcPort]; match && found {
+			match = match && elem == flow.Forward.SrcPort
+		}
 
-	// -src-nat ip    Source NAT ip
-	if elem, found := f.ipFilter[ConntrackReplySrcIP]; match && found {
-		match = match && elem.Equal(flow.Reverse.SrcIP)
-	}
-
-	// -dst-nat ip    Destination NAT ip
-	if elem, found := f.ipFilter[ConntrackReplyDstIP]; match && found {
-		match = match && elem.Equal(flow.Reverse.DstIP)
-	}
-
-	// Match source or destination reply IP
-	if elem, found := f.ipFilter[ConntrackReplyAnyIP]; match && found {
-		match = match && (elem.Equal(flow.Reverse.SrcIP) || elem.Equal(flow.Reverse.DstIP))
+		// -orig-port-dst port	Destination port from original direction
+		if elem, found := f.portFilter[ConntrackOrigDstPort]; match && found {
+			match = match && elem == flow.Forward.DstPort
+		}
 	}
 
 	return match

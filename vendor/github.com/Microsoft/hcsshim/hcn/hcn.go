@@ -3,7 +3,6 @@
 package hcn
 
 import (
-	"encoding/json"
 	"fmt"
 	"syscall"
 
@@ -64,12 +63,6 @@ import (
 //sys hcnDeleteRoute(id *_guid, result **uint16) (hr error) = computenetwork.HcnDeleteSdnRoute?
 //sys hcnCloseRoute(route hcnRoute) (hr error) = computenetwork.HcnCloseSdnRoute?
 
-// Service
-//sys hcnOpenService(service *hcnService, result **uint16) (hr error) = computenetwork.HcnOpenService?
-//sys hcnRegisterServiceCallback(service hcnService, callback int32, context int32, callbackHandle *hcnCallbackHandle) (hr error) = computenetwork.HcnRegisterServiceCallback?
-//sys hcnUnregisterServiceCallback(callbackHandle hcnCallbackHandle) (hr error) = computenetwork.HcnUnregisterServiceCallback?
-//sys hcnCloseService(service hcnService) (hr error) = computenetwork.HcnCloseService?
-
 type _guid = guid.GUID
 
 type hcnNetwork syscall.Handle
@@ -77,8 +70,6 @@ type hcnEndpoint syscall.Handle
 type hcnNamespace syscall.Handle
 type hcnLoadBalancer syscall.Handle
 type hcnRoute syscall.Handle
-type hcnService syscall.Handle
-type hcnCallbackHandle syscall.Handle
 
 // SchemaVersion for HCN Objects/Queries.
 type SchemaVersion = Version // hcnglobals.go
@@ -101,6 +92,20 @@ type HostComputeQuery struct {
 	Filter        string                `json:",omitempty"`
 }
 
+type ExtraParams struct {
+	Resources        interface{} `json:",omitempty"`
+	SharedContainers interface{} `json:",omitempty"`
+	LayeredOn        string      `json:",omitempty"`
+	SwitchGuid       string      `json:",omitempty"`
+	UtilityVM        string      `json:",omitempty"`
+	VirtualMachine   string      `json:",omitempty"`
+}
+
+type Health struct {
+	Data  interface{} `json:",omitempty"`
+	Extra ExtraParams `json:",omitempty"`
+}
+
 // defaultQuery generates HCN Query.
 // Passed into get/enumerate calls to filter results.
 func defaultQuery() HostComputeQuery {
@@ -112,15 +117,6 @@ func defaultQuery() HostComputeQuery {
 		Flags: HostComputeQueryFlagsNone,
 	}
 	return query
-}
-
-func defaultQueryJson() string {
-	query := defaultQuery()
-	queryJson, err := json.Marshal(query)
-	if err != nil {
-		return ""
-	}
-	return string(queryJson)
 }
 
 // PlatformDoesNotSupportError happens when users are attempting to use a newer shim on an older OS
@@ -205,6 +201,24 @@ func IPv6DualStackSupported() error {
 		return nil
 	}
 	return platformDoesNotSupportError("IPv6 DualStack")
+}
+
+//L4proxySupported returns an error if the HCN verison does not support L4Proxy
+func L4proxyPolicySupported() error {
+	supported := GetSupportedFeatures()
+	if supported.L4Proxy {
+		return nil
+	}
+	return platformDoesNotSupportError("L4ProxyPolicy")
+}
+
+// L4WfpProxySupported returns an error if the HCN verison does not support L4WfpProxy
+func L4WfpProxyPolicySupported() error {
+	supported := GetSupportedFeatures()
+	if supported.L4WfpProxy {
+		return nil
+	}
+	return platformDoesNotSupportError("L4WfpProxyPolicy")
 }
 
 // SetPolicySupported returns an error if the HCN version does not support SetPolicy.

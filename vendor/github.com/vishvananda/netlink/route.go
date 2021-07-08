@@ -29,25 +29,38 @@ type Encap interface {
 
 // Route represents a netlink route.
 type Route struct {
-	LinkIndex  int
-	ILinkIndex int
-	Scope      Scope
-	Dst        *net.IPNet
-	Src        net.IP
-	Gw         net.IP
-	MultiPath  []*NexthopInfo
-	Protocol   int
-	Priority   int
-	Table      int
-	Type       int
-	Tos        int
-	Flags      int
-	MPLSDst    *int
-	NewDst     Destination
-	Encap      Encap
-	MTU        int
-	AdvMSS     int
-	Hoplimit   int
+	LinkIndex        int
+	ILinkIndex       int
+	Scope            Scope
+	Dst              *net.IPNet
+	Src              net.IP
+	Gw               net.IP
+	MultiPath        []*NexthopInfo
+	Protocol         int
+	Priority         int
+	Table            int
+	Type             int
+	Tos              int
+	Flags            int
+	MPLSDst          *int
+	NewDst           Destination
+	Encap            Encap
+	MTU              int
+	Window           int
+	Rtt              int
+	RttVar           int
+	Ssthresh         int
+	Cwnd             int
+	AdvMSS           int
+	Reordering       int
+	Hoplimit         int
+	InitCwnd         int
+	Features         int
+	RtoMin           int
+	InitRwnd         int
+	QuickACK         int
+	Congctl          string
+	FastOpenNoCookie int
 }
 
 func (r Route) String() string {

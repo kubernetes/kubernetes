@@ -10,5 +10,5 @@
 package hcsschema
 
 type Memory struct {
-	SizeInMB int32 `json:"SizeInMB,omitempty"`
+	SizeInMB uint64 `json:"SizeInMB,omitempty"`
 }

@@ -237,6 +237,37 @@ func (h *Handle) macvlanMACAddrChange(link Link, addrs []net.HardwareAddr, mode 
 	return err
 }
 
+// LinkSetMacvlanMode sets the mode of a macvlan or macvtap link device.
+// Note that passthrough mode cannot be set to and from and will fail.
+// Equivalent to: `ip link set $link type (macvlan|macvtap) mode $mode
+func LinkSetMacvlanMode(link Link, mode MacvlanMode) error {
+	return pkgHandle.LinkSetMacvlanMode(link, mode)
+}
+
+// LinkSetMacvlanMode sets the mode of the macvlan or macvtap link device.
+// Note that passthrough mode cannot be set to and from and will fail.
+// Equivalent to: `ip link set $link type (macvlan|macvtap) mode $mode
+func (h *Handle) LinkSetMacvlanMode(link Link, mode MacvlanMode) error {
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(unix.RTM_NEWLINK, unix.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(unix.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	linkInfo := nl.NewRtAttr(unix.IFLA_LINKINFO, nil)
+	linkInfo.AddRtAttr(nl.IFLA_INFO_KIND, nl.NonZeroTerminated(link.Type()))
+
+	data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
+	data.AddRtAttr(nl.IFLA_MACVLAN_MODE, nl.Uint32Attr(macvlanModes[mode]))
+
+	req.AddData(linkInfo)
+
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	return err
+}
+
 func BridgeSetMcastSnoop(link Link, on bool) error {
 	return pkgHandle.BridgeSetMcastSnoop(link, on)
 }
@@ -244,6 +275,16 @@ func BridgeSetMcastSnoop(link Link, on bool) error {
 func (h *Handle) BridgeSetMcastSnoop(link Link, on bool) error {
 	bridge := link.(*Bridge)
 	bridge.MulticastSnooping = &on
+	return h.linkModify(bridge, unix.NLM_F_ACK)
+}
+
+func BridgeSetVlanFiltering(link Link, on bool) error {
+	return pkgHandle.BridgeSetVlanFiltering(link, on)
+}
+
+func (h *Handle) BridgeSetVlanFiltering(link Link, on bool) error {
+	bridge := link.(*Bridge)
+	bridge.VlanFiltering = &on
 	return h.linkModify(bridge, unix.NLM_F_ACK)
 }
 
@@ -1048,6 +1089,10 @@ func (h *Handle) LinkAdd(link Link) error {
 	return h.linkModify(link, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 }
 
+func (h *Handle) LinkModify(link Link) error {
+	return h.linkModify(link, unix.NLM_F_REQUEST|unix.NLM_F_ACK)
+}
+
 func (h *Handle) linkModify(link Link, flags int) error {
 	// TODO: support extra data for macvlan
 	base := link.Attrs()
@@ -1060,8 +1105,6 @@ func (h *Handle) linkModify(link Link, flags int) error {
 	}
 
 	if isTuntap {
-		// TODO: support user
-		// TODO: support group
 		if tuntap.Mode < unix.IFF_TUN || tuntap.Mode > unix.IFF_TAP {
 			return fmt.Errorf("Tuntap.Mode %v unknown", tuntap.Mode)
 		}
@@ -1089,21 +1132,64 @@ func (h *Handle) linkModify(link Link, flags int) error {
 		}
 
 		req.Flags |= uint16(tuntap.Mode)
-
+		const TUN = "/dev/net/tun"
 		for i := 0; i < queues; i++ {
 			localReq := req
-			file, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
+			fd, err := unix.Open(TUN, os.O_RDWR|syscall.O_CLOEXEC, 0)
 			if err != nil {
 				cleanupFds(fds)
 				return err
 			}
 
-			fds = append(fds, file)
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, file.Fd(), uintptr(unix.TUNSETIFF), uintptr(unsafe.Pointer(&localReq)))
+			_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), uintptr(unix.TUNSETIFF), uintptr(unsafe.Pointer(&localReq)))
 			if errno != 0 {
+				// close the new fd
+				unix.Close(fd)
+				// and the already opened ones
 				cleanupFds(fds)
 				return fmt.Errorf("Tuntap IOCTL TUNSETIFF failed [%d], errno %v", i, errno)
 			}
+
+			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TUNSETOWNER, uintptr(tuntap.Owner))
+			if errno != 0 {
+				cleanupFds(fds)
+				return fmt.Errorf("Tuntap IOCTL TUNSETOWNER failed [%d], errno %v", i, errno)
+			}
+
+			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TUNSETGROUP, uintptr(tuntap.Group))
+			if errno != 0 {
+				cleanupFds(fds)
+				return fmt.Errorf("Tuntap IOCTL TUNSETGROUP failed [%d], errno %v", i, errno)
+			}
+
+			// Set the tun device to non-blocking before use. The below comment
+			// taken from:
+			//
+			// https://github.com/mistsys/tuntap/commit/161418c25003bbee77d085a34af64d189df62bea
+			//
+			// Note there is a complication because in go, if a device node is
+			// opened, go sets it to use nonblocking I/O. However a /dev/net/tun
+			// doesn't work with epoll until after the TUNSETIFF ioctl has been
+			// done. So we open the unix fd directly, do the ioctl, then put the
+			// fd in nonblocking mode, an then finally wrap it in a os.File,
+			// which will see the nonblocking mode and add the fd to the
+			// pollable set, so later on when we Read() from it blocked the
+			// calling thread in the kernel.
+			//
+			// See
+			//   https://github.com/golang/go/issues/30426
+			// which got exposed in go 1.13 by the fix to
+			//   https://github.com/golang/go/issues/30624
+			err = unix.SetNonblock(fd, true)
+			if err != nil {
+				cleanupFds(fds)
+				return fmt.Errorf("Tuntap set to non-blocking failed [%d], err %v", i, err)
+			}
+
+			// create the file from the file descriptor and store it
+			file := os.NewFile(uintptr(fd), TUN)
+			fds = append(fds, file)
+
 			// 1) we only care for the name of the first tap in the multi queue set
 			// 2) if the original name was empty, the localReq has now the actual name
 			//
@@ -1114,6 +1200,7 @@ func (h *Handle) linkModify(link Link, flags int) error {
 			if i == 0 {
 				link.Attrs().Name = strings.Trim(string(localReq.Name[:]), "\x00")
 			}
+
 		}
 
 		// only persist interface if NonPersist is NOT set
@@ -1192,6 +1279,11 @@ func (h *Handle) linkModify(link Link, flags int) error {
 
 	nameData := nl.NewRtAttr(unix.IFLA_IFNAME, nl.ZeroTerminated(base.Name))
 	req.AddData(nameData)
+
+	if base.Alias != "" {
+		alias := nl.NewRtAttr(unix.IFLA_IFALIAS, []byte(base.Alias))
+		req.AddData(alias)
+	}
 
 	if base.MTU > 0 {
 		mtu := nl.NewRtAttr(unix.IFLA_MTU, nl.Uint32Attr(uint32(base.MTU)))
@@ -1272,11 +1364,27 @@ func (h *Handle) linkModify(link Link, flags int) error {
 		if base.TxQLen >= 0 {
 			peer.AddRtAttr(unix.IFLA_TXQLEN, nl.Uint32Attr(uint32(base.TxQLen)))
 		}
+		if base.NumTxQueues > 0 {
+			peer.AddRtAttr(unix.IFLA_NUM_TX_QUEUES, nl.Uint32Attr(uint32(base.NumTxQueues)))
+		}
+		if base.NumRxQueues > 0 {
+			peer.AddRtAttr(unix.IFLA_NUM_RX_QUEUES, nl.Uint32Attr(uint32(base.NumRxQueues)))
+		}
 		if base.MTU > 0 {
 			peer.AddRtAttr(unix.IFLA_MTU, nl.Uint32Attr(uint32(base.MTU)))
 		}
 		if link.PeerHardwareAddr != nil {
 			peer.AddRtAttr(unix.IFLA_ADDRESS, []byte(link.PeerHardwareAddr))
+		}
+		if link.PeerNamespace != nil {
+			switch ns := link.PeerNamespace.(type) {
+			case NsPid:
+				val := nl.Uint32Attr(uint32(ns))
+				peer.AddRtAttr(unix.IFLA_NET_NS_PID, val)
+			case NsFd:
+				val := nl.Uint32Attr(uint32(ns))
+				peer.AddRtAttr(unix.IFLA_NET_NS_FD, val)
+			}
 		}
 	case *Vxlan:
 		addVxlanAttrs(link, linkInfo)
@@ -1509,7 +1617,11 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 		return nil, err
 	}
 
-	base := LinkAttrs{Index: int(msg.Index), RawFlags: msg.Flags, Flags: linkFlags(msg.Flags), EncapType: msg.EncapType()}
+	base := NewLinkAttrs()
+	base.Index = int(msg.Index)
+	base.RawFlags = msg.Flags
+	base.Flags = linkFlags(msg.Flags)
+	base.EncapType = msg.EncapType()
 	if msg.Flags&unix.IFF_PROMISC != 0 {
 		base.Promisc = 1
 	}
@@ -1543,6 +1655,8 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 						link = &Vlan{}
 					case "veth":
 						link = &Veth{}
+					case "wireguard":
+						link = &Wireguard{}
 					case "vxlan":
 						link = &Vxlan{}
 					case "bond":
@@ -2080,6 +2194,13 @@ func parseVlanData(link Link, data []syscall.NetlinkRouteAttr) {
 func parseVxlanData(link Link, data []syscall.NetlinkRouteAttr) {
 	vxlan := link.(*Vxlan)
 	for _, datum := range data {
+		// NOTE(vish): Apparently some messages can be sent with no value.
+		//             We special case GBP here to not change existing
+		//             functionality. It appears that GBP sends a datum.Value
+		//             of null.
+		if len(datum.Value) == 0 && datum.Attr.Type != nl.IFLA_VXLAN_GBP {
+			continue
+		}
 		switch datum.Attr.Type {
 		case nl.IFLA_VXLAN_ID:
 			vxlan.VxlanId = int(native.Uint32(datum.Value[0:4]))
@@ -2513,7 +2634,8 @@ func parseLinkXdp(data []byte) (*LinkXdp, error) {
 		case nl.IFLA_XDP_FD:
 			xdp.Fd = int(native.Uint32(attr.Value[0:4]))
 		case nl.IFLA_XDP_ATTACHED:
-			xdp.Attached = attr.Value[0] != 0
+			xdp.AttachMode = uint32(attr.Value[0])
+			xdp.Attached = xdp.AttachMode != 0
 		case nl.IFLA_XDP_FLAGS:
 			xdp.Flags = native.Uint32(attr.Value[0:4])
 		case nl.IFLA_XDP_PROG_ID:
@@ -2577,7 +2699,7 @@ func parseIptunData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_IPTUN_ENCAP_FLAGS:
 			iptun.EncapFlags = native.Uint16(datum.Value[0:2])
 		case nl.IFLA_IPTUN_COLLECT_METADATA:
-			iptun.FlowBased = int8(datum.Value[0]) != 0
+			iptun.FlowBased = true
 		}
 	}
 }
@@ -2601,10 +2723,14 @@ func addIp6tnlAttrs(ip6tnl *Ip6tnl, linkInfo *nl.RtAttr) {
 
 	data.AddRtAttr(nl.IFLA_IPTUN_TTL, nl.Uint8Attr(ip6tnl.Ttl))
 	data.AddRtAttr(nl.IFLA_IPTUN_TOS, nl.Uint8Attr(ip6tnl.Tos))
-	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_LIMIT, nl.Uint8Attr(ip6tnl.EncapLimit))
 	data.AddRtAttr(nl.IFLA_IPTUN_FLAGS, nl.Uint32Attr(ip6tnl.Flags))
 	data.AddRtAttr(nl.IFLA_IPTUN_PROTO, nl.Uint8Attr(ip6tnl.Proto))
 	data.AddRtAttr(nl.IFLA_IPTUN_FLOWINFO, nl.Uint32Attr(ip6tnl.FlowInfo))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_LIMIT, nl.Uint8Attr(ip6tnl.EncapLimit))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_TYPE, nl.Uint16Attr(ip6tnl.EncapType))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_FLAGS, nl.Uint16Attr(ip6tnl.EncapFlags))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_SPORT, htons(ip6tnl.EncapSport))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_DPORT, htons(ip6tnl.EncapDport))
 }
 
 func parseIp6tnlData(link Link, data []syscall.NetlinkRouteAttr) {
@@ -2616,17 +2742,25 @@ func parseIp6tnlData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_IPTUN_REMOTE:
 			ip6tnl.Remote = net.IP(datum.Value[:16])
 		case nl.IFLA_IPTUN_TTL:
-			ip6tnl.Ttl = uint8(datum.Value[0])
+			ip6tnl.Ttl = datum.Value[0]
 		case nl.IFLA_IPTUN_TOS:
-			ip6tnl.Tos = uint8(datum.Value[0])
-		case nl.IFLA_IPTUN_ENCAP_LIMIT:
-			ip6tnl.EncapLimit = uint8(datum.Value[0])
+			ip6tnl.Tos = datum.Value[0]
 		case nl.IFLA_IPTUN_FLAGS:
 			ip6tnl.Flags = native.Uint32(datum.Value[:4])
 		case nl.IFLA_IPTUN_PROTO:
-			ip6tnl.Proto = uint8(datum.Value[0])
+			ip6tnl.Proto = datum.Value[0]
 		case nl.IFLA_IPTUN_FLOWINFO:
 			ip6tnl.FlowInfo = native.Uint32(datum.Value[:4])
+		case nl.IFLA_IPTUN_ENCAP_LIMIT:
+			ip6tnl.EncapLimit = datum.Value[0]
+		case nl.IFLA_IPTUN_ENCAP_TYPE:
+			ip6tnl.EncapType = native.Uint16(datum.Value[0:2])
+		case nl.IFLA_IPTUN_ENCAP_FLAGS:
+			ip6tnl.EncapFlags = native.Uint16(datum.Value[0:2])
+		case nl.IFLA_IPTUN_ENCAP_SPORT:
+			ip6tnl.EncapSport = ntohs(datum.Value[0:2])
+		case nl.IFLA_IPTUN_ENCAP_DPORT:
+			ip6tnl.EncapDport = ntohs(datum.Value[0:2])
 		}
 	}
 }
@@ -2653,8 +2787,10 @@ func addSittunAttrs(sittun *Sittun, linkInfo *nl.RtAttr) {
 		data.AddRtAttr(nl.IFLA_IPTUN_TTL, nl.Uint8Attr(sittun.Ttl))
 	}
 
+	data.AddRtAttr(nl.IFLA_IPTUN_PROTO, nl.Uint8Attr(sittun.Proto))
 	data.AddRtAttr(nl.IFLA_IPTUN_TOS, nl.Uint8Attr(sittun.Tos))
 	data.AddRtAttr(nl.IFLA_IPTUN_PMTUDISC, nl.Uint8Attr(sittun.PMtuDisc))
+	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_LIMIT, nl.Uint8Attr(sittun.EncapLimit))
 	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_TYPE, nl.Uint16Attr(sittun.EncapType))
 	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_FLAGS, nl.Uint16Attr(sittun.EncapFlags))
 	data.AddRtAttr(nl.IFLA_IPTUN_ENCAP_SPORT, htons(sittun.EncapSport))
@@ -2670,11 +2806,13 @@ func parseSittunData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_IPTUN_REMOTE:
 			sittun.Remote = net.IP(datum.Value[0:4])
 		case nl.IFLA_IPTUN_TTL:
-			sittun.Ttl = uint8(datum.Value[0])
+			sittun.Ttl = datum.Value[0]
 		case nl.IFLA_IPTUN_TOS:
-			sittun.Tos = uint8(datum.Value[0])
+			sittun.Tos = datum.Value[0]
 		case nl.IFLA_IPTUN_PMTUDISC:
-			sittun.PMtuDisc = uint8(datum.Value[0])
+			sittun.PMtuDisc = datum.Value[0]
+		case nl.IFLA_IPTUN_PROTO:
+			sittun.Proto = datum.Value[0]
 		case nl.IFLA_IPTUN_ENCAP_TYPE:
 			sittun.EncapType = native.Uint16(datum.Value[0:2])
 		case nl.IFLA_IPTUN_ENCAP_FLAGS:
@@ -2761,6 +2899,9 @@ func addBridgeAttrs(bridge *Bridge, linkInfo *nl.RtAttr) {
 	if bridge.MulticastSnooping != nil {
 		data.AddRtAttr(nl.IFLA_BR_MCAST_SNOOPING, boolToByte(*bridge.MulticastSnooping))
 	}
+	if bridge.AgeingTime != nil {
+		data.AddRtAttr(nl.IFLA_BR_AGEING_TIME, nl.Uint32Attr(*bridge.AgeingTime))
+	}
 	if bridge.HelloTime != nil {
 		data.AddRtAttr(nl.IFLA_BR_HELLO_TIME, nl.Uint32Attr(*bridge.HelloTime))
 	}
@@ -2773,6 +2914,9 @@ func parseBridgeData(bridge Link, data []syscall.NetlinkRouteAttr) {
 	br := bridge.(*Bridge)
 	for _, datum := range data {
 		switch datum.Attr.Type {
+		case nl.IFLA_BR_AGEING_TIME:
+			ageingTime := native.Uint32(datum.Value[0:4])
+			br.AgeingTime = &ageingTime
 		case nl.IFLA_BR_HELLO_TIME:
 			helloTime := native.Uint32(datum.Value[0:4])
 			br.HelloTime = &helloTime
@@ -2852,6 +2996,24 @@ func parseVfInfo(data []syscall.NetlinkRouteAttr, id int) VfInfo {
 			vfr := nl.DeserializeVfRate(element.Value[:])
 			vf.MaxTxRate = vfr.MaxTxRate
 			vf.MinTxRate = vfr.MinTxRate
+		case nl.IFLA_VF_STATS:
+			vfstats := nl.DeserializeVfStats(element.Value[:])
+			vf.RxPackets = vfstats.RxPackets
+			vf.TxPackets = vfstats.TxPackets
+			vf.RxBytes = vfstats.RxBytes
+			vf.TxBytes = vfstats.TxBytes
+			vf.Multicast = vfstats.Multicast
+			vf.Broadcast = vfstats.Broadcast
+			vf.RxDropped = vfstats.RxDropped
+			vf.TxDropped = vfstats.TxDropped
+
+		case nl.IFLA_VF_RSS_QUERY_EN:
+			result := nl.DeserializeVfRssQueryEn(element.Value)
+			vf.RssQuery = result.Setting
+
+		case nl.IFLA_VF_TRUST:
+			result := nl.DeserializeVfTrust(element.Value)
+			vf.Trust = result.Setting
 		}
 	}
 	return vf

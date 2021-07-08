@@ -5,12 +5,15 @@ module k8s.io/apiextensions-apiserver
 go 1.16
 
 require (
+	cloud.google.com/go v0.54.0 // indirect
+	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
 	github.com/googleapis/gnostic v0.5.5
+	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0

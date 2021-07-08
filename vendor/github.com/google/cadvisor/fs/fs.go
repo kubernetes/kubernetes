@@ -19,6 +19,7 @@ package fs
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -55,6 +56,9 @@ const (
 
 // A pool for restricting the number of consecutive `du` and `find` tasks running.
 var pool = make(chan struct{}, maxConcurrentOps)
+
+// ErrDeviceNotInPartitionsMap is the error resulting if a device could not be found in the partitions map.
+var ErrDeviceNotInPartitionsMap = errors.New("could not find device in cached partitions map")
 
 func init() {
 	for i := 0; i < maxConcurrentOps; i++ {
@@ -582,15 +586,20 @@ func (i *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	}
 
 	mnt, found := i.mountInfoFromDir(dir)
-	if found && mnt.FSType == "btrfs" && mnt.Major == 0 && strings.HasPrefix(mnt.Source, "/dev/") {
-		major, minor, err := getBtrfsMajorMinorIds(mnt)
-		if err != nil {
-			klog.Warningf("%s", err)
-		} else {
-			return &DeviceInfo{mnt.Source, uint(major), uint(minor)}, nil
+	if found && strings.HasPrefix(mnt.Source, "/dev/") {
+		major, minor := mnt.Major, mnt.Minor
+
+		if mnt.FSType == "btrfs" && major == 0 {
+			major, minor, err = getBtrfsMajorMinorIds(mnt)
+			if err != nil {
+				klog.Warningf("Unable to get btrfs mountpoint IDs: %v", err)
+			}
 		}
+
+		return &DeviceInfo{mnt.Source, uint(major), uint(minor)}, nil
 	}
-	return nil, fmt.Errorf("could not find device with major: %d, minor: %d in cached partitions map", major, minor)
+
+	return nil, fmt.Errorf("with major: %d, minor: %d: %w", major, minor, ErrDeviceNotInPartitionsMap)
 }
 
 func GetDirUsage(dir string) (UsageInfo, error) {

@@ -189,8 +189,8 @@ func Parse(specifier string) (specs.Platform, error) {
 		if isKnownOS(p.OS) {
 			// picks a default architecture
 			p.Architecture = runtime.GOARCH
-			if p.Architecture == "arm" && cpuVariant != "v7" {
-				p.Variant = cpuVariant
+			if p.Architecture == "arm" && cpuVariant() != "v7" {
+				p.Variant = cpuVariant()
 			}
 
 			return p, nil

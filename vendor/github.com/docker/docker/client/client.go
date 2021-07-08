@@ -2,7 +2,7 @@
 Package client is a Go client for the Docker Engine API.
 
 For more information about the Engine API, see the documentation:
-https://docs.docker.com/engine/reference/api/
+https://docs.docker.com/engine/api/
 
 Usage
 

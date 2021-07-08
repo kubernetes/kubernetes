@@ -9,21 +9,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Route is assoicated with a subnet.
+// Route is associated with a subnet.
 type Route struct {
 	NextHop           string `json:",omitempty"`
 	DestinationPrefix string `json:",omitempty"`
 	Metric            uint16 `json:",omitempty"`
 }
 
-// Subnet is assoicated with a Ipam.
+// Subnet is associated with a Ipam.
 type Subnet struct {
 	IpAddressPrefix string            `json:",omitempty"`
 	Policies        []json.RawMessage `json:",omitempty"`
 	Routes          []Route           `json:",omitempty"`
 }
 
-// Ipam (Internet Protocol Addres Management) is assoicated with a network
+// Ipam (Internet Protocol Address Management) is associated with a network
 // and represents the address space(s) of a network.
 type Ipam struct {
 	Type    string   `json:",omitempty"` // Ex: Static, DHCP
@@ -36,12 +36,12 @@ type MacRange struct {
 	EndMacAddress   string `json:",omitempty"`
 }
 
-// MacPool is assoicated with a network and represents pool of MacRanges.
+// MacPool is associated with a network and represents pool of MacRanges.
 type MacPool struct {
 	Ranges []MacRange `json:",omitempty"`
 }
 
-// Dns (Domain Name System is associated with a network.
+// Dns (Domain Name System is associated with a network).
 type Dns struct {
 	Domain     string   `json:",omitempty"`
 	Search     []string `json:",omitempty"`
@@ -82,6 +82,7 @@ type HostComputeNetwork struct {
 	Dns           Dns             `json:",omitempty"`
 	Ipams         []Ipam          `json:",omitempty"`
 	Flags         NetworkFlags    `json:",omitempty"` // 0: None
+	Health        Health          `json:",omitempty"`
 	SchemaVersion SchemaVersion   `json:",omitempty"`
 }
 

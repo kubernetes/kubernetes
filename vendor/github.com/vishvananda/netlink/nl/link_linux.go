@@ -1,6 +1,8 @@
 package nl
 
 import (
+	"bytes"
+	"encoding/binary"
 	"unsafe"
 )
 
@@ -243,7 +245,9 @@ const (
 	IFLA_VF_STATS_TX_BYTES
 	IFLA_VF_STATS_BROADCAST
 	IFLA_VF_STATS_MULTICAST
-	IFLA_VF_STATS_MAX = IFLA_VF_STATS_MULTICAST
+	IFLA_VF_STATS_RX_DROPPED
+	IFLA_VF_STATS_TX_DROPPED
+	IFLA_VF_STATS_MAX = IFLA_VF_STATS_TX_DROPPED
 )
 
 const (
@@ -324,6 +328,59 @@ func DeserializeVfTxRate(b []byte) *VfTxRate {
 
 func (msg *VfTxRate) Serialize() []byte {
 	return (*(*[SizeofVfTxRate]byte)(unsafe.Pointer(msg)))[:]
+}
+
+//struct ifla_vf_stats {
+//	__u64 rx_packets;
+//	__u64 tx_packets;
+//	__u64 rx_bytes;
+//	__u64 tx_bytes;
+//	__u64 broadcast;
+//	__u64 multicast;
+//};
+
+type VfStats struct {
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
+	Multicast uint64
+	Broadcast uint64
+	RxDropped uint64
+	TxDropped uint64
+}
+
+func DeserializeVfStats(b []byte) VfStats {
+	var vfstat VfStats
+	stats, err := ParseRouteAttr(b)
+	if err != nil {
+		return vfstat
+	}
+	var valueVar uint64
+	for _, stat := range stats {
+		if err := binary.Read(bytes.NewBuffer(stat.Value), NativeEndian(), &valueVar); err != nil {
+			break
+		}
+		switch stat.Attr.Type {
+		case IFLA_VF_STATS_RX_PACKETS:
+			vfstat.RxPackets = valueVar
+		case IFLA_VF_STATS_TX_PACKETS:
+			vfstat.TxPackets = valueVar
+		case IFLA_VF_STATS_RX_BYTES:
+			vfstat.RxBytes = valueVar
+		case IFLA_VF_STATS_TX_BYTES:
+			vfstat.TxBytes = valueVar
+		case IFLA_VF_STATS_MULTICAST:
+			vfstat.Multicast = valueVar
+		case IFLA_VF_STATS_BROADCAST:
+			vfstat.Broadcast = valueVar
+		case IFLA_VF_STATS_RX_DROPPED:
+			vfstat.RxDropped = valueVar
+		case IFLA_VF_STATS_TX_DROPPED:
+			vfstat.TxDropped = valueVar
+		}
+	}
+	return vfstat
 }
 
 // struct ifla_vf_rate {
@@ -476,6 +533,14 @@ const (
 	IFLA_XDP_FLAGS    /* xdp prog related flags */
 	IFLA_XDP_PROG_ID  /* xdp prog id */
 	IFLA_XDP_MAX      = IFLA_XDP_PROG_ID
+)
+
+// XDP program attach mode (used as dump value for IFLA_XDP_ATTACHED)
+const (
+	XDP_ATTACHED_NONE = iota
+	XDP_ATTACHED_DRV
+	XDP_ATTACHED_SKB
+	XDP_ATTACHED_HW
 )
 
 const (

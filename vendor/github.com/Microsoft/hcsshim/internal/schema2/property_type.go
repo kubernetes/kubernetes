@@ -22,4 +22,5 @@ const (
 	PTGuestConnection             PropertyType = "GuestConnection"
 	PTICHeartbeatStatus           PropertyType = "ICHeartbeatStatus"
 	PTProcessorTopology           PropertyType = "ProcessorTopology"
+	PTCPUGroup                    PropertyType = "CpuGroup"
 )

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
@@ -89,7 +88,7 @@ func NewFw(attrs FilterAttrs, fattrs FilterFwAttrs) (*Fw, error) {
 		if CalcRtable(&police.Rate, rtab[:], rcellLog, fattrs.Mtu, linklayer) < 0 {
 			return nil, errors.New("TBF: failed to calculate rate table")
 		}
-		police.Burst = uint32(Xmittime(uint64(police.Rate.Rate), uint32(buffer)))
+		police.Burst = Xmittime(uint64(police.Rate.Rate), uint32(buffer))
 	}
 	police.Mtu = fattrs.Mtu
 	if police.PeakRate.Rate != 0 {
@@ -456,6 +455,9 @@ func EncodeActions(attr *nl.RtAttr, actions []Action) error {
 				} else {
 					return fmt.Errorf("invalid dst addr %s for tunnel_key action", action.DstAddr)
 				}
+				if action.DestPort != 0 {
+					aopts.AddRtAttr(nl.TCA_TUNNEL_KEY_ENC_DST_PORT, htons(action.DestPort))
+				}
 			}
 		case *SkbEditAction:
 			table := attr.AddRtAttr(tabIndex, nil)
@@ -566,12 +568,12 @@ func parseActions(tables []syscall.NetlinkRouteAttr) ([]Action, error) {
 							action.(*TunnelKeyAction).Action = TunnelKeyAct(tun.Action)
 						case nl.TCA_TUNNEL_KEY_ENC_KEY_ID:
 							action.(*TunnelKeyAction).KeyID = networkOrder.Uint32(adatum.Value[0:4])
-						case nl.TCA_TUNNEL_KEY_ENC_IPV6_SRC:
-						case nl.TCA_TUNNEL_KEY_ENC_IPV4_SRC:
-							action.(*TunnelKeyAction).SrcAddr = net.IP(adatum.Value[:])
-						case nl.TCA_TUNNEL_KEY_ENC_IPV6_DST:
-						case nl.TCA_TUNNEL_KEY_ENC_IPV4_DST:
-							action.(*TunnelKeyAction).DstAddr = net.IP(adatum.Value[:])
+						case nl.TCA_TUNNEL_KEY_ENC_IPV6_SRC, nl.TCA_TUNNEL_KEY_ENC_IPV4_SRC:
+							action.(*TunnelKeyAction).SrcAddr = adatum.Value[:]
+						case nl.TCA_TUNNEL_KEY_ENC_IPV6_DST, nl.TCA_TUNNEL_KEY_ENC_IPV4_DST:
+							action.(*TunnelKeyAction).DstAddr = adatum.Value[:]
+						case nl.TCA_TUNNEL_KEY_ENC_DST_PORT:
+							action.(*TunnelKeyAction).DestPort = ntohs(adatum.Value)
 						}
 					case "skbedit":
 						switch adatum.Attr.Type {
@@ -783,7 +785,7 @@ func CalcRtable(rate *nl.TcRateSpec, rtab []uint32, cellLog int, mtu uint32, lin
 	}
 	for i := 0; i < 256; i++ {
 		sz = AdjustSize(uint((i+1)<<uint32(cellLog)), uint(mpu), linklayer)
-		rtab[i] = uint32(Xmittime(uint64(bps), uint32(sz)))
+		rtab[i] = Xmittime(uint64(bps), uint32(sz))
 	}
 	rate.CellAlign = -1
 	rate.CellLog = uint8(cellLog)

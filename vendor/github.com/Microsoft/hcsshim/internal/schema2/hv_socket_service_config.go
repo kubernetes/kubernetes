@@ -19,4 +19,10 @@ type HvSocketServiceConfig struct {
 
 	//  If true, HvSocket will process wildcard binds for this service/system combination.  Wildcard binds are secured in the registry at  SOFTWARE/Microsoft/Windows NT/CurrentVersion/Virtualization/HvSocket/WildcardDescriptors
 	AllowWildcardBinds bool `json:"AllowWildcardBinds,omitempty"`
+
+	// Disabled controls whether the HvSocket service is accepting connection requests.
+	// This set to true will make the service refuse all incoming connections as well as cancel
+	// any connections already established. The service itself will still be active however
+	// and can be re-enabled at a future time.
+	Disabled bool `json:"Disabled,omitempty"`
 }

@@ -39,6 +39,11 @@ func init() {
 	}
 }
 
+func numericDate(epoch int64) *jwt.NumericDate {
+	date := jwt.NumericDate(epoch)
+	return &date
+}
+
 func TestClaims(t *testing.T) {
 	sa := core.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,9 +90,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800),
+				IssuedAt:  numericDate(1514764800),
+				NotBefore: numericDate(1514764800),
+				Expiry:    numericDate(1514764800),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -107,9 +112,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  numericDate(1514764800),
+				NotBefore: numericDate(1514764800),
+				Expiry:    numericDate(1514764800 + 100),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -130,9 +135,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  numericDate(1514764800),
+				NotBefore: numericDate(1514764800),
+				Expiry:    numericDate(1514764800 + 100),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -152,9 +157,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1", "2"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  numericDate(1514764800),
+				NotBefore: numericDate(1514764800),
+				Expiry:    numericDate(1514764800 + 100),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -175,9 +180,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 60*60*24),
+				IssuedAt:  numericDate(1514764800),
+				NotBefore: numericDate(1514764800),
+				Expiry:    numericDate(1514764800 + 60*60*24),
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -337,7 +342,7 @@ func TestValidatePrivateClaims(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			v := &validator{tc.getter}
-			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: jwt.NumericDate(nowUnix)}, tc.private)
+			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: numericDate(nowUnix)}, tc.private)
 			if err != nil && !tc.expectErr {
 				t.Fatal(err)
 			}

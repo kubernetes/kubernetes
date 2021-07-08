@@ -43,12 +43,12 @@ func NewHtbClass(attrs ClassAttrs, cattrs HtbClassAttrs) *HtbClass {
 	if buffer == 0 {
 		buffer = uint32(float64(rate)/Hz() + float64(mtu))
 	}
-	buffer = uint32(Xmittime(rate, buffer))
+	buffer = Xmittime(rate, buffer)
 
 	if cbuffer == 0 {
 		cbuffer = uint32(float64(ceil)/Hz() + float64(mtu))
 	}
-	cbuffer = uint32(Xmittime(ceil, cbuffer))
+	cbuffer = Xmittime(ceil, cbuffer)
 
 	return &HtbClass{
 		ClassAttrs: attrs,
@@ -56,9 +56,9 @@ func NewHtbClass(attrs ClassAttrs, cattrs HtbClassAttrs) *HtbClass {
 		Ceil:       ceil,
 		Buffer:     buffer,
 		Cbuffer:    cbuffer,
-		Quantum:    10,
 		Level:      0,
-		Prio:       0,
+		Prio:       cattrs.Prio,
+		Quantum:    cattrs.Quantum,
 	}
 }
 
@@ -179,12 +179,15 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 	case "hfsc":
 		hfsc := class.(*HfscClass)
 		opt := nl.HfscCopt{}
-		opt.Rsc.Set(hfsc.Rsc.Attrs())
-		opt.Fsc.Set(hfsc.Fsc.Attrs())
-		opt.Usc.Set(hfsc.Usc.Attrs())
-		options.AddRtAttr(nl.TCA_HFSC_RSC, nl.SerializeHfscCurve(&opt.Rsc))
-		options.AddRtAttr(nl.TCA_HFSC_FSC, nl.SerializeHfscCurve(&opt.Fsc))
-		options.AddRtAttr(nl.TCA_HFSC_USC, nl.SerializeHfscCurve(&opt.Usc))
+		rm1, rd, rm2 := hfsc.Rsc.Attrs()
+		opt.Rsc.Set(rm1/8, rd, rm2/8)
+		fm1, fd, fm2 := hfsc.Fsc.Attrs()
+		opt.Fsc.Set(fm1/8, fd, fm2/8)
+		um1, ud, um2 := hfsc.Usc.Attrs()
+		opt.Usc.Set(um1/8, ud, um2/8)
+		nl.NewRtAttrChild(options, nl.TCA_HFSC_RSC, nl.SerializeHfscCurve(&opt.Rsc))
+		nl.NewRtAttrChild(options, nl.TCA_HFSC_FSC, nl.SerializeHfscCurve(&opt.Fsc))
+		nl.NewRtAttrChild(options, nl.TCA_HFSC_USC, nl.SerializeHfscCurve(&opt.Usc))
 	}
 	req.AddData(options)
 	return nil
@@ -315,11 +318,11 @@ func parseHfscClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, err
 		m1, d, m2 := nl.DeserializeHfscCurve(datum.Value).Attrs()
 		switch datum.Attr.Type {
 		case nl.TCA_HFSC_RSC:
-			hfsc.Rsc = ServiceCurve{m1: m1, d: d, m2: m2}
+			hfsc.Rsc = ServiceCurve{m1: m1 * 8, d: d, m2: m2 * 8}
 		case nl.TCA_HFSC_FSC:
-			hfsc.Fsc = ServiceCurve{m1: m1, d: d, m2: m2}
+			hfsc.Fsc = ServiceCurve{m1: m1 * 8, d: d, m2: m2 * 8}
 		case nl.TCA_HFSC_USC:
-			hfsc.Usc = ServiceCurve{m1: m1, d: d, m2: m2}
+			hfsc.Usc = ServiceCurve{m1: m1 * 8, d: d, m2: m2 * 8}
 		}
 	}
 	return detailed, nil

@@ -10,7 +10,7 @@
 package hcsschema
 
 type Memory2 struct {
-	SizeInMB int32 `json:"SizeInMB,omitempty"`
+	SizeInMB uint64 `json:"SizeInMB,omitempty"`
 
 	AllowOvercommit bool `json:"AllowOvercommit,omitempty"`
 

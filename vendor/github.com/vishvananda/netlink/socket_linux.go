@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
@@ -49,10 +50,15 @@ func (r *socketRequest) Serialize() []byte {
 	native.PutUint32(b.Next(4), r.States)
 	networkOrder.PutUint16(b.Next(2), r.ID.SourcePort)
 	networkOrder.PutUint16(b.Next(2), r.ID.DestinationPort)
-	copy(b.Next(4), r.ID.Source.To4())
-	b.Next(12)
-	copy(b.Next(4), r.ID.Destination.To4())
-	b.Next(12)
+	if r.Family == unix.AF_INET6 {
+		copy(b.Next(16), r.ID.Source)
+		copy(b.Next(16), r.ID.Destination)
+	} else {
+		copy(b.Next(4), r.ID.Source.To4())
+		b.Next(12)
+		copy(b.Next(4), r.ID.Destination.To4())
+		b.Next(12)
+	}
 	native.PutUint32(b.Next(4), r.ID.Interface)
 	native.PutUint32(b.Next(4), r.ID.Cookie[0])
 	native.PutUint32(b.Next(4), r.ID.Cookie[1])
@@ -89,10 +95,15 @@ func (s *Socket) deserialize(b []byte) error {
 	s.Retrans = rb.Read()
 	s.ID.SourcePort = networkOrder.Uint16(rb.Next(2))
 	s.ID.DestinationPort = networkOrder.Uint16(rb.Next(2))
-	s.ID.Source = net.IPv4(rb.Read(), rb.Read(), rb.Read(), rb.Read())
-	rb.Next(12)
-	s.ID.Destination = net.IPv4(rb.Read(), rb.Read(), rb.Read(), rb.Read())
-	rb.Next(12)
+	if s.Family == unix.AF_INET6 {
+		s.ID.Source = net.IP(rb.Next(16))
+		s.ID.Destination = net.IP(rb.Next(16))
+	} else {
+		s.ID.Source = net.IPv4(rb.Read(), rb.Read(), rb.Read(), rb.Read())
+		rb.Next(12)
+		s.ID.Destination = net.IPv4(rb.Read(), rb.Read(), rb.Read(), rb.Read())
+		rb.Next(12)
+	}
 	s.ID.Interface = native.Uint32(rb.Next(4))
 	s.ID.Cookie[0] = native.Uint32(rb.Next(4))
 	s.ID.Cookie[1] = native.Uint32(rb.Next(4))
@@ -159,4 +170,69 @@ func SocketGet(local, remote net.Addr) (*Socket, error) {
 		return nil, err
 	}
 	return sock, nil
+}
+
+// SocketDiagTCPInfo requests INET_DIAG_INFO for TCP protocol for specified family type.
+func SocketDiagTCPInfo(family uint8) ([]*InetDiagTCPInfoResp, error) {
+	s, err := nl.Subscribe(unix.NETLINK_INET_DIAG)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+
+	req := nl.NewNetlinkRequest(nl.SOCK_DIAG_BY_FAMILY, unix.NLM_F_DUMP)
+	req.AddData(&socketRequest{
+		Family:   family,
+		Protocol: unix.IPPROTO_TCP,
+		Ext:      INET_DIAG_INFO,
+		States:   uint32(0xfff), // All TCP states
+	})
+	s.Send(req)
+
+	var result []*InetDiagTCPInfoResp
+loop:
+	for {
+		msgs, from, err := s.Receive()
+		if err != nil {
+			return nil, err
+		}
+		if from.Pid != nl.PidKernel {
+			return nil, fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, nl.PidKernel)
+		}
+		if len(msgs) == 0 {
+			return nil, errors.New("no message nor error from netlink")
+		}
+
+		for _, m := range msgs {
+			switch m.Header.Type {
+			case unix.NLMSG_DONE:
+				break loop
+			case unix.NLMSG_ERROR:
+				native := nl.NativeEndian()
+				error := int32(native.Uint32(m.Data[0:4]))
+				return nil, syscall.Errno(-error)
+			}
+			sockInfo := &Socket{}
+			if err := sockInfo.deserialize(m.Data); err != nil {
+				return nil, err
+			}
+			attrs, err := nl.ParseRouteAttr(m.Data[sizeofSocket:])
+			if err != nil {
+				return nil, err
+			}
+			var tcpInfo *TCPInfo
+			for _, a := range attrs {
+				if a.Attr.Type == INET_DIAG_INFO {
+					tcpInfo = &TCPInfo{}
+					if err := tcpInfo.deserialize(a.Value); err != nil {
+						return nil, err
+					}
+					break
+				}
+			}
+			r := &InetDiagTCPInfoResp{InetDiagMsg: sockInfo, TCPInfo: tcpInfo}
+			result = append(result, r)
+		}
+	}
+	return result, nil
 }

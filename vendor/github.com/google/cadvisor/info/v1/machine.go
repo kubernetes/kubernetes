@@ -47,13 +47,16 @@ type Node struct {
 }
 
 type Core struct {
-	Id       int     `json:"core_id"`
-	Threads  []int   `json:"thread_ids"`
-	Caches   []Cache `json:"caches"`
-	SocketID int     `json:"socket_id"`
+	Id           int     `json:"core_id"`
+	Threads      []int   `json:"thread_ids"`
+	Caches       []Cache `json:"caches"`
+	UncoreCaches []Cache `json:"uncore_caches"`
+	SocketID     int     `json:"socket_id"`
 }
 
 type Cache struct {
+	// Id of memory cache
+	Id int `json:"id"`
 	// Size of memory cache in bytes.
 	Size uint64 `json:"size"`
 	// Type of memory cache: data, instruction, or unified.

@@ -33,6 +33,11 @@ func DefaultSpec() specs.Platform {
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		// The Variant field will be empty if arch != ARM.
-		Variant: cpuVariant,
+		Variant: cpuVariant(),
 	}
+}
+
+// DefaultStrict returns strict form of Default.
+func DefaultStrict() MatchComparer {
+	return OnlyStrict(DefaultSpec())
 }

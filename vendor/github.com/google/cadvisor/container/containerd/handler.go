@@ -133,11 +133,19 @@ func newContainerdContainerHandler(
 	}
 	// Add the name and bare ID as aliases of the container.
 	handler.image = cntr.Image
-	for _, envVar := range spec.Process.Env {
-		if envVar != "" {
-			splits := strings.SplitN(envVar, "=", 2)
-			if len(splits) == 2 {
-				handler.envs[splits[0]] = splits[1]
+
+	for _, exposedEnv := range metadataEnvs {
+		if exposedEnv == "" {
+			// if no containerdEnvWhitelist provided, len(metadataEnvs) == 1, metadataEnvs[0] == ""
+			continue
+		}
+
+		for _, envVar := range spec.Process.Env {
+			if envVar != "" {
+				splits := strings.SplitN(envVar, "=", 2)
+				if len(splits) == 2 && strings.HasPrefix(splits[0], exposedEnv) {
+					handler.envs[splits[0]] = splits[1]
+				}
 			}
 		}
 	}

@@ -213,10 +213,11 @@ const (
 
 type TunnelKeyAction struct {
 	ActionAttrs
-	Action  TunnelKeyAct
-	SrcAddr net.IP
-	DstAddr net.IP
-	KeyID   uint32
+	Action   TunnelKeyAct
+	SrcAddr  net.IP
+	DstAddr  net.IP
+	KeyID    uint32
+	DestPort uint16
 }
 
 func (action *TunnelKeyAction) Type() string {

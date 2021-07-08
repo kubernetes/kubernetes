@@ -27,9 +27,10 @@ type namespaceResourceRequest struct {
 }
 
 type Namespace struct {
-	ID           string
-	IsDefault    bool                `json:",omitempty"`
-	ResourceList []NamespaceResource `json:",omitempty"`
+	ID            string
+	IsDefault     bool                `json:",omitempty"`
+	ResourceList  []NamespaceResource `json:",omitempty"`
+	CompartmentId uint32              `json:",omitempty"`
 }
 
 func issueNamespaceRequest(id *string, method, subpath string, request interface{}) (*Namespace, error) {

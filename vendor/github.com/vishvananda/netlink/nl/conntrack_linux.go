@@ -40,9 +40,10 @@ const (
 	NFNETLINK_V0 = 0
 )
 
-// #define NLA_F_NESTED (1 << 15)
 const (
-	NLA_F_NESTED = (1 << 15)
+	NLA_F_NESTED        uint16 = (1 << 15) // #define NLA_F_NESTED (1 << 15)
+	NLA_F_NET_BYTEORDER uint16 = (1 << 14) // #define NLA_F_NESTED (1 << 14)
+	NLA_TYPE_MASK              = ^(NLA_F_NESTED | NLA_F_NET_BYTEORDER)
 )
 
 // enum ctattr_type {

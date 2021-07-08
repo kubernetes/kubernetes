@@ -13,7 +13,7 @@ const (
 	SizeofXfrmAlgoAuth       = 0x48
 	SizeofXfrmAlgoAEAD       = 0x48
 	SizeofXfrmEncapTmpl      = 0x18
-	SizeofXfrmUsersaFlush    = 0x8
+	SizeofXfrmUsersaFlush    = 0x1
 	SizeofXfrmReplayStateEsn = 0x18
 )
 

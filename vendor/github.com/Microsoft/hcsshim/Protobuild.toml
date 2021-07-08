@@ -35,20 +35,10 @@ plugins = ["grpc", "fieldpath"]
 prefixes = ["github.com/Microsoft/hcsshim/internal/shimdiag"]
 plugins = ["ttrpc"]
 
-# Lock down runhcs config
+[[overrides]]
+prefixes = ["github.com/Microsoft/hcsshim/internal/computeagent"]
+plugins = ["ttrpc"]
 
-[[descriptors]]
-prefix = "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
-target = "cmd/containerd-shim-runhcs-v1/options/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
-
-[[descriptors]]
-prefix = "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
-target = "cmd/containerd-shim-runhcs-v1/stats/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-	"gogoproto/gogo.proto"
-]
+[[overrides]]
+prefixes = ["github.com/Microsoft/hcsshim/internal/ncproxyttrpc"]
+plugins = ["ttrpc"]

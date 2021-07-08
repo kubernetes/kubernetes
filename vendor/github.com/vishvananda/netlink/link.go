@@ -65,6 +65,17 @@ type VfInfo struct {
 	LinkState uint32
 	MaxTxRate uint32 // IFLA_VF_RATE Max TxRate
 	MinTxRate uint32 // IFLA_VF_RATE Min TxRate
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
+	Multicast uint64
+	Broadcast uint64
+	RxDropped uint64
+	TxDropped uint64
+
+	RssQuery uint32
+	Trust    uint32
 }
 
 // LinkOperState represents the values of the IFLA_OPERSTATE link
@@ -103,7 +114,8 @@ func (s LinkOperState) String() string {
 // NewLinkAttrs returns LinkAttrs structure filled with default values
 func NewLinkAttrs() LinkAttrs {
 	return LinkAttrs{
-		TxQLen: -1,
+		NetNsID: -1,
+		TxQLen:  -1,
 	}
 }
 
@@ -196,10 +208,11 @@ type LinkStatistics64 struct {
 }
 
 type LinkXdp struct {
-	Fd       int
-	Attached bool
-	Flags    uint32
-	ProgId   uint32
+	Fd         int
+	Attached   bool
+	AttachMode uint32
+	Flags      uint32
+	ProgId     uint32
 }
 
 // Device links cannot be created via netlink. These links
@@ -246,6 +259,7 @@ func (ifb *Ifb) Type() string {
 type Bridge struct {
 	LinkAttrs
 	MulticastSnooping *bool
+	AgeingTime        *uint32
 	HelloTime         *uint32
 	VlanFiltering     *bool
 }
@@ -338,6 +352,7 @@ type Veth struct {
 	LinkAttrs
 	PeerName         string // veth on create only
 	PeerHardwareAddr net.HardwareAddr
+	PeerNamespace    interface{}
 }
 
 func (veth *Veth) Attrs() *LinkAttrs {
@@ -346,6 +361,19 @@ func (veth *Veth) Attrs() *LinkAttrs {
 
 func (veth *Veth) Type() string {
 	return "veth"
+}
+
+// Wireguard represent links of type "wireguard", see https://www.wireguard.com/
+type Wireguard struct {
+	LinkAttrs
+}
+
+func (wg *Wireguard) Attrs() *LinkAttrs {
+	return &wg.LinkAttrs
+}
+
+func (wg *Wireguard) Type() string {
+	return "wireguard"
 }
 
 // GenericLink links represent types that are not currently understood
@@ -878,10 +906,14 @@ type Ip6tnl struct {
 	Remote     net.IP
 	Ttl        uint8
 	Tos        uint8
-	EncapLimit uint8
 	Flags      uint32
 	Proto      uint8
 	FlowInfo   uint32
+	EncapLimit uint8
+	EncapType  uint16
+	EncapFlags uint16
+	EncapSport uint16
+	EncapDport uint16
 }
 
 func (ip6tnl *Ip6tnl) Attrs() *LinkAttrs {
@@ -895,11 +927,13 @@ func (ip6tnl *Ip6tnl) Type() string {
 type Sittun struct {
 	LinkAttrs
 	Link       uint32
-	Local      net.IP
-	Remote     net.IP
 	Ttl        uint8
 	Tos        uint8
 	PMtuDisc   uint8
+	Proto      uint8
+	Local      net.IP
+	Remote     net.IP
+	EncapLimit uint8
 	EncapType  uint16
 	EncapFlags uint16
 	EncapSport uint16

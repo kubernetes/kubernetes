@@ -141,6 +141,8 @@ func NewEncrypter(enc ContentEncryption, rcpt Recipient, opts *EncrypterOptions)
 		keyID, rawKey = encryptionKey.KeyID, encryptionKey.Key
 	case *JSONWebKey:
 		keyID, rawKey = encryptionKey.KeyID, encryptionKey.Key
+	case OpaqueKeyEncrypter:
+		keyID, rawKey = encryptionKey.KeyID(), encryptionKey
 	default:
 		rawKey = encryptionKey
 	}
@@ -267,9 +269,11 @@ func makeJWERecipient(alg KeyAlgorithm, encryptionKey interface{}) (recipientKey
 		recipient, err := makeJWERecipient(alg, encryptionKey.Key)
 		recipient.keyID = encryptionKey.KeyID
 		return recipient, err
-	default:
-		return recipientKeyInfo{}, ErrUnsupportedKeyType
 	}
+	if encrypter, ok := encryptionKey.(OpaqueKeyEncrypter); ok {
+		return newOpaqueKeyEncrypter(alg, encrypter)
+	}
+	return recipientKeyInfo{}, ErrUnsupportedKeyType
 }
 
 // newDecrypter creates an appropriate decrypter based on the key type
@@ -295,9 +299,11 @@ func newDecrypter(decryptionKey interface{}) (keyDecrypter, error) {
 		return newDecrypter(decryptionKey.Key)
 	case *JSONWebKey:
 		return newDecrypter(decryptionKey.Key)
-	default:
-		return nil, ErrUnsupportedKeyType
 	}
+	if okd, ok := decryptionKey.(OpaqueKeyDecrypter); ok {
+		return &opaqueKeyDecrypter{decrypter: okd}, nil
+	}
+	return nil, ErrUnsupportedKeyType
 }
 
 // Implementation of encrypt method producing a JWE object.

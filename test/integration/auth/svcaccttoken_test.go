@@ -421,16 +421,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("error parsing warnafter: %v", err)
 		}
 
-		if exp < int64(actualExpiry)-leeway || exp > int64(actualExpiry)+leeway {
+		if exp < int64(*actualExpiry)-leeway || exp > int64(*actualExpiry)+leeway {
 			t.Errorf("unexpected token exp %d, should within range of %d +- %d seconds", exp, actualExpiry, leeway)
 		}
-		if warnafter < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+		if warnafter < int64(*assumedExpiry)-leeway || warnafter > int64(*assumedExpiry)+leeway {
 			t.Errorf("unexpected token warnafter %d, should within range of %d +- %d seconds", warnafter, assumedExpiry, leeway)
 		}
 
 		checkExpiration(t, treq, requestExp)
 		expStatus := treq.Status.ExpirationTimestamp.Time.Unix()
-		if expStatus < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+		if expStatus < int64(*assumedExpiry)-leeway || warnafter > int64(*assumedExpiry)+leeway {
 			t.Errorf("unexpected expiration returned in tokenrequest status %d, should within range of %d +- %d seconds", expStatus, assumedExpiry, leeway)
 		}
 	})

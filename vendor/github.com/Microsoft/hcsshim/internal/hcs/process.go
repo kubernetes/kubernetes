@@ -64,11 +64,7 @@ type processStatus struct {
 	LastWaitResult int32
 }
 
-const (
-	stdIn  string = "StdIn"
-	stdOut string = "StdOut"
-	stdErr string = "StdErr"
-)
+const stdIn string = "StdIn"
 
 const (
 	modifyConsoleSize string = "ConsoleSize"
@@ -176,8 +172,10 @@ func (process *Process) waitBackground() {
 		trace.Int64Attribute("pid", int64(process.processID)))
 
 	var (
-		err      error
-		exitCode = -1
+		err            error
+		exitCode       = -1
+		propertiesJSON string
+		resultJSON     string
 	)
 
 	err = waitForNotification(ctx, process.callbackNumber, hcsNotificationProcessExited, nil)
@@ -190,15 +188,15 @@ func (process *Process) waitBackground() {
 
 		// Make sure we didnt race with Close() here
 		if process.handle != 0 {
-			propertiesJSON, resultJSON, err := vmcompute.HcsGetProcessProperties(ctx, process.handle)
+			propertiesJSON, resultJSON, err = vmcompute.HcsGetProcessProperties(ctx, process.handle)
 			events := processHcsResult(ctx, resultJSON)
 			if err != nil {
-				err = makeProcessError(process, operation, err, events)
+				err = makeProcessError(process, operation, err, events) //nolint:ineffassign
 			} else {
 				properties := &processStatus{}
 				err = json.Unmarshal([]byte(propertiesJSON), properties)
 				if err != nil {
-					err = makeProcessError(process, operation, err, nil)
+					err = makeProcessError(process, operation, err, nil) //nolint:ineffassign
 				} else {
 					if properties.LastWaitResult != 0 {
 						log.G(ctx).WithField("wait-result", properties.LastWaitResult).Warning("non-zero last wait result")
@@ -468,7 +466,7 @@ func (process *Process) unregisterCallback(ctx context.Context) error {
 	delete(callbackMap, callbackNumber)
 	callbackMapLock.Unlock()
 
-	handle = 0
+	handle = 0 //nolint:ineffassign
 
 	return nil
 }

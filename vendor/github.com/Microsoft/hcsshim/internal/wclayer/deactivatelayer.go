@@ -11,7 +11,7 @@ import (
 // DeactivateLayer will dismount a layer that was mounted via ActivateLayer.
 func DeactivateLayer(ctx context.Context, path string) (err error) {
 	title := "hcsshim::DeactivateLayer"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))

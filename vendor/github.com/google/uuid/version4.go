@@ -14,6 +14,14 @@ func New() UUID {
 	return Must(NewRandom())
 }
 
+// NewString creates a new random UUID and returns it as a string or panics.
+// NewString is equivalent to the expression
+//
+//    uuid.New().String()
+func NewString() string {
+	return Must(NewRandom()).String()
+}
+
 // NewRandom returns a Random (Version 4) UUID.
 //
 // The strength of the UUIDs is based on the strength of the crypto/rand
