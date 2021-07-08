@@ -30,7 +30,7 @@ The check implementation looks at the appropriate value based on version.
 
 func init() {
 	fixtureData_restricted_1_19 := fixtureGenerator{
-		expectErrorSubstring: "seccomp profile",
+		expectErrorSubstring: "seccompProfile",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
@@ -43,11 +43,6 @@ func init() {
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = nil
 					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
-					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.SeccompProfile = nil
-					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileLocalhost("testing")
 					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileLocalhost("testing")
 				}),
 			}
@@ -55,36 +50,36 @@ func init() {
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
+				// unset everywhere
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = nil
 				}),
+				// unconfined, pod-level
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = seccompProfileUnconfined
 				}),
+				// unset initContainer
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = nil
 					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
 				}),
+				// unset container
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = nil
 					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
 				}),
+				// unconfined, container-level
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.SeccompProfile = nil
 					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
 					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileUnconfined
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.SeccompProfile = nil
-					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileUnconfined
-					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
 				}),
 			}
 		},
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelRestricted, version: api.MajorMinorVersion(1, 19), check: "seccomp_restricted"},
+		fixtureKey{level: api.LevelRestricted, version: api.MajorMinorVersion(1, 19), check: "seccompProfile_restricted"},
 		fixtureData_restricted_1_19,
 	)
 }
