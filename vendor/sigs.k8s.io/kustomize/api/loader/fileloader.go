@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/git"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // fileLoader is a kustomization's interface to files.

@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
 
@@ -481,7 +482,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
-		return nil, err
+		if libcontaineruserns.RunningInUserNS() {
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
+				// oomwatcher.NewWatcher returns "open /dev/kmsg: operation not permitted" error,
+				// when running in a user namespace with sysctl value `kernel.dmesg_restrict=1`.
+				klog.V(2).InfoS("Failed to create an oomWatcher (running in UserNS, ignoring)", "err", err)
+				oomWatcher = nil
+			} else {
+				klog.ErrorS(err, "Failed to create an oomWatcher (running in UserNS, Hint: enable KubeletInUserNamespace feature flag to ignore the error)")
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	clusterDNS := make([]net.IP, 0, len(kubeCfg.ClusterDNS))
@@ -1360,8 +1373,10 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Start out of memory watcher.
-	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
-		return fmt.Errorf("failed to start OOM watcher %v", err)
+	if kl.oomWatcher != nil {
+		if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
+			return fmt.Errorf("failed to start OOM watcher: %w", err)
+		}
 	}
 
 	// Start resource analyzer

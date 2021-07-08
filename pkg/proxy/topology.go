@@ -27,7 +27,7 @@ import (
 // labels, and enabled feature gates. This is primarily used to enable topology
 // aware routing.
 func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) []Endpoint {
-	if svcInfo.NodeLocalExternal() || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if svcInfo.NodeLocalExternal() {
 		return endpoints
 	}
 

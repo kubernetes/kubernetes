@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // Used as a temporary non-empty occupant of the cloneDir

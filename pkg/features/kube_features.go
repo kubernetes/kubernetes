@@ -38,6 +38,7 @@ const (
 	// owner: @mtaufen
 	// alpha: v1.4
 	// beta: v1.11
+	// deprecated: 1.22
 	DynamicKubeletConfig featuregate.Feature = "DynamicKubeletConfig"
 
 	// owner: @pweil-
@@ -425,6 +426,7 @@ const (
 	// kep: http://kep.k8s.io/752
 	// alpha: v1.18
 	// beta: v1.19
+	// ga: v1.22
 	//
 	// Enable Endpoint Slice consumption by kube-proxy for improved scalability.
 	EndpointSliceProxying featuregate.Feature = "EndpointSliceProxying"
@@ -433,6 +435,7 @@ const (
 	// kep: http://kep.k8s.io/752
 	// alpha: v1.19
 	// beta: v1.21
+	// ga: v1.22
 	//
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
@@ -485,6 +488,7 @@ const (
 	// owner: @bart0sh
 	// alpha: v1.18
 	// beta: v1.19
+	// GA: 1.22
 	//
 	// Enables usage of HugePages-<size> in a volume medium,
 	// e.g. emptyDir:
@@ -761,6 +765,14 @@ const (
 	//
 	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
 	CSRDuration featuregate.Feature = "CSRDuration"
+
+	// owner: @AkihiroSuda
+	// alpha: v1.22
+	//
+	// Enables support for running kubelet in a user namespace.
+	// The user namespace has to be created before running kubelet.
+	// All the node components such as CRI need to be running in the same user namespace.
+	KubeletInUserNamespace featuregate.Feature = "KubeletInUserNamespace"
 )
 
 func init() {
@@ -772,7 +784,7 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AppArmor:             {Default: true, PreRelease: featuregate.Beta},
-	DynamicKubeletConfig: {Default: true, PreRelease: featuregate.Beta},
+	DynamicKubeletConfig: {Default: false, PreRelease: featuregate.Deprecated}, // feature gate is deprecated in 1.22, remove no early than 1.23
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                                  {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate:                 {Default: true, PreRelease: featuregate.Beta},
@@ -824,19 +836,19 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: true, PreRelease: featuregate.Beta},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
+	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
 	ProxyTerminatingEndpoints:                      {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSliceNodeName:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.25
-	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.Beta},
+	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
-	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
-	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta}, // on by default in 1.22
+	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta},                   // on by default in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
 	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.24
@@ -875,6 +887,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
 	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
 	DelegateFSGroupToCSIDriver:                     {Default: false, PreRelease: featuregate.Alpha},
+	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

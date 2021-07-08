@@ -736,7 +736,7 @@ func TestServiceRegistryLoadBalancerService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
-	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortTrue)
+	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
@@ -762,28 +762,56 @@ func TestAllocateLoadBalancerNodePorts(t *testing.T) {
 		allocateNodePortGate bool
 		expectError          bool
 	}{{
-		name:                 "allocate false, gate on",
-		svc:                  svctest.MakeService("alloc-false", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortFalse),
+		name: "allocate false, gate on, not specified",
+		svc: svctest.MakeService("alloc-false",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
 		expectNodePorts:      false,
 		allocateNodePortGate: true,
 	}, {
-		name:                 "allocate true, gate on",
-		svc:                  svctest.MakeService("alloc-true", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortTrue),
+		name: "allocate true, gate on, not specified",
+		svc: svctest.MakeService("alloc-true",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
 		expectNodePorts:      true,
 		allocateNodePortGate: true,
 	}, {
-		name:                 "allocate nil, gate off",
-		svc:                  svctest.MakeService("alloc-nil", svctest.SetTypeLoadBalancer),
+		name: "allocate false, gate on, port specified",
+		svc: svctest.MakeService("alloc-false-specific",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetNodePorts(30000),
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
+		expectNodePorts:      true,
+		allocateNodePortGate: true,
+	}, {
+		name: "allocate true, gate on, port specified",
+		svc: svctest.MakeService("alloc-true-specific",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetNodePorts(30000),
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
+		expectNodePorts:      true,
+		allocateNodePortGate: true,
+	}, {
+		name: "allocate nil, gate off",
+		svc: svctest.MakeService("alloc-nil",
+			svctest.SetTypeLoadBalancer,
+			func(s *api.Service) {
+				s.Spec.AllocateLoadBalancerNodePorts = nil
+			}),
 		expectNodePorts:      true,
 		allocateNodePortGate: false,
 	}, {
-		name:                 "allocate false, gate off",
-		svc:                  svctest.MakeService("alloc-false", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortFalse),
+		name: "allocate false, gate off",
+		svc: svctest.MakeService("alloc-false",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(false)),
 		expectNodePorts:      true,
 		allocateNodePortGate: false,
 	}, {
-		name:                 "allocate true, gate off",
-		svc:                  svctest.MakeService("alloc-true", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortTrue),
+		name: "allocate true, gate off",
+		svc: svctest.MakeService("alloc-true",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetAllocateLoadBalancerNodePorts(true)),
 		expectNodePorts:      true,
 		allocateNodePortGate: false,
 	}}
@@ -965,9 +993,7 @@ func TestServiceRegistryUpdateMultiPortLoadBalancerService(t *testing.T) {
 		svctest.SetTypeLoadBalancer,
 		svctest.SetPorts(
 			svctest.MakeServicePort("p", 6502, intstr.FromInt(6502), api.ProtocolTCP),
-			svctest.MakeServicePort("q", 8086, intstr.FromInt(8086), api.ProtocolTCP)),
-		svctest.SetAllocateLBNodePortTrue,
-	)
+			svctest.MakeServicePort("q", 8086, intstr.FromInt(8086), api.ProtocolTCP)))
 	obj, err := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -1321,7 +1347,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 
-	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer, svctest.SetAllocateLBNodePortTrue)
+	svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
 	ctx := genericapirequest.NewDefaultContext()
 	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if createdSvc == nil || err != nil {
@@ -1352,7 +1378,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp",
 		svctest.SetTypeLoadBalancer,
-		svctest.SetAllocateLBNodePortTrue,
 		func(s *api.Service) {
 			s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
 		},
@@ -1380,7 +1405,6 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp",
 		svctest.SetTypeLoadBalancer,
-		svctest.SetAllocateLBNodePortTrue,
 		func(s *api.Service) {
 			// hard-code NodePort to make sure it doesn't conflict with the healthport.
 			// TODO: remove this once http://issue.k8s.io/93922 fixes auto-allocation conflicting with user-specified health check ports
@@ -1430,7 +1454,6 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	defer server.Terminate(t)
 	svc := svctest.MakeService("external-lb-esipp",
 		svctest.SetTypeLoadBalancer,
-		svctest.SetAllocateLBNodePortTrue,
 		func(s *api.Service) {
 			s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
 		},

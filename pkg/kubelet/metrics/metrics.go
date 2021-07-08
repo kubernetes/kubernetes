@@ -350,20 +350,22 @@ var (
 	// AssignedConfig is a Gauge that is set 1 if the Kubelet has a NodeConfig assigned.
 	AssignedConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           AssignedConfigKey,
-			Help:           "The node's understanding of intended config. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              AssignedConfigKey,
+			Help:              "The node's understanding of intended config. The count is always 1.",
+			DeprecatedVersion: "1.22",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
 	// ActiveConfig is a Gauge that is set to 1 if the Kubelet has an active NodeConfig.
 	ActiveConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           ActiveConfigKey,
-			Help:           "The config source the node is actively using. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              ActiveConfigKey,
+			Help:              "The config source the node is actively using. The count is always 1.",
+			DeprecatedVersion: "1.22",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
@@ -371,20 +373,22 @@ var (
 	// are certain errors.
 	LastKnownGoodConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           LastKnownGoodConfigKey,
-			Help:           "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              LastKnownGoodConfigKey,
+			Help:              "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
+			DeprecatedVersion: "1.22",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
 	// ConfigError is a Gauge that is set to 1 if the node is experiencing a configuration-related error.
 	ConfigError = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           ConfigErrorKey,
-			Help:           "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              ConfigErrorKey,
+			Help:              "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
+			DeprecatedVersion: "1.22",
+			StabilityLevel:    metrics.ALPHA,
 		},
 	)
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.

@@ -4,14 +4,13 @@
 package resource
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/filters/patchstrategicmerge"
 	"sigs.k8s.io/kustomize/api/ifc"
-	"sigs.k8s.io/kustomize/api/konfig"
+	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/resid"
@@ -28,28 +27,14 @@ type Resource struct {
 	refVarNames []string
 }
 
-const (
-	buildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
-	buildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
-	buildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
-	buildAnnotationSuffixes           = konfig.ConfigAnnoDomain + "/suffixes"
-	buildAnnotationPreviousNamespaces = konfig.ConfigAnnoDomain + "/previousNamespaces"
-
-	// the following are only for patches, to specify whether they can change names
-	// and kinds of their targets
-	buildAnnotationAllowNameChange = konfig.ConfigAnnoDomain + "/allowNameChange"
-	buildAnnotationAllowKindChange = konfig.ConfigAnnoDomain + "/allowKindChange"
-	allowed                        = "allowed"
-)
-
-var buildAnnotations = []string{
-	buildAnnotationPreviousKinds,
-	buildAnnotationPreviousNames,
-	buildAnnotationPrefixes,
-	buildAnnotationSuffixes,
-	buildAnnotationPreviousNamespaces,
-	buildAnnotationAllowNameChange,
-	buildAnnotationAllowKindChange,
+var BuildAnnotations = []string{
+	utils.BuildAnnotationPreviousKinds,
+	utils.BuildAnnotationPreviousNames,
+	utils.BuildAnnotationPrefixes,
+	utils.BuildAnnotationSuffixes,
+	utils.BuildAnnotationPreviousNamespaces,
+	utils.BuildAnnotationAllowNameChange,
+	utils.BuildAnnotationAllowKindChange,
 }
 
 func (r *Resource) ResetRNode(incoming *Resource) {
@@ -191,12 +176,12 @@ func copyStringSlice(s []string) []string {
 
 // Implements ResCtx AddNamePrefix
 func (r *Resource) AddNamePrefix(p string) {
-	r.appendCsvAnnotation(buildAnnotationPrefixes, p)
+	r.appendCsvAnnotation(utils.BuildAnnotationPrefixes, p)
 }
 
 // Implements ResCtx AddNameSuffix
 func (r *Resource) AddNameSuffix(s string) {
-	r.appendCsvAnnotation(buildAnnotationSuffixes, s)
+	r.appendCsvAnnotation(utils.BuildAnnotationSuffixes, s)
 }
 
 func (r *Resource) appendCsvAnnotation(name, value string) {
@@ -214,30 +199,14 @@ func (r *Resource) appendCsvAnnotation(name, value string) {
 	}
 }
 
-func SameEndingSubarray(shortest, longest []string) bool {
-	if len(shortest) > len(longest) {
-		longest, shortest = shortest, longest
-	}
-	diff := len(longest) - len(shortest)
-	if len(shortest) == 0 {
-		return diff == 0
-	}
-	for i := len(shortest) - 1; i >= 0; i-- {
-		if longest[i+diff] != shortest[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // Implements ResCtx GetNamePrefixes
 func (r *Resource) GetNamePrefixes() []string {
-	return r.getCsvAnnotation(buildAnnotationPrefixes)
+	return r.getCsvAnnotation(utils.BuildAnnotationPrefixes)
 }
 
 // Implements ResCtx GetNameSuffixes
 func (r *Resource) GetNameSuffixes() []string {
-	return r.getCsvAnnotation(buildAnnotationSuffixes)
+	return r.getCsvAnnotation(utils.BuildAnnotationSuffixes)
 }
 
 func (r *Resource) getCsvAnnotation(name string) []string {
@@ -252,7 +221,8 @@ func (r *Resource) getCsvAnnotation(name string) []string {
 // as OutermostPrefixSuffix but performs a deeper comparison
 // of the suffix and prefix slices.
 func (r *Resource) PrefixesSuffixesEquals(o ResCtx) bool {
-	return SameEndingSubarray(r.GetNamePrefixes(), o.GetNamePrefixes()) && SameEndingSubarray(r.GetNameSuffixes(), o.GetNameSuffixes())
+	return utils.SameEndingSubSlice(r.GetNamePrefixes(), o.GetNamePrefixes()) &&
+		utils.SameEndingSubSlice(r.GetNameSuffixes(), o.GetNameSuffixes())
 }
 
 // RemoveBuildAnnotations removes annotations created by the build process.
@@ -263,7 +233,7 @@ func (r *Resource) RemoveBuildAnnotations() {
 	if len(annotations) == 0 {
 		return
 	}
-	for _, a := range buildAnnotations {
+	for _, a := range BuildAnnotations {
 		delete(annotations, a)
 	}
 	if err := r.SetAnnotations(annotations); err != nil {
@@ -272,16 +242,16 @@ func (r *Resource) RemoveBuildAnnotations() {
 }
 
 func (r *Resource) setPreviousId(ns string, n string, k string) *Resource {
-	r.appendCsvAnnotation(buildAnnotationPreviousNames, n)
-	r.appendCsvAnnotation(buildAnnotationPreviousNamespaces, ns)
-	r.appendCsvAnnotation(buildAnnotationPreviousKinds, k)
+	r.appendCsvAnnotation(utils.BuildAnnotationPreviousNames, n)
+	r.appendCsvAnnotation(utils.BuildAnnotationPreviousNamespaces, ns)
+	r.appendCsvAnnotation(utils.BuildAnnotationPreviousKinds, k)
 	return r
 }
 
 // AllowNameChange allows name changes to the resource.
 func (r *Resource) AllowNameChange() {
 	annotations := r.GetAnnotations()
-	annotations[buildAnnotationAllowNameChange] = allowed
+	annotations[utils.BuildAnnotationAllowNameChange] = utils.Allowed
 	if err := r.SetAnnotations(annotations); err != nil {
 		panic(err)
 	}
@@ -289,14 +259,14 @@ func (r *Resource) AllowNameChange() {
 
 func (r *Resource) NameChangeAllowed() bool {
 	annotations := r.GetAnnotations()
-	v, ok := annotations[buildAnnotationAllowNameChange]
-	return ok && v == allowed
+	v, ok := annotations[utils.BuildAnnotationAllowNameChange]
+	return ok && v == utils.Allowed
 }
 
 // AllowKindChange allows kind changes to the resource.
 func (r *Resource) AllowKindChange() {
 	annotations := r.GetAnnotations()
-	annotations[buildAnnotationAllowKindChange] = allowed
+	annotations[utils.BuildAnnotationAllowKindChange] = utils.Allowed
 	if err := r.SetAnnotations(annotations); err != nil {
 		panic(err)
 	}
@@ -304,8 +274,8 @@ func (r *Resource) AllowKindChange() {
 
 func (r *Resource) KindChangeAllowed() bool {
 	annotations := r.GetAnnotations()
-	v, ok := annotations[buildAnnotationAllowKindChange]
-	return ok && v == allowed
+	v, ok := annotations[utils.BuildAnnotationAllowKindChange]
+	return ok && v == utils.Allowed
 }
 
 // String returns resource as JSON.
@@ -369,26 +339,12 @@ func (r *Resource) OrgId() resid.ResId {
 // The returned array does not include the resource's current
 // ID. If there are no previous IDs, this will return nil.
 func (r *Resource) PrevIds() []resid.ResId {
-	var ids []resid.ResId
-	// TODO: merge previous names and namespaces into one list of
-	//     pairs on one annotation so there is no chance of error
-	names := r.getCsvAnnotation(buildAnnotationPreviousNames)
-	ns := r.getCsvAnnotation(buildAnnotationPreviousNamespaces)
-	kinds := r.getCsvAnnotation(buildAnnotationPreviousKinds)
-	if len(names) != len(ns) || len(names) != len(kinds) {
-		panic(errors.New(
-			"number of previous names, " +
-				"number of previous namespaces, " +
-				"number of previous kinds not equal"))
+	prevIds, err := utils.PrevIds(&r.RNode)
+	if err != nil {
+		// this should never happen
+		panic(err)
 	}
-	for i := range names {
-		k := kinds[i]
-		gvk := r.GetGvk()
-		gvk.Kind = k
-		ids = append(ids, resid.NewResIdWithNamespace(
-			gvk, names[i], ns[i]))
-	}
-	return ids
+	return prevIds
 }
 
 // StorePreviousId stores the resource's current ID via build annotations.

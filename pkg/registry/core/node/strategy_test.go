@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -338,6 +339,43 @@ func TestValidate(t *testing.T) {
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
+
+func TestWarningOnUpdateAndCreate(t *testing.T) {
+	tests := []struct {
+		oldNode     api.Node
+		node        api.Node
+		warningText string
+	}{
+		{api.Node{},
+			api.Node{},
+			""},
+		{api.Node{},
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource"},
+		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource"},
+		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			api.Node{}, ""},
+	}
+	for i, test := range tests {
+		warnings := (nodeStrategy{}).WarningsOnUpdate(context.Background(), &test.node, &test.oldNode)
+		if (test.warningText != "" && len(warnings) != 1) || (test.warningText == "" && len(warnings) != 0) {
+			t.Errorf("%d: Unexpected warnings count: %v", i, warnings)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		} else if test.warningText != "" && !strings.Contains(warnings[0], test.warningText) {
+			t.Errorf("%d: Wrong warning message: %v", i, warnings[0])
+		}
+
+		warnings = (nodeStrategy{}).WarningsOnCreate(context.Background(), &test.node)
+		if (test.warningText != "" && len(warnings) != 1) || (test.warningText == "" && len(warnings) != 0) {
+			t.Errorf("%d: Unexpected warnings count: %v", i, warnings)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		} else if test.warningText != "" && !strings.Contains(warnings[0], test.warningText) {
+			t.Errorf("%d: Wrong warning message: %v", i, warnings[0])
 		}
 	}
 }
