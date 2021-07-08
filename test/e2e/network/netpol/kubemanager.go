@@ -22,7 +22,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
