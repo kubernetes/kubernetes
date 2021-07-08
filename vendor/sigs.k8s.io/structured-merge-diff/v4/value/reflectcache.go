@@ -269,7 +269,6 @@ func (e TypeReflectCacheEntry) FromUnstructured(sv, dv reflect.Value) error {
 	if err != nil {
 		return fmt.Errorf("error encoding %s to json: %v", st.String(), err)
 	}
-	// TODO: this is where we're failing
 	if unmarshaler, ok := e.getJsonUnmarshaler(dv); ok {
 		return unmarshaler.UnmarshalJSON(data)
 	}

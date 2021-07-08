@@ -10,20 +10,27 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
+// UnstructuredExtractor enables extracting the applied configuration state from object for fieldManager into an
+// unstructured object type.
 type UnstructuredExtractor interface {
 	ExtractUnstructured(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 	ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 }
 
-type parserCache interface {
-	parserForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error)
+// objectTypeCache is a cache of typed.ParseableTypes
+type objectTypeCache interface {
+	objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error)
 }
 
-type nonCachingParserCache struct {
+// nonCachingObjectTypeCache is a objectTypeCache that does no caching
+// (i.e. it downloads the OpenAPISchema every time)
+// Useful during the proof-of-concept stage until we agree on a caching solution.
+type nonCachingObjectTypeCache struct {
 	discoveryClient *discovery.DiscoveryClient
 }
 
-func (c *nonCachingParserCache) parserForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
+// objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
+func (c *nonCachingObjectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
 	doc, err := c.discoveryClient.OpenAPISchema()
 	if err != nil {
 		return nil, err
@@ -43,31 +50,38 @@ func (c *nonCachingParserCache) parserForGVK(gvk schema.GroupVersionKind) (*type
 }
 
 type extractor struct {
-	cache parserCache
+	cache objectTypeCache
 }
 
+// NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
+// for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc *discovery.DiscoveryClient) UnstructuredExtractor {
 	return &extractor{
-		cache: &nonCachingParserCache{dc},
+		cache: &nonCachingObjectTypeCache{dc},
 	}
 }
 
+// ExtractUnstructured extracts the applied configuration owned by fiieldManager from an unstructured object.
+// Note that the apply configuration itself is also an unstructured object.
 func (e *extractor) ExtractUnstructured(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
 	return e.extractUnstructured(object, fieldManager, "")
 }
 
+// ExtractUnstructuredStatus is the same as ExtractUnstructured except
+// that it extracts the status subresource applied configuration.
+// Experimental!
 func (e *extractor) ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
 	return e.extractUnstructured(object, fieldManager, "status")
 }
 
 func (e *extractor) extractUnstructured(object *unstructured.Unstructured, fieldManager string, subresource string) (*unstructured.Unstructured, error) {
 	gvk := object.GetObjectKind().GroupVersionKind()
-	parser, err := e.cache.parserForGVK(gvk)
+	objectType, err := e.cache.objectTypeForGVK(gvk)
 	if err != nil {
 		return nil, err
 	}
 	result := &unstructured.Unstructured{}
-	err = managedfields.ExtractInto(object, *parser, fieldManager, result, subresource)
+	err = managedfields.ExtractInto(object, *objectType, fieldManager, result, subresource)
 	if err != nil {
 		return nil, err
 	}

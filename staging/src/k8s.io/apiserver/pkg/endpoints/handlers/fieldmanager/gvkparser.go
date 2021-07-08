@@ -65,15 +65,12 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 			panic(fmt.Sprintf("ListModels returns a model that can't be looked-up for: %v", modelName))
 		}
 		gvkList := parseGroupVersionKind(model)
-		//fmt.Println("+++")
-		//fmt.Printf("gvkList = %+v\n", gvkList)
-		//fmt.Println("+++")
 		for _, gvk := range gvkList {
 			if len(gvk.Kind) > 0 {
 				_, ok := parser.gvks[gvk]
 				if ok {
-					//return nil, fmt.Errorf("duplicate entry for %v", gvk)
-					fmt.Printf("duplicate entry for %v\n", gvk)
+					// TODO: double check why this is failing in real_cluster_script.go
+					return nil, fmt.Errorf("duplicate entry for %v", gvk)
 				}
 				parser.gvks[gvk] = modelName
 			}

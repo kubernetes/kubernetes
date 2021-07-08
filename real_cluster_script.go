@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,12 +24,17 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
+// This is a small hacky script that tests the extract config against a real cluster
+// to demonstrate a bug I'm seeing with the GVKParser where it claims there
+// are duplicate GVK entries
+// TODO: don't commit this, delete it before merging.
+// Any and all functionality from this script should be captured in the appropriate integration test.
 func main() {
-	fmt.Println("vim-go")
 	defaultNS := "default"
 	mydep := "mydep"
 	mgr := "mymanager"
-	kubeconfig := "/usr/local/google/home/kevindelgado/.kube/config"
+	// TODO: make this an arg
+	kubeconfig := os.Getenv("KUBECONFIG")
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
