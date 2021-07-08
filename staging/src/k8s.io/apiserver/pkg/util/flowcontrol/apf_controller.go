@@ -127,7 +127,7 @@ type configController struct {
 	// This must be locked while accessing flowSchemas or
 	// priorityLevelStates.  It is the lock involved in
 	// LockingWriteMultiple.
-	lock sync.Mutex
+	lock sync.RWMutex
 
 	// flowSchemas holds the flow schema objects, sorted by increasing
 	// numerical (decreasing logical) matching precedence.  Every
@@ -765,8 +765,8 @@ func (immediateRequest) Finish(execute func()) bool {
 // waiting in its queue, or `Time{}` if this did not happen.
 func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
 	klog.V(7).Infof("startRequest(%#+v)", rd)
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+	cfgCtlr.lock.RLock()
+	defer cfgCtlr.lock.RUnlock()
 	var selectedFlowSchema, catchAllFlowSchema *flowcontrol.FlowSchema
 	for _, fs := range cfgCtlr.flowSchemas {
 		if matchesFlowSchema(rd, fs) {
