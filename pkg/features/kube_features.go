@@ -486,6 +486,7 @@ const (
 	// owner: @bart0sh
 	// alpha: v1.18
 	// beta: v1.19
+	// GA: 1.22
 	//
 	// Enables usage of HugePages-<size> in a volume medium,
 	// e.g. emptyDir:
@@ -844,8 +845,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
-	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
-	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta}, // on by default in 1.22
+	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta},                   // on by default in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
 	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.24
