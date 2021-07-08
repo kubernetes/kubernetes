@@ -145,8 +145,8 @@ func tryValidateEC2Creds() bool {
 
 // Provide returns a DockerConfig with credentials from the cache if they are
 // found, or from ECR
-func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {
-	parsed, err := parseRepoURL(image)
+func (p *ecrProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	parsed, err := parseRepoURL(opts.Image)
 	if err != nil {
 		return credentialprovider.DockerConfig{}
 	}

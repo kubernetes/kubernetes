@@ -243,10 +243,10 @@ func (a *acrProvider) getFromACR(loginServer string) (credentialprovider.DockerC
 	return cfg, nil
 }
 
-func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
-	loginServer := a.parseACRLoginServerFromImage(image)
+func (a *acrProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	loginServer := a.parseACRLoginServerFromImage(opts.Image)
 	if loginServer == "" {
-		klog.V(2).Infof("image(%s) is not from ACR, return empty authentication", image)
+		klog.V(2).Infof("image(%s) is not from ACR, return empty authentication", opts.Image)
 		return credentialprovider.DockerConfig{}
 	}
 

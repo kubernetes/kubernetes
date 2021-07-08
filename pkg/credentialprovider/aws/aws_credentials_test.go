@@ -174,7 +174,10 @@ func TestECRProvide(t *testing.T) {
 		},
 	}, isAlwaysEC2)
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	keyring.Add(p.Provide(image))
+	opts := &credentialprovider.Options{
+		Image: image,
+	}
+	keyring.Add(p.Provide(opts))
 
 	// Verify that we get the expected username/password combo for
 	// an ECR image name.
@@ -219,11 +222,17 @@ func TestECRProvideCached(t *testing.T) {
 		},
 	}, isAlwaysEC2)
 	image1 := path.Join(registry, "foo/bar")
+	opts1 := &credentialprovider.Options{
+		Image: image1,
+	}
 	image2 := path.Join(registry, "bar/baz")
+	opts2 := &credentialprovider.Options{
+		Image: image2,
+	}
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	keyring.Add(p.Provide(image1))
+	keyring.Add(p.Provide(opts1))
 	// time.Sleep(6 * time.Second) //for testing with the cache expiring
-	keyring.Add(p.Provide(image2))
+	keyring.Add(p.Provide(opts2))
 	// Verify that we get the credentials from the
 	// cache the second time
 	creds1, ok := keyring.Lookup(image1)
@@ -272,7 +281,10 @@ func TestChinaECRProvide(t *testing.T) {
 		},
 	}, isAlwaysEC2)
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	keyring.Add(p.Provide(image))
+	opts := &credentialprovider.Options{
+		Image: image,
+	}
+	keyring.Add(p.Provide(opts))
 	// Verify that we get the expected username/password combo for
 	// an ECR image name.
 	creds, ok := keyring.Lookup(image)
@@ -317,9 +329,12 @@ func TestChinaECRProvideCached(t *testing.T) {
 	}, isAlwaysEC2)
 	image := path.Join(registry, "foo/bar")
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	keyring.Add(p.Provide(image))
+	opts := &credentialprovider.Options{
+		Image: image,
+	}
+	keyring.Add(p.Provide(opts))
 	// time.Sleep(6 * time.Second) //for testing with the cache expiring
-	keyring.Add(p.Provide(image))
+	keyring.Add(p.Provide(opts))
 	// Verify that we get the credentials from the
 	// cache the second time
 	creds, ok := keyring.Lookup(image)

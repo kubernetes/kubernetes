@@ -111,6 +111,9 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		} else {
 			key = parsed.Host
 		}
+		// TODO(mtaufen): Do we ever delete old creds? Looks like we
+		// might just construct a new keyring on every image pull?
+		// see: kubeGenericRuntimeManager.PullImage
 		dk.creds[key] = append(dk.creds[key], creds)
 		dk.index = append(dk.index, key)
 	}
@@ -264,8 +267,13 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 func (dk *providersDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	keyring := &BasicDockerKeyring{}
 
+	// TODO(mtaufen): Lookup mutates the keyring? Is that weird? Could it get weird with
+	// ServiceAccountTokens being part of this? Also how are expirations managed?
+	// CachingDockerCredentialProvider in provider.go seems to take expiration
+	// into account, so MAYBE that's okay, but how often do we reconstruct the keyring?
+	// Assuming this is fine since it's been around a while, but curious to understand better.
 	for _, p := range dk.Providers {
-		keyring.Add(p.Provide(image))
+		keyring.Add(p.Provide(&Options{Image: image}))
 	}
 
 	return keyring.Lookup(image)

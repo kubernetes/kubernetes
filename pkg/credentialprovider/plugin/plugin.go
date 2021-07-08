@@ -192,12 +192,14 @@ func (c *cacheExpirationPolicy) IsExpired(entry *cache.TimestampedEntry) bool {
 
 // Provide returns a credentialprovider.DockerConfig based on the credentials returned
 // from cache or the exec plugin.
-func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
-	if !p.isImageAllowed(image) {
+func (p *pluginProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	if !p.isImageAllowed(opts.Image) {
 		return credentialprovider.DockerConfig{}
 	}
 
-	cachedConfig, found, err := p.getCachedCredentials(image)
+	// TODO(mtaufen): Credentials would also have to be cached based on the
+	// (Image, ServiceAccount) pair now.
+	cachedConfig, found, err := p.getCachedCredentials(opts.Image)
 	if err != nil {
 		klog.Errorf("Failed to get cached docker config: %v", err)
 		return credentialprovider.DockerConfig{}
@@ -213,8 +215,8 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 	// foo.bar.registry
 	// foo.bar.registry/image1
 	// foo.bar.registry/image2
-	res, err, _ := p.group.Do(image, func() (interface{}, error) {
-		return p.plugin.ExecPlugin(context.Background(), image)
+	res, err, _ := p.group.Do(opts.Image, func() (interface{}, error) {
+		return p.plugin.ExecPlugin(context.Background(), opts.Image)
 	})
 
 	if err != nil {
@@ -231,9 +233,9 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 	var cacheKey string
 	switch cacheKeyType := response.CacheKeyType; cacheKeyType {
 	case credentialproviderapi.ImagePluginCacheKeyType:
-		cacheKey = image
+		cacheKey = opts.Image
 	case credentialproviderapi.RegistryPluginCacheKeyType:
-		registry := parseRegistry(image)
+		registry := parseRegistry(opts.Image)
 		cacheKey = registry
 	case credentialproviderapi.GlobalPluginCacheKeyType:
 		cacheKey = globalCacheKey
@@ -365,7 +367,9 @@ type execPlugin struct {
 func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
 	klog.V(5).Infof("Getting image %s credentials from external exec plugin %s", image, e.name)
 
-	authRequest := &credentialproviderapi.CredentialProviderRequest{Image: image}
+	authRequest := &credentialproviderapi.CredentialProviderRequest{
+		Image: image,
+	}
 	data, err := e.encodeRequest(authRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode auth request: %w", err)
@@ -390,6 +394,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", envVar.Name, envVar.Value))
 	}
 
+	// TODO(mtaufen): Add kns/ksa to these logs?
 	err = cmd.Run()
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, ctx.Err())

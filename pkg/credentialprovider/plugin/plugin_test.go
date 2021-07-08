@@ -216,7 +216,11 @@ func Test_Provide(t *testing.T) {
 		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			t.Parallel()
-			dockerconfig := testcase.pluginProvider.Provide(testcase.image)
+
+			opts := &credentialprovider.Options{
+				Image: testcase.image,
+			}
+			dockerconfig := testcase.pluginProvider.Provide(opts)
 			if !reflect.DeepEqual(dockerconfig, testcase.dockerconfig) {
 				t.Logf("actual docker config: %v", dockerconfig)
 				t.Logf("expected docker config: %v", testcase.dockerconfig)
@@ -286,8 +290,12 @@ func Test_ProvideParallel(t *testing.T) {
 
 			for i := 0; i < 5; i++ {
 				go func(w *sync.WaitGroup) {
+					// TODO(mtaufen): test with KSA too
 					image := fmt.Sprintf(testcase.registry+"/%s", rand.String(5))
-					dockerconfigResponse := pluginProvider.Provide(image)
+					dockerconfigResponse := pluginProvider.Provide(
+						&credentialprovider.Options{
+							Image: image,
+						})
 					if !reflect.DeepEqual(dockerconfigResponse, dockerconfig) {
 						t.Logf("actual docker config: %v", dockerconfigResponse)
 						t.Logf("expected docker config: %v", dockerconfig)
@@ -417,7 +425,7 @@ func Test_encodeRequest(t *testing.T) {
 			request: &credentialproviderapi.CredentialProviderRequest{
 				Image: "test.registry.io/foobar",
 			},
-			expectedData: []byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","image":"test.registry.io/foobar"}
+			expectedData: []byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","image":"test.registry.io/foobar","serviceAccountToken":""}
 `),
 			expectedErr: false,
 		},
@@ -539,7 +547,10 @@ func Test_RegistryCacheKeyType(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	opts := &credentialprovider.Options{
+		Image: "test.registry.io/foo/bar",
+	}
+	dockerConfig := pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -558,7 +569,7 @@ func Test_RegistryCacheKeyType(t *testing.T) {
 	// nil out the exec plugin, this will test whether credentialproviderapi are fetched
 	// from cache, otherwise Provider should panic
 	pluginProvider.plugin = nil
-	dockerConfig = pluginProvider.Provide("test.registry.io/foo/bar")
+	dockerConfig = pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -592,7 +603,10 @@ func Test_ImageCacheKeyType(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	opts := &credentialprovider.Options{
+		Image: "test.registry.io/foo/bar",
+	}
+	dockerConfig := pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -611,7 +625,7 @@ func Test_ImageCacheKeyType(t *testing.T) {
 	// nil out the exec plugin, this will test whether credentialproviderapi are fetched
 	// from cache, otherwise Provider should panic
 	pluginProvider.plugin = nil
-	dockerConfig = pluginProvider.Provide("test.registry.io/foo/bar")
+	dockerConfig = pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -645,7 +659,10 @@ func Test_GlobalCacheKeyType(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	opts := &credentialprovider.Options{
+		Image: "test.registry.io/foo/bar",
+	}
+	dockerConfig := pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -664,7 +681,7 @@ func Test_GlobalCacheKeyType(t *testing.T) {
 	// nil out the exec plugin, this will test whether credentialproviderapi are fetched
 	// from cache, otherwise Provider should panic
 	pluginProvider.plugin = nil
-	dockerConfig = pluginProvider.Provide("test.registry.io/foo/bar")
+	dockerConfig = pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -698,7 +715,10 @@ func Test_NoCacheResponse(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	opts := &credentialprovider.Options{
+		Image: "test.registry.io/foo/bar",
+	}
+	dockerConfig := pluginProvider.Provide(opts)
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)

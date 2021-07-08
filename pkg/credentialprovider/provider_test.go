@@ -31,7 +31,7 @@ func (d *testProvider) Enabled() bool {
 }
 
 // Provide implements dockerConfigProvider
-func (d *testProvider) Provide(image string) DockerConfig {
+func (d *testProvider) Provide(opts *Options) DockerConfig {
 	d.Count++
 	return DockerConfig{}
 }
@@ -47,32 +47,35 @@ func TestCachingProvider(t *testing.T) {
 	}
 
 	image := "image"
+	opts := &Options{
+		Image: image,
+	}
 
 	if provider.Count != 0 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
 	if provider.Count != 1 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
 
 	time.Sleep(cache.Lifetime)
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
 	if provider.Count != 2 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
 
 	time.Sleep(cache.Lifetime)
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
-	cache.Provide(image)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
+	cache.Provide(opts)
 	if provider.Count != 3 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}

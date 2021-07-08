@@ -148,13 +148,13 @@ func (g *MetadataProvider) Enabled() bool {
 }
 
 // Provide implements DockerConfigProvider
-func (g *DockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
-	return registryToDocker(gcpcredential.ProvideConfigKey(g.Client, image))
+func (g *DockerConfigKeyProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideConfigKey(g.Client, opts.Image))
 }
 
 // Provide implements DockerConfigProvider
-func (g *DockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
-	return registryToDocker(gcpcredential.ProvideURLKey(g.Client, image))
+func (g *DockerConfigURLKeyProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideURLKey(g.Client, opts.Image))
 }
 
 // runWithBackoff runs input function `f` with an exponential backoff.
@@ -236,8 +236,8 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 }
 
 // Provide implements DockerConfigProvider
-func (g *ContainerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
-	return registryToDocker(gcpcredential.ProvideContainerRegistry(g.Client, image))
+func (g *ContainerRegistryProvider) Provide(opts *credentialprovider.Options) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideContainerRegistry(g.Client, opts.Image))
 }
 
 func registryToDocker(registryConfig credentialconfig.RegistryConfig) credentialprovider.DockerConfig {

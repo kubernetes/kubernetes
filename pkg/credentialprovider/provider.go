@@ -25,6 +25,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type Options struct {
+	Image           string
+	ImagePullTokens []ImagePullToken
+}
+
+type ImagePullToken struct {
+	MatchImages []string
+	Token       string
+}
+
 // DockerConfigProvider is the interface that registered extensions implement
 // to materialize 'dockercfg' credentials.
 type DockerConfigProvider interface {
@@ -36,7 +46,7 @@ type DockerConfigProvider interface {
 	// The image is passed in as context in the event that the
 	// implementation depends on information in the image name to return
 	// credentials; implementations are safe to ignore the image.
-	Provide(image string) DockerConfig
+	Provide(opts *Options) DockerConfig
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
@@ -74,7 +84,7 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 }
 
 // Provide implements dockerConfigProvider
-func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
+func (d *defaultDockerConfigProvider) Provide(opts *Options) DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
@@ -90,7 +100,7 @@ func (d *CachingDockerConfigProvider) Enabled() bool {
 }
 
 // Provide implements dockerConfigProvider
-func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
+func (d *CachingDockerConfigProvider) Provide(opts *Options) DockerConfig {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -100,7 +110,7 @@ func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
 	}
 
 	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
-	config := d.Provider.Provide(image)
+	config := d.Provider.Provide(opts)
 	if d.ShouldCache == nil || d.ShouldCache(config) {
 		d.cacheDockerConfig = config
 		d.expiration = time.Now().Add(d.Lifetime)
