@@ -182,8 +182,8 @@ type EndpointChangeTracker struct {
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
-	ect := &EndpointChangeTracker{
+func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
+	return &EndpointChangeTracker{
 		hostname:                  hostname,
 		items:                     make(map[types.NamespacedName]*endpointsChange),
 		makeEndpointInfo:          makeEndpointInfo,
@@ -192,11 +192,8 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
+		endpointSliceCache:        NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo),
 	}
-	if endpointSlicesEnabled {
-		ect.endpointSliceCache = NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo)
-	}
-	return ect
 }
 
 // Update updates given service's endpoints change map based on the <previous, current> endpoints pair.  It returns true

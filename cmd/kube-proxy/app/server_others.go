@@ -364,7 +364,7 @@ func newProxyServer(
 		}
 	}
 
-	useEndpointSlices := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	useEndpointSlices := true
 	if proxyMode == proxyModeUserspace {
 		// userspace mode doesn't support endpointslice.
 		useEndpointSlices = false
