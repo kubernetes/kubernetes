@@ -96,6 +96,20 @@ func (l *testListener) satisfiedExpectations() bool {
 	return sets.NewString(l.receivedItemNames...).Equal(l.expectedItemNames)
 }
 
+func eventHandlerCount(i SharedInformer) int {
+	s := i.(*sharedIndexInformer)
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return len(s.processor.listeners)
+}
+
+func isStarted(i SharedInformer) bool {
+	s := i.(*sharedIndexInformer)
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.started
+}
+
 func TestListenerResyncPeriods(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
@@ -377,21 +391,21 @@ func TestSharedInformerRemoveHandler(t *testing.T) {
 		return
 	}
 
-	if informer.EventHandlerCount() != 2 {
-		t.Errorf("informer has %d registered handler, instead of 2", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByHandle(handle2); err != nil {
 		t.Errorf("removing of first pointer handler failed: %s", err)
 	}
-	if informer.EventHandlerCount() != 1 {
-		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 1 {
+		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByHandle(handle1); err != nil {
 		t.Errorf("removing of second pointer handler failed: %s", err)
 	}
-	if informer.EventHandlerCount() != 0 {
+	if eventHandlerCount(informer) != 0 {
 		t.Errorf("informer still has registered handlers after removing both handlers")
 	}
 }
@@ -415,22 +429,22 @@ func TestSharedInformerRemoveNonComparableHandler(t *testing.T) {
 		return
 	}
 
-	if informer.EventHandlerCount() != 2 {
-		t.Errorf("informer has %d registered handler(s), instead of 2", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler(s), instead of 2", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByHandle(handle2); err != nil {
 		t.Errorf("removing of pointer handler failed: %s", err)
 	}
-	if informer.EventHandlerCount() != 1 {
-		t.Errorf("after removal informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 1 {
+		t.Errorf("after removal informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByHandle(handle1); err != nil {
 		t.Errorf("removing of non-pointer handler failed: %s", err)
 	}
-	if informer.EventHandlerCount() != 0 {
-		t.Errorf("after removal informer has %d registered handler(s), instead of 0", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 0 {
+		t.Errorf("after removal informer has %d registered handler(s), instead of 0", eventHandlerCount(informer))
 	}
 }
 
@@ -463,8 +477,8 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if informer.EventHandlerCount() != 2 {
-		t.Errorf("informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByHandle(reg1); err != nil {
@@ -480,11 +494,11 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if informer.EventHandlerCount() != 1 {
-		if informer.EventHandlerCount() == 0 {
+	if eventHandlerCount(informer) != 1 {
+		if eventHandlerCount(informer) == 0 {
 			t.Errorf("informer has no registered handler anymore after removal of duplicate registrations")
 		} else {
-			t.Errorf("informer has unexpected number (%d) of handlers after removal of duplicate handler registration", informer.EventHandlerCount())
+			t.Errorf("informer has unexpected number (%d) of handlers after removal of duplicate handler registration", eventHandlerCount(informer))
 		}
 	}
 
@@ -497,8 +511,8 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if informer.EventHandlerCount() != 0 {
-		t.Errorf("informer has unexpected number (%d) of handlers after removal of second handler registrations", informer.EventHandlerCount())
+	if eventHandlerCount(informer) != 0 {
+		t.Errorf("informer has unexpected number (%d) of handlers after removal of second handler registrations", eventHandlerCount(informer))
 	}
 }
 
@@ -539,7 +553,7 @@ func TestStateSharedInformer(t *testing.T) {
 	listener := newTestListener("listener", 0, "pod1")
 	informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
 
-	if informer.IsStarted() {
+	if isStarted(informer) {
 		t.Errorf("informer already started after creation")
 		return
 	}
@@ -555,7 +569,7 @@ func TestStateSharedInformer(t *testing.T) {
 		return
 	}
 
-	if !informer.IsStarted() {
+	if !isStarted(informer) {
 		t.Errorf("informer does not report to be started although handling events")
 		close(stop)
 		return
@@ -574,7 +588,7 @@ func TestStateSharedInformer(t *testing.T) {
 		t.Errorf("informer reports not to be stopped although stop channel closed")
 		return
 	}
-	if !informer.IsStarted() {
+	if !isStarted(informer) {
 		t.Errorf("informer reports not to be started after it has been started and stopped")
 		return
 	}

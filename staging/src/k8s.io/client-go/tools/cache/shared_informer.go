@@ -131,16 +131,6 @@ import (
 // state, except that its ResourceVersion is replaced with a
 // ResourceVersion in which the object is actually absent.
 //
-// The informational methods (EventHandlerCount, IsStopped, IsStarted)
-// are intended to be used to manage informers in any upper informer
-// management layer for creating and destroying informers on-the fly when
-// adding or removing handlers.
-// Beware of race conditions: Such a layer must hide the basic informer
-// objects from its users and offer a closed *synchronized* view for informers.
-// Although these informational methods are synchronized each, in
-// sequences the state queried first might have been changed before
-// calling the next method, if other callers (or the stop channel)
-// are able to interact with the informer interface in parallel.
 type SharedInformer interface {
 	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
 	// period.  Events to a single handler are delivered sequentially, but there is no coordination
@@ -207,16 +197,10 @@ type SharedInformer interface {
 	// offloaded.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
 
-	// EventHandlerCount return the number of actually registered
-	// event handlers.
-	EventHandlerCount() int
-
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
+	// An informer already stopped will never be started again.
 	IsStopped() bool
-
-	// IsStarted reports whether the informer has already been started
-	IsStarted() bool
 }
 
 // ResourceEventHandlerHandle is a handle returned by the
@@ -636,26 +620,11 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	return nil
 }
 
-// IsStarted reports whether the informer has already been started
-func (s *sharedIndexInformer) IsStarted() bool {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
-	return s.started
-}
-
 // IsStopped reports whether the informer has already been stopped
 func (s *sharedIndexInformer) IsStopped() bool {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 	return s.stopped
-}
-
-// EventHandlerCount reports whether the informer still has registered
-// event handlers
-func (s *sharedIndexInformer) EventHandlerCount() int {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
-	return len(s.processor.listeners)
 }
 
 // RemoveEventHandlerByHandle tries to remove a formerly added event handler by its
