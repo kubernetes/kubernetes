@@ -113,55 +113,40 @@ func WithPriorityAndFairness(
 				waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
 			}
 		}
-		var resultCh chan interface{}
+
+		var execute func()
 		var forgetWatch utilflowcontrol.ForgetWatchFunc
+		var watchInitializationSignal utilflowcontrol.InitializationSignal
+		var shouldStartWatchCh chan struct{}
+		var watchReq *http.Request
+
 		if isWatchRequest {
-			resultCh = make(chan interface{})
-		}
-		execute := func() {
-			noteExecutingDelta(1)
-			defer noteExecutingDelta(-1)
-			served = true
+			shouldStartWatchCh = make(chan struct{})
+			execute = func() {
+				noteExecutingDelta(1)
+				defer noteExecutingDelta(-1)
+				served = true
+				setResponseHeaders(classification, w)
 
-			innerCtx := ctx
-			innerReq := r
-
-			var watchInitializationSignal utilflowcontrol.InitializationSignal
-			if isWatchRequest {
 				watchInitializationSignal = newInitializationSignal()
-				innerCtx = utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
-				innerReq = r.Clone(innerCtx)
-			}
-			setResponseHeaders(classification, w)
+				watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+				watchReq = r.Clone(watchCtx)
 
-			forgetWatch = fcIfc.RegisterWatch(requestInfo)
+				forgetWatch = fcIfc.RegisterWatch(requestInfo)
 
-			if isWatchRequest {
-				go func() {
-					defer func() {
-						err := recover()
-						// do not wrap the sentinel ErrAbortHandler panic value
-						if err != nil && err != http.ErrAbortHandler {
-							// Same as stdlib http server code. Manually allocate stack
-							// trace buffer size to prevent excessively large logs
-							const size = 64 << 10
-							buf := make([]byte, size)
-							buf = buf[:runtime.Stack(buf, false)]
-							err = fmt.Sprintf("%v\n%s", err, buf)
-						}
-						resultCh <- err
-					}()
-
-					// Protect from the situations when request will not reach storage layer
-					// and the initialization signal will not be send.
-					defer watchInitializationSignal.Signal()
-
-					handler.ServeHTTP(w, innerReq)
-				}()
+				// Notify that we should start watch
+				close(shouldStartWatchCh)
 
 				watchInitializationSignal.Wait()
-			} else {
-				handler.ServeHTTP(w, innerReq)
+			}
+		} else {
+			execute = func() {
+				noteExecutingDelta(1)
+				defer noteExecutingDelta(-1)
+				served = true
+				setResponseHeaders(classification, w)
+
+				handler.ServeHTTP(w, r)
 			}
 		}
 
@@ -171,13 +156,64 @@ func WithPriorityAndFairness(
 		width := widthEstimator.EstimateWidth(r)
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user, Width: width}
 
-		fcIfc.Handle(ctx, digest, note, func(inQueue bool) {
+		queueNote := func(inQueue bool) {
 			if inQueue {
 				noteWaitingDelta(1)
 			} else {
 				noteWaitingDelta(-1)
 			}
-		}, execute)
+		}
+
+		if isWatchRequest {
+			resultCh := make(chan interface{})
+			go func() {
+				defer func() {
+					err := recover()
+					// do not wrap the sentinel ErrAbortHandler panic value
+					if err != nil && err != http.ErrAbortHandler {
+						// Same as stdlib http server code. Manually allocate stack
+						// trace buffer size to prevent excessively large logs
+						const size = 64 << 10
+						buf := make([]byte, size)
+						buf = buf[:runtime.Stack(buf, false)]
+						err = fmt.Sprintf("%v\n%s", err, buf)
+					}
+
+					// This ensure we put something to resultCh independently
+					// if the request was actually executed or not.
+					resultCh <- err
+				}()
+
+				fcIfc.Handle(ctx, digest, note, queueNote, execute)
+			}()
+
+			select {
+			case <-shouldStartWatchCh:
+				// TODO: In case of panic from the underlying handler, there is
+				//  a possibility to leak the the goroutine started from execute()
+				// if watchInitializationSignal wasn't signaled.
+				// Consider adding deferred recover func to handle it.
+				handler.ServeHTTP(w, watchReq)
+				// Protect from the situations when request will not reach storage layer
+				// and the initialization signal will not be send.
+				watchInitializationSignal.Signal()
+				// Ensure we consume the resultCh error.
+				if err := <-resultCh; err != nil {
+					panic(err)
+				}
+			case err := <-resultCh:
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			if forgetWatch != nil {
+				forgetWatch()
+			}
+		} else {
+			fcIfc.Handle(ctx, digest, note, queueNote, execute)
+		}
+
 		if !served {
 			setResponseHeaders(classification, w)
 
@@ -187,25 +223,7 @@ func WithPriorityAndFairness(
 				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
-			if isWatchRequest {
-				close(resultCh)
-			}
 			tooManyRequests(r, w)
-		}
-
-		// For watch requests, from the APF point of view the request is already
-		// finished at this point. However, that doesn't mean it is already finished
-		// from the non-APF point of view. So we need to wait here until the request is:
-		// 1) finished being processed or
-		// 2) rejected
-		if isWatchRequest {
-			if forgetWatch != nil {
-				forgetWatch()
-			}
-			err := <-resultCh
-			if err != nil {
-				panic(err)
-			}
 		}
 	})
 }
