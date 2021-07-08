@@ -30,7 +30,7 @@ The check implementation looks at the appropriate value based on version.
 
 func init() {
 	fixtureData_baseline_1_0 := fixtureGenerator{
-		expectErrorSubstring: "seccomp profile",
+		expectErrorSubstring: "seccompProfile",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod already has seccomp config
 			if val, ok := p.Annotations[annotationKeyPod]; ok &&
@@ -41,14 +41,11 @@ func init() {
 			p = ensureAnnotation(p)
 			return []*corev1.Pod{
 				tweak(p, func(p *corev1.Pod) {
+					// pod-level default
 					p.Annotations[annotationKeyPod] = corev1.SeccompProfileRuntimeDefault
-					p.Annotations[annotationKeyContainer(p.Spec.Containers[0])] = corev1.SeccompProfileRuntimeDefault
-					p.Annotations[annotationKeyContainer(p.Spec.InitContainers[0])] = corev1.SeccompProfileRuntimeDefault
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Annotations[annotationKeyPod] = corev1.SeccompLocalhostProfileNamePrefix + "testing"
+					// container-level localhost
 					p.Annotations[annotationKeyContainer(p.Spec.Containers[0])] = corev1.SeccompLocalhostProfileNamePrefix + "testing"
-					p.Annotations[annotationKeyContainer(p.Spec.InitContainers[0])] = corev1.SeccompLocalhostProfileNamePrefix + "testing"
+					// init-container unset
 				}),
 			}
 		},
@@ -69,7 +66,7 @@ func init() {
 	}
 
 	fixtureData_baseline_1_19 := fixtureGenerator{
-		expectErrorSubstring: "seccomp profile",
+		expectErrorSubstring: "seccompProfile",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod already has seccomp config
 			if p.Spec.SecurityContext != nil &&
@@ -81,14 +78,11 @@ func init() {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				tweak(p, func(p *corev1.Pod) {
+					// pod-level default
 					p.Spec.SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
+					// container-level localhost
 					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
-					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileRuntimeDefault
-				}),
-				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.SeccompProfile = seccompProfileLocalhost("testing")
-					p.Spec.Containers[0].SecurityContext.SeccompProfile = seccompProfileLocalhost("testing")
-					p.Spec.InitContainers[0].SecurityContext.SeccompProfile = seccompProfileLocalhost("testing")
+					// init-container unset
 				}),
 			}
 		},
@@ -109,12 +103,12 @@ func init() {
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "seccomp_baseline"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "seccompProfile_baseline"},
 		fixtureData_baseline_1_0,
 	)
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 19), check: "seccomp_baseline"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 19), check: "seccompProfile_baseline"},
 		fixtureData_baseline_1_19,
 	)
 }
