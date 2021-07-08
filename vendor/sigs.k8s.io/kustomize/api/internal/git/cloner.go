@@ -4,7 +4,7 @@
 package git
 
 import (
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // Cloner is a function that can clone a git repo.

@@ -6,7 +6,7 @@ package loader
 import (
 	"fmt"
 
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type LoadRestrictorFunc func(

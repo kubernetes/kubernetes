@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -177,11 +178,24 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		audit.AddAuditAnnotation(ctx, podsecurityadmissionapi.AuditAnnotationPrefix+k, v)
 	}
 	if !result.Allowed {
-		if result.Result != nil && len(result.Result.Message) > 0 {
-			// TODO: use code/reason/etc from status
-			return admission.NewForbidden(a, errors.New(result.Result.Message))
+		// start with a generic forbidden error
+		retval := admission.NewForbidden(a, errors.New("Not allowed by PodSecurity")).(*apierrors.StatusError)
+		// use message/reason/details/code from admission library if populated
+		if result.Result != nil {
+			if len(result.Result.Message) > 0 {
+				retval.ErrStatus.Message = result.Result.Message
+			}
+			if len(result.Result.Reason) > 0 {
+				retval.ErrStatus.Reason = result.Result.Reason
+			}
+			if result.Result.Details != nil {
+				retval.ErrStatus.Details = result.Result.Details
+			}
+			if result.Result.Code != 0 {
+				retval.ErrStatus.Code = result.Result.Code
+			}
 		}
-		return admission.NewForbidden(a, errors.New("Not allowed by PodSecurity"))
+		return retval
 	}
 	return nil
 }

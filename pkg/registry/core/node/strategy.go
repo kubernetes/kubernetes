@@ -141,7 +141,9 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+}
 
 // Canonicalize normalizes the object after validation.
 func (nodeStrategy) Canonicalize(obj runtime.Object) {
@@ -155,7 +157,7 @@ func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object)
 
 // WarningsOnUpdate returns warnings for the given update.
 func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return dynamicKubeletConfigIsDeprecatedWarning(obj)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -282,4 +284,15 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 
 	// Otherwise, return the requested scheme and port, and the proxy transport
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
+}
+
+func dynamicKubeletConfigIsDeprecatedWarning(obj runtime.Object) []string {
+	newNode := obj.(*api.Node)
+	if newNode.Spec.ConfigSource != nil {
+		var warnings []string
+		// KEP https://github.com/kubernetes/enhancements/issues/281
+		warnings = append(warnings, "spec.configSource: deprecated in v1.22, support removal is planned in v1.23")
+		return warnings
+	}
+	return nil
 }
