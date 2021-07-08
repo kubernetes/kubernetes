@@ -3093,6 +3093,14 @@ type PodSpec struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,15,rep,name=imagePullSecrets"`
+	// ImagePullTokens is a list of Kubernetes ServiceAccount JWT tokens to use
+	// for making image pulls. Kubelet will request the tokens and pass them
+	// to credential provider plugins when pulling images. Plugins may use the
+	// token, for instance, to request a token that can authenticate to the
+	// target registry.
+	// +optional
+	// +listType=atomic
+	ImagePullTokens []ImagePullTokenSpec `json:"imagePullTokens,omitempty" protobuf:"bytes,36,rep,name=imagePullTokens"`
 	// Specifies the hostname of the Pod
 	// If not specified, the pod's hostname will be set to a system-defined value.
 	// +optional
@@ -4457,6 +4465,15 @@ type ServiceAccount struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
 	// +optional
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" protobuf:"bytes,3,rep,name=imagePullSecrets"`
+
+	// ImagePullTokens is a list of Kubernetes ServiceAccount JWT tokens to use
+	// for making image pulls. Kubelet will request the tokens and pass them
+	// to credential provider plugins when pulling images. Plugins may use the
+	// token, for instance, to request a token that can authenticate to the
+	// target registry.
+	// +optional
+	// +listType=atomic
+	ImagePullTokens []ImagePullTokenSpec `json:"imagePullTokens,omitempty" protobuf:"bytes,5,rep,name=imagePullTokens"`
 
 	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
 	// Can be overridden at the pod level.
@@ -6021,6 +6038,31 @@ type ConfigMapList struct {
 
 	// Items is the list of ConfigMaps.
 	Items []ConfigMap `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// ImagePullTokenSpec specifies a token to use for image pulls
+type ImagePullTokenSpec struct {
+	// MatchImages determines which images the token will be used to pull.
+	// Same specification as https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2133-kubelet-credential-providers#credential-provider-configuration
+	// (basically glob patterns). Empty means "match all images in the Pod"
+	// in this case.
+	// +optional
+	// +listType=atomic
+	MatchImages []string `json:"matchImages,omitempty" protobuf:"bytes,1,rep,name=matchImages"`
+
+	// TODO(mtaufen): _Probably_ shouldn't default this to kube-apiserver as an audience.
+	// TODO(mtaufen): Any reason to allow multiple audiences here?
+
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token.
+	// +optional
+	Audience string `json:"audience,omitempty" protobuf:"bytes,2,opt,name=audience"`
+
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token.
+	// +optional
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,3,opt,name=expirationSeconds"`
 }
 
 // Type and constants for component health validation.

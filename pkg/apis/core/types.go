@@ -2800,6 +2800,13 @@ type PodSpec struct {
 	// in the case of docker, only DockerConfig type secrets are honored.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
+	// ImagePullTokens is a list of Kubernetes ServiceAccount JWT tokens to use
+	// for making image pulls. Kubelet will request the tokens and pass them
+	// to credential provider plugins when pulling images. Plugins may use the
+	// token, for instance, to request a token that can authenticate to the
+	// target registry.
+	// +optional
+	ImagePullTokens []ImagePullTokenSpec
 	// Specifies the hostname of the Pod.
 	// If not specified, the pod's hostname will be set to a system-defined value.
 	// +optional
@@ -3858,6 +3865,14 @@ type ServiceAccount struct {
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
+
+	// ImagePullTokens is a list of Kubernetes ServiceAccount JWT tokens to use
+	// for making image pulls. Kubelet will request the tokens and pass them
+	// to credential provider plugins when pulling images. Plugins may use the
+	// token, for instance, to request a token that can authenticate to the
+	// target registry.
+	// +optional
+	ImagePullTokens []ImagePullTokenSpec
 
 	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
 	// Can be overridden at the pod level.
@@ -5233,6 +5248,27 @@ const (
 	// and data streams for a single forwarded connection
 	PortForwardRequestIDHeader = "requestID"
 )
+
+// ImagePullTokenSpec specifies a token to use for image pulls
+type ImagePullTokenSpec struct {
+	// MatchImages determines which images the token will be used to pull.
+	// Same specification as https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2133-kubelet-credential-providers#credential-provider-configuration
+	// (basically glob patterns). Empty means "match all images in the Pod"
+	// in this case.
+	// +optional
+	MatchImages []string
+
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token.
+	// +optional
+	Audience string
+
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token.
+	// +optional
+	ExpirationSeconds *int64
+}
 
 // ComponentConditionType defines type and constants for component health validation.
 type ComponentConditionType string
