@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -43,11 +44,17 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targets []*types.T
 			t.FieldPaths = []string{types.DefaultReplacementFieldPath}
 		}
 		for _, n := range nodes {
-			id := makeResId(n)
-			if id.IsSelectedBy(t.Select.ResId) && !rejectId(t.Reject, id) {
-				err := applyToNode(n, value, t)
-				if err != nil {
-					return nil, err
+			ids, err := utils.MakeResIds(n)
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range ids {
+				if id.IsSelectedBy(t.Select.ResId) && !rejectId(t.Reject, &id) {
+					err := applyToNode(n, value, t)
+					if err != nil {
+						return nil, err
+					}
+					break
 				}
 			}
 		}
@@ -66,7 +73,7 @@ func rejectId(rejects []*types.Selector, id *resid.ResId) bool {
 
 func applyToNode(node *yaml.RNode, value *yaml.RNode, target *types.TargetSelector) error {
 	for _, fp := range target.FieldPaths {
-		fieldPath := strings.Split(fp, ".")
+		fieldPath := utils.SmarterPathSplitter(fp, ".")
 		var t *yaml.RNode
 		var err error
 		if target.Options != nil && target.Options.Create {
@@ -87,12 +94,11 @@ func applyToNode(node *yaml.RNode, value *yaml.RNode, target *types.TargetSelect
 }
 
 func setTargetValue(options *types.FieldOptions, t *yaml.RNode, value *yaml.RNode) error {
+	value = value.Copy()
 	if options != nil && options.Delimiter != "" {
-
 		if t.YNode().Kind != yaml.ScalarNode {
 			return fmt.Errorf("delimiter option can only be used with scalar nodes")
 		}
-
 		tv := strings.Split(t.YNode().Value, options.Delimiter)
 		v := yaml.GetValue(value)
 		// TODO: Add a way to remove an element
@@ -119,7 +125,7 @@ func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, err
 	if r.Source.FieldPath == "" {
 		r.Source.FieldPath = types.DefaultReplacementFieldPath
 	}
-	fieldPath := strings.Split(r.Source.FieldPath, ".")
+	fieldPath := utils.SmarterPathSplitter(r.Source.FieldPath, ".")
 
 	rn, err := source.Pipe(yaml.Lookup(fieldPath...))
 	if err != nil {
@@ -152,30 +158,23 @@ func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, 
 func selectSourceNode(nodes []*yaml.RNode, selector *types.SourceSelector) (*yaml.RNode, error) {
 	var matches []*yaml.RNode
 	for _, n := range nodes {
-		if makeResId(n).IsSelectedBy(selector.ResId) {
-			if len(matches) > 0 {
-				return nil, fmt.Errorf(
-					"multiple matches for selector %s", selector)
+		ids, err := utils.MakeResIds(n)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			if id.IsSelectedBy(selector.ResId) {
+				if len(matches) > 0 {
+					return nil, fmt.Errorf(
+						"multiple matches for selector %s", selector)
+				}
+				matches = append(matches, n)
+				break
 			}
-			matches = append(matches, n)
 		}
 	}
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("nothing selected by %s", selector)
 	}
 	return matches[0], nil
-}
-
-// makeResId makes a ResId from an RNode.
-func makeResId(n *yaml.RNode) *resid.ResId {
-	apiVersion := n.Field(yaml.APIVersionField)
-	var group, version string
-	if apiVersion != nil {
-		group, version = resid.ParseGroupVersion(yaml.GetValue(apiVersion.Value))
-	}
-	return &resid.ResId{
-		Gvk:       resid.Gvk{Group: group, Version: version, Kind: n.GetKind()},
-		Name:      n.GetName(),
-		Namespace: n.GetNamespace(),
-	}
 }

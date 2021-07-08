@@ -236,7 +236,7 @@ func (n *fsNode) CleanedAbs(path string) (ConfirmedDir, string, error) {
 		return "", "", errors.Wrap(err, "unable to clean")
 	}
 	if node == nil {
-		return "", "", fmt.Errorf("'%s' doesn't exist", path)
+		return "", "", notExistError(path)
 	}
 	if node.isNodeADir() {
 		return ConfirmedDir(node.Path()), "", nil
@@ -309,7 +309,8 @@ func (n *fsNode) RemoveAll(path string) error {
 		return err
 	}
 	if result == nil {
-		return fmt.Errorf("cannot find '%s' to remove it", path)
+		// If the path doesn't exist, no need to remove anything.
+		return nil
 	}
 	return result.Remove()
 }
@@ -349,6 +350,32 @@ func (n *fsNode) IsDir(path string) bool {
 	return result.isNodeADir()
 }
 
+// ReadDir implements FileSystem.
+func (n *fsNode) ReadDir(path string) ([]string, error) {
+	if !n.Exists(path) {
+		return nil, notExistError(path)
+	}
+	if !n.IsDir(path) {
+		return nil, fmt.Errorf("%s is not a directory", path)
+	}
+
+	dir, err := n.Find(path)
+	if err != nil {
+		return nil, err
+	}
+	if dir == nil {
+		return nil, fmt.Errorf("could not find directory %s", path)
+	}
+
+	keys := make([]string, len(dir.dir))
+	i := 0
+	for k := range dir.dir {
+		keys[i] = k
+		i++
+	}
+	return keys, nil
+}
+
 // Size returns the size of the node.
 func (n *fsNode) Size() int64 {
 	if n.isNodeADir() {
@@ -375,7 +402,7 @@ func (n *fsNode) Open(path string) (File, error) {
 		return nil, err
 	}
 	if result == nil {
-		return nil, fmt.Errorf("cannot find '%s' to open it", path)
+		return nil, notExistError(path)
 	}
 	if result.offset != nil {
 		return nil, fmt.Errorf("cannot open previously opened file '%s'", path)
@@ -400,7 +427,7 @@ func (n *fsNode) ReadFile(path string) (c []byte, err error) {
 		return nil, err
 	}
 	if result == nil {
-		return nil, fmt.Errorf("cannot find '%s' to read it", path)
+		return nil, notExistError(path)
 	}
 	if result.isNodeADir() {
 		return nil, fmt.Errorf("cannot read content from non-file '%s'", n.Path())
@@ -467,7 +494,7 @@ func (n *fsNode) Walk(path string, walkFn filepath.WalkFunc) error {
 		return err
 	}
 	if result == nil {
-		return fmt.Errorf("cannot find '%s' to walk it", path)
+		return notExistError(path)
 	}
 	return result.WalkMe(walkFn)
 }
@@ -560,7 +587,7 @@ func isLegalFileNameForCreation(n string) bool {
 func (n *fsNode) RegExpGlob(pattern string) ([]string, error) {
 	var result []string
 	var expression = regexp.MustCompile(pattern)
-	n.WalkMe(func(path string, info os.FileInfo, err error) error {
+	err := n.WalkMe(func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -571,6 +598,9 @@ func (n *fsNode) RegExpGlob(pattern string) ([]string, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 	sort.Strings(result)
 	return result, nil
 }
@@ -582,7 +612,7 @@ func (n *fsNode) RegExpGlob(pattern string) ([]string, error) {
 // This is how /bin/ls behaves.
 func (n *fsNode) Glob(pattern string) ([]string, error) {
 	var result []string
-	n.WalkMe(func(path string, info os.FileInfo, err error) error {
+	err := n.WalkMe(func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -597,6 +627,16 @@ func (n *fsNode) Glob(pattern string) ([]string, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 	sort.Strings(result)
 	return result, nil
 }
+
+// notExistError indicates that a file or directory does not exist.
+// Unwrapping returns os.ErrNotExist so errors.Is(err, os.ErrNotExist) works correctly.
+type notExistError string
+
+func (err notExistError) Error() string { return fmt.Sprintf("'%s' doesn't exist", string(err)) }
+func (err notExistError) Unwrap() error { return os.ErrNotExist }

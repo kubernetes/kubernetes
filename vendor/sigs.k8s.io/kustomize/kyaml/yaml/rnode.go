@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
 )
 
@@ -544,6 +544,32 @@ func (rn *RNode) GetBinaryDataMap() map[string]string {
 		return nil
 	})
 	return result
+}
+
+// GetValidatedDataMap retrieves the data map and returns an error if the data
+// map contains entries which are not included in the expectedKeys set.
+func (rn *RNode) GetValidatedDataMap(expectedKeys []string) (map[string]string, error) {
+	dataMap := rn.GetDataMap()
+	err := rn.validateDataMap(dataMap, expectedKeys)
+	return dataMap, err
+}
+
+func (rn *RNode) validateDataMap(dataMap map[string]string, expectedKeys []string) error {
+	if dataMap == nil {
+		return fmt.Errorf("The datamap is unassigned")
+	}
+	for key := range dataMap {
+		found := false
+		for _, expected := range expectedKeys {
+			if expected == key {
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("an unexpected key (%v) was found", key)
+		}
+	}
+	return nil
 }
 
 func (rn *RNode) SetDataMap(m map[string]string) {
