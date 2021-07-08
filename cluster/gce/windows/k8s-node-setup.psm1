@@ -1584,9 +1584,10 @@ function Install_Containerd {
   $tmp_dir = 'C:\containerd_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
-  # TODO(ibrahimab) Change this to a gcs bucket with CI maintained and accessible by community.
-  $version = '1.4.4'
-  $tar_url = ("https://github.com/containerd/containerd/releases/download/v${version}/" +
+  # TODO(ibrahimab) Change this to pick from a CI maintained and accessible by community.
+  # Current (1.5.2) version on the gke-release bucket is patched with PR pull/5411 on containerd repo.
+  $version = '1.5.2'
+  $tar_url = ("https://storage.googleapis.com/gke-release/winnode/containerd/${version}/" +
               "cri-containerd-cni-${version}-windows-amd64.tar.gz")
   $sha_url = $tar_url + ".sha256sum"
   MustDownload-File -URLs $sha_url -OutFile $tmp_dir\sha256sum
