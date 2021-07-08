@@ -76,7 +76,7 @@ const (
 	largeClusterThreshold = 100
 
 	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
+	awsControlPlaneIP = "172.20.0.9"
 
 	// AllContainers specifies that all containers be visited
 	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
@@ -187,8 +187,8 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
-// MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
-func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
+// ControlPlaneOSDistroIs returns true if the master OS distro is included in the supportedControlPlaneOsDistros. Otherwise false.
+func ControlPlaneOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
 		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
 			return true
@@ -1291,7 +1291,7 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 			ips.Insert(ip)
 		}
 	case "aws":
-		ips.Insert(awsMasterIP)
+		ips.Insert(awsControlPlaneIP)
 	default:
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
