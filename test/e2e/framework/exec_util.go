@@ -58,7 +58,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 	const tty = false
 
-	Logf("ExecWithOptions: Clientset creation ")
+	Logf("ExecWithOptions: Clientset creation")
 	req := f.ClientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
