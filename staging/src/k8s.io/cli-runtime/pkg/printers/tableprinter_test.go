@@ -740,7 +740,7 @@ func TestStringPrinting(t *testing.T) {
 				{Cells: []interface{}{"test1", "20h", "This is first line\nThis is second line\nThis is third line\nand another one\n"}},
 			},
 			expected: `NAME    AGE   DESCRIPTION
-test1   20h   This is first line + 56 more...
+test1   20h   This is first line...
 `,
 		},
 		// lengthy string
@@ -754,7 +754,7 @@ test1   20h   This is first line + 56 more...
 				{Cells: []interface{}{"test1", "20h", "This is first line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
 			},
 			expected: `NAME    AGE   DESCRIPTION
-test1   20h   This is first line which is long and goes for on and on and on an on and on and on and on and on and + 38 more...
+test1   20h   This is first line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on
 `,
 		},
 		// lengthy string + newline
@@ -768,7 +768,7 @@ test1   20h   This is first line which is long and goes for on and on and on an 
 				{Cells: []interface{}{"test1", "20h", "This is first\n line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
 			},
 			expected: `NAME    AGE   DESCRIPTION
-test1   20h   This is first + 126 more...
+test1   20h   This is first...
 `,
 		},
 	}
