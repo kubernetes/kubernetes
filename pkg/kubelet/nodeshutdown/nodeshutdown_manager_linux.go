@@ -103,6 +103,10 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		shutdownGracePeriodCriticalPods: conf.ShutdownGracePeriodCriticalPods,
 		clock:                           conf.Clock,
 	}
+	klog.InfoS("Creating node shutdown manager",
+		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
+		"shutdownGracePeriodCriticalPods", conf.ShutdownGracePeriodCriticalPods,
+	)
 	return manager, manager
 }
 
