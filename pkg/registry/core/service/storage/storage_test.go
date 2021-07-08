@@ -86,7 +86,7 @@ func validService() *api.Service {
 		svctest.SetIPFamilies(api.IPv4Protocol))
 }
 
-func TestCreate(t *testing.T) {
+func TestGenericCreate(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -103,7 +103,7 @@ func TestCreate(t *testing.T) {
 	)
 }
 
-func TestUpdate(t *testing.T) {
+func TestGenericUpdate(t *testing.T) {
 	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
@@ -134,7 +134,7 @@ func TestUpdate(t *testing.T) {
 	)
 }
 
-func TestDelete(t *testing.T) {
+func TestGenericDelete(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -142,7 +142,7 @@ func TestDelete(t *testing.T) {
 	test.TestDelete(validService())
 }
 
-func TestGet(t *testing.T) {
+func TestGenericGet(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -150,7 +150,7 @@ func TestGet(t *testing.T) {
 	test.TestGet(validService())
 }
 
-func TestList(t *testing.T) {
+func TestGenericList(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -158,7 +158,7 @@ func TestList(t *testing.T) {
 	test.TestList(validService())
 }
 
-func TestWatch(t *testing.T) {
+func TestGenericWatch(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -182,7 +182,7 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-func TestShortNames(t *testing.T) {
+func TestGenericShortNames(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -190,7 +190,7 @@ func TestShortNames(t *testing.T) {
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
-func TestCategories(t *testing.T) {
+func TestGenericCategories(t *testing.T) {
 	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
