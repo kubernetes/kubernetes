@@ -17,6 +17,7 @@ limitations under the License.
 package policy
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,19 +53,19 @@ spec.initContainers[*].securityContext.seLinuxOptions.role
 */
 
 func init() {
-	addCheck(CheckSELinux)
+	addCheck(CheckSELinuxOptions)
 }
 
-// CheckSELinux returns a baseline level check
+// CheckSELinuxOptions returns a baseline level check
 // that limits seLinuxOptions type, user, and role values in 1.0+
-func CheckSELinux() Check {
+func CheckSELinuxOptions() Check {
 	return Check{
-		ID:    "selinux",
+		ID:    "seLinuxOptions",
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       checkSelinux_1_0,
+				CheckPod:       seLinuxOptions_1_0,
 			},
 		},
 	}
@@ -74,36 +75,85 @@ var (
 	selinux_allowed_types_1_0 = sets.NewString("", "container_t", "container_init_t", "container_kvm_t")
 )
 
-func checkSelinux_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var forbiddenDetails []string
+func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	var (
+		// sources that set bad seLinuxOptions
+		badSetters []string
 
-	checkSelinuxOptions := func(path *field.Path, opts *corev1.SELinuxOptions) {
+		// invalid type values set
+		badTypes = sets.NewString()
+		// was user set?
+		setUser = false
+		// was role set?
+		setRole = false
+	)
+
+	validSELinuxOptions := func(opts *corev1.SELinuxOptions) bool {
+		valid := true
 		if !selinux_allowed_types_1_0.Has(opts.Type) {
-			forbiddenDetails = append(forbiddenDetails, path.Child("securityContext", "seLinuxOptions", "type").String())
+			valid = false
+			badTypes.Insert(opts.Type)
 		}
 		if len(opts.User) > 0 {
-			forbiddenDetails = append(forbiddenDetails, path.Child("securityContext", "seLinuxOptions", "user").String())
+			valid = false
+			setUser = true
 		}
 		if len(opts.Role) > 0 {
-			forbiddenDetails = append(forbiddenDetails, path.Child("securityContext", "seLinuxOptions", "role").String())
+			valid = false
+			setRole = true
 		}
+		return valid
 	}
 
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.SELinuxOptions != nil {
-		checkSelinuxOptions(field.NewPath("spec"), podSpec.SecurityContext.SELinuxOptions)
+		if !validSELinuxOptions(podSpec.SecurityContext.SELinuxOptions) {
+			badSetters = append(badSetters, "pod")
+		}
 	}
 
+	var badContainers []string
 	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
 		if container.SecurityContext != nil && container.SecurityContext.SELinuxOptions != nil {
-			checkSelinuxOptions(path, container.SecurityContext.SELinuxOptions)
+			if !validSELinuxOptions(container.SecurityContext.SELinuxOptions) {
+				badContainers = append(badContainers, container.Name)
+			}
 		}
 	})
+	if len(badContainers) > 0 {
+		badSetters = append(
+			badSetters,
+			fmt.Sprintf(
+				"%s %s",
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+			),
+		)
+	}
 
-	if len(forbiddenDetails) > 0 {
+	if len(badSetters) > 0 {
+		var badData []string
+		if len(badTypes) > 0 {
+			badData = append(badData, fmt.Sprintf(
+				"%s %s",
+				pluralize("type", "types", len(badTypes)),
+				joinQuote(badTypes.List()),
+			))
+			if setUser {
+				badData = append(badData, "user may not be set")
+			}
+			if setRole {
+				badData = append(badData, "role may not be set")
+			}
+		}
+
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "forbidden seLinuxOptions",
-			ForbiddenDetail: strings.Join(forbiddenDetails, ", "),
+			ForbiddenReason: "seLinuxOptions",
+			ForbiddenDetail: fmt.Sprintf(
+				`%s set forbidden securityContext.seLinuxOptions: %s`,
+				strings.Join(badSetters, " and "),
+				strings.Join(badData, "; "),
+			),
 		}
 	}
 	return CheckResult{Allowed: true}
