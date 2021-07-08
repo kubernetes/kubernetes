@@ -782,6 +782,13 @@ const (
 	// The user namespace has to be created before running kubelet.
 	// All the node components such as CRI need to be running in the same user namespace.
 	KubeletInUserNamespace featuregate.Feature = "KubeletInUserNamespace"
+
+	// owner: @xiaoxubeii
+	// kep: http://kep.k8s.io/2570
+	// alpha: v1.22
+	//
+	// Enables kubelet to support memory QoS with cgroups v2.
+	MemoryQoS featuregate.Feature = "MemoryQoS"
 )
 
 func init() {
@@ -898,6 +905,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
 	DelegateFSGroupToCSIDriver:                     {Default: false, PreRelease: featuregate.Alpha},
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
+	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -251,3 +251,7 @@ func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.Contai
 func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
 	return nil
 }
+
+func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
+	return nil
+}

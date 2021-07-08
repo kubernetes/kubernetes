@@ -327,6 +327,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.MemoryThrottlingFactor != nil {
+		in, out := &in.MemoryThrottlingFactor, &out.MemoryThrottlingFactor
+		*out = new(float64)
+		**out = **in
+	}
 	return
 }
 

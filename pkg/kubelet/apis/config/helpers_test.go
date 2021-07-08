@@ -249,5 +249,6 @@ var (
 		"VolumePluginDir",
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
+		"MemoryThrottlingFactor",
 	)
 )

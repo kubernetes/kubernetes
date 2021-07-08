@@ -147,6 +147,10 @@ func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.Contai
 	return nil
 }
 
+func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
+	return nil
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
