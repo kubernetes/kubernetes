@@ -186,11 +186,6 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		if allPods.Has(string(uid)) {
 			continue
 		}
-		// if the pod is within termination grace period, we shouldn't cleanup the underlying volumes
-		if kl.podKiller.IsPodPendingTerminationByUID(uid) {
-			klog.V(3).InfoS("Pod is pending termination", "podUID", uid)
-			continue
-		}
 		// If volumes have not been unmounted/detached, do not delete directory.
 		// Doing so may result in corruption of data.
 		// TODO: getMountedVolumePathListFromDisk() call may be redundant with

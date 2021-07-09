@@ -13,5 +13,5 @@ spec:
     runAsNonRoot: true
   volumes:
   - gcePersistentDisk:
-      pdName: testing
-    name: volume-gcepersistentdisk
+      pdName: test
+    name: volume1

@@ -25,7 +25,7 @@ import (
 
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
-		expectErrorSubstring: "forbidden procMount",
+		expectErrorSubstring: "procMount",
 		generatePass: func(p *v1.Pod) []*v1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
@@ -43,13 +43,13 @@ func init() {
 			return []*corev1.Pod{
 				// set proc mount of container to a forbidden value
 				tweak(p, func(copy *v1.Pod) {
-					inValidProcMountType := v1.UnmaskedProcMount
-					copy.Spec.Containers[0].SecurityContext.ProcMount = &inValidProcMountType
+					unmaskedProcMountType := v1.UnmaskedProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 				}),
 				// set proc mount of init container to a forbidden value
 				tweak(p, func(copy *v1.Pod) {
-					inValidProcMountType := v1.UnmaskedProcMount
-					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &inValidProcMountType
+					unmaskedProcMountType := v1.UnmaskedProcMount
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 				}),
 			}
 		},

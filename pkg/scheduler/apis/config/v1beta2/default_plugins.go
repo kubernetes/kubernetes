@@ -156,6 +156,8 @@ type pluginIndex struct {
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta2.PluginSet) v1beta2.PluginSet {
 	disabledPlugins := sets.NewString()
 	enabledCustomPlugins := make(map[string]pluginIndex)
+	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
+	replacedPluginIndex := sets.NewInt()
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
@@ -170,16 +172,22 @@ func mergePluginSet(defaultPluginSet, customPluginSet v1beta2.PluginSet) v1beta2
 			}
 			// The default plugin is explicitly re-configured, update the default plugin accordingly.
 			if customPlugin, ok := enabledCustomPlugins[defaultEnabledPlugin.Name]; ok {
-				klog.InfoS("Defaut plugin is explicitly re-configured and is overriding.", "plugin", defaultEnabledPlugin.Name)
-				// update the default plugin in place to preserve order
+				klog.InfoS("Default plugin is explicitly re-configured; overriding", "plugin", defaultEnabledPlugin.Name)
+				// Update the default plugin in place to preserve order.
 				defaultEnabledPlugin = customPlugin.plugin
-				// kick the plugin from the enabled list of custom plugins
-				customPluginSet.Enabled = append(customPluginSet.Enabled[:customPlugin.index], customPluginSet.Enabled[customPlugin.index+1:]...)
+				replacedPluginIndex.Insert(customPlugin.index)
 			}
 			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
 		}
 	}
 
-	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
+	// Append all the custom plugins which haven't replaced any default plugins.
+	// Note: duplicated custom plugins will still be appended here.
+	// If so, the instantiation of scheduler framework will detect it and abort.
+	for index, plugin := range customPluginSet.Enabled {
+		if !replacedPluginIndex.Has(index) {
+			enabledPlugins = append(enabledPlugins, plugin)
+		}
+	}
 	return v1beta2.PluginSet{Enabled: enabledPlugins}
 }

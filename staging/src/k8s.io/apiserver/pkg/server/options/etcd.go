@@ -206,11 +206,6 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 		}
 	}
 
-	// StorageConfig should use the storage object count tracker provided by server Config
-	if c.StorageObjectCountTracker != nil {
-		s.StorageConfig.ObjectCountTracker = c.StorageObjectCountTracker.OnCount
-	}
-
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{
 		Options:              *s,
 		TransformerOverrides: transformerOverrides,
@@ -222,12 +217,6 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-
-	// StorageConfig should use the storage object count tracker provided by server Config
-	if c.StorageObjectCountTracker != nil {
-		s.StorageConfig.ObjectCountTracker = c.StorageObjectCountTracker.OnCount
-	}
-
 	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
 }

@@ -24,6 +24,6 @@ spec:
     seccompProfile:
       type: RuntimeDefault
   volumes:
-  - name: volume-storageos
+  - name: volume1
     storageos:
       volumeName: test

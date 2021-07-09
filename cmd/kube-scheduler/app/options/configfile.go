@@ -87,30 +87,6 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 	}
 	cfg.Profiles = completedProfiles
 
-	if len(fileName) > 0 {
-		// Since the default component config lists all the default plugins as enabled
-		// without disabling them, we must explicitly disable all the plugins for each
-		// extension point using the "*" expression to ensure that the generated config
-		// file is usable
-		disabledPlugins := []config.Plugin{{Name: "*"}}
-		for i := range cfg.Profiles {
-			if cfg.Profiles[i].Plugins == nil {
-				continue
-			}
-			cfg.Profiles[i].Plugins.QueueSort.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.PreFilter.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.Filter.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.PostFilter.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.PreScore.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.Score.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.Reserve.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.Permit.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.PreBind.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.Bind.Disabled = disabledPlugins
-			cfg.Profiles[i].Plugins.PostBind.Disabled = disabledPlugins
-		}
-	}
-
 	buf, err := encodeConfig(cfg)
 	if err != nil {
 		return err

@@ -529,15 +529,13 @@ func GetKey(obj interface{}, t *testing.T) string {
 	}
 	val := reflect.ValueOf(obj).Elem()
 	name := val.FieldByName("Name").String()
-	kind := val.FieldByName("Kind").String()
-	// Note kind is not always set in the tests, so ignoring that for now
-	if len(name) == 0 || len(kind) == 0 {
+	if len(name) == 0 {
 		t.Errorf("Unexpected object %v", obj)
 	}
 
 	key, err := keyFunc(obj)
 	if err != nil {
-		t.Errorf("Unexpected error getting key for %v %v: %v", kind, name, err)
+		t.Errorf("Unexpected error getting key for %T %v: %v", val.Interface(), name, err)
 		return ""
 	}
 	return key
