@@ -1,6 +1,6 @@
 # apiserver
 
-Generic library for building a Kubernetes aggregated API server.
+Generic library for building a Kubernetes aggregated API server..
 
 
 ## Purpose
