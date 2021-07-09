@@ -732,6 +732,16 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
 
+		var cpuManagerPolicyOptions map[string]string
+		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+				cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
+			} else if s.CPUManagerPolicyOptions != nil {
+				return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
+					s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
+			}
+		}
+
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -756,6 +766,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				},
 				QOSReserved:                             *experimentalQOSReserved,
 				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
+				ExperimentalCPUManagerPolicyOptions:     cpuManagerPolicyOptions,
 				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
