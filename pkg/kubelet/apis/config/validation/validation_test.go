@@ -156,7 +156,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
-			"NodeSwapEnabled":         true,
+			"NodeSwap":                true,
 			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
@@ -241,7 +241,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
-			"NodeSwapEnabled":         true,
+			"NodeSwap":                true,
 			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
