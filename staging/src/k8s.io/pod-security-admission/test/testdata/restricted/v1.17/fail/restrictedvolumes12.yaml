@@ -17,6 +17,6 @@ spec:
     runAsNonRoot: true
   volumes:
   - azureFile:
-      secretName: testing
-      shareName: testing
-    name: volume-azurefile
+      secretName: test
+      shareName: test
+    name: volume1

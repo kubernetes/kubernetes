@@ -17,11 +17,11 @@ limitations under the License.
 package policy
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -34,7 +34,9 @@ spec.securityContext.runAsNonRoot
 spec.containers[*].securityContext.runAsNonRoot
 spec.initContainers[*].securityContext.runAsNonRoot
 
-**Allowed Values:** true
+**Allowed Values:**
+true
+undefined/null at container-level if pod-level is set to true
 */
 
 func init() {
@@ -57,47 +59,68 @@ func CheckRunAsNonRoot() Check {
 }
 
 func runAsNonRoot_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var forbiddenPaths []string
+	// things that explicitly set runAsNonRoot=false
+	var badSetters []string
 
-	// TODO: how to check ephemeral containers
-
-	containerCount := 0
-	containerRunAsNonRootCount := 0
 	podRunAsNonRoot := false
-
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
-		containerCount++
-		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil {
-			if !*container.SecurityContext.RunAsNonRoot {
-				forbiddenPaths = append(forbiddenPaths, path.Child("securityContext", "runAsNonRoot").String())
-			} else {
-				containerRunAsNonRootCount++
-			}
-		}
-	})
-
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsNonRoot != nil {
 		if !*podSpec.SecurityContext.RunAsNonRoot {
-			forbiddenPaths = append(forbiddenPaths, field.NewPath("spec").Child("securityContext", "runAsNonRoot").String())
+			badSetters = append(badSetters, "pod")
 		} else {
 			podRunAsNonRoot = true
 		}
 	}
 
+	// containers that explicitly set runAsNonRoot=false
+	var explicitlyBadContainers []string
+	// containers that didn't set runAsNonRoot and aren't caught by a pod-level runAsNonRoot=true
+	var implicitlyBadContainers []string
+
+	visitContainers(podSpec, func(container *corev1.Container) {
+		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil {
+			// container explicitly set runAsNonRoot
+			if !*container.SecurityContext.RunAsNonRoot {
+				// container explicitly set runAsNonRoot to a bad value
+				explicitlyBadContainers = append(explicitlyBadContainers, container.Name)
+			}
+		} else {
+			// container did not explicitly set runAsNonRoot
+			if !podRunAsNonRoot {
+				// no pod-level runAsNonRoot=true, so this container implicitly has a bad value
+				implicitlyBadContainers = append(implicitlyBadContainers, container.Name)
+			}
+		}
+	})
+
+	if len(explicitlyBadContainers) > 0 {
+		badSetters = append(
+			badSetters,
+			fmt.Sprintf(
+				"%s %s",
+				pluralize("container", "containers", len(explicitlyBadContainers)),
+				joinQuote(explicitlyBadContainers),
+			),
+		)
+	}
 	// pod or containers explicitly set runAsNonRoot=false
-	if len(forbiddenPaths) > 0 {
+	if len(badSetters) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "runAsNonRoot != false",
-			ForbiddenDetail: strings.Join(forbiddenPaths, ", "),
+			ForbiddenReason: "runAsNonRoot != true",
+			ForbiddenDetail: fmt.Sprintf("%s must not set securityContext.runAsNonRoot=false", strings.Join(badSetters, " and ")),
 		}
 	}
 
 	// pod didn't set runAsNonRoot and not all containers opted into runAsNonRoot
-	if podRunAsNonRoot == false && containerCount > containerRunAsNonRootCount {
+	if len(implicitlyBadContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "runAsNonRoot != false",
+			ForbiddenReason: "runAsNonRoot != true",
+			ForbiddenDetail: fmt.Sprintf(
+				"pod or %s %s must set securityContext.runAsNonRoot=true",
+				pluralize("container", "containers", len(implicitlyBadContainers)),
+				joinQuote(implicitlyBadContainers),
+			),
 		}
 	}
 

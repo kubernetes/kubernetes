@@ -19,6 +19,6 @@ spec:
       type: RuntimeDefault
   volumes:
   - glusterfs:
-      endpoints: testing
-      path: testing
-    name: volume-glusterfs
+      endpoints: test
+      path: test
+    name: volume1

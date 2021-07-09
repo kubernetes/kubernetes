@@ -16,7 +16,7 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-nfs
+  - name: volume1
     nfs:
-      path: /testing
-      server: testing
+      path: /test
+      server: test

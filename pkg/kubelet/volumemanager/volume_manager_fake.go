@@ -50,6 +50,11 @@ func (f *FakeVolumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	return nil
 }
 
+// WaitForUnmount is not implemented
+func (f *FakeVolumeManager) WaitForUnmount(pod *v1.Pod) error {
+	return nil
+}
+
 // GetMountedVolumesForPod is not implemented
 func (f *FakeVolumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	return nil

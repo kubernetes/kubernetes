@@ -18,4 +18,4 @@ spec:
   volumes:
   - hostPath:
       path: /dev/null
-    name: volume-hostpath
+    name: volume1

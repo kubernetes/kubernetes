@@ -1438,6 +1438,25 @@ function Configure_Dockerd {
  Restart-Service Docker
 }
 
+# Configures the TCP/IP parameters to be in sync with the GCP recommendation.
+# Not setting these values correctly can cause network issues for connections
+# that live longer than 10 minutes.
+# See: https://cloud.google.com/compute/docs/troubleshooting/general-tips#idle-connections
+function Set-WindowsTCPParameters {
+  Set-ItemProperty -Force -Confirm:$false -Path `
+    'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'KeepAliveInterval' -Type Dword -Value 1000
+  Set-ItemProperty -Force -Confirm:$false `
+    -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'KeepAliveTime' -Type Dword -Value 60000
+  Set-ItemProperty -Force -Confirm:$false `
+    -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' `
+    -Name 'TcpMaxDataRetransmissions' -Type Dword -Value 10
+
+  Log-Output 'TCP/IP Parameters'
+  Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters'
+}
+
 # Writes a CNI config file under $env:CNI_CONFIG_DIR for containerd.
 #
 # Prerequisites:

@@ -551,7 +551,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 
 	// create 2 api servers and 2 clients
 	for i := 0; i < 2; i++ {
-		// start master count api server
+		// start count api server
 		t.Logf("starting api server: %d", i)
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),

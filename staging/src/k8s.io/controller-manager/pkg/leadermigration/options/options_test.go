@@ -80,6 +80,25 @@ controllerLeaders: []
 				ControllerLeaders: []config.ControllerLeaderConfiguration{},
 			},
 		},
+		{
+			name:              "enabled, with custom configuration file (version v1beta1)",
+			flags:             []string{"--enable-leader-migration"},
+			enableFeatureGate: true,
+			expectEnabled:     true,
+			configContent: `
+apiVersion: controllermanager.config.k8s.io/v1beta1
+kind: LeaderMigrationConfiguration
+leaderName: test-leader-migration
+resourceLock: leases
+controllerLeaders: []
+`,
+			expectErr: false,
+			expectConfig: &config.LeaderMigrationConfiguration{
+				LeaderName:        "test-leader-migration",
+				ResourceLock:      "leases",
+				ControllerLeaders: []config.ControllerLeaderConfiguration{},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

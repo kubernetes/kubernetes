@@ -113,7 +113,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -185,6 +185,19 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 		result.CpuShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits
+
+	if enforceMemoryQoS {
+		memoryMin := int64(0)
+		if request, found := reqs[v1.ResourceMemory]; found {
+			memoryMin = request.Value()
+		}
+		if memoryMin > 0 {
+			result.Unified = map[string]string{
+				MemoryMin: strconv.FormatInt(memoryMin, 10),
+			}
+		}
+	}
+
 	return result
 }
 

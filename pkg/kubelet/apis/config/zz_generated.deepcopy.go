@@ -201,6 +201,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	if in.CPUManagerPolicyOptions != nil {
+		in, out := &in.CPUManagerPolicyOptions, &out.CPUManagerPolicyOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	if in.QOSReserved != nil {
 		in, out := &in.QOSReserved, &out.QOSReserved
@@ -281,6 +288,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.MemoryThrottlingFactor != nil {
+		in, out := &in.MemoryThrottlingFactor, &out.MemoryThrottlingFactor
+		*out = new(float64)
+		**out = **in
 	}
 	return
 }

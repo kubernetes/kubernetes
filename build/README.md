@@ -9,6 +9,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
      **Note**: You will want to set the Docker VM to have at least 8GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
+  **Note**: You will need to check if Docker CLI plugin buildx is properly installed. You can install buildx according to the [instructions](https://github.com/docker/buildx/blob/master/README.md#installing).
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
 You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.

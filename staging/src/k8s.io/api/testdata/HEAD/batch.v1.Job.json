@@ -1565,6 +1565,14 @@
     "active": 543081713,
     "succeeded": -377965530,
     "failed": 77405208,
-    "completedIndexes": "495"
+    "completedIndexes": "495",
+    "uncountedTerminatedPods": {
+      "succeeded": [
+        "Ʊ巭銔07?为Èá網抒h"
+      ],
+      "failed": [
+        "W"
+      ]
+    }
   }
 }

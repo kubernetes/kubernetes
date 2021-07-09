@@ -25,5 +25,5 @@ spec:
       type: RuntimeDefault
   volumes:
   - flocker:
-      datasetName: testing
-    name: volume-flocker
+      datasetName: test
+    name: volume1

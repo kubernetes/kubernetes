@@ -187,7 +187,7 @@ func TestSelectorImmutability(t *testing.T) {
 			},
 			map[string]string{"a": "b"},
 			map[string]string{"c": "d"},
-			field.ErrorList{},
+			nil,
 		},
 	}
 

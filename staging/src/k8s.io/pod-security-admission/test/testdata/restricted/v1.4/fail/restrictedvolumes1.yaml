@@ -13,5 +13,5 @@ spec:
     runAsNonRoot: true
   volumes:
   - awsElasticBlockStore:
-      volumeID: testing
-    name: volume-awselasticblockstore
+      volumeID: test
+    name: volume1

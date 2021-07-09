@@ -12,7 +12,7 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-portworxvolume
+  - name: volume1
     portworxVolume:
       fsType: ext4
-      volumeID: testing
+      volumeID: test
