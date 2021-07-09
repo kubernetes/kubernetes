@@ -166,6 +166,17 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			pod.Spec.ImagePullSecrets[i].Name = serviceAccount.ImagePullSecrets[i].Name
 		}
 	}
+	if len(pod.Spec.ImagePullTokens) == 0 {
+		pod.Spec.ImagePullTokens = make([]api.ImagePullTokenSpec, len(serviceAccount.ImagePullTokens))
+		for i := range serviceAccount.ImagePullTokens {
+			// TODO(mtaufen): just use conversion helpers? were they too slow hence the above?
+			pod.Spec.ImagePullTokens[i] = api.ImagePullTokenSpec{
+				MatchImages:       serviceAccount.ImagePullTokens[i].MatchImages,
+				Audience:          serviceAccount.ImagePullTokens[i].Audience,
+				ExpirationSeconds: serviceAccount.ImagePullTokens[i].ExpirationSeconds,
+			}
+		}
+	}
 
 	return s.Validate(ctx, a, o)
 }
