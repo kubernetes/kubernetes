@@ -86,6 +86,16 @@ func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx context.Co
 	return rest.OrphanDependents
 }
 
+type mutatingDeleteRESTStrategy struct {
+	runtime.ObjectTyper
+}
+
+func (t *mutatingDeleteRESTStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+	n := int64(10)
+	options.GracePeriodSeconds = &n
+	return true
+}
+
 type testRESTStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
@@ -2038,6 +2048,36 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestStoreDeleteCollectionNoMutateOptions(t *testing.T) {
+	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.DeleteStrategy = &mutatingDeleteRESTStrategy{scheme}
+	defer destroyFunc()
+
+	if _, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Create(testContext, podB, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	n := int64(50)
+	inputDeleteOptions := &metav1.DeleteOptions{GracePeriodSeconds: &n}
+	safeCopyOfDelete := inputDeleteOptions.DeepCopy()
+	// Delete all pods.
+	_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, inputDeleteOptions, &metainternalversion.ListOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(inputDeleteOptions, safeCopyOfDelete) {
+		t.Error(inputDeleteOptions)
 	}
 }
 
