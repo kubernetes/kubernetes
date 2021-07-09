@@ -3,7 +3,10 @@ package servicecacertpublisher
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -149,6 +152,44 @@ func (c *Publisher) processNextWorkItem() bool {
 	return true
 }
 
+var (
+	// default secure
+	// This annotation prompts the service ca operator to inject
+	// the service ca bundle into the configmap.
+	injectionAnnotation = map[string]string{
+		"service.beta.openshift.io/inject-cabundle": "true",
+	}
+	setAnnotationOnce = sync.Once{}
+)
+
+func getInjectionAnnotation() map[string]string {
+	setAnnotationOnce.Do(func() {
+		// this envvar can be used to get the kube-controller-manager to inject a vulnerable legacy service ca
+		// the kube-controller-manager carries no existing patches to launch, so we aren't going add new
+		// perma-flags.
+		// it would be nicer to find a way to pass this more obviously.  This is a deep side-effect.
+		// though ideally, we see this age out over time.
+		useVulnerable := os.Getenv("OPENSHIFT_USE_VULNERABLE_LEGACY_SERVICE_CA_CRT")
+		if len(useVulnerable) == 0 {
+			return
+		}
+		useVulnerableBool, err := strconv.ParseBool(useVulnerable)
+		if err != nil {
+			// caller went crazy, don't use this unless you're careful
+			panic(err)
+		}
+		if useVulnerableBool {
+			// This annotation prompts the service ca operator to inject
+			// the vulnerable, legacy service ca bundle into the configmap.
+			injectionAnnotation = map[string]string{
+				"service.alpha.openshift.io/inject-vulnerable-legacy-cabundle": "true",
+			}
+		}
+	})
+
+	return injectionAnnotation
+}
+
 func (c *Publisher) syncNamespace(ns string) (err error) {
 	startTime := time.Now()
 	defer func() {
@@ -156,11 +197,7 @@ func (c *Publisher) syncNamespace(ns string) (err error) {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
-	annotations := map[string]string{
-		// This annotation prompts the service ca operator to inject
-		// the service ca bundle into the configmap.
-		"service.beta.openshift.io/inject-cabundle": "true",
-	}
+	annotations := getInjectionAnnotation()
 
 	cm, err := c.cmLister.ConfigMaps(ns).Get(ServiceCACertConfigMapName)
 	switch {
