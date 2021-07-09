@@ -650,10 +650,15 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectedList := []*framework.PodInfo{medPriorityPodInfo, unschedulablePodInfo}
-	if !reflect.DeepEqual(expectedList, q.NominatedPodsForNode("node1")) {
-		t.Error("Unexpected list of nominated Pods for node.")
+	podInfos := q.NominatedPodsForNode("node1")
+	if diff := cmp.Diff(expectedList, podInfos); diff != "" {
+		t.Errorf("Unexpected list of nominated Pods for node: (-want, +got):\n%s", diff)
 	}
-	if q.NominatedPodsForNode("node2") != nil {
+	podInfos[0].Pod.Name = "not mpp"
+	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode("node1")); diff == "" {
+		t.Error("Expected list of nominated Pods for node2 is different from podInfos")
+	}
+	if len(q.NominatedPodsForNode("node2")) != 0 {
 		t.Error("Expected list of nominated Pods for node2 to be empty.")
 	}
 }
