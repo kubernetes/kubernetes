@@ -21,6 +21,7 @@ package nodeshutdown
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -329,15 +330,18 @@ func TestRestart(t *testing.T) {
 	syncNodeStatus := func() {}
 
 	var shutdownChan chan bool
+	var shutdownChanMut sync.Mutex
 	var connChan = make(chan struct{}, 1)
 
 	systemDbus = func() (dbusInhibiter, error) {
 		defer func() {
 			connChan <- struct{}{}
 		}()
-
-		shutdownChan = make(chan bool)
-		dbus := &fakeDbus{currentInhibitDelay: systemInhibitDelay, shutdownChan: shutdownChan, overrideSystemInhibitDelay: overrideSystemInhibitDelay}
+		ch := make(chan bool)
+		shutdownChanMut.Lock()
+		shutdownChan = ch
+		shutdownChanMut.Unlock()
+		dbus := &fakeDbus{currentInhibitDelay: systemInhibitDelay, shutdownChan: ch, overrideSystemInhibitDelay: overrideSystemInhibitDelay}
 		return dbus, nil
 	}
 
@@ -347,14 +351,15 @@ func TestRestart(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	for i := 0; i != 5; i++ {
+	for i := 0; i != 3; i++ {
 		select {
 		case <-time.After(dbusReconnectPeriod * 5):
 			t.Fatal("wait dbus connect timeout")
 		case <-connChan:
 		}
 
-		time.Sleep(time.Second)
+		shutdownChanMut.Lock()
 		close(shutdownChan)
+		shutdownChanMut.Unlock()
 	}
 }
