@@ -414,9 +414,9 @@ func (qs *queueSet) syncTimeLocked() {
 // been advancing, according to the logic in `doc.go`.
 func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	activeQueues := 0
-	seatsInUse := 0
+	seatsRequested := 0
 	for _, queue := range qs.queues {
-		seatsInUse += queue.seatsInUse
+		seatsRequested += (queue.seatsInUse + queue.requests.SeatsSum())
 		if queue.requests.Length() > 0 || queue.requestsExecuting > 0 {
 			activeQueues++
 		}
@@ -424,7 +424,7 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	if activeQueues == 0 {
 		return 0
 	}
-	return math.Min(float64(seatsInUse), float64(qs.dCfg.ConcurrencyLimit)) / float64(activeQueues)
+	return math.Min(float64(seatsRequested), float64(qs.dCfg.ConcurrencyLimit)) / float64(activeQueues)
 }
 
 // timeoutOldRequestsAndRejectOrEnqueueLocked encapsulates the logic required
