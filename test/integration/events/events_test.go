@@ -75,7 +75,9 @@ func TestEventCompatibility(t *testing.T) {
 			return false, err
 		}
 
-		if len(v1Events.Items) != 2 {
+		// Be sure that at least the events we sent in the test were delivered.
+		// To add any events from the kube-apiserver itself will require this tolerate additional events.
+		if len(v1Events.Items) < 2 {
 			return false, nil
 		}
 
@@ -84,9 +86,15 @@ func TestEventCompatibility(t *testing.T) {
 			return false, err
 		}
 
-		if len(events.Items) != 2 {
+		if len(events.Items) < 2 {
 			return false, nil
 		}
+
+		// Be sure that both APIs produce the same number of events.
+		if len(events.Items) != len(v1Events.Items) {
+			return false, nil
+		}
+
 		return true, nil
 	})
 	if err != nil {
