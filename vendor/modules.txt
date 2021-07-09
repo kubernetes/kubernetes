@@ -929,6 +929,7 @@ go.opentelemetry.io/otel/sdk/metric/controller/time
 go.opentelemetry.io/otel/sdk/metric/processor/basic
 go.opentelemetry.io/otel/sdk/metric/selector/simple
 # go.opentelemetry.io/otel/trace v0.20.0 => go.opentelemetry.io/otel/trace v0.20.0
+## explicit
 go.opentelemetry.io/otel/trace
 # go.opentelemetry.io/proto/otlp v0.7.0 => go.opentelemetry.io/proto/otlp v0.7.0
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
