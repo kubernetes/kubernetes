@@ -197,17 +197,8 @@ func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, extenders 
 		return nil, err
 	}
 	node := []*framework.NodeInfo{nodeInfo}
-	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, node)
-	if err != nil {
-		return nil, err
-	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
-	if err != nil {
-		return nil, err
-	}
-
-	return feasibleNodes, nil
+	return g.findFeasibleNodes(ctx, fwk, state, pod, diagnosis, node, extenders)
 }
 
 // Filters the nodes to find the ones that fit the pod based on the framework
@@ -250,16 +241,24 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 			return feasibleNodes, diagnosis, nil
 		}
 	}
-	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, allNodes)
-	if err != nil {
-		return nil, diagnosis, err
-	}
-
-	feasibleNodes, err = findNodesThatPassExtenders(extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	feasibleNodes, err := g.findFeasibleNodes(ctx, fwk, state, pod, diagnosis, allNodes, extenders)
 	if err != nil {
 		return nil, diagnosis, err
 	}
 	return feasibleNodes, diagnosis, nil
+}
+
+func (g *genericScheduler) findFeasibleNodes(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod, diagnosis framework.Diagnosis, nodes []*framework.NodeInfo, extenders []framework.Extender) ([]*v1.Node, error) {
+	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	feasibleNodes, err = findNodesThatPassExtenders(extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	if err != nil {
+		return nil, err
+	}
+	return feasibleNodes, nil
 }
 
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
