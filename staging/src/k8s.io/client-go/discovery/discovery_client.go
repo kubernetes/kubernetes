@@ -46,9 +46,6 @@ const (
 	defaultRetries = 2
 	// protobuf mime type
 	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
-	// defaultTimeout is the maximum amount of time per request when no timeout has been set on a RESTClient.
-	// Defaults to 32s in order to have a distinguishable length of time, relative to other timeouts that exist.
-	defaultTimeout = 32 * time.Second
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -462,9 +459,6 @@ func withRetries(maxRetries int, f func() ([]*metav1.APIGroup, []*metav1.APIReso
 func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
-	if config.Timeout == 0 {
-		config.Timeout = defaultTimeout
-	}
 	if config.Burst == 0 && config.QPS < 100 {
 		// discovery is expected to be bursty, increase the default burst
 		// to accommodate looking up resource info for many API groups.
