@@ -1036,7 +1036,7 @@ package()
   KUBE_OUTPUT_SUBPATH="${__output_subpath}" \
     KUBE_GIT_VERSION_FILE="${KUBE_ROOT}/${KUBE_GIT_VERSION_FILE}" \
     KUBE_GORUNNER_IMAGE="${__go_runner_image}" \
-    "${KUBE_ROOT}"/build/package-tarballs.sh
+    "${KUBE_ROOT}"/gke/build/package-tarballs.sh
 
   # For BoringCrypto, run associated hook for additional processing. This is
   # mainly about injecting the license and source code of dependencies into the
