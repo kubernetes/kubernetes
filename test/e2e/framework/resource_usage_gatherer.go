@@ -617,7 +617,7 @@ func getKubemarkControlPlaneComponentsResourceUsage() map[string]*kubemarkResour
 	// Get kubernetes component resource usage
 	sshResult, err := getControlPlaneUsageByPrefix("kube")
 	if err != nil {
-		Logf("Error when trying to SSH to controlplane machine. Skipping probe. %v", err)
+		Logf("Error when trying to SSH to control plane machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))
