@@ -156,10 +156,11 @@ func TestEndpointUpdates(t *testing.T) {
 
 }
 
-// TestEndpointWithTerminatingPod tests that terminating pods are NOT included in Endpoints
-// DO NOT update this test to include terminating endpoints. This test ensures that Endpoints
-// continue to exclude terminating endpoints for compatibility reasons. Only EndpointSlice
-// will contain terminating endpoints going forward.
+// TestEndpointWithTerminatingPod tests that terminating pods are NOT included in Endpoints.
+// This capability is only available in the newer EndpointSlice API and there are no plans to
+// include it for Endpoints. This test can be removed in the future if we decide to include
+// terminating endpoints in Endpoints, but in the mean time this test ensures we do not change
+// this behavior accidentally.
 func TestEndpointWithTerminatingPod(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
