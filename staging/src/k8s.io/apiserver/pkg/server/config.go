@@ -782,7 +782,7 @@ func eventReference() (*corev1.ObjectReference, error) {
 	}
 	if len(ns) == 0 {
 		pod = ""
-		ns = "kube-system"
+		ns = "openshift-kube-apiserver"
 	}
 	if len(pod) == 0 {
 		return &corev1.ObjectReference{
