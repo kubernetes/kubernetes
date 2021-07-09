@@ -164,7 +164,8 @@ func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.
 		return
 	}
 
-	ch <- metrics.NewLazyConstMetric(containerStartTimeDesc, metrics.GaugeValue, float64(s.StartTime.UnixNano())/float64(time.Second), s.Name, pod.PodRef.Name, pod.PodRef.Namespace)
+	ch <- metrics.NewLazyMetricWithTimestamp(s.StartTime.Time,
+		metrics.NewLazyConstMetric(containerStartTimeDesc, metrics.GaugeValue, float64(s.StartTime.UnixNano())/float64(time.Second), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
 }
 
 func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
