@@ -796,6 +796,13 @@ const (
 	//
 	// Allow fine-tuning of cpumanager policies
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
+
+	// owner: @jiahuif
+	// alpha: v1.21
+	// beta:  v1.22
+	//
+	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
+	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
 )
 
 func init() {
@@ -914,6 +921,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyOptions:                        {Default: false, PreRelease: featuregate.Alpha},
+	ControllerManagerLeaderMigration:               {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
