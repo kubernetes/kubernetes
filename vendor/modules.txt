@@ -503,7 +503,6 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/gonum/lapack => github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9
 # github.com/gonum/matrix => github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
-## explicit
 github.com/google/btree
 # github.com/google/btree => github.com/google/btree v1.0.0
 # github.com/google/cadvisor v0.39.0 => github.com/openshift/google-cadvisor v0.33.2-0.20210610135131-57b941c7657a
@@ -1027,10 +1026,8 @@ github.com/openshift/client-go/network/informers/externalversions/network
 github.com/openshift/client-go/network/informers/externalversions/network/v1
 github.com/openshift/client-go/network/listers/network/v1
 github.com/openshift/client-go/oauth/clientset/versioned
-github.com/openshift/client-go/oauth/clientset/versioned/fake
 github.com/openshift/client-go/oauth/clientset/versioned/scheme
 github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1
-github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1/fake
 github.com/openshift/client-go/oauth/informers/externalversions
 github.com/openshift/client-go/oauth/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/oauth/informers/externalversions/oauth
@@ -1086,7 +1083,6 @@ github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
 github.com/openshift/library-go/pkg/apiserver/admission/admissiontimeout
 github.com/openshift/library-go/pkg/apiserver/apiserverconfig
 github.com/openshift/library-go/pkg/apiserver/httprequest
-github.com/openshift/library-go/pkg/authentication/bootstrapauthenticator
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
 github.com/openshift/library-go/pkg/authorization/scopemetadata
 github.com/openshift/library-go/pkg/config/client
