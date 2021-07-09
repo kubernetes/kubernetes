@@ -95,6 +95,9 @@ func (cgroupName CgroupName) ToSystemd() string {
 	}
 	newparts := []string{}
 	for _, part := range cgroupName {
+		if strings.TrimSpace(part) == "" {
+			continue
+		}
 		part = escapeSystemdCgroupName(part)
 		newparts = append(newparts, part)
 	}

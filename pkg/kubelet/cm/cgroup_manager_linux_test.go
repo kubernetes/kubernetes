@@ -22,6 +22,8 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -123,6 +125,37 @@ func TestCgroupNameToSystemd(t *testing.T) {
 		if actual := testCase.input.ToSystemd(); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
+	}
+}
+
+func TestCgroupNameWithEmptyPartToSystemd(t *testing.T) {
+	testCases := []struct {
+		input    CgroupName
+		expected string
+	}{
+		{
+			input:    RootCgroupName,
+			expected: "/",
+		},
+		{
+			input:    NewCgroupName(RootCgroupName, "Burstable", ""),
+			expected: "/Burstable.slice",
+		},
+		{
+			input:    NewCgroupName(RootCgroupName, "", "Burstable", "pod-123"),
+			expected: "/Burstable.slice/Burstable-pod_123.slice",
+		},
+		{
+			input:    NewCgroupName(RootCgroupName, "BestEffort", "", "pod-6c1a4e95-6bb6-11e6-bc26-28d2444e470d", ""),
+			expected: "/BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice",
+		},
+		{
+			input:    NewCgroupName(RootCgroupName, "kubepods", ""),
+			expected: "/kubepods.slice",
+		},
+	}
+	for _, testCase := range testCases {
+		require.Equal(t, testCase.expected, testCase.input.ToSystemd())
 	}
 }
 
