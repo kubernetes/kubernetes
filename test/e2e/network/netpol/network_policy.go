@@ -1407,14 +1407,6 @@ func getK8sNamespaces(f *framework.Framework) (string, string, string, string, *
 	return rootNs, nsX, nsY, nsZ, newKubeManager(f)
 }
 
-// getK8sModel generates a network policy model using the framework's root namespace and cluster DNS domain.
-// This function is deterministic and has no side effects, so may be safely called multiple times.
-func getK8SModel(f *framework.Framework) (string, string, string, *Model, *kubeManager) {
-	nsX, nsY, nsZ, namespaces := getNamespaces(f.Namespace.GetName())
-	model := defaultModel(namespaces, framework.TestContext.ClusterDNSDomain)
-	return nsX, nsY, nsZ, model, newKubeManager(f)
-}
-
 // initializeResourcesByFixedNS uses the e2e framework to create all necessary namespace resources, cleaning up
 // network policies from the namespace if useFixedNamespace is set true, avoiding policies overlap of new tests.
 func initializeResourcesByFixedNS(f *framework.Framework) *Model {
