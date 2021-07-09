@@ -36,7 +36,7 @@ func init() {
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
-				// privileged set to false
+				// privileged explicitly set to false
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].SecurityContext.Privileged = pointer.BoolPtr(false)
 					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.BoolPtr(false)

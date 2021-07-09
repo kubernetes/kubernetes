@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -82,22 +83,59 @@ func checksForLevelAndVersion(checks []policy.Check, level api.Level, version ap
 	return retval, nil
 }
 
-// maxMinorVersionToTest returns the maximum minor version to exercise for a given set of checks.
-// checks are assumed to be well-formed and valid to pass to policy.NewEvaluator().
-func maxMinorVersionToTest(checks []policy.Check) (int, error) {
-	// start with the release under development (1.22 at time of writing).
-	// this can be incremented to the current version whenever is convenient.
-	maxTestMinor := 22
+// computeVersionsToTest returns all the versions that have distinct checks defined,
+// all the versions that have distinct minimal valid pod fixtures defined, and
+// any hard-coded versions that should always be tested.
+//
+// This lets us sparsely test all versions with distinct fixture or policy changes
+// without needing to exercise every intermediate version that had no changes.
+func computeVersionsToTest(t *testing.T, checks []policy.Check) []api.Version {
+	seenVersions := map[api.Version]bool{}
+
+	// include all versions we have registered distinct checks for
 	for _, check := range checks {
-		lastCheckVersion := check.Versions[len(check.Versions)-1].MinimumVersion
-		if lastCheckVersion.Major() != 1 {
-			return 0, fmt.Errorf("expected major version 1, got %d", lastCheckVersion.Major())
-		}
-		if lastCheckVersion.Minor() > maxTestMinor {
-			maxTestMinor = lastCheckVersion.Minor()
+		for _, checkVersion := range check.Versions {
+			if checkVersion.MinimumVersion.Major() != 1 {
+				t.Fatalf("expected major version 1, got %d", checkVersion.MinimumVersion.Major())
+			}
+			seenVersions[checkVersion.MinimumVersion] = true
 		}
 	}
-	return maxTestMinor, nil
+	if len(seenVersions) == 0 {
+		t.Fatal("no versions defined for checks")
+	}
+
+	// include all versions we have registered distinct fixtures for
+	for _, versionsForLevel := range minimalValidPods {
+		for version := range versionsForLevel {
+			if version.Major() != 1 {
+				t.Fatalf("expected major version 1, got %d", version.Major())
+			}
+			seenVersions[version] = true
+		}
+	}
+
+	alwaysIncludeVersions := []api.Version{
+		// include the oldest version by default
+		api.MajorMinorVersion(1, 0),
+		// include the release under development (1.22 at time of writing).
+		// this can be incremented to the current version whenever is convenient.
+		// TODO: find a way to use api.LatestVersion() here
+		api.MajorMinorVersion(1, 22),
+	}
+	for _, version := range alwaysIncludeVersions {
+		seenVersions[version] = true
+	}
+
+	versions := []api.Version{}
+	for version := range seenVersions {
+		versions = append(versions, version)
+	}
+	sort.Slice(versions, func(i, j int) bool { return versions[i].Older(versions[j]) })
+
+	// TODO: consider exposing an option to test all versions instead of sparse ones
+
+	return versions
 }
 
 type testWarningHandler struct {
@@ -140,15 +178,12 @@ func Run(t *testing.T, opts Options) {
 	if err != nil {
 		t.Fatalf("invalid checks: %v", err)
 	}
-	maxMinor, err := maxMinorVersionToTest(opts.Checks)
-	if err != nil {
-		t.Fatalf("invalid checks: %v", err)
-	}
+
+	versionsToTest := computeVersionsToTest(t, opts.Checks)
 
 	for _, level := range []api.Level{api.LevelBaseline, api.LevelRestricted} {
-		for minor := 0; minor <= maxMinor; minor++ {
-			version := api.MajorMinorVersion(1, minor)
-
+		for _, version := range versionsToTest {
+			minor := version.Minor()
 			// create test name
 			ns := fmt.Sprintf("podsecurity-%s-1-%d", level, minor)
 

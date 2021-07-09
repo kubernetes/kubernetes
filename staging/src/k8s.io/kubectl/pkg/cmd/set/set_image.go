@@ -66,7 +66,7 @@ type SetImageOptions struct {
 
 var (
 	imageResources = i18n.T(`
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`)
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`)
 
 	imageLong = templates.LongDesc(i18n.T(`
 		Update existing container image(s) of resources.

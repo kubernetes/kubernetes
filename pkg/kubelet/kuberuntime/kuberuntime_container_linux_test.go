@@ -20,6 +20,7 @@ package kuberuntime
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -36,7 +37,7 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
@@ -62,7 +63,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Stdin:       container.Stdin,
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), "", nil),
+		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), "", nil, enforceMemoryQoS),
 		Envs:        envs,
 	}
 	return expectedConfig
@@ -97,7 +98,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	expectedConfig := makeExpectedConfig(m, pod, 0)
+	expectedConfig := makeExpectedConfig(m, pod, 0, false)
 	containerConfig, _, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
@@ -143,6 +144,101 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
+}
+
+func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
+	pod2MemoryHigh := float64(memoryNodeAllocatable.Value()) * m.memoryThrottlingFactor
+
+	type expectedResult struct {
+		containerConfig *runtimeapi.LinuxContainerConfig
+		memoryLow       int64
+		memoryHigh      int64
+	}
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		expected *expectedResult
+	}{
+		{
+			name: "Request128MBLimit256MB",
+			pod:  pod1,
+			expected: &expectedResult{
+				m.generateLinuxContainerConfig(&pod1.Spec.Containers[0], pod1, new(int64), "", nil, true),
+				128 * 1024 * 1024,
+				int64(float64(256*1024*1024) * m.memoryThrottlingFactor),
+			},
+		},
+		{
+			name: "Request128MBWithoutLimit",
+			pod:  pod2,
+			expected: &expectedResult{
+				m.generateLinuxContainerConfig(&pod2.Spec.Containers[0], pod2, new(int64), "", nil, true),
+				128 * 1024 * 1024,
+				int64(pod2MemoryHigh),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		linuxConfig := m.generateLinuxContainerConfig(&test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
+		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
+		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
+		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
+	}
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
@@ -361,7 +457,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target)
+			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
 			}
@@ -452,7 +548,7 @@ func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m.memorySwapBehavior = tc.swapSetting
-			actual := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil)
+			actual := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
 			assert.Equal(t, tc.expected, actual.Resources.MemorySwapLimitInBytes, "memory swap config for %s", tc.name)
 		})
 	}

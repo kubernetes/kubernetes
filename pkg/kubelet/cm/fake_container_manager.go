@@ -227,3 +227,9 @@ func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.Contai
 	defer cm.Unlock()
 	return nil
 }
+
+func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
+	cm.Lock()
+	defer cm.Unlock()
+	return nil
+}

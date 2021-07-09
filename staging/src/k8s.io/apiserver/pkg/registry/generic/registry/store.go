@@ -982,6 +982,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 }
 
 // Delete removes the item from storage.
+// options can be mutated by rest.BeforeDelete due to a graceful deletion strategy.
 func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -1148,7 +1149,11 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
+				// DeepCopy the deletion options because individual graceful deleters communicate changes via a mutating
+				// function in the delete strategy called in the delete method.  While that is always ugly, it works
+				// when making a single call.  When making multiple calls via delete collection, the mutation applied to
+				// pod/A can change the option ultimately used for pod/B.
+				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options.DeepCopy()); err != nil && !apierrors.IsNotFound(err) {
 					klog.V(4).InfoS("Delete object in DeleteCollection failed", "object", klog.KObj(accessor), "err", err)
 					errs <- err
 					return

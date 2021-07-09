@@ -1010,14 +1010,15 @@ func TestGenericScheduler(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			result, err := scheduler.Schedule(ctx, nil, fwk, framework.NewCycleState(), test.pod)
-			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
 				if gotOK != wantOK {
 					t.Errorf("Expected err to be FitError: %v, but got %v", wantOK, gotOK)
-				} else if gotOK && !reflect.DeepEqual(gotFitErr, wantFitErr) {
-					t.Errorf("Unexpected fitError. Want %v, but got %v", wantFitErr, gotFitErr)
+				} else if gotOK {
+					if diff := cmp.Diff(gotFitErr, wantFitErr); diff != "" {
+						t.Errorf("Unexpected fitErr: (-want, +got): %s", diff)
+					}
 				}
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
@@ -1068,13 +1069,16 @@ func TestFindFitAllError(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// TODO(#94696): use cmp.Diff() to compare `diagnosis`.
-	if len(diagnosis.NodeToStatusMap) != len(nodes) {
-		t.Errorf("unexpected failed status map: %v", diagnosis.NodeToStatusMap)
+	expected := framework.Diagnosis{
+		NodeToStatusMap: framework.NodeToStatusMap{
+			"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+			"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+			"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+		},
+		UnschedulablePlugins: sets.NewString("MatchFilter"),
 	}
-
-	if diff := cmp.Diff(sets.NewString("MatchFilter"), diagnosis.UnschedulablePlugins); diff != "" {
-		t.Errorf("Unexpected unschedulablePlugins: (-want, +got): %s", diagnosis.UnschedulablePlugins)
+	if diff := cmp.Diff(diagnosis, expected); diff != "" {
+		t.Errorf("Unexpected diagnosis: (-want, +got): %s", diff)
 	}
 }
 

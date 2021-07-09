@@ -4294,11 +4294,14 @@ type ServiceSpec struct {
 	IPFamilyPolicy *IPFamilyPolicyType `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicyType"`
 
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
-	// allocated for services with type LoadBalancer.  Default is "true". It may be
-	// set to "false" if the cluster load-balancer does not rely on NodePorts.
-	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
-	// and will be cleared if the type is changed to any other type.
-	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// allocated for services with type LoadBalancer.  Default is "true". It
+	// may be set to "false" if the cluster load-balancer does not rely on
+	// NodePorts.  If the caller requests specific NodePorts (by specifying a
+	// value), those requests will be respected, regardless of this field.
+	// This field may only be set for services with type LoadBalancer and will
+	// be cleared if the type is changed to any other type.
+	// This field is beta-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// +featureGate=ServiceLBNodePortControl
 	// +optional
 	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerNodePorts"`
 
@@ -4621,8 +4624,10 @@ type NodeSpec struct {
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
-	// If specified, the source to get node configuration from
-	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+
+	// Deprecated. If specified, the source of the node's configuration.
+	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field.
+	// This field is deprecated as of 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 	// +optional
 	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
 
@@ -4633,6 +4638,7 @@ type NodeSpec struct {
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+// This API is deprecated since 1.22
 type NodeConfigSource struct {
 	// For historical context, regarding the below kind, apiVersion, and configMapRef deprecation tags:
 	// 1. kind/apiVersion were used by the kubelet to persist this struct to disk (they had no protobuf tags)
@@ -4650,6 +4656,7 @@ type NodeConfigSource struct {
 }
 
 // ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+// This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.

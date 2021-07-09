@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script updates `translations/kubectl/template.pot` for
-# `pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go`.
+# This script updates `staging/src/k8s.io/kubectl/pkg/util/i18n/translations/kubectl/template.pot` and
+# generates/fixes .po and .mo files.
 # Usage: `update-translations.sh`.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
@@ -98,15 +98,15 @@ fi
 if [[ "${fix_translations}" == "true" ]]; then
   echo "Fixing .po files"
   kube::util::ensure-temp-dir
-  for PO_FILE in translations/kubectl/*/LC_MESSAGES/k8s.po; do
+  for PO_FILE in "${TRANSLATIONS}"/kubectl/*/LC_MESSAGES/k8s.po; do
     TMP="${KUBE_TEMP}/fix.po"
     if [[ "${PO_FILE}" =~ .*/default/.* || "${PO_FILE}" =~ .*/en_US/.*  ]]; then
       # mark obsolete, and set default values for english translations
-      msgen translations/kubectl/template.pot | \
+      msgen "${TRANSLATIONS}/kubectl/template.pot" | \
         msgmerge -s --no-fuzzy-matching "${PO_FILE}" - > "${TMP}"
     else
       # mark obsolete, but do not add untranslated messages
-      msgmerge -s --no-fuzzy-matching "${PO_FILE}" translations/kubectl/template.pot | msgattrib --translated - > "${TMP}"
+      msgmerge -s --no-fuzzy-matching "${PO_FILE}" "${TRANSLATIONS}/kubectl/template.pot" | msgattrib --translated - > "${TMP}"
     fi
     mv "${TMP}" "${PO_FILE}"
   done

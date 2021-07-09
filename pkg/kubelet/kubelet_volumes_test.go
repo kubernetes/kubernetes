@@ -315,9 +315,14 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	// TODO: this may not be threadsafe (technically waitForVolumeUnmount)
+	kubelet.podWorkers.(*fakePodWorkers).removeRuntime = map[types.UID]bool{pod.UID: true}
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(pod))
+	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
+		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
+	}
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
@@ -499,6 +504,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	kubelet.podWorkers.(*fakePodWorkers).removeRuntime = map[types.UID]bool{pod.UID: true}
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))

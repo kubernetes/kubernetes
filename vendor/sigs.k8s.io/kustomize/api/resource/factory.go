@@ -22,6 +22,12 @@ import (
 // Factory makes instances of Resource.
 type Factory struct {
 	hasher ifc.KustHasher
+
+	// When set to true, IncludeLocalConfigs indicates
+	// that Factory should include resources with the
+	// annotation 'config.kubernetes.io/local-config'.
+	// By default these resources are ignored.
+	IncludeLocalConfigs bool
 }
 
 // NewFactory makes an instance of Factory.
@@ -221,13 +227,15 @@ func (rf *Factory) shouldIgnore(n *yaml.RNode) (bool, error) {
 	if n.IsNilOrEmpty() {
 		return true, nil
 	}
-	md, err := n.GetValidatedMetadata()
-	if err != nil {
-		return true, err
-	}
-	_, ignore := md.ObjectMeta.Annotations[konfig.IgnoredByKustomizeAnnotation]
-	if ignore {
-		return true, nil
+	if !rf.IncludeLocalConfigs {
+		md, err := n.GetValidatedMetadata()
+		if err != nil {
+			return true, err
+		}
+		_, ignore := md.ObjectMeta.Annotations[konfig.IgnoredByKustomizeAnnotation]
+		if ignore {
+			return true, nil
+		}
 	}
 	if foundNil, path := n.HasNilEntryInList(); foundNil {
 		return true, fmt.Errorf("empty item at %v in object %v", path, n)

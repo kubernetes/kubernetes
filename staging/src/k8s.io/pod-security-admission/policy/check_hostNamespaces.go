@@ -21,7 +21,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -34,7 +33,7 @@ spec.hostNetwork
 spec.hostPID
 spec.hostIPC
 
-**Allowed Values:** false
+**Allowed Values:** undefined, false
 */
 
 func init() {
@@ -57,25 +56,25 @@ func CheckHostNamespaces() Check {
 }
 
 func hostNamespaces_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	hostNamespaces := sets.NewString()
+	var hostNamespaces []string
 
 	if podSpec.HostNetwork {
-		hostNamespaces.Insert("hostNetwork")
+		hostNamespaces = append(hostNamespaces, "hostNetwork=true")
 	}
 
 	if podSpec.HostPID {
-		hostNamespaces.Insert("hostPID")
+		hostNamespaces = append(hostNamespaces, "hostPID=true")
 	}
 
 	if podSpec.HostIPC {
-		hostNamespaces.Insert("hostIPC")
+		hostNamespaces = append(hostNamespaces, "hostIPC=true")
 	}
 
 	if len(hostNamespaces) > 0 {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "host namespaces",
-			ForbiddenDetail: strings.Join(hostNamespaces.List(), ", "),
+			ForbiddenDetail: strings.Join(hostNamespaces, ", "),
 		}
 	}
 

@@ -19,5 +19,5 @@ spec:
   - iscsi:
       iqn: iqn.2001-04.com.example:storage.kube.sys1.xyz
       lun: 0
-      targetPortal: testing
-    name: volume-iscsi
+      targetPortal: test
+    name: volume1

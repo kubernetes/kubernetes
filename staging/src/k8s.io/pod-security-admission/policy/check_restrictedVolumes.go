@@ -27,7 +27,15 @@ import (
 
 /*
 In addition to restricting HostPath volumes, the restricted profile
-limits usage of non-core volume types to those defined through PersistentVolumes.
+limits usage of inline pod volume sources to:
+* configMap
+* downwardAPI
+* emptyDir
+* projected
+* secret
+* csi
+* persistentVolumeClaim
+* ephemeral
 
 **Restricted Fields:**
 
@@ -41,7 +49,7 @@ spec.volumes[*].glusterfs
 spec.volumes[*].rbd
 spec.volumes[*].flexVolume
 spec.volumes[*].cinder
-spec.volumes[*].cephFS
+spec.volumes[*].cephfs
 spec.volumes[*].flocker
 spec.volumes[*].fc
 spec.volumes[*].azureFile
@@ -49,11 +57,11 @@ spec.volumes[*].vsphereVolume
 spec.volumes[*].quobyte
 spec.volumes[*].azureDisk
 spec.volumes[*].portworxVolume
+spec.volumes[*].photonPersistentDisk
 spec.volumes[*].scaleIO
 spec.volumes[*].storageos
-spec.volumes[*].csi
 
-**Allowed Values:** undefined/nil
+**Allowed Values:** undefined/null
 */
 
 func init() {
@@ -76,7 +84,8 @@ func CheckRestrictedVolumes() Check {
 }
 
 func restrictedVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	restrictedVolumeNames := sets.NewString()
+	var badVolumes []string
+	badVolumeTypes := sets.NewString()
 
 	for _, volume := range podSpec.Volumes {
 		switch {
@@ -89,16 +98,71 @@ func restrictedVolumes_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 			volume.Projected != nil,
 			volume.Secret != nil:
 			continue
+
 		default:
-			restrictedVolumeNames.Insert(volume.Name)
+			badVolumes = append(badVolumes, volume.Name)
+
+			switch {
+			case volume.HostPath != nil:
+				badVolumeTypes.Insert("hostPath")
+			case volume.GCEPersistentDisk != nil:
+				badVolumeTypes.Insert("gcePersistentDisk")
+			case volume.AWSElasticBlockStore != nil:
+				badVolumeTypes.Insert("awsElasticBlockStore")
+			case volume.GitRepo != nil:
+				badVolumeTypes.Insert("gitRepo")
+			case volume.NFS != nil:
+				badVolumeTypes.Insert("nfs")
+			case volume.ISCSI != nil:
+				badVolumeTypes.Insert("iscsi")
+			case volume.Glusterfs != nil:
+				badVolumeTypes.Insert("glusterfs")
+			case volume.RBD != nil:
+				badVolumeTypes.Insert("rbd")
+			case volume.FlexVolume != nil:
+				badVolumeTypes.Insert("flexVolume")
+			case volume.Cinder != nil:
+				badVolumeTypes.Insert("cinder")
+			case volume.CephFS != nil:
+				badVolumeTypes.Insert("cephfs")
+			case volume.Flocker != nil:
+				badVolumeTypes.Insert("flocker")
+			case volume.FC != nil:
+				badVolumeTypes.Insert("fc")
+			case volume.AzureFile != nil:
+				badVolumeTypes.Insert("azureFile")
+			case volume.VsphereVolume != nil:
+				badVolumeTypes.Insert("vsphereVolume")
+			case volume.Quobyte != nil:
+				badVolumeTypes.Insert("quobyte")
+			case volume.AzureDisk != nil:
+				badVolumeTypes.Insert("azureDisk")
+			case volume.PhotonPersistentDisk != nil:
+				badVolumeTypes.Insert("photonPersistentDisk")
+			case volume.PortworxVolume != nil:
+				badVolumeTypes.Insert("portworxVolume")
+			case volume.ScaleIO != nil:
+				badVolumeTypes.Insert("scaleIO")
+			case volume.StorageOS != nil:
+				badVolumeTypes.Insert("storageos")
+			default:
+				badVolumeTypes.Insert("unknown")
+			}
 		}
 	}
 
-	if len(restrictedVolumeNames) > 0 {
+	if len(badVolumes) > 0 {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "restricted volume types",
-			ForbiddenDetail: fmt.Sprintf("volumes %q have restricted types", restrictedVolumeNames.List()),
+			ForbiddenDetail: fmt.Sprintf(
+				"%s %s %s %s %s",
+				pluralize("volume", "volumes", len(badVolumes)),
+				joinQuote(badVolumes),
+				pluralize("uses", "use", len(badVolumes)),
+				pluralize("restricted volume type", "restricted volume types", len(badVolumeTypes)),
+				joinQuote(badVolumeTypes.List()),
+			),
 		}
 	}
 

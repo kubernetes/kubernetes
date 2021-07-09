@@ -53,6 +53,10 @@ const (
 	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
+	// MemoryMin is memory.min for cgroup v2
+	MemoryMin string = "memory.min"
+	// MemoryHigh is memory.high for cgroup v2
+	MemoryHigh string = "memory.high"
 )
 
 var RootCgroupName = CgroupName([]string{})
@@ -433,6 +437,15 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 			Pagesize: pageSize,
 			Limit:    uint64(0),
 		})
+	}
+	// Ideally unified is used for all the resources when running on cgroup v2.
+	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
+	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
+	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+		resources.Unified = make(map[string]string)
+		for k, v := range resourceConfig.Unified {
+			resources.Unified[k] = v
+		}
 	}
 	return resources
 }

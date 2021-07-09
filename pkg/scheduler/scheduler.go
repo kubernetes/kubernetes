@@ -519,6 +519,10 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	start := time.Now()
 	state := framework.NewCycleState()
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
+	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
+	podsToActivate := framework.NewPodsToActivate()
+	state.Write(framework.PodsToActivateKey, podsToActivate)
+
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, sched.Extenders, fwk, state, pod)
@@ -607,6 +611,13 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		return
 	}
 
+	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
+	if len(podsToActivate.Map) != 0 {
+		sched.SchedulingQueue.Activate(podsToActivate.Map)
+		// Clear the entries after activation.
+		podsToActivate.Map = make(map[string]*v1.Pod)
+	}
+
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
@@ -666,6 +677,13 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 			// Run "postbind" plugins.
 			fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+
+			// At the end of a successful binding cycle, move up Pods if needed.
+			if len(podsToActivate.Map) != 0 {
+				sched.SchedulingQueue.Activate(podsToActivate.Map)
+				// Unlike the logic in scheduling cycle, we don't bother deleting the entries
+				// as `podsToActivate.Map` is no longer consumed.
+			}
 		}
 	}()
 }

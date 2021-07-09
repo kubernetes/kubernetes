@@ -91,6 +91,9 @@ const (
 	DefaultDummyDevice = "kube-ipvs0"
 
 	connReuseMinSupportedKernelVersion = "4.1"
+
+	// https://github.com/torvalds/linux/commit/35dfb013149f74c2be1ff9c78f14e6a3cd1539d1
+	connReuseFixedKernelVersion = "5.9"
 )
 
 // iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
@@ -221,10 +224,9 @@ type Proxier struct {
 	endpointsMap proxy.EndpointsMap
 	portsMap     map[utilnet.LocalPort]utilnet.Closeable
 	nodeLabels   map[string]string
-	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true when
+	// endpointSlicesSynced, and servicesSynced are set to true when
 	// corresponding objects are synced after startup. This is used to avoid updating
 	// ipvs rules with some partial data after kube-proxy restart.
-	endpointsSynced      bool
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
@@ -377,6 +379,9 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 	if kernelVersion.LessThan(version.MustParseGeneric(connReuseMinSupportedKernelVersion)) {
 		klog.ErrorS(nil, fmt.Sprintf("can't set sysctl %s, kernel version must be at least %s", sysctlConnReuse, connReuseMinSupportedKernelVersion))
+	} else if kernelVersion.AtLeast(version.MustParseGeneric(connReuseFixedKernelVersion)) {
+		// https://github.com/kubernetes/kubernetes/issues/93297
+		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
 	} else {
 		// Set the connection reuse mode
 		if err := utilproxy.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
@@ -438,8 +443,6 @@ func NewProxier(ipt utiliptables.Interface,
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
-
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	nodePortAddresses = ipFamilyMap[ipFamily]
 	// Log the IPs not matching the ipFamily
@@ -456,7 +459,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceMap:            make(proxy.ServiceMap),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, endpointSlicesEnabled, nil),
+		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, nil),
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
 		excludeCIDRs:          parsedExcludeCIDRs,
@@ -881,44 +884,27 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
-		proxier.setInitialized(proxier.endpointSlicesSynced)
-	} else {
-		proxier.setInitialized(proxier.endpointsSynced)
-	}
+	proxier.setInitialized(proxier.endpointSlicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
 }
+
+// The following methods exist to implement the Proxier interface however
+// ipvs proxier only uses EndpointSlices so the following are noops
 
 // OnEndpointsAdd is called whenever creation of new endpoints object is observed.
-func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(nil, endpoints)
-}
+func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {}
 
 // OnEndpointsUpdate is called whenever modification of an existing endpoints object is observed.
-func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
-		proxier.Sync()
-	}
-}
+func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {}
 
 // OnEndpointsDelete is called whenever deletion of an existing endpoints object is observed.
-func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(endpoints, nil)
-}
+func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {}
 
 // OnEndpointsSynced is called once all the initial event handlers were called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointsSynced() {
-	proxier.mu.Lock()
-	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
-}
+func (proxier *Proxier) OnEndpointsSynced() {}
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.

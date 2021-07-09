@@ -13,5 +13,5 @@ spec:
     runAsNonRoot: true
   volumes:
   - cinder:
-      volumeID: testing
-    name: volume-cinder
+      volumeID: test
+    name: volume1

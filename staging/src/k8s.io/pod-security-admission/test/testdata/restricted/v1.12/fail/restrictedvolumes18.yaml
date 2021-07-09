@@ -16,6 +16,6 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-storageos
+  - name: volume1
     storageos:
       volumeName: test

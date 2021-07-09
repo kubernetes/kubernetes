@@ -19,5 +19,5 @@ spec:
       type: RuntimeDefault
   volumes:
   - cinder:
-      volumeID: testing
-    name: volume-cinder
+      volumeID: test
+    name: volume1

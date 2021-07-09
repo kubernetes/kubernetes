@@ -19,9 +19,20 @@ package v1
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-const JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
+const (
+	JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
+
+	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
+	// being deleted before being accounted in the Job status.
+	// The apiserver and job controller use this string as a Job annotation, to
+	// mark Jobs that are being tracked using pod finalizers. Two releases after
+	// the JobTrackingWithFinalizers graduates to GA, JobTrackingFinalizer will
+	// no longer be used as a Job annotation.
+	JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -237,6 +248,38 @@ type JobStatus struct {
 	// represented as "1,3-5,7".
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
+
+	// UncountedTerminatedPods holds the UIDs of Pods that have terminated but
+	// the job controller hasn't yet accounted for in the status counters.
+	//
+	// The job controller creates pods with a finalizer. When a pod terminates
+	// (succeeded or failed), the controller does three steps to account for it
+	// in the job status:
+	// (1) Add the pod UID to the arrays in this field.
+	// (2) Remove the pod finalizer.
+	// (3) Remove the pod UID from the arrays while increasing the corresponding
+	//     counter.
+	//
+	// This field is alpha-level. The job controller only makes use of this field
+	// when the feature gate PodTrackingWithFinalizers is enabled.
+	// Old jobs might not be tracked using this field, in which case the field
+	// remains null.
+	// +optional
+	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
+}
+
+// UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't
+// been accounted in Job status counters.
+type UncountedTerminatedPods struct {
+	// Succeeded holds UIDs of succeeded Pods.
+	// +listType=set
+	// +optional
+	Succeeded []types.UID `json:"succeeded,omitempty" protobuf:"bytes,1,rep,name=succeeded,casttype=k8s.io/apimachinery/pkg/types.UID"`
+
+	// Failed holds UIDs of failed Pods.
+	// +listType=set
+	// +optional
+	Failed []types.UID `json:"failed,omitempty" protobuf:"bytes,2,rep,name=failed,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
 type JobConditionType string

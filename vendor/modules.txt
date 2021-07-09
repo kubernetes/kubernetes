@@ -471,10 +471,6 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/internal
 github.com/grpc-ecosystem/grpc-gateway/runtime
 github.com/grpc-ecosystem/grpc-gateway/utilities
-# github.com/hashicorp/golang-lru v0.5.1 => github.com/hashicorp/golang-lru v0.5.1
-## explicit
-github.com/hashicorp/golang-lru
-github.com/hashicorp/golang-lru/simplelru
 # github.com/heketi/heketi v10.3.0+incompatible => github.com/heketi/heketi v10.3.0+incompatible
 ## explicit
 github.com/heketi/heketi/client/api/go-client
@@ -1965,6 +1961,7 @@ k8s.io/component-helpers/storage/volume
 k8s.io/controller-manager/app
 k8s.io/controller-manager/config
 k8s.io/controller-manager/config/v1alpha1
+k8s.io/controller-manager/config/v1beta1
 k8s.io/controller-manager/options
 k8s.io/controller-manager/pkg/clientbuilder
 k8s.io/controller-manager/pkg/features
@@ -2265,7 +2262,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.5.0 => k8s.io/system-validators v1.5.0
 ## explicit
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20210521133846-da695404a2bc => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9 => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -2273,8 +2270,11 @@ k8s.io/utils/exec
 k8s.io/utils/exec/testing
 k8s.io/utils/inotify
 k8s.io/utils/integer
+k8s.io/utils/internal/third_party/forked/golang/golang-lru
+k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/io
 k8s.io/utils/keymutex
+k8s.io/utils/lru
 k8s.io/utils/net
 k8s.io/utils/net/ebtables
 k8s.io/utils/nsenter
@@ -2285,13 +2285,13 @@ k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/kustomize/api v0.8.10 => sigs.k8s.io/kustomize/api v0.8.10
+# sigs.k8s.io/kustomize/api v0.8.11 => sigs.k8s.io/kustomize/api v0.8.11
 sigs.k8s.io/kustomize/api/builtins
-sigs.k8s.io/kustomize/api/filesys
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
 sigs.k8s.io/kustomize/api/filters/filtersutil
 sigs.k8s.io/kustomize/api/filters/fsslice
+sigs.k8s.io/kustomize/api/filters/iampolicygenerator
 sigs.k8s.io/kustomize/api/filters/imagetag
 sigs.k8s.io/kustomize/api/filters/labels
 sigs.k8s.io/kustomize/api/filters/nameref
@@ -2329,17 +2329,19 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kustomize/v4 v4.1.3 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.3
+# sigs.k8s.io/kustomize/kustomize/v4 v4.2.0 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
 sigs.k8s.io/kustomize/kustomize/v4/commands/build
-# sigs.k8s.io/kustomize/kyaml v0.10.20 => sigs.k8s.io/kustomize/kyaml v0.10.20
+# sigs.k8s.io/kustomize/kyaml v0.11.0 => sigs.k8s.io/kustomize/kyaml v0.11.0
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
 sigs.k8s.io/kustomize/kyaml/fieldmeta
+sigs.k8s.io/kustomize/kyaml/filesys
 sigs.k8s.io/kustomize/kyaml/fn/runtime/container
 sigs.k8s.io/kustomize/kyaml/fn/runtime/exec
 sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil
 sigs.k8s.io/kustomize/kyaml/fn/runtime/starlark
+sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml
 sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/qri-io/starlib/util
 sigs.k8s.io/kustomize/kyaml/kio
 sigs.k8s.io/kustomize/kyaml/kio/filters
@@ -2749,7 +2751,7 @@ sigs.k8s.io/yaml
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 # k8s.io/system-validators => k8s.io/system-validators v1.5.0
-# k8s.io/utils => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/utils => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
 # modernc.org/mathutil => modernc.org/mathutil v1.0.0
@@ -2757,9 +2759,9 @@ sigs.k8s.io/yaml
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
-# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.10
-# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.12
-# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.3
-# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.10.20
+# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.11
+# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.13
+# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
+# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.11.0
 # sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 # sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0

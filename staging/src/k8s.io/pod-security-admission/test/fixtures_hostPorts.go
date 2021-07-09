@@ -31,7 +31,7 @@ containerFields: []string{
 
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
-		expectErrorSubstring: "forbidden host ports",
+		expectErrorSubstring: "hostPort",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			return []*corev1.Pod{
 				// no host ports
@@ -60,6 +60,7 @@ func init() {
 						},
 					}
 				}),
+				// check initContainer
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.InitContainers[0].Ports = []corev1.ContainerPort{
 						{
@@ -68,7 +69,7 @@ func init() {
 						},
 					}
 				}),
-				// both init-container and app container use host ports and regular ports
+				// mix of hostPorts and regular ports
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Containers[0].Ports = []corev1.ContainerPort{
 						{

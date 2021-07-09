@@ -48,9 +48,9 @@ type fifo interface {
 	// Length returns the number of requests in the list.
 	Length() int
 
-	// Width returns the total width (number of seats) of requests
+	// SeatsSum returns the total number of seats of all requests
 	// in this list.
-	Width() int
+	SeatsSum() int
 
 	// Walk iterates through the list in order of oldest -> newest
 	// and executes the specified walkFunc for each request in that order.
@@ -65,7 +65,7 @@ type fifo interface {
 type requestFIFO struct {
 	*list.List
 
-	width int
+	seatsSum int
 }
 
 func newRequestFIFO() fifo {
@@ -78,19 +78,19 @@ func (l *requestFIFO) Length() int {
 	return l.Len()
 }
 
-func (l *requestFIFO) Width() int {
-	return l.width
+func (l *requestFIFO) SeatsSum() int {
+	return l.seatsSum
 }
 
 func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
 	e := l.PushBack(req)
-	l.width += req.Seats()
+	l.seatsSum += req.Seats()
 
 	return func() *request {
 		if e.Value != nil {
 			l.Remove(e)
 			e.Value = nil
-			l.width -= req.Seats()
+			l.seatsSum -= req.Seats()
 		}
 		return req
 	}
@@ -109,7 +109,7 @@ func (l *requestFIFO) Dequeue() (*request, bool) {
 
 	request, ok := e.Value.(*request)
 	if ok {
-		l.width -= request.Seats()
+		l.seatsSum -= request.Seats()
 	}
 	return request, ok
 }

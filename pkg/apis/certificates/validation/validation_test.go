@@ -193,7 +193,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: "example.com/some-signer-name",
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"signerName with a total length greater than 571 characters should be rejected": {
 			csr: capi.CertificateSigningRequest{
@@ -232,7 +231,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: fmt.Sprintf("abc.io/%s.%s", repeatString("a", 253), repeatString("a", 253)),
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"signerName with a domain label greater than 63 characters will fail": {
 			csr: capi.CertificateSigningRequest{
@@ -263,7 +261,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: maxLengthSignerName,
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"negative duration": {
 			csr: capi.CertificateSigningRequest{
@@ -331,7 +328,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					ExpirationSeconds: csr.DurationToExpirationSeconds(10 * time.Minute),
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"missing usages": {
 			csr: capi.CertificateSigningRequest{
@@ -356,7 +352,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: validSignerName,
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"unknown and duplicate usages - v1": {
 			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1"},

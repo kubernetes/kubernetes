@@ -25,6 +25,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
@@ -59,9 +60,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.8),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
@@ -103,8 +106,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.NoneTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.9),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
+			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
@@ -147,10 +152,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
 		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.5),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 			"NodeSwapEnabled":         true,
+			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
@@ -230,16 +237,18 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ShutdownGracePeriod:             metav1.Duration{Duration: 40 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
 		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: "invalid"},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(1.1),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 			"NodeSwapEnabled":         true,
+			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
 			Format: "text",
 		},
 	}
-	const numErrsErrorCase2 = 4
+	const numErrsErrorCase2 = 5
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
