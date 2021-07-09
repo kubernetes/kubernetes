@@ -672,10 +672,13 @@ func describeQuota(resourceQuota *corev1.ResourceQuota) (string, error) {
 
 		msg := "%v\t%v\t%v\n"
 		for i := range resources {
-			resource := resources[i]
-			hardQuantity := resourceQuota.Status.Hard[resource]
-			usedQuantity := resourceQuota.Status.Used[resource]
-			w.Write(LEVEL_0, msg, resource, usedQuantity.String(), hardQuantity.String())
+			resourceName := resources[i]
+			hardQuantity := resourceQuota.Status.Hard[resourceName]
+			usedQuantity := resourceQuota.Status.Used[resourceName]
+			if hardQuantity.Format != usedQuantity.Format {
+				usedQuantity = *resource.NewQuantity(usedQuantity.Value(), hardQuantity.Format)
+			}
+			w.Write(LEVEL_0, msg, resourceName, usedQuantity.String(), hardQuantity.String())
 		}
 		return nil
 	})
