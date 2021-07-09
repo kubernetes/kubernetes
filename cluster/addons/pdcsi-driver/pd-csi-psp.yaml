@@ -1,0 +1,74 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: csi-gce-pd-controller-psp
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  fsGroup:
+    rule: RunAsAny
+  hostNetwork: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - emptyDir
+  - secret
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: csi-gce-pd-node-psp
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  allowedHostPaths:
+  - pathPrefix: /var/lib/kubelet/plugins_registry/
+  - pathPrefix: /var/lib/kubelet
+  - pathPrefix: /var/lib/kubelet/plugins/pd.csi.storage.gke.io/
+  - pathPrefix: /dev
+  - pathPrefix: /etc/udev
+  - pathPrefix: /lib/udev
+  - pathPrefix: /run/udev
+  - pathPrefix: /sys
+  fsGroup:
+    rule: RunAsAny
+  hostNetwork: true
+  privileged: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - '*'
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: csi-gce-pd-node-psp-win
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  allowedHostPaths:
+  - pathPrefix: \var\lib\kubelet
+  - pathPrefix: \var\lib\kubelet\plugins_registry
+  - pathPrefix: \var\lib\kubelet\plugins\pd.csi.storage.gke.io
+  - pathPrefix: \\.\pipe\csi-proxy-disk-v1beta1
+  - pathPrefix: \\.\pipe\csi-proxy-volume-v1beta1
+  - pathPrefix: \\.\pipe\csi-proxy-filesystem-v1beta1
+  fsGroup:
+    rule: RunAsAny
+  hostNetwork: true
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - '*'

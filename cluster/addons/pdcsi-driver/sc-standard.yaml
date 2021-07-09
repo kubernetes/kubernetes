@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    components.gke.io/layer: addon
+  name: standard-rwo
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: EnsureExists
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-balanced
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

@@ -1,0 +1,458 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-gce-pd-node-sa
+  namespace: kube-system
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-gce-pd-node-sa-win
+  namespace: kube-system
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: csi-gce-pd-leaderelection-role
+  namespace: kube-system
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - watch
+  - list
+  - delete
+  - update
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-attacher-role
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments/status
+  verbs:
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-controller-deploy
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - csi-gce-pd-controller-psp
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-node-deploy
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - csi-gce-pd-node-psp
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-node-deploy-win
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - csi-gce-pd-node-psp-win
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-provisioner-role
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-resizer-role
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/status
+  verbs:
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-gce-pd-snapshotter-role
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - delete
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents/status
+  verbs:
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: csi-gce-pd-controller-leaderelection-binding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: csi-gce-pd-leaderelection-role
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-controller
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-node-deploy
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-controller-attacher-binding
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-attacher-role
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-controller-deploy
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-controller-deploy
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-controller-provisioner-binding
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-provisioner-role
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-controller-snapshotter-binding
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-snapshotter-role
+subjects:
+- kind: User
+  name: system:pdcsi-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-node
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-node-deploy
+subjects:
+- kind: ServiceAccount
+  name: csi-gce-pd-node-sa
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-node-win
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-node-deploy-win
+subjects:
+- kind: ServiceAccount
+  name: csi-gce-pd-node-sa-win
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-gce-pd-resizer-binding
+  labels:
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: csi-gce-pd-resizer-role
+subjects:
+- kind: User
+  name: system:pdcsi-controller

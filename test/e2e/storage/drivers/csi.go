@@ -860,8 +860,8 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 		Framework: f,
 	}
 
-	if framework.ProviderIs("gke") {
-		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
+	if framework.ProviderIs("gce", "gke") {
+		framework.Logf("The csi gce-pd driver is automatically installed in GCE/GKE. Skipping driver installation.")
 		return cfg, func() {}
 	}
 

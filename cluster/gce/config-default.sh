@@ -421,6 +421,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install pd csi driver
+ENABLE_PDCSI_DRIVER="${ENABLE_PDCSI_DRIVER:-true}"
+
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
 

@@ -764,6 +764,9 @@ function create-master-auth {
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"           "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
+  if [[ -n "${PDCSI_CONTROLLER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${PDCSI_CONTROLLER_TOKEN},"        "system:pdcsi-controller,uid:system:pdcsi-controller,system:masters"
+  fi
   if [[ -n "${KONNECTIVITY_SERVER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KONNECTIVITY_SERVER_TOKEN},"     "system:konnectivity-server,uid:system:konnectivity-server"
     create-kubeconfig "konnectivity-server" "${KONNECTIVITY_SERVER_TOKEN}"
@@ -2764,6 +2767,9 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${ENABLE_PDCSI_DRIVER:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "pdcsi-driver"
+  fi
   if [[ "${ENABLE_VOLUME_SNAPSHOTS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "volumesnapshots/crd"
     setup-addon-manifests "addons" "volumesnapshots/volume-snapshot-controller"
@@ -2796,6 +2802,19 @@ EOF
   sed -i -e "s@{{kubectl_extra_prune_whitelist}}@${ADDON_MANAGER_PRUNE_WHITELIST:-}@g" "${src_file}"
   sed -i -e "s@{{runAsUser}}@${KUBE_ADDON_MANAGER_RUNASUSER:-2002}@g" "${src_file}"
   sed -i -e "s@{{runAsGroup}}@${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
+}
+
+# Prepares the manifests of pdcsi controller, and starts the pdcsi controller.
+function start-pdcsi-controller {
+  echo "Prepare pdcsi controller manifests and start pdcsi controller"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+
+  create-kubeconfig "pdcsi-controller" "${PDCSI_CONTROLLER_TOKEN}"
+
+  src_file="${src_dir}/pdcsi-controller.yaml"
+  sed -i -e "s@{{runAsUser}}@${PDCSI_CONTROLLER_RUNASUSER:-2045}@g" "${src_file}"
+  sed -i -e "s@{{runAsGroup}}@${PDCSI_CONTROLLER_RUNASGROUP:-2045}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -3294,6 +3313,7 @@ function main() {
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
+  PDCSI_CONTROLLER_TOKEN="$(secure_random 32)"
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
@@ -3380,6 +3400,9 @@ function main() {
     log-wrap 'StartKubeScheduler' start-kube-scheduler
     log-wrap 'WaitTillApiserverReady' wait-till-apiserver-ready
     log-wrap 'StartKubeAddons' start-kube-addons
+    if [[ "${ENABLE_PDCSI_DRIVER:-}" == "true" ]]; then
+      log-wrap 'StartPdcsiController' start-pdcsi-controller
+    fi
     log-wrap 'StartClusterAutoscaler' start-cluster-autoscaler
     log-wrap 'StartLBController' start-lb-controller
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &

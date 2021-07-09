@@ -1,0 +1,165 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pdcsi-controller
+  namespace: kube-system
+  labels:
+    app: gcp-compute-persistent-disk-csi-driver
+    component: pdcsi-controller
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    runAsUser: {{runAsUser}}
+    runAsGroup: {{runAsGroup}}
+  containers:
+  - args:
+    - --v=5
+    - --csi-address=/csi/csi.sock
+    - --feature-gates=Topology=true
+    - --http-endpoint=:22011
+    - --leader-election-namespace=$(PDCSI_NAMESPACE)
+    - --timeout=250s
+    - --extra-create-metadata
+    - --leader-election
+    - --default-fstype=ext4
+    - --kubeconfig=/etc/srv/kubernetes/pdcsi-controller/kubeconfig
+    env:
+    - name: PDCSI_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    image: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1
+    livenessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: /healthz/leader-election
+        port: http-endpoint
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      timeoutSeconds: 10
+    name: csi-provisioner
+    ports:
+    - containerPort: 22011
+      name: http-endpoint
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /csi
+      name: socket-dir
+    - mountPath: /etc/srv/kubernetes/pdcsi-controller
+      name: srv
+      readOnly: true
+  - args:
+    - --v=5
+    - --csi-address=/csi/csi.sock
+    - --http-endpoint=:22012
+    - --leader-election
+    - --leader-election-namespace=$(PDCSI_NAMESPACE)
+    - --timeout=250s
+    - --kubeconfig=/etc/srv/kubernetes/pdcsi-controller/kubeconfig
+    env:
+    - name: PDCSI_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    image: k8s.gcr.io/sig-storage/csi-attacher:v3.2.1
+    livenessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: /healthz/leader-election
+        port: http-endpoint
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      timeoutSeconds: 10
+    name: csi-attacher
+    ports:
+    - containerPort: 22012
+      name: http-endpoint
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /csi
+      name: socket-dir
+    - mountPath: /etc/srv/kubernetes/pdcsi-controller
+      name: srv
+      readOnly: true
+  - args:
+    - --v=5
+    - --csi-address=/csi/csi.sock
+    - --http-endpoint=:22013
+    - --leader-election
+    - --leader-election-namespace=$(PDCSI_NAMESPACE)
+    - --handle-volume-inuse-error=false
+    - --kubeconfig=/etc/srv/kubernetes/pdcsi-controller/kubeconfig
+    env:
+    - name: PDCSI_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    image: k8s.gcr.io/sig-storage/csi-resizer:v1.2.0
+    livenessProbe:
+      failureThreshold: 1
+      httpGet:
+        path: /healthz/leader-election
+        port: http-endpoint
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      timeoutSeconds: 10
+    name: csi-resizer
+    ports:
+    - containerPort: 22013
+      name: http-endpoint
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /csi
+      name: socket-dir
+    - mountPath: /etc/srv/kubernetes/pdcsi-controller
+      name: srv
+      readOnly: true
+  - args:
+    - --v=5
+    - --csi-address=/csi/csi.sock
+    - --metrics-address=:22014
+    - --leader-election
+    - --leader-election-namespace=$(PDCSI_NAMESPACE)
+    - --timeout=300s
+    - --kubeconfig=/etc/srv/kubernetes/pdcsi-controller/kubeconfig
+    env:
+    - name: PDCSI_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    image: k8s.gcr.io/sig-storage/csi-snapshotter:v3.0.3
+    name: csi-snapshotter
+    volumeMounts:
+    - mountPath: /csi
+      name: socket-dir
+    - mountPath: /etc/srv/kubernetes/pdcsi-controller
+      name: srv
+      readOnly: true 
+  - args:
+    - --v=5
+    - --endpoint=unix:/csi/csi.sock
+    - --cloud-config=/etc/gce.conf
+    - --run-node-service=false
+    image: k8s.gcr.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.2.2
+    name: gce-pd-driver
+    volumeMounts:
+    - mountPath: /csi
+      name: socket-dir
+    - mountPath: /etc/gce.conf
+      name: cloud-config-mount
+      readOnly: true
+  hostNetwork: true
+  nodeSelector:
+    kubernetes.io/os: linux
+  priorityClassName: system-node-critical
+  volumes:
+  - emptyDir: {}
+    name: socket-dir
+  - name: cloud-config-mount
+    hostPath:
+      path: /etc/gce.conf
+      type: FileOrCreate
+  - name: srv
+    hostPath:
+      path: /etc/srv/kubernetes/pdcsi-controller
