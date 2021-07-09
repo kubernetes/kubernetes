@@ -62,6 +62,9 @@ mkdir -p "${_tmp}"
 echo "Running: go get ${dep}@${sha}"
 go get -d "${dep}@${sha}"
 
+kube::util::list_staging_repos \
+  | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" go.mod; done
+
 # Find the resolved version
 rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
 

@@ -44,5 +44,8 @@ for mod in "${MODULES[@]}"; do
     echo "=== tidying go.mod/go.sum in ${mod}"
     go mod edit -fmt
     go mod tidy
+    kube::util::list_staging_repos \
+      | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" go.mod; done
+
   popd >/dev/null
 done

@@ -167,6 +167,22 @@ function add_generated_comments() {
   go mod edit -fmt
 }
 
+function update_staging_references() {
+  # Prune
+  go mod edit -json \
+      | jq -r '.Require[]? | select(.Version == "v0.0.0")                 | "-droprequire \(.Path)"' \
+      | xargs -L 100 go mod edit -fmt
+  go mod edit -json \
+      | jq -r '.Replace[]? | select(.New.Path | startswith("./staging/")) | "-dropreplace \(.Old.Path)"' \
+      | xargs -L 100 go mod edit -fmt
+  # Readd
+  kube::util::list_staging_repos \
+      | while read -r X; do echo "-require k8s.io/${X}@v0.0.0"; done \
+      | xargs -L 100 go mod edit -fmt
+  kube::util::list_staging_repos \
+      | while read -r X; do echo "-replace k8s.io/${X}=./staging/src/k8s.io/${X}"; done \
+      | xargs -L 100 go mod edit -fmt
+}
 
 # Phase 1: ensure go.mod files for staging modules and main module
 
@@ -191,21 +207,7 @@ fi
 # Phase 2: ensure staging repo require/replace directives
 
 kube::log::status "go.mod: update staging references"
-# Prune
-go mod edit -json \
-    | jq -r '.Require[]? | select(.Version == "v0.0.0")                 | "-droprequire \(.Path)"' \
-    | xargs -L 100 go mod edit -fmt
-go mod edit -json \
-    | jq -r '.Replace[]? | select(.New.Path | startswith("./staging/")) | "-dropreplace \(.Old.Path)"' \
-    | xargs -L 100 go mod edit -fmt
-# Readd
-kube::util::list_staging_repos \
-    | while read -r X; do echo "-require k8s.io/${X}@v0.0.0"; done \
-    | xargs -L 100 go mod edit -fmt
-kube::util::list_staging_repos \
-    | while read -r X; do echo "-replace k8s.io/${X}=./staging/src/k8s.io/${X}"; done \
-    | xargs -L 100 go mod edit -fmt
-
+update_staging_references
 
 # Phase 3: capture required (minimum) versions from all modules, and replaced (pinned) versions from the root module
 
@@ -334,6 +336,11 @@ $(go mod why "${loopback_deps[@]}")"
 
   popd >/dev/null 2>&1
 done
+
+kube::log::status "go.mod: update staging references"
+update_staging_references
+group_replace_directives
+
 echo "=== tidying root" >> "${LOG_FILE}"
 go mod tidy >>"${LOG_FILE}" 2>&1
 
@@ -375,6 +382,25 @@ done
 
 kube::log::status "vendor: updating vendor/LICENSES"
 hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
+
+kube::log::status "go.mod: clean staging and unused references"
+unused=$(comm -23 \
+  <(go mod edit -json | jq -r '.Replace[] | select(.New.Version != null) | .Old.Path' | sort) \
+  <(go list -m -json all | jq -r .Path | sort))
+if [[ -n "${unused}" ]]; then
+  echo "${unused}" | xargs -L 1 go mod edit -dropreplace
+  echo "${unused}" | xargs -L 1 -I{} sed -i "\|# {} =>|d" "${KUBE_ROOT}/vendor/modules.txt"
+fi
+kube::util::list_staging_repos \
+  | while read -r X; do sed -i "s/k8s.io\/${X} v.* =>/k8s.io\/${X} v0.0.0 =>/" "${KUBE_ROOT}/vendor/modules.txt"; done
+kube::util::list_staging_repos \
+  | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" "${KUBE_ROOT}/go.mod"; done
+for repo in $(kube::util::list_staging_repos); do
+  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+  kube::util::list_staging_repos \
+    | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" go.mod; done
+  popd >/dev/null 2>&1
+done
 
 kube::log::status "vendor: creating OWNERS file"
 rm -f "vendor/OWNERS"

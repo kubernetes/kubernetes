@@ -88,5 +88,8 @@ if [[ -n "${unused}${outdated}" ]]; then
   rc=1
 fi
 
+kube::util::list_staging_repos \
+  | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" "${KUBE_ROOT}/go.mod"; done
+
 echo "All pinned versions of checked dependencies match their preferred version."
 exit $rc

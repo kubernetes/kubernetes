@@ -187,7 +187,10 @@ if [ -f "${LICENSE_ROOT}/LICENSE" ]; then
 fi
 
 # Loop through every vendored package
-for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
+packages=$(go list -m -json all | jq -r .Path | sort -f)
+kube::util::list_staging_repos \
+  | while read -r X; do sed -i "s/k8s.io\/${X} v.*/k8s.io\/${X} v0.0.0/" "${KUBE_ROOT}/go.mod"; done
+for PACKAGE in $packages; do
   if [[ -e "staging/src/${PACKAGE}" ]]; then
     echo "${PACKAGE} is a staging package, skipping" >&2
     continue
