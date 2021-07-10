@@ -84,6 +84,7 @@ var allowedEphemeralContainerFields = map[string]bool{
 	"TerminationMessagePath":   true,
 	"TerminationMessagePolicy": true,
 	"ImagePullPolicy":          true,
+	"SecurityContext":          true,
 	"Stdin":                    true,
 	"StdinOnce":                true,
 	"TTY":                      true,
