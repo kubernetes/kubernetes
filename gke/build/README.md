@@ -39,9 +39,9 @@ build system:
 
 - **Louhi**: Use either `./make_louhi_prod.sh` or `./make_louhi_test.sh`.
 - **Developers**: There are two options.
-  1. Use `./make_dev_simple.sh` to get a quick build. This build skips running
-    [bcheck][bcheck] and also skips building Docker images. If you want to still
-    build Docker images, invoke with `./make_dev_simple.sh SKIP_DOCKER=0`.
+  1. Use `./make_dev_simple.sh` to get a quick build. This build skips building
+    Docker images. If you want to still build Docker images, invoke with
+    `./make_dev_simple.sh SKIP_DOCKER=0`.
   2. If you want to use your build to create a new cluster, run
     `./make_dev_push.sh` instead. This is like `make_dev_simple.sh`, but
     additionally runs the `package,validate,push-gcs` steps to generate all
@@ -111,8 +111,6 @@ Below is a list of supported options and their descriptions.
   everything under `<KUBE_ROOT>/_output/for-gcs/<VERSION>` will be uploaded into
   this bucket. If blank, the setting in `push.gcs.to` in the config YAML will
   take precedence.
-- `SKIP_BCHECK`: Whether to skip running the [bcheck][bcheck] tool during the
-  `validate` step. Can be `1` for true and `0` for false. Default false.
 - `SKIP_DOCKER`: Whether to skip generating Docker images during the `package`
   step. Can be `1` for true and `0` for false. Default false.
 - `TEMP_DIR`: The temporary directory to use for storing build artifacts. By
@@ -132,4 +130,3 @@ New consumers of this system should:
 [louhi]: http://go/louhi
 [louhi-flow-official]: https://louhi.dev/?projectId=5846944631226368&expandedFlows=ff455683-a314-4346-9211-f6928045ecae#/flows
 [louhi-stagetype-official]: https://louhi.dev/?projectId=5846944631226368#/stage-type/f30a4ed0-ef3d-4c55-be71-5cb28d88373e
-[bcheck]: https://gke-internal.googlesource.com/bcheck

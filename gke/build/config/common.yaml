@@ -70,6 +70,19 @@ build-env:
   docker-image:
     name: "gcr.io/cloud-builders/docker"
 
+  # These are the runtime base images for containerized binaries.
+  runtime-image:
+    # GKE's boringcrypto-patched binaries require glibc, which is not present
+    # in the OSS `go-runner` image. Our internal `go-runner` is based on
+    # `gke-distroless/libc` with the addition of a `go-runner` binary mirrored
+    # into google3 from:
+    # https://github.com/kubernetes/release/blob/master/images/build/go-runner/go-runner.go
+    # For release history, see: http://rapid/gke_distroless
+    # For source, see: http://google3/cloud/kubernetes/distro/images/base/BUILD
+    # For instructions on updating `go-runner` and creating a new
+    # `gke-distroless/go-runner` release, see: http://go/gke-security-compliance#updating-gke-distrolessgo-runner
+    go-runner: "gke.gcr.io/gke-distroless/go-runner:20210225_1710_RC0"
+
 compile:
   # This is the VERSION field that is supplied at Golang compilation time. This
   # propagates everywhere else (to each binary's "--version" flag, to the GCR
@@ -258,18 +271,13 @@ package:
 
 validate:
   boringcrypto:
-    # Image used for validating binaries for compilation with
-    # golang-boringcrypto-image. It's only used if golang-boringcrypto-image is
-    # non-empty.
-    bcheck-image: "gcr.io/gke-release-staging/bcheck:20200903-767c968"
     binaries:
     - kubectl
     - kubelet
     - kube-proxy
     - kube-apiserver
-    assertions:
-    - linkedWithBoringCrypto
-    - linkedDynamically
+    - kube-controller-manager
+    - kube-scheduler
 
 push:
   # For GCS, we push all directories under 'dirs' to each bucket.

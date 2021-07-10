@@ -8,7 +8,6 @@ source "${SCRIPT_DIR}"/lib_gke.sh
 # meant for execution from inside Louhi).
 louhi_hook()
 {
-  # Skip bcheck for known (problematic) branches.
   log.debugvar _LOUHI_BRANCH_NAME
 
   # Louhi puts us in a detached HEAD state. This is not a problem, but for the

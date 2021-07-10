@@ -15,7 +15,6 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 "${SCRIPT_DIR}"/make_custom.sh \
   GKE_BUILD_ACTIONS=compile,package,validate,push-gcs \
   GKE_BUILD_CONFIG="${SCRIPT_DIR}/config/common.yaml,${SCRIPT_DIR}/config/dev_simple.yaml" \
-  SKIP_BCHECK=1 \
   SKIP_DOCKER_LICENSE_INJECTION=1 \
   SKIP_DOCKER_SOURCE_INJECTION=1 \
   VERSION_SUFFIX="${USER}" \

@@ -52,7 +52,7 @@ usage: $0 [KEY=VALUE..]
   values:
     a. compile
     b. package
-    c. validate     (runs bcheck)
+    c. validate
     d. push-gcs
     e. push-gcr
     f. clean        (deletes build outputs to free up disk space)
@@ -77,7 +77,6 @@ usage: $0 [KEY=VALUE..]
   - TARGET_PLATFORMS
   - GCR_REPO
   - GCS_BUCKET
-  - SKIP_BCHECK
   - SKIP_DOCKER
   - TEMP_DIR
 
@@ -135,10 +134,6 @@ usage: $0 [KEY=VALUE..]
   gs://foo will upload "v1.2.3" into this bucket, such that eventually
   gs://foo/v1.2.3 is pushed up. By default this is set to 'push.gcs.to' field in
   GKE_BUILD_CONFIG.
-
-
-  [SKIP_BCHECK] whether to skip running the 'bcheck' Go binary validator. Can be
-  '1' or '0'. Default is '0' (false).
 
 
   [SKIP_DOCKER] whether to skip generation of Docker images during the 'package'
@@ -277,14 +272,6 @@ process_args()
       ;;
     GCS_BUCKET=*)
       __GCS_BUCKET="${arg#GCS_BUCKET=}"
-      ;;
-    SKIP_BCHECK=*)
-      # Accepts either 0 (false) or 1 (true) as a value.
-      #
-      # Allows skipping bcheck validation by specifying a command line option,
-      # instead of having to modify an underlying configuration file and messing
-      # up the Git state.
-      __SKIP_BCHECK="${arg#SKIP_BCHECK=}"
       ;;
     SKIP_DOCKER=*)
       # Accepts either 0 (false) or 1 (true) as a value.
@@ -772,27 +759,32 @@ set_global_vars()
   __golang_boringcrypto_image=$(get_val "build-env.compiler-image.deps.golang-boringcrypto-image")
   log.debugvar __golang_boringcrypto_image
   if [[ -n "${__golang_boringcrypto_image}" ]]; then
-    __bc_binaries=""
+    __boringcrypto_bins=""
     bc_binaries_len="$(get_val "validate.boringcrypto.binaries" -l)"
     for ((i=0; i<bc_binaries_len; ++i)); do
-      __bc_binaries+="$(get_val "validate.boringcrypto.binaries[$i]")",
+      __boringcrypto_bins+="$(get_val "validate.boringcrypto.binaries[$i]")",
     done
     # Drop trailing comma.
-    __bc_binaries="${__bc_binaries:0: -1}"
-    log.debugvar __bc_binaries
+    __boringcrypto_bins="${__boringcrypto_bins:0: -1}"
+    log.debugvar __boringcrypto_bins
 
-    __bc_assertions=""
-    bc_assertions_len="$(get_val "validate.boringcrypto.assertions" -l)"
-    for ((i=0; i<bc_assertions_len; ++i)); do
-      __bc_assertions+="$(get_val "validate.boringcrypto.assertions[$i]")",
-    done
-    __bc_assertions="${__bc_assertions:0: -1}"
-    log.debugvar __bc_assertions
+    # Make a space-separated list of bins that should be compiled with CGO enabled.
+    # See `KUBE_CGO_OVERRIDES` in hack/lib/golang.sh.
+    # Boringcrypto requires cgo to be enabled.
+    __KUBE_CGO_OVERRIDES="$(sed "s/,/ /g" <<< "${__boringcrypto_bins}")"
+    log.debugvar __KUBE_CGO_OVERRIDES
+    # Set the `gkeboringcrypto` build flag.
+    # Note: as of release `b6`, the go-boringcrypto buildchain automatically
+    # sets the `boringcrypto` build tag.
+    __GOFLAGS='-tags=gkeboringcrypto'
   fi
+
+  # This overrides the OSS `go-runner` runtime base image.
+  __go_runner_image=$(get_val "build-env.runtime-image.go-runner")
+  log.debugvar __go_runner_image
 
   # Log remaining variables of interest.
   log.debugvar __INJECT_DEV_VERSION_MARKER
-  log.debugvar __SKIP_BCHECK
   log.debugvar __SKIP_DOCKER
   log.debugvar __GCR_REPO
   log.debugvar __GCS_BUCKET
@@ -1015,6 +1007,8 @@ compile()
     -e KUBE_BUILD_PLATFORMS="${KUBE_BUILD_PLATFORMS}" \
     -e KUBE_OUTPUT_SUBPATH="${__output_subpath}" \
     -e KUBE_GIT_VERSION_FILE="${__KUBE_ROOT_MOUNT_PATH}/${KUBE_GIT_VERSION_FILE}" \
+    -e KUBE_CGO_OVERRIDES="${__KUBE_CGO_OVERRIDES:-}" \
+    -e GOFLAGS="${__GOFLAGS:-}" \
     -v "${KUBE_ROOT}":"${__KUBE_ROOT_MOUNT_PATH}" \
     -w "${__KUBE_ROOT_MOUNT_PATH}" \
     -u "$(id -u):$(id -g)" \
@@ -1041,6 +1035,7 @@ package()
   pushd "${KUBE_ROOT}"
   KUBE_OUTPUT_SUBPATH="${__output_subpath}" \
     KUBE_GIT_VERSION_FILE="${KUBE_ROOT}/${KUBE_GIT_VERSION_FILE}" \
+    KUBE_GORUNNER_IMAGE="${__go_runner_image}" \
     "${KUBE_ROOT}"/build/package-tarballs.sh
 
   # For BoringCrypto, run associated hook for additional processing. This is
@@ -1205,38 +1200,29 @@ tar_inject_tars()
 validate()
 {
   validate_licenses
-
-  # Only run bcheck validation if we are using a goboring compiler *and* we are
-  # not skipping it explicitly.
-  if [[ -n "${__golang_boringcrypto_image:-}" ]]; then
-    validate_bc_sources
-
-    if ! (( ${__SKIP_BCHECK:-0} )); then
-      validate_bcheck
-    fi
-  fi
+  validate_bc_sources
+  validate_bc_bins
 }
 
-# Validate that the binaries are linked dynamically with the BoringCrypto
-# compiler, but only if we used it to compile the binaries in the first place.
-validate_bcheck()
+# Validate that the binaries were compiled with Go-BoringCrypto, as implied
+# by the presence of the sentinel ASCII string in
+# gke/fips/boringcrypto/certifiably_boring.go
+validate_bc_bins()
 {
-  # Use a separate variable from plain __for_gcs, because that variable points
-  # to the location of GCS artifacts *outside* of the compiler image on local
-  # disk. We want the path to be from *inside* the bcheck image, which uses
-  # __KUBE_ROOT_MOUNT_PATH.
-  local for_gcs_inside_image
-  for_gcs_inside_image=$(get_val "package.gcs.to")
-  for_gcs_inside_image=${for_gcs_inside_image/\${KUBE_ROOT\}/${__KUBE_ROOT_MOUNT_PATH}}
-  local bcheck_image
-  bcheck_image=$(get_val "validate.boringcrypto.bcheck-image")
-  log.info "running bcheck"
-  docker run \
-    -v "${KUBE_ROOT}":"${__KUBE_ROOT_MOUNT_PATH}" \
-    "${bcheck_image}" \
-    -p="${for_gcs_inside_image}/${KUBE_GIT_VERSION}"/bin/linux/amd64 \
-    --binaries="${__bc_binaries}" \
-    --assertions="${__bc_assertions}"
+  local artifacts_root="${__for_gcs}/${KUBE_GIT_VERSION}"
+  local bin_dir="${artifacts_root}/bin/linux/amd64"
+  local sentinel_bc_string='This GKE-distributed binary expects to be utilizing boringcrypto'
+
+  log.info "validating go-boringcrypto binaries"
+
+  local bc_binaries_len="$(get_val "validate.boringcrypto.binaries" -l)"
+  for ((i=0; i<bc_binaries_len; ++i)); do
+    local bc_bin="${bin_dir}/$(get_val "validate.boringcrypto.binaries[$i]")"
+    assert_path_exists "${bc_bin}"
+
+    log.info "validating ${bc_bin}"
+    grep -aq "${sentinel_bc_string}" "${bc_bin}" || log.fail "${bc_bin} could not be confirmed to be compiled w/ go-boringcrypto"
+  done
 }
 
 validate_licenses()
@@ -2268,17 +2254,6 @@ self_test()
 branch_hook()
 {
   local branch="${1:-}"
-
-  # SKIP_BCHECK by branch.
-  case "${branch}" in
-      master)
-        __SKIP_BCHECK=1 ;;
-      *)
-        # We should by default try to run the bcheck utility (that is, don't
-        # skip running bcheck). See b/169091516 (bcheck doesn't work with go
-        # 1.14+) for why we *would* want to otherwise skip running bcheck.
-        __SKIP_BCHECK=0 ;;
-  esac
 
   # INJECT_DEV_VERSION_MARKER by branch.
   case "${branch}" in
