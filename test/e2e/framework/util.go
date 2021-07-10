@@ -188,9 +188,9 @@ func ProviderIs(providers ...string) bool {
 }
 
 // ControlPlaneOSDistroIs returns true if the master OS distro is included in the supportedControlPlaneOsDistros. Otherwise false.
-func ControlPlaneOSDistroIs(supportedMasterOsDistros ...string) bool {
-	for _, distro := range supportedMasterOsDistros {
-		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
+func ControlPlaneOSDistroIs(supportedControlPlaneOSDistros ...string) bool {
+	for _, distro := range supportedControlPlaneOSDistros {
+		if strings.EqualFold(distro, TestContext.ControlPlaneOSDistro) {
 			return true
 		}
 	}
