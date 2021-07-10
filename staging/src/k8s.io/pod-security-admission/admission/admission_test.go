@@ -184,6 +184,14 @@ func (t *testEvaluator) EvaluatePod(lv api.LevelVersion, meta *metav1.ObjectMeta
 	}
 }
 
+type testNamespaceGetter struct {
+	ns *corev1.Namespace
+}
+
+func (t *testNamespaceGetter) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
+	return t.ns, nil
+}
+
 type testPodLister struct {
 	called bool
 	pods   []*corev1.Pod
@@ -454,6 +462,181 @@ func TestValidateNamespace(t *testing.T) {
 			if !reflect.DeepEqual(result.Warnings, tc.expectWarnings) {
 				t.Errorf("expected warnings:\n%v\ngot\n%v", tc.expectWarnings, result.Warnings)
 			}
+		})
+	}
+}
+
+func TestValidatePodController(t *testing.T) {
+	testName, testNamespace := "testname", "default"
+	objMetadata := metav1.ObjectMeta{Name: testName, Namespace: testNamespace, Labels: map[string]string{"foo": "bar"}}
+	// One of the pod-template objects
+	goodDeploy := appsv1.Deployment{
+		ObjectMeta: objMetadata,
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: objMetadata,
+				Spec: corev1.PodSpec{
+					RuntimeClassName: pointer.String("containerd"),
+				},
+			},
+		},
+	}
+	badDeploy := appsv1.Deployment{
+		ObjectMeta: objMetadata,
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: objMetadata,
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						// out of allowed sysctls to return auditAnnotation or warning
+						Sysctls: []corev1.Sysctl{{Name: "unknown", Value: "unknown"}},
+					},
+					RuntimeClassName: pointer.String("containerd"),
+				},
+			},
+		},
+	}
+
+	// Ensure that under the baseline policy,
+	// the pod-template object of all tests returns correct information or is exempted
+	nsLabels := map[string]string{
+		api.EnforceLevelLabel: string(api.LevelBaseline),
+		api.WarnLevelLabel:    string(api.LevelBaseline),
+		api.AuditLevelLabel:   string(api.LevelBaseline),
+	}
+
+	testCases := []struct {
+		desc                 string
+		exemptNamespaces     []string
+		exemptRuntimeClasses []string
+		exemptUsers          []string
+		// request subresource
+		subresource string
+		// for create
+		newObject runtime.Object
+		// for update
+		oldObject runtime.Object
+		gvr       schema.GroupVersionResource
+
+		expectWarnings         []string
+		expectAuditAnnotations map[string]string
+	}{
+		{
+			desc:        "subresource(status) updates don't produce warnings",
+			subresource: "status",
+			newObject:   &badDeploy,
+			oldObject:   &goodDeploy,
+			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+		},
+		{
+			desc:             "namespace in exemptNamespaces will be exempted",
+			newObject:        &badDeploy,
+			gvr:              schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptNamespaces: []string{testNamespace},
+		},
+		{
+			desc:                 "runtimeClass in exemptRuntimeClasses will be exempted",
+			newObject:            &badDeploy,
+			gvr:                  schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptRuntimeClasses: []string{"containerd"},
+		},
+		{
+			desc:        "user in exemptUsers will be exempted",
+			newObject:   &badDeploy,
+			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			exemptUsers: []string{"testuser"},
+		},
+		{
+			desc:      "podMetadata == nil && podSpec == nil will skip verification",
+			newObject: &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo-rc"}},
+			gvr:       schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"},
+		},
+		{
+			desc:                   "good deploy creates and produce nothing",
+			newObject:              &goodDeploy,
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			expectAuditAnnotations: map[string]string{},
+		},
+		{
+			desc:                   "bad deploy creates produce correct user-visible warnings and correct auditAnnotations",
+			newObject:              &badDeploy,
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			expectAuditAnnotations: map[string]string{"audit": "forbidden sysctls (unknown)"},
+			expectWarnings:         []string{"would violate \"latest\" version of \"baseline\" PodSecurity profile: forbidden sysctls (unknown)"},
+		},
+		{
+			desc:                   "bad spec updates don't block on enforce failures and returns correct information",
+			newObject:              &badDeploy,
+			oldObject:              &goodDeploy,
+			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			expectAuditAnnotations: map[string]string{"audit": "forbidden sysctls (unknown)"},
+			expectWarnings:         []string{"would violate \"latest\" version of \"baseline\" PodSecurity profile: forbidden sysctls (unknown)"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			var operation = admissionv1.Create
+			if tc.oldObject != nil {
+				operation = admissionv1.Update
+			}
+
+			attrs := &AttributesRecord{
+				testName,
+				testNamespace,
+				tc.gvr,
+				tc.subresource,
+				operation,
+				tc.newObject,
+				tc.oldObject,
+				"testuser",
+			}
+
+			defaultPolicy := api.Policy{
+				Enforce: api.LevelVersion{Level: api.LevelPrivileged, Version: api.LatestVersion()},
+				Audit:   api.LevelVersion{Level: api.LevelPrivileged, Version: api.LatestVersion()},
+				Warn:    api.LevelVersion{Level: api.LevelPrivileged, Version: api.LatestVersion()},
+			}
+
+			podLister := &testPodLister{}
+			evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
+			assert.NoError(t, err)
+			nsGetter := &testNamespaceGetter{
+				ns: &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testName,
+						Namespace: testNamespace,
+						Labels:    nsLabels}},
+			}
+			PodSpecExtractor := &DefaultPodSpecExtractor{}
+			a := &Admission{
+				PodLister:        podLister,
+				Evaluator:        evaluator,
+				PodSpecExtractor: PodSpecExtractor,
+				Configuration: &admissionapi.PodSecurityConfiguration{
+					Exemptions: admissionapi.PodSecurityExemptions{
+						Namespaces:     tc.exemptNamespaces,
+						RuntimeClasses: tc.exemptRuntimeClasses,
+						Usernames:      tc.exemptUsers,
+					},
+				},
+				defaultPolicy:   defaultPolicy,
+				NamespaceGetter: nsGetter,
+			}
+
+			result := a.ValidatePodController(context.TODO(), attrs)
+			// podContorller will not return an error due to correct evaluation
+			resultError := ""
+			if result.Result != nil {
+				resultError = result.Result.Message
+			}
+
+			assert.Equal(t, true, result.Allowed)
+			assert.Empty(t, resultError)
+			assert.Equal(t, tc.expectAuditAnnotations, result.AuditAnnotations, "unexpected AuditAnnotations")
+			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
 		})
 	}
 }
