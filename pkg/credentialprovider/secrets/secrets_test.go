@@ -32,7 +32,7 @@ type fakeKeyring struct {
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // Returns fake results based on the auth and ok fields in fakeKeyring
-func (f *fakeKeyring) Lookup(image string) ([]credentialprovider.AuthConfig, bool) {
+func (f *fakeKeyring) Lookup(opts *Options) ([]credentialprovider.AuthConfig, bool) {
 	return f.auth, f.ok
 }
 
@@ -269,7 +269,10 @@ func Test_MakeDockerKeyring(t *testing.T) {
 				t.Fatalf("error creating secret-based docker keyring: %v", err)
 			}
 
-			authConfigs, found := keyring.Lookup(testcase.image)
+			opts := &credentialprovider.Options{
+				Image: testcase.image,
+			}
+			authConfigs, found := keyring.Lookup(opts)
 			if found != testcase.found {
 				t.Logf("actual lookup status: %v", found)
 				t.Logf("expected lookup status: %v", testcase.found)

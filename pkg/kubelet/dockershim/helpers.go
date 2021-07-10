@@ -334,8 +334,12 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 		return err
 	}
 
+	// TODO(mtaufen): Pull sandbox image with bound tokens too?
+	opts := &credentialprovider.Options{
+		Image: repoToPull,
+	}
 	keyring := credentialprovider.NewDockerKeyring()
-	creds, withCredentials := keyring.Lookup(repoToPull)
+	creds, withCredentials := keyring.Lookup(opts)
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling the image without credentials", "image", image)
 

@@ -35,7 +35,7 @@ import (
 //   most specific match for a given image
 // - iterating a map does not yield predictable results
 type DockerKeyring interface {
-	Lookup(image string) ([]AuthConfig, bool)
+	Lookup(opts *Options) ([]AuthConfig, bool)
 }
 
 // BasicDockerKeyring is a trivial map-backed implementation of DockerKeyring
@@ -237,13 +237,13 @@ func URLsMatch(globURL *url.URL, targetURL *url.URL) (bool, error) {
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // Multiple credentials may be returned if there are multiple potentially valid credentials
 // available.  This allows for rotation.
-func (dk *BasicDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
+func (dk *BasicDockerKeyring) Lookup(opts *Options) ([]AuthConfig, bool) {
 	// range over the index as iterating over a map does not provide a predictable ordering
 	ret := []AuthConfig{}
 	for _, k := range dk.index {
 		// both k and image are schemeless URLs because even though schemes are allowed
 		// in the credential configurations, we remove them in Add.
-		if matched, _ := URLsMatchStr(k, image); matched {
+		if matched, _ := URLsMatchStr(k, opts.Image); matched {
 			ret = append(ret, dk.creds[k]...)
 		}
 	}
@@ -253,7 +253,7 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	}
 
 	// Use credentials for the default registry if provided, and appropriate
-	if isDefaultRegistryMatch(image) {
+	if isDefaultRegistryMatch(opts.Image) {
 		if auth, ok := dk.creds[defaultRegistryHost]; ok {
 			return auth, true
 		}
@@ -264,7 +264,7 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 
 // Lookup implements the DockerKeyring method for fetching credentials
 // based on image name.
-func (dk *providersDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
+func (dk *providersDockerKeyring) Lookup(opts *Options) ([]AuthConfig, bool) {
 	keyring := &BasicDockerKeyring{}
 
 	// TODO(mtaufen): Lookup mutates the keyring? Is that weird? Could it get weird with
@@ -273,10 +273,10 @@ func (dk *providersDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	// into account, so MAYBE that's okay, but how often do we reconstruct the keyring?
 	// Assuming this is fine since it's been around a while, but curious to understand better.
 	for _, p := range dk.Providers {
-		keyring.Add(p.Provide(&Options{Image: image}))
+		keyring.Add(p.Provide(opts))
 	}
 
-	return keyring.Lookup(image)
+	return keyring.Lookup(opts)
 }
 
 // FakeKeyring a fake config credentials
@@ -287,7 +287,7 @@ type FakeKeyring struct {
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name
 // return fake auth and ok
-func (f *FakeKeyring) Lookup(image string) ([]AuthConfig, bool) {
+func (f *FakeKeyring) Lookup(opts *Options) ([]AuthConfig, bool) {
 	return f.auth, f.ok
 }
 
@@ -296,14 +296,14 @@ type UnionDockerKeyring []DockerKeyring
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // return each credentials
-func (k UnionDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
+func (k UnionDockerKeyring) Lookup(opts *Options) ([]AuthConfig, bool) {
 	authConfigs := []AuthConfig{}
 	for _, subKeyring := range k {
 		if subKeyring == nil {
 			continue
 		}
 
-		currAuthResults, _ := subKeyring.Lookup(image)
+		currAuthResults, _ := subKeyring.Lookup(opts)
 		authConfigs = append(authConfigs, currAuthResults...)
 	}
 

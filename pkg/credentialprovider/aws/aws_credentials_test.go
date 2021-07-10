@@ -181,7 +181,7 @@ func TestECRProvide(t *testing.T) {
 
 	// Verify that we get the expected username/password combo for
 	// an ECR image name.
-	creds, ok := keyring.Lookup(image)
+	creds, ok := keyring.Lookup(opts)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", image)
 		return
@@ -203,7 +203,7 @@ func TestECRProvide(t *testing.T) {
 	// Verify that we get an error for other images.
 	for _, otherRegistry := range otherRegistries {
 		image = path.Join(otherRegistry, "foo/bar")
-		_, ok = keyring.Lookup(image)
+		_, ok = keyring.Lookup(opts)
 		if ok {
 			t.Errorf("Unexpectedly found image: %s", image)
 			return
@@ -235,7 +235,7 @@ func TestECRProvideCached(t *testing.T) {
 	keyring.Add(p.Provide(opts2))
 	// Verify that we get the credentials from the
 	// cache the second time
-	creds1, ok := keyring.Lookup(image1)
+	creds1, ok := keyring.Lookup(opts1)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", image1)
 		return
@@ -248,7 +248,7 @@ func TestECRProvideCached(t *testing.T) {
 		t.Errorf("cached credentials do not match")
 	}
 
-	creds2, ok := keyring.Lookup(image2)
+	creds2, ok := keyring.Lookup(opts2)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", image1)
 		return
@@ -287,7 +287,7 @@ func TestChinaECRProvide(t *testing.T) {
 	keyring.Add(p.Provide(opts))
 	// Verify that we get the expected username/password combo for
 	// an ECR image name.
-	creds, ok := keyring.Lookup(image)
+	creds, ok := keyring.Lookup(opts)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", image)
 		return
@@ -309,7 +309,7 @@ func TestChinaECRProvide(t *testing.T) {
 	// Verify that we get an error for other images.
 	for _, otherRegistry := range otherRegistries {
 		image = path.Join(otherRegistry, image)
-		_, ok = keyring.Lookup(image)
+		_, ok = keyring.Lookup(opts)
 		if ok {
 			t.Errorf("Unexpectedly found image: %s", image)
 			return
@@ -337,7 +337,7 @@ func TestChinaECRProvideCached(t *testing.T) {
 	keyring.Add(p.Provide(opts))
 	// Verify that we get the credentials from the
 	// cache the second time
-	creds, ok := keyring.Lookup(image)
+	creds, ok := keyring.Lookup(opts)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", image)
 		return

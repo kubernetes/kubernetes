@@ -42,16 +42,10 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 	imgSpec := toRuntimeAPIImageSpec(image)
 
-	// TODO(mtaufen): Why do we only pass repoToPull into Lookup?
-	// This gets passed through to providers, including the new exec plugins right?
-	// Does this mean exec plugins will never see the full image path/could
-	// that be a problem? Hmm... seems like repoToPull may actually be the
-	// full name, only maybe missing tag and digest, so maybe not a big deal?
-	// opts := &credentialprovider.Options{
-	// 	Image:               repoToPull,
-	// 	ServiceAccountToken: nil, // TODO
-	// }
-	creds, withCredentials := keyring.Lookup(repoToPull)
+	opts := &credentialprovider.Options{
+		Image: repoToPull,
+	}
+	creds, withCredentials := keyring.Lookup(opts)
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
 

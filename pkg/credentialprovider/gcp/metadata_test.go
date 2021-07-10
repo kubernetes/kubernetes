@@ -118,9 +118,13 @@ func DockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 		t.Errorf("Provider is unexpectedly disabled")
 	}
 
-	keyring.Add(provider.Provide(""))
+	opts := &credentialprovider.Options{
+		Image: registryURL,
+	}
 
-	creds, ok := keyring.Lookup(registryURL)
+	keyring.Add(provider.Provide(opts))
+
+	creds, ok := keyring.Lookup(opts)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryURL)
 		return
@@ -190,9 +194,13 @@ func DockerKeyringFromGoogleDockerConfigMetadataURL(t *testing.T) {
 		t.Errorf("Provider is unexpectedly disabled")
 	}
 
-	keyring.Add(provider.Provide(""))
+	opts := &credentialprovider.Options{
+		Image: registryURL,
+	}
 
-	creds, ok := keyring.Lookup(registryURL)
+	keyring.Add(provider.Provide(opts))
+
+	creds, ok := keyring.Lookup(opts)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryURL)
 		return
@@ -271,9 +279,13 @@ func ContainerRegistryBasics(t *testing.T) {
 				t.Errorf("Provider is unexpectedly disabled")
 			}
 
-			keyring.Add(provider.Provide(""))
+			opts := &credentialprovider.Options{
+				Image: registryURL,
+			}
 
-			creds, ok := keyring.Lookup(registryURL)
+			keyring.Add(provider.Provide(opts))
+
+			creds, ok := keyring.Lookup(opts)
 			if !ok {
 				t.Errorf("Didn't find expected URL: %s", registryURL)
 				return
