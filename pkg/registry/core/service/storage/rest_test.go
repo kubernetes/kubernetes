@@ -41,7 +41,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
-	"k8s.io/kubernetes/pkg/api/service"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -1182,110 +1181,6 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	_, _, err = storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err == nil || !errors.IsInvalid(err) {
 		t.Errorf("Unexpected error type: %v", err)
-	}
-}
-
-// Validate allocation of a nodePort when ExternalTrafficPolicy is set to Local
-// and type is LoadBalancer.
-func TestServiceRegistryCreateExternalTrafficHealthCheckNodePortAllocation(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("external-lb-esipp",
-		svctest.SetTypeLoadBalancer,
-		func(s *api.Service) {
-			s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
-		},
-	)
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
-	}
-
-	createdSvc := obj.(*api.Service)
-	if !service.NeedsHealthCheck(createdSvc) {
-		t.Errorf("Expecting health check needed, returned health check not needed instead")
-	}
-	port := createdSvc.Spec.HealthCheckNodePort
-	if port == 0 {
-		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
-	}
-}
-
-// Validate using the user specified nodePort when ExternalTrafficPolicy is set to Local
-// and type is LoadBalancer.
-func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("external-lb-esipp",
-		svctest.SetTypeLoadBalancer,
-		func(s *api.Service) {
-			// hard-code NodePort to make sure it doesn't conflict with the healthport.
-			// TODO: remove this once http://issue.k8s.io/93922 fixes auto-allocation conflicting with user-specified health check ports
-			s.Spec.Ports[0].NodePort = 30500
-			s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
-			s.Spec.HealthCheckNodePort = 30501
-		},
-	)
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		t.Fatalf("Unexpected failure creating service :%v", err)
-	}
-
-	createdSvc := obj.(*api.Service)
-	if !service.NeedsHealthCheck(createdSvc) {
-		t.Errorf("Expecting health check needed, returned health check not needed instead")
-	}
-	port := createdSvc.Spec.HealthCheckNodePort
-	if port == 0 {
-		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
-	}
-	if port != 30501 {
-		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", 30501, port)
-	}
-}
-
-// Validate that the service creation fails when the requested port number is -1.
-func TestServiceRegistryCreateExternalTrafficHealthCheckNodePortNegative(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("external-lb-esipp", svctest.SetTypeLoadBalancer, func(s *api.Service) {
-		s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
-		s.Spec.HealthCheckNodePort = int32(-1)
-	})
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		return
-	}
-	t.Errorf("Unexpected creation of service with invalid HealthCheckNodePort specified")
-}
-
-// Validate that the health check nodePort is not allocated when ExternalTrafficPolicy is set to Global.
-func TestServiceRegistryCreateExternalTrafficGlobal(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("external-lb-esipp",
-		svctest.SetTypeLoadBalancer,
-		func(s *api.Service) {
-			s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
-		},
-	)
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
-	}
-
-	createdSvc := obj.(*api.Service)
-	if service.NeedsHealthCheck(createdSvc) {
-		t.Errorf("Expecting health check not needed, returned health check needed instead")
-	}
-	// Make sure the service does not have the health check node port allocated
-	port := createdSvc.Spec.HealthCheckNodePort
-	if port != 0 {
-		t.Errorf("Unexpected allocation of health check node port: %v", port)
 	}
 }
 
