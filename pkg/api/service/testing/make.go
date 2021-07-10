@@ -195,3 +195,10 @@ func SetUniqueNodePorts(svc *api.Service) {
 		svc.Spec.Ports[i].NodePort = int32(30000 + i)
 	}
 }
+
+// SetHealthCheckNodePort sets the HealthCheckNodePort field.
+func SetHealthCheckNodePort(val int32) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.HealthCheckNodePort = val
+	}
+}

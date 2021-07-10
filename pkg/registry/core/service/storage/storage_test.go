@@ -5125,6 +5125,225 @@ func TestCreateInitNodePorts(t *testing.T) {
 	}
 }
 
+func TestCreateExternalTrafficPolicy(t *testing.T) {
+	testCases := []struct {
+		name        string
+		svc         *api.Service
+		expectError bool
+		expectHCNP  bool
+	}{{
+		name: "ExternalName_policy:none_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy("")),
+		expectHCNP: false,
+	}, {
+		name: "ExternalName_policy:none_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(""),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "ExternalName_policy:Cluster_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster)),
+		expectError: true,
+	}, {
+		name: "ExternalName_policy:Cluster_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "ExternalName_policy:Local_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		expectError: true,
+	}, {
+		name: "ExternalName_policy:Local_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "ClusterIP_policy:none_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy("")),
+		expectHCNP: false,
+	}, {
+		name: "ClusterIP_policy:none_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy(""),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "ClusterIP_policy:Cluster_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster)),
+		expectError: true,
+	}, {
+		name: "ClusterIP_policy:Cluster_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "ClusterIP_policy:Local_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		expectError: true,
+	}, {
+		name: "ClusterIP_policy:Local_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "NodePort_policy:none_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy("")),
+		expectHCNP: false,
+	}, {
+		name: "NodePort_policy:none_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy(""),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "NodePort_policy:Cluster:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster)),
+		expectHCNP: false,
+	}, {
+		name: "NodePort_policy:Cluster:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "NodePort_policy:Local_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		expectHCNP: false,
+	}, {
+		name: "NodePort_policy:Local_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "LoadBalancer_policy:none_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy("")),
+		expectHCNP: false,
+	}, {
+		name: "LoadBalancer_policy:none_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(""),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "LoadBalancer_policy:Cluster_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster)),
+		expectHCNP: false,
+	}, {
+		name: "LoadBalancer_policy:Cluster_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeCluster),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectError: true,
+	}, {
+		name: "LoadBalancer_policy:Local_hcnp:none",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		expectHCNP: true,
+	}, {
+		name: "LoadBalancer_policy:Local_hcnp:specified",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(30000)),
+		expectHCNP: true,
+	}, {
+		name: "LoadBalancer_policy:Local_hcnp:negative",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(-1)),
+		expectError: true,
+	}}
+
+	// Do this in the outer scope for performance.
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tc.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			defer storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if tc.expectError && err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			if !tc.expectHCNP {
+				if createdSvc.Spec.HealthCheckNodePort != 0 {
+					t.Fatalf("expected no HealthCheckNodePort, got %d", createdSvc.Spec.HealthCheckNodePort)
+				}
+				return
+			}
+
+			if createdSvc.Spec.HealthCheckNodePort == 0 {
+				t.Fatalf("expected a HealthCheckNodePort")
+			}
+			if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+				t.Errorf("expected HealthCheckNodePort to be allocated: %v", createdSvc.Spec.HealthCheckNodePort)
+			}
+			if tc.svc.Spec.HealthCheckNodePort != 0 {
+				if want, got := tc.svc.Spec.HealthCheckNodePort, createdSvc.Spec.HealthCheckNodePort; want != got {
+					t.Errorf("wrong HealthCheckNodePort value: wanted %d, got %d", want, got)
+				}
+			}
+			for i, p := range createdSvc.Spec.Ports {
+				if p.NodePort == createdSvc.Spec.HealthCheckNodePort {
+					t.Errorf("HealthCheckNodePort overlaps NodePort[%d]", i)
+				}
+			}
+		})
+	}
+}
+
 // Prove that a dry-run create doesn't actually allocate IPs or ports.
 func TestCreateDryRun(t *testing.T) {
 	testCases := []struct {
