@@ -2230,6 +2230,8 @@ k8s.io/pod-security-admission/admission/api/scheme
 k8s.io/pod-security-admission/admission/api/v1alpha1
 k8s.io/pod-security-admission/admission/api/validation
 k8s.io/pod-security-admission/api
+k8s.io/pod-security-admission/cmd/webhook/server
+k8s.io/pod-security-admission/cmd/webhook/server/options
 k8s.io/pod-security-admission/metrics
 k8s.io/pod-security-admission/policy
 k8s.io/pod-security-admission/test
