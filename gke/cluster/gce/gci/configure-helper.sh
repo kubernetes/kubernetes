@@ -66,6 +66,14 @@ function setup-os-params {
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
   # now, set a generic core_pattern that users can work with.
   echo "/core.%e.%p.%t" > /proc/sys/kernel/core_pattern
+
+  # Tuning node kernel parameteres and apply the node-pool level overrides on
+  # GKE.
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if [[ "${KUBERNETES_MASTER:-false}" == "false" ]]; then
+      configure-node-sysctls
+    fi
+  fi
 }
 
 # secure_random generates a secure random string of bytes. This function accepts
@@ -1599,7 +1607,8 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
 
   local -r kubelet_env_file="/etc/default/kubelet"
-  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
+  # POD_SYSCTLS is set in function configure-node-sysctls.
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} --pod-sysctls='${POD_SYSCTLS:-}'"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
 
@@ -2865,8 +2874,6 @@ function setup-kubelet-dir {
 # Override for GKE custom master setup scripts (no-op outside of GKE).
 function gke-master-start {
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
-    echo "Running GKE internal configuration script"
-    . "${KUBE_HOME}/bin/gke-internal-configure-helper.sh"
     gke-internal-master-start
  elif [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
    echo "setting up local admin kubeconfig"
@@ -3318,6 +3325,11 @@ function main() {
   fi
   log-end 'GenerateTokens'
 
+  # Source the GKE specific scripts.
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    echo "Running GKE internal configuration script"
+    log-wrap 'SourceGKEInternalConfigureHelper' . "${KUBE_HOME}/bin/gke-internal-configure-helper.sh"
+  fi
   log-wrap 'SetupOSParams' setup-os-params
   log-wrap 'ConfigIPFirewall' config-ip-firewall
   log-wrap 'CreateDirs' create-dirs
