@@ -42,7 +42,7 @@ type fakeExecPlugin struct {
 	auth map[string]credentialproviderapi.AuthConfig
 }
 
-func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
+func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image, serviceAccountToken string) (*credentialproviderapi.CredentialProviderResponse, error) {
 	return &credentialproviderapi.CredentialProviderResponse{
 		CacheKeyType: f.cacheKeyType,
 		CacheDuration: &metav1.Duration{

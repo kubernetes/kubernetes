@@ -197,8 +197,6 @@ func (p *pluginProvider) Provide(opts *credentialprovider.Options) credentialpro
 		return credentialprovider.DockerConfig{}
 	}
 
-	// TODO(mtaufen): Credentials would also have to be cached based on the
-	// (Image, ServiceAccount) pair now.
 	cachedConfig, found, err := p.getCachedCredentials(opts.Image)
 	if err != nil {
 		klog.Errorf("Failed to get cached docker config: %v", err)
@@ -209,6 +207,16 @@ func (p *pluginProvider) Provide(opts *credentialprovider.Options) credentialpro
 		return cachedConfig
 	}
 
+	// Find the first token that matches the image, and pass that to ExecPlugin.
+	// Up to users not to overlap MatchImages for now. Maybe never change that.
+	serviceAccountToken := ""
+	for _, ipt := range opts.ImagePullTokens {
+		if credentialprovider.MatchImage(ipt.MatchImages, opts.Image) {
+			serviceAccountToken = ipt.Token
+			break
+		}
+	}
+
 	// ExecPlugin is wrapped in single flight to exec plugin once for concurrent same image request.
 	// The caveat here is we don't know cacheKeyType yet, so if cacheKeyType is registry/global and credentials saved in cache
 	// on per registry/global basis then exec will be called for all requests if requests are made concurrently.
@@ -216,7 +224,7 @@ func (p *pluginProvider) Provide(opts *credentialprovider.Options) credentialpro
 	// foo.bar.registry/image1
 	// foo.bar.registry/image2
 	res, err, _ := p.group.Do(opts.Image, func() (interface{}, error) {
-		return p.plugin.ExecPlugin(context.Background(), opts.Image)
+		return p.plugin.ExecPlugin(context.Background(), opts.Image, serviceAccountToken)
 	})
 
 	if err != nil {
@@ -288,13 +296,7 @@ func (p *pluginProvider) Enabled() bool {
 
 // isImageAllowed returns true if the image matches against the list of allowed matches by the plugin.
 func (p *pluginProvider) isImageAllowed(image string) bool {
-	for _, matchImage := range p.matchImages {
-		if matched, _ := credentialprovider.URLsMatchStr(matchImage, image); matched {
-			return true
-		}
-	}
-
-	return false
+	return credentialprovider.MatchImage(p.matchImages, image)
 }
 
 // getCachedCredentials returns a credentialprovider.DockerConfig if cached from the plugin.
@@ -343,7 +345,7 @@ func (p *pluginProvider) getCachedCredentials(image string) (credentialprovider.
 // Plugin is the interface calling ExecPlugin. This is mainly for testability
 // so tests don't have to actually exec any processes.
 type Plugin interface {
-	ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error)
+	ExecPlugin(ctx context.Context, image, serviceAccountToken string) (*credentialproviderapi.CredentialProviderResponse, error)
 }
 
 // execPlugin is the implementation of the Plugin interface that execs a credential provider plugin based
@@ -364,11 +366,12 @@ type execPlugin struct {
 //
 // The plugin is expected to receive the CredentialProviderRequest API via stdin from the kubelet and
 // return CredentialProviderResponse via stdout.
-func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
+func (e *execPlugin) ExecPlugin(ctx context.Context, image, serviceAccountToken string) (*credentialproviderapi.CredentialProviderResponse, error) {
 	klog.V(5).Infof("Getting image %s credentials from external exec plugin %s", image, e.name)
 
 	authRequest := &credentialproviderapi.CredentialProviderRequest{
-		Image: image,
+		Image:               image,
+		ServiceAccountToken: serviceAccountToken,
 	}
 	data, err := e.encodeRequest(authRequest)
 	if err != nil {

@@ -196,6 +196,16 @@ func URLsMatchStr(glob string, target string) (bool, error) {
 	return URLsMatch(globURL, targetURL)
 }
 
+// MatchImage determines if the image matches any of matchImages patterns
+func MatchImage(matchImages []string, image string) bool {
+	for _, matchImage := range matchImages {
+		if matched, _ := URLsMatchStr(matchImage, image); matched {
+			return true
+		}
+	}
+	return false
+}
+
 // URLsMatch checks whether the given target url matches the glob url, which may have
 // glob wild cards in the host name.
 //
