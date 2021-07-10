@@ -79,7 +79,7 @@ func TestRepair(t *testing.T) {
 
 func TestRepairLeak(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous, err := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestRepairLeak(t *testing.T) {
 
 func TestRepairWithExisting(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous, err := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
 		t.Fatal(err)
 	}

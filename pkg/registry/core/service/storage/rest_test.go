@@ -215,12 +215,12 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 		var r ipallocator.Interface
 		switch family {
 		case api.IPv4Protocol:
-			r, err = ipallocator.NewCIDRRange(makeIPNet(t))
+			r, err = ipallocator.NewInMemory(makeIPNet(t))
 			if err != nil {
 				t.Fatalf("cannot create CIDR Range %v", err)
 			}
 		case api.IPv6Protocol:
-			r, err = ipallocator.NewCIDRRange(makeIPNet6(t))
+			r, err = ipallocator.NewInMemory(makeIPNet6(t))
 			if err != nil {
 				t.Fatalf("cannot create CIDR Range %v", err)
 			}
@@ -234,7 +234,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 	}
 
 	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
-	portAllocator, err := portallocator.NewPortAllocator(portRange)
+	portAllocator, err := portallocator.NewInMemory(portRange)
 	if err != nil {
 		t.Fatalf("cannot create port allocator %v", err)
 	}

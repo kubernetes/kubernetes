@@ -82,7 +82,7 @@ func TestRepair(t *testing.T) {
 
 func TestRepairLeak(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestRepairLeak(t *testing.T) {
 
 func TestRepairWithExisting(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestRepairWithExisting(t *testing.T) {
 
 func makeRangeRegistry(t *testing.T, cidrRange string) *mockRangeRegistry {
 	_, cidr, _ := net.ParseCIDR(cidrRange)
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 	previous.Allocate(net.ParseIP("192.168.1.10"))
 
 	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
-	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
+	secondaryPrevious, err := ipallocator.NewInMemory(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,13 +467,13 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
-	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
+	secondaryPrevious, err := ipallocator.NewInMemory(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
 	}
