@@ -833,7 +833,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		return !podutil.IsPodReady(s.Pods[i])
 	}
 
-	// 4. higher pod-deletion-cost < lower pod-deletion cost
+	// 4. lower pod-deletion-cost < higher pod-deletion cost
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost) {
 		pi, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[i].Annotations)
 		pj, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[j].Annotations)
