@@ -1,5 +1,6 @@
 //go:build !dockerless
 // +build !dockerless
+//go:generate mockgen -source client.go  -destination testing/mock_client.go -package testing
 
 /*
 Copyright 2014 The Kubernetes Authors.
