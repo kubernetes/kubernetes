@@ -69,7 +69,7 @@ func TestAllocate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r, err := NewCIDRRange(cidr)
+		r, err := NewInMemory(cidr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +163,7 @@ func TestAllocateTiny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := NewCIDRRange(cidr)
+	r, err := NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestAllocateSmall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := NewCIDRRange(cidr)
+	r, err := NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestForEach(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		r, err := NewCIDRRange(cidr)
+		r, err := NewInMemory(cidr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -264,7 +264,7 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := NewCIDRRange(cidr)
+	r, err := NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,14 +296,14 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewCIDRRange(otherCidr)
+	_, err = NewInMemory(otherCidr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
 		t.Fatal(err)
 	}
-	other, err := NewCIDRRange(network)
+	other, err := NewInMemory(network)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestNewFromSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := NewCIDRRange(cidr)
+	r, err := NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +367,7 @@ func TestClusterIPMetrics(t *testing.T) {
 	// create IPv4 allocator
 	cidrIPv4 := "10.0.0.0/24"
 	_, clusterCIDRv4, _ := net.ParseCIDR(cidrIPv4)
-	a, err := NewCIDRRange(clusterCIDRv4)
+	a, err := NewInMemory(clusterCIDRv4)
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestClusterIPMetrics(t *testing.T) {
 	// create IPv6 allocator
 	cidrIPv6 := "2001:db8::/112"
 	_, clusterCIDRv6, _ := net.ParseCIDR(cidrIPv6)
-	b, err := NewCIDRRange(clusterCIDRv6)
+	b, err := NewInMemory(clusterCIDRv6)
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
 	}

@@ -123,7 +123,7 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
 
-	rebuilt, err := portallocator.NewPortAllocator(c.portRange)
+	rebuilt, err := portallocator.NewInMemory(c.portRange)
 	if err != nil {
 		return fmt.Errorf("unable to create port allocator: %v", err)
 	}
