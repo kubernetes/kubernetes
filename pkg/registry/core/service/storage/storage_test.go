@@ -5594,6 +5594,64 @@ func TestCreateDryRun(t *testing.T) {
 	}
 }
 
+func TestDeleteTypes(t *testing.T) {
+	testCases := []struct {
+		name string
+		svc  *api.Service
+	}{{
+		name: "type:ExternalName",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeExternalName),
+	}, {
+		name: "type:ClusterIP",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP),
+	}, {
+		name: "type:ClusterIP_headless",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetHeadless),
+	}, {
+		name: "type:NodePort",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeNodePort),
+	}, {
+		name: "type:LoadBalancer",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer),
+	}, {
+		name: "type:LoadBalancer_etp:Local",
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+	}}
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+
+			_, deleted, err := storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error deleting service: %v", err)
+			}
+			if !deleted {
+				t.Fatalf("expected service to be deleted")
+			}
+		})
+	}
+}
+
 // Prove that a dry-run delete doesn't actually deallocate IPs or ports.
 func TestDeleteDryRun(t *testing.T) {
 	testCases := []struct {
