@@ -686,21 +686,6 @@ func TestServiceRegistryUpdateMultiPortLoadBalancerService(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryGet(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("error creating service: %v", err)
-	}
-	obj, _ := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	svc := obj.(*api.Service)
-	if e, a := "foo", svc.Name; e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-}
-
 // this is local because it's not fully fleshed out enough for general use.
 func makePod(name string, ips ...string) api.Pod {
 	p := api.Pod{
