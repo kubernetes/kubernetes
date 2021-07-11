@@ -156,6 +156,161 @@ func TestEndpointUpdates(t *testing.T) {
 
 }
 
+// TestEndpointWithTerminatingPod tests that terminating pods are NOT included in Endpoints.
+// This capability is only available in the newer EndpointSlice API and there are no plans to
+// include it for Endpoints. This test can be removed in the future if we decide to include
+// terminating endpoints in Endpoints, but in the mean time this test ensures we do not change
+// this behavior accidentally.
+func TestEndpointWithTerminatingPod(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	informers := informers.NewSharedInformerFactory(client, 0)
+
+	epController := endpoint.NewEndpointController(
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Endpoints(),
+		client,
+		0)
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go epController.Run(1, stopCh)
+
+	// Create namespace
+	ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	// Create a pod with labels
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-pod",
+			Labels: labelMap(),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "fake-node",
+			Containers: []v1.Container{
+				{
+					Name:  "fakename",
+					Image: "fakeimage",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "port-443",
+							ContainerPort: 443,
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			PodIP: "10.0.0.1",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "10.0.0.1",
+				},
+			},
+		},
+	}
+
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
+	}
+
+	createdPod.Status = pod.Status
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), createdPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+	}
+
+	// Create a service associated to the pod
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-service",
+			Namespace: ns.Name,
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Ports: []v1.ServicePort{
+				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt(443)},
+			},
+		},
+	}
+	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
+	}
+
+	// poll until associated Endpoints to the previously created Service exists
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		numEndpoints := 0
+		for _, subset := range endpoints.Subsets {
+			numEndpoints += len(subset.Addresses)
+		}
+
+		if numEndpoints == 0 {
+			return false, nil
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatalf("endpoints not found: %v", err)
+	}
+
+	err = client.CoreV1().Pods(ns.Name).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("error deleting test pod: %v", err)
+	}
+
+	// poll until endpoint for deleted Pod is no longer in Endpoints.
+	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		numEndpoints := 0
+		for _, subset := range endpoints.Subsets {
+			numEndpoints += len(subset.Addresses)
+		}
+
+		if numEndpoints > 0 {
+			return false, nil
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatalf("error checking for no endpoints with terminating pods: %v", err)
+	}
+}
+
 func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
 }
