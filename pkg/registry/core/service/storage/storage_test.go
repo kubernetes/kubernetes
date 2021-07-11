@@ -4714,19 +4714,82 @@ func TestCreateInitIPFields(t *testing.T) {
 					}
 					if itc.expectHeadless {
 						if !reflect.DeepEqual(createdSvc.Spec.ClusterIPs, []string{"None"}) {
-							t.Errorf("wrong clusterIPs: want [\"None\"], got %v", createdSvc.Spec.ClusterIPs)
+							t.Fatalf("wrong clusterIPs: want [\"None\"], got %v", createdSvc.Spec.ClusterIPs)
 						}
-					} else {
-						if c, f := len(createdSvc.Spec.ClusterIPs), len(createdSvc.Spec.IPFamilies); c != f {
-							t.Errorf("clusterIPs and ipFamilies are not the same length: %d vs %d", c, f)
+						return
+					}
+					if c, f := len(createdSvc.Spec.ClusterIPs), len(createdSvc.Spec.IPFamilies); c != f {
+						t.Errorf("clusterIPs and ipFamilies are not the same length: %d vs %d", c, f)
+					}
+					for i, clip := range createdSvc.Spec.ClusterIPs {
+						if cf, ef := familyOf(clip), createdSvc.Spec.IPFamilies[i]; cf != ef {
+							t.Errorf("clusterIP is the wrong IP family: want %s, got %s", ef, cf)
 						}
-						for i, clip := range createdSvc.Spec.ClusterIPs {
-							if cf, ef := familyOf(clip), createdSvc.Spec.IPFamilies[i]; cf != ef {
-								t.Errorf("clusterIP is the wrong IP family: want %s, got %s", ef, cf)
-							}
+						if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
+							t.Errorf("clusterIP is not allocated: %v", clip)
 						}
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestCreateReallocation(t *testing.T) {
+	testCases := []struct {
+		name string
+		svc  *api.Service
+	}{{
+		name: "v4",
+		svc:  svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetIPFamilies(api.IPv4Protocol)),
+	}, {
+		name: "v6",
+		svc:  svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetIPFamilies(api.IPv6Protocol)),
+	}, {
+		name: "v4v6",
+		svc:  svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+	}}
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			_, _, err = storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			//FIXME: HACK!!  Delete above calls "inner" which doesn't
+			// yet call the allocators - no release = test errors!
+			for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
+				for _, ip := range createdSvc.Spec.ClusterIPs {
+					al.Release(net.ParseIP(ip))
+				}
+			}
+			for _, p := range createdSvc.Spec.Ports {
+				storage.alloc.serviceNodePorts.Release(int(p.NodePort))
+			}
+
+			// Force the same IPs and ports
+			svc2 := tc.svc.DeepCopy()
+			svc2.Spec.ClusterIP = createdSvc.Spec.ClusterIP
+			svc2.Spec.ClusterIPs = createdSvc.Spec.ClusterIPs
+			svc2.Spec.Ports = createdSvc.Spec.Ports
+
+			_, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
 			}
 		})
 	}
