@@ -154,6 +154,7 @@ func WithPriorityAndFairness(
 				close(shouldStartWatchCh)
 
 				watchInitializationSignal.Wait()
+				klog.Errorf("CCC (initialize): %v", requestInfo)
 			}
 		} else {
 			execute = func() {
@@ -184,6 +185,7 @@ func WithPriorityAndFairness(
 		if isWatchRequest {
 			resultCh := make(chan interface{})
 			go func() {
+				klog.Errorf("AAA %v", requestInfo)
 				defer func() {
 					err := recover()
 					// do not wrap the sentinel ErrAbortHandler panic value
@@ -196,9 +198,11 @@ func WithPriorityAndFairness(
 						err = fmt.Sprintf("%v\n%s", err, buf)
 					}
 
+					klog.Errorf("DDD %v", requestInfo)
 					// This ensure we put something to resultCh independently
 					// if the request was actually executed or not.
 					resultCh <- err
+					klog.Errorf("EEE %v", requestInfo)
 				}()
 
 				trace.Step("About to handle from goroutine")
@@ -213,6 +217,7 @@ func WithPriorityAndFairness(
 				//  a possibility to leak the the goroutine started from execute()
 				// if watchInitializationSignal wasn't signaled.
 				// Consider adding deferred recover func to handle it.
+				klog.Errorf("BBB (pushed down) %v", requestInfo)
 				handler.ServeHTTP(w, watchReq)
 				// Protect from the situations when request will not reach storage layer
 				// and the initialization signal will not be send.
