@@ -346,25 +346,6 @@ func shouldAllocateNodePorts(service *api.Service) bool {
 	return false
 }
 
-// externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
-// It is necessary because we default ExternalTrafficPolicy field to different values.
-// (NodePort / LoadBalancer: default is Global; Other types: default is empty.)
-func externalTrafficPolicyUpdate(oldService, service *api.Service) {
-	var neededExternalTraffic, needsExternalTraffic bool
-	if oldService.Spec.Type == api.ServiceTypeNodePort ||
-		oldService.Spec.Type == api.ServiceTypeLoadBalancer {
-		neededExternalTraffic = true
-	}
-	if service.Spec.Type == api.ServiceTypeNodePort ||
-		service.Spec.Type == api.ServiceTypeLoadBalancer {
-		needsExternalTraffic = true
-	}
-	if neededExternalTraffic && !needsExternalTraffic {
-		// Clear ExternalTrafficPolicy to prevent confusion from ineffective field.
-		service.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
-	}
-}
-
 // healthCheckNodePortUpdate handles HealthCheckNodePort allocation/release
 // and adjusts HealthCheckNodePort during service update if needed.
 func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
@@ -390,13 +371,12 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 		klog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTrafficPolicy=Global")
 		klog.V(4).Infof("Releasing healthCheckNodePort: %d", oldHealthCheckNodePort)
 		nodePortOp.ReleaseDeferred(int(oldHealthCheckNodePort))
-		// Clear the HealthCheckNodePort field.
-		service.Spec.HealthCheckNodePort = 0
 
 	// Case 3: Remain in needs HealthCheckNodePort.
 	// Reject changing the value of the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && needsHealthCheckNodePort:
 		if oldHealthCheckNodePort != newHealthCheckNodePort {
+			//FIXME: Let validation do this.
 			klog.Warningf("Attempt to change value of health check node port DENIED")
 			fldPath := field.NewPath("spec", "healthCheckNodePort")
 			el := field.ErrorList{field.Invalid(fldPath, newHealthCheckNodePort,
@@ -499,7 +479,6 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	if !success || err != nil {
 		return nil, false, err
 	}
-	externalTrafficPolicyUpdate(oldService, service)
 	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
