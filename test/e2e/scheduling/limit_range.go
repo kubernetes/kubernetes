@@ -72,6 +72,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for limitRanges")
 		framework.ExpectEqual(len(limitRanges.Items), 0)
+
 		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
