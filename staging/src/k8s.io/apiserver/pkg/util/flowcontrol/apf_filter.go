@@ -32,6 +32,8 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+
+	utiltrace "k8s.io/utils/trace"
 )
 
 // ConfigConsumerAsFieldManager is how the config consuminng
@@ -54,6 +56,7 @@ type Interface interface {
 		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
+		trace *utiltrace.Trace,
 	)
 
 	// MaintainObservations is a helper for maintaining statistics.
@@ -145,10 +148,13 @@ func NewTestable(config TestableConfig) Interface {
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 	queueNoteFn fq.QueueNoteFn,
-	execFn func()) {
+	execFn func(),
+	trace *utiltrace.Trace) {
 	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
+	trace.Step("request started")
 	queued := startWaitingTime != time.Time{}
 	noteFn(fs, pl)
+	trace.Step("request noted")
 	if req == nil {
 		if queued {
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
@@ -167,6 +173,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 		}
 	}()
 	idle = req.Finish(func() {
+		trace.Step("waiting finished")
 		if queued {
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
@@ -176,6 +183,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 		defer func() {
 			metrics.ObserveExecutionDuration(ctx, pl.Name, fs.Name, time.Since(startExecutionTime))
 		}()
+		trace.Step("about to exec")
 		execFn()
 	})
 	if queued && !executed {

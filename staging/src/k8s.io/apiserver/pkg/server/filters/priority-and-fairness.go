@@ -30,6 +30,9 @@ import (
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
+
+	"time"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // PriorityAndFairnessClassification identifies the results of
@@ -67,6 +70,9 @@ func WithPriorityAndFairness(
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		var trace *utiltrace.Trace
+
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
@@ -86,6 +92,12 @@ func WithPriorityAndFairness(
 			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
 			handler.ServeHTTP(w, r)
 			return
+		}
+
+		if isWatchRequest {
+			trace = utiltrace.New("APF watch initialization")
+		} else {
+			trace = utiltrace.New("APF regular initialization")
 		}
 
 		var classification *PriorityAndFairnessClassification
@@ -132,7 +144,11 @@ func WithPriorityAndFairness(
 				watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
 				watchReq = r.Clone(watchCtx)
 
+				trace.Step("About to register watch")
+
 				forgetWatch = fcIfc.RegisterWatch(requestInfo)
+
+				trace.Step("watch registered")
 
 				// Notify that we should start watch
 				close(shouldStartWatchCh)
@@ -146,6 +162,7 @@ func WithPriorityAndFairness(
 				served = true
 				setResponseHeaders(classification, w)
 
+				trace.LogIfLong(500 * time.Millisecond)
 				handler.ServeHTTP(w, r)
 			}
 		}
@@ -184,11 +201,14 @@ func WithPriorityAndFairness(
 					resultCh <- err
 				}()
 
-				fcIfc.Handle(ctx, digest, note, queueNote, execute)
+				trace.Step("About to handle from goroutine")
+				fcIfc.Handle(ctx, digest, note, queueNote, execute, trace)
 			}()
 
 			select {
 			case <-shouldStartWatchCh:
+				trace.LogIfLong(500 * time.Millisecond)
+
 				// TODO: In case of panic from the underlying handler, there is
 				//  a possibility to leak the the goroutine started from execute()
 				// if watchInitializationSignal wasn't signaled.
@@ -211,7 +231,8 @@ func WithPriorityAndFairness(
 				forgetWatch()
 			}
 		} else {
-			fcIfc.Handle(ctx, digest, note, queueNote, execute)
+			trace.Step("About to Handle")
+			fcIfc.Handle(ctx, digest, note, queueNote, execute, trace)
 		}
 
 		if !served {
