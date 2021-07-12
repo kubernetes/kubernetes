@@ -62,7 +62,7 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun
+	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun + "$"
 	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
 	if dirs, err := io.ReadDir(devPath); err == nil {

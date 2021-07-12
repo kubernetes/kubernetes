@@ -58,7 +58,7 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	switch dirname {
 	case "/dev/disk/by-path/":
 		f1 := &fakeFileInfo{
-			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-0",
+			name: "pci-0000:41:00.0-fc-0x500a0981891b8dc5-lun-10",
 		}
 		f2 := &fakeFileInfo{
 			name: "fc-0x5005076810213b32-lun-2",
@@ -103,7 +103,7 @@ func TestSearchDisk(t *testing.T) {
 		{
 			name: "PCI disk",
 			wwns: []string{"500a0981891b8dc5"},
-			lun:  "0",
+			lun:  "10",
 		},
 		{
 			name: "Non PCI disk",
@@ -120,6 +120,12 @@ func TestSearchDisk(t *testing.T) {
 			name:        "Non existing disk",
 			wwns:        []string{"500507681fffffff"},
 			lun:         "0",
+			expectError: true,
+		},
+		{
+			name:        "Non existing disk II",
+			wwns:        []string{"500a0981891b8dc5"},
+			lun:         "1",
 			expectError: true,
 		},
 	}
