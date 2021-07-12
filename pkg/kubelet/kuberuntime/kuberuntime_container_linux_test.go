@@ -466,7 +466,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwapEnabled, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, true)()
 	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)

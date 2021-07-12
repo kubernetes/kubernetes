@@ -929,6 +929,7 @@ go.opentelemetry.io/otel/sdk/metric/controller/time
 go.opentelemetry.io/otel/sdk/metric/processor/basic
 go.opentelemetry.io/otel/sdk/metric/selector/simple
 # go.opentelemetry.io/otel/trace v0.20.0 => go.opentelemetry.io/otel/trace v0.20.0
+## explicit
 go.opentelemetry.io/otel/trace
 # go.opentelemetry.io/proto/otlp v0.7.0 => go.opentelemetry.io/proto/otlp v0.7.0
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
@@ -2230,6 +2231,8 @@ k8s.io/pod-security-admission/admission/api/scheme
 k8s.io/pod-security-admission/admission/api/v1alpha1
 k8s.io/pod-security-admission/admission/api/validation
 k8s.io/pod-security-admission/api
+k8s.io/pod-security-admission/cmd/webhook/server
+k8s.io/pod-security-admission/cmd/webhook/server/options
 k8s.io/pod-security-admission/metrics
 k8s.io/pod-security-admission/policy
 k8s.io/pod-security-admission/test

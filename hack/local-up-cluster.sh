@@ -786,7 +786,7 @@ function start_kubelet {
 
     # warn if users are running with swap allowed
     if [ "${FAIL_SWAP_ON}" == "false" ]; then
-        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap unless testing NodeSwapEnabled feature."
+        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap unless testing NodeSwap feature."
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then

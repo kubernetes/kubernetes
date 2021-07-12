@@ -1337,7 +1337,8 @@ message EphemeralContainerCommon {
   // +optional
   optional string imagePullPolicy = 14;
 
-  // SecurityContext is not allowed for ephemeral containers.
+  // Optional: SecurityContext defines the security options the ephemeral container should be run with.
+  // If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
   // +optional
   optional SecurityContext securityContext = 15;
 
