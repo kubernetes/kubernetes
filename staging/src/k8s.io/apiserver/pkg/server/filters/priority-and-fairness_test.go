@@ -53,6 +53,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/google/go-cmp/cmp"
+
+	utiltrace "k8s.io/utils/trace"
 )
 
 func TestMain(m *testing.M) {
@@ -87,7 +89,7 @@ func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 	queueNoteFn fq.QueueNoteFn,
-	execFn func(),
+	execFn func(), _ *utiltrace.Trace,
 ) {
 	if t.mockDecision == decisionSkipFilter {
 		panic("Handle should not be invoked")
@@ -388,6 +390,7 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 	_ fq.QueueNoteFn,
 	execFn func(),
+	_ *utiltrace.Trace,
 ) {
 	canExecute := false
 	func() {
@@ -581,7 +584,7 @@ type fakeFilterRequestDigest struct {
 func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
-	_ fq.QueueNoteFn, _ func(),
+	_ fq.QueueNoteFn, _ func(), _ *utiltrace.Trace,
 ) {
 	f.requestDigestGot = &requestDigest
 }
