@@ -3,7 +3,7 @@ package corefile
 import (
 	"strings"
 
-	"github.com/caddyserver/caddy/caddyfile"
+	"github.com/coredns/caddy/caddyfile"
 )
 
 type Corefile struct {

@@ -23,13 +23,13 @@ func (s *PidsGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *PidsGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.PidsLimit != 0 {
+func (s *PidsGroup) Set(path string, r *configs.Resources) error {
+	if r.PidsLimit != 0 {
 		// "max" is the fallback value.
 		limit := "max"
 
-		if cgroup.Resources.PidsLimit > 0 {
-			limit = strconv.FormatInt(cgroup.Resources.PidsLimit, 10)
+		if r.PidsLimit > 0 {
+			limit = strconv.FormatInt(r.PidsLimit, 10)
 		}
 
 		if err := fscommon.WriteFile(path, "pids.max", limit); err != nil {

@@ -19,14 +19,16 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"runtime"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
-
-	"k8s.io/klog/v2"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -97,7 +99,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if wc.Resources.CpuCount > 0 {
 		if wc.Resources.CpuMaximum > 0 {
 			wc.Resources.CpuMaximum = 0
-			klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
@@ -120,6 +122,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	// override with Windows options if present
 	if effectiveSc.WindowsOptions != nil && effectiveSc.WindowsOptions.RunAsUserName != nil {
 		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
+	}
+
+	if securitycontext.HasWindowsHostProcessRequest(pod, container) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
+		}
+		wc.SecurityContext.HostProcess = true
 	}
 
 	return wc, nil

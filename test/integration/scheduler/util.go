@@ -35,14 +35,16 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 // initDisruptionController initializes and runs a Disruption Controller to properly
@@ -78,31 +80,33 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 	return dc
 }
 
-// initTest initializes a test environment and creates master and scheduler with default
+// initTest initializes a test environment and creates API server and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
 
-// initTestDisablePreemption initializes a test environment and creates master and scheduler with default
+// initTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			PostFilter: schedulerconfig.PluginSet{
-				Disabled: []schedulerconfig.Plugin{
-					{Name: defaultpreemption.Name},
+	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
+		Profiles: []v1beta2.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta2.Plugins{
+				PostFilter: v1beta2.PluginSet{
+					Disabled: []v1beta2.Plugin{
+						{Name: defaultpreemption.Name},
+					},
 				},
 			},
-		},
-	}
+		}},
+	})
 	testCtx := testutils.InitTestSchedulerWithOptions(
-		t, testutils.InitTestMaster(t, nsPrefix, nil), nil,
-		scheduler.WithProfiles(prof))
+		t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil,
+		scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -470,9 +474,12 @@ func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.Conditio
 }
 
 // cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
-// be actually deleted.
+// be actually deleted.  They are removed with no grace.
 func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
-	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+	t.Helper()
+
+	zero := int64(0)
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{}); err != nil {
 		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
 		return
 	}
@@ -496,4 +503,14 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 		}
 		return true, nil
 	}
+}
+
+func createNamespacesWithLabels(cs clientset.Interface, namespaces []string, labels map[string]string) error {
+	for _, n := range namespaces {
+		ns := v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n, Labels: labels}}
+		if _, err := cs.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

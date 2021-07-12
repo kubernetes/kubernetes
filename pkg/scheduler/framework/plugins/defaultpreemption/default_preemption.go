@@ -33,24 +33,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
 	// Name of the plugin used in the plugin registry and configurations.
-	Name = "DefaultPreemption"
+	Name = names.DefaultPreemption
 )
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -69,19 +69,19 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(dpArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func New(dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
 	}
-	if err := validation.ValidateDefaultPreemptionArgs(*args); err != nil {
+	if err := validation.ValidateDefaultPreemptionArgs(nil, args); err != nil {
 		return nil, err
 	}
 	pl := DefaultPreemption{
 		fh:        fh,
 		args:      *args,
 		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		pdbLister: getPDBLister(fh.SharedInformerFactory()),
+		pdbLister: getPDBLister(fh.SharedInformerFactory(), fts.EnablePodDisruptionBudget),
 	}
 	return &pl, nil
 }
@@ -335,7 +335,7 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Clone()
 		stateCopy := state.Clone()
 		pods, numPDBViolations, status := selectVictimsOnNode(ctx, fh, stateCopy, pod, nodeInfoCopy, pdbs)
-		if status.IsSuccess() {
+		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),
@@ -353,11 +353,14 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
 				cancel()
 			}
-		} else {
-			statusesLock.Lock()
-			nodeStatuses[nodeInfoCopy.Node().Name] = status
-			statusesLock.Unlock()
+			return
 		}
+		if status.IsSuccess() && len(pods) == 0 {
+			status = framework.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeInfoCopy.Node().Name))
+		}
+		statusesLock.Lock()
+		nodeStatuses[nodeInfoCopy.Node().Name] = status
+		statusesLock.Unlock()
 	}
 	fh.Parallelizer().Until(parallelCtx, len(potentialNodes), checkNode)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses
@@ -392,6 +395,18 @@ func CallExtenders(extenders []framework.Extender, pod *v1.Pod, nodeLister frame
 			}
 			return nil, framework.AsStatus(err)
 		}
+		// Check if the returned victims are valid.
+		for nodeName, victims := range nodeNameToVictims {
+			if victims == nil || len(victims.Pods) == 0 {
+				if extender.IsIgnorable() {
+					delete(nodeNameToVictims, nodeName)
+					klog.InfoS("Ignoring node without victims", "node", nodeName)
+					continue
+				}
+				return nil, framework.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeName))
+			}
+		}
+
 		// Replace victimsMap with new result after preemption. So the
 		// rest of extenders can continue use it as parameter.
 		victimsMap = nodeNameToVictims
@@ -694,13 +709,13 @@ func selectVictimsOnNode(
 // - Clear the low-priority pods' nominatedNodeName status if needed
 func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod, pluginName string) *framework.Status {
 	for _, victim := range c.Victims().Pods {
-		if err := util.DeletePod(cs, victim); err != nil {
-			klog.ErrorS(err, "preempting pod", "pod", klog.KObj(victim))
-			return framework.AsStatus(err)
-		}
-		// If the victim is a WaitingPod, send a reject message to the PermitPlugin
+		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
+		// Otherwise we should delete the victim.
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
+		} else if err := util.DeletePod(cs, victim); err != nil {
+			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+			return framework.AsStatus(err)
 		}
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())
@@ -796,8 +811,8 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 	return violatingPodInfos, nonViolatingPodInfos
 }
 
-func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+func getPDBLister(informerFactory informers.SharedInformerFactory, enablePodDisruptionBudget bool) policylisters.PodDisruptionBudgetLister {
+	if enablePodDisruptionBudget {
 		return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 	}
 	return nil

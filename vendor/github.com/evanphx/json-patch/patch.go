@@ -721,6 +721,10 @@ func (p Patch) Apply(doc []byte) ([]byte, error) {
 // ApplyIndent mutates a JSON document according to the patch, and returns the new
 // document indented.
 func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
+	if len(doc) == 0 {
+		return doc, nil
+	}
+
 	var pd container
 	if doc[0] == '[' {
 		pd = &partialArray{}

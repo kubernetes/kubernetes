@@ -132,6 +132,9 @@ message CustomResourceConversion {
 // <.spec.name>.<.spec.group>.
 // Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 message CustomResourceDefinition {
+  // Standard object's metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes how the user wants the resources to appear
@@ -166,6 +169,9 @@ message CustomResourceDefinitionCondition {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 message CustomResourceDefinitionList {
+  // Standard object's metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items list individual CustomResourceDefinition objects

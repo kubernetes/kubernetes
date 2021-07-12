@@ -1,5 +1,104 @@
 # Changelog
 
+## 1.17.0 (25 May 2021)
+
+Bugfixes:
+* [#867][]: Encode `<nil>` for nil `error` instead of a panic.
+* [#931][], [#936][]: Update minimum version constraints to address
+  vulnerabilities in dependencies.
+
+Enhancements:
+* [#865][]: Improve alignment of fields of the Logger struct, reducing its
+  size from 96 to 80 bytes.
+* [#881][]: Support `grpclog.LoggerV2` in zapgrpc.
+* [#903][]: Support URL-encoded POST requests to the AtomicLevel HTTP handler
+  with the `application/x-www-form-urlencoded` content type.
+* [#912][]: Support multi-field encoding with `zap.Inline`.
+* [#913][]: Speed up SugaredLogger for calls with a single string.
+* [#928][]: Add support for filtering by field name to `zaptest/observer`.
+
+Thanks to @ash2k, @FMLS, @jimmystewpot, @Oncilla, @tsoslow, @tylitianrui, @withshubh, and @wziww for their contributions to this release.
+
+## 1.16.0 (1 Sep 2020)
+
+Bugfixes:
+* [#828][]: Fix missing newline in IncreaseLevel error messages.
+* [#835][]: Fix panic in JSON encoder when encoding times or durations
+  without specifying a time or duration encoder.
+* [#843][]: Honor CallerSkip when taking stack traces.
+* [#862][]: Fix the default file permissions to use `0666` and rely on the umask instead.
+* [#854][]: Encode `<nil>` for nil `Stringer` instead of a panic error log.
+
+Enhancements:
+* [#629][]: Added `zapcore.TimeEncoderOfLayout` to easily create time encoders
+  for custom layouts.
+* [#697][]: Added support for a configurable delimiter in the console encoder.
+* [#852][]: Optimize console encoder by pooling the underlying JSON encoder.
+* [#844][]: Add ability to include the calling function as part of logs.
+* [#843][]: Add `StackSkip` for including truncated stacks as a field.
+* [#861][]: Add options to customize Fatal behaviour for better testability.
+
+Thanks to @SteelPhase, @tmshn, @lixingwang, @wyxloading, @moul, @segevfiner, @andy-retailnext and @jcorbin for their contributions to this release.
+
+## 1.15.0 (23 Apr 2020)
+
+Bugfixes:
+* [#804][]: Fix handling of `Time` values out of `UnixNano` range.
+* [#812][]: Fix `IncreaseLevel` being reset after a call to `With`.
+
+Enhancements:
+* [#806][]: Add `WithCaller` option to supersede the `AddCaller` option. This
+  allows disabling annotation of log entries with caller information if
+  previously enabled with `AddCaller`.
+* [#813][]: Deprecate `NewSampler` constructor in favor of
+  `NewSamplerWithOptions` which supports a `SamplerHook` option. This option
+   adds support for monitoring sampling decisions through a hook.
+
+Thanks to @danielbprice for their contributions to this release.
+
+## 1.14.1 (14 Mar 2020)
+
+Bugfixes:
+* [#791][]: Fix panic on attempting to build a logger with an invalid Config.
+* [#795][]: Vendoring Zap with `go mod vendor` no longer includes Zap's
+  development-time dependencies.
+* [#799][]: Fix issue introduced in 1.14.0 that caused invalid JSON output to
+  be generated for arrays of `time.Time` objects when using string-based time
+  formats.
+
+Thanks to @YashishDua for their contributions to this release.
+
+## 1.14.0 (20 Feb 2020)
+
+Enhancements:
+* [#771][]: Optimize calls for disabled log levels.
+* [#773][]: Add millisecond duration encoder.
+* [#775][]: Add option to increase the level of a logger.
+* [#786][]: Optimize time formatters using `Time.AppendFormat` where possible.
+
+Thanks to @caibirdme for their contributions to this release.
+
+## 1.13.0 (13 Nov 2019)
+
+Enhancements:
+* [#758][]: Add `Intp`, `Stringp`, and other similar `*p` field constructors
+  to log pointers to primitives with support for `nil` values.
+
+Thanks to @jbizzle for their contributions to this release.
+
+## 1.12.0 (29 Oct 2019)
+
+Enhancements:
+* [#751][]: Migrate to Go modules.
+
+## 1.11.0 (21 Oct 2019)
+
+Enhancements:
+* [#725][]: Add `zapcore.OmitKey` to omit keys in an `EncoderConfig`.
+* [#736][]: Add `RFC3339` and `RFC3339Nano` time encoders.
+
+Thanks to @juicemia, @uhthomas for their contributions to this release.
+
 ## 1.10.0 (29 Apr 2019)
 
 Bugfixes:
@@ -325,3 +424,37 @@ upgrade to the upcoming stable release.
 [#610]: https://github.com/uber-go/zap/pull/610
 [#675]: https://github.com/uber-go/zap/pull/675
 [#704]: https://github.com/uber-go/zap/pull/704
+[#725]: https://github.com/uber-go/zap/pull/725
+[#736]: https://github.com/uber-go/zap/pull/736
+[#751]: https://github.com/uber-go/zap/pull/751
+[#758]: https://github.com/uber-go/zap/pull/758
+[#771]: https://github.com/uber-go/zap/pull/771
+[#773]: https://github.com/uber-go/zap/pull/773
+[#775]: https://github.com/uber-go/zap/pull/775
+[#786]: https://github.com/uber-go/zap/pull/786
+[#791]: https://github.com/uber-go/zap/pull/791
+[#795]: https://github.com/uber-go/zap/pull/795
+[#799]: https://github.com/uber-go/zap/pull/799
+[#804]: https://github.com/uber-go/zap/pull/804
+[#812]: https://github.com/uber-go/zap/pull/812
+[#806]: https://github.com/uber-go/zap/pull/806
+[#813]: https://github.com/uber-go/zap/pull/813
+[#629]: https://github.com/uber-go/zap/pull/629
+[#697]: https://github.com/uber-go/zap/pull/697
+[#828]: https://github.com/uber-go/zap/pull/828
+[#835]: https://github.com/uber-go/zap/pull/835
+[#843]: https://github.com/uber-go/zap/pull/843
+[#844]: https://github.com/uber-go/zap/pull/844
+[#852]: https://github.com/uber-go/zap/pull/852
+[#854]: https://github.com/uber-go/zap/pull/854
+[#861]: https://github.com/uber-go/zap/pull/861
+[#862]: https://github.com/uber-go/zap/pull/862
+[#865]: https://github.com/uber-go/zap/pull/865
+[#867]: https://github.com/uber-go/zap/pull/867
+[#881]: https://github.com/uber-go/zap/pull/881
+[#903]: https://github.com/uber-go/zap/pull/903
+[#912]: https://github.com/uber-go/zap/pull/912
+[#913]: https://github.com/uber-go/zap/pull/913
+[#928]: https://github.com/uber-go/zap/pull/928
+[#931]: https://github.com/uber-go/zap/pull/931
+[#936]: https://github.com/uber-go/zap/pull/936

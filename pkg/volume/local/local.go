@@ -161,7 +161,7 @@ func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1
 		return nil, err
 	}
 
-	return &localVolumeMapper{
+	mapper := &localVolumeMapper{
 		localVolume: &localVolume{
 			podUID:     pod.UID,
 			volName:    spec.Name(),
@@ -169,8 +169,15 @@ func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1
 			plugin:     plugin,
 		},
 		readOnly: readOnly,
-	}, nil
+	}
 
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(pod.UID)))
+
+	return mapper, nil
 }
 
 func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
@@ -348,7 +355,7 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	return nil
 }
 
-func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
 		return fmt.Errorf("local volume source is nil or local path is not set")
 	}
@@ -626,9 +633,16 @@ func (m *localVolumeMapper) GetStagingPath() string {
 	return ""
 }
 
+// SupportsMetrics returns true for SupportsMetrics as it initializes the
+// MetricsProvider.
+func (m *localVolumeMapper) SupportsMetrics() bool {
+	return true
+}
+
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
 type localVolumeUnmapper struct {
 	*localVolume
+	volume.MetricsNil
 }
 
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}

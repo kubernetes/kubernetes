@@ -70,10 +70,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
 	})
 
-	// Requires the alpha level feature gate SuspendJob. This e2e test will not
-	// pass without the following flag being passed to kubetest:
-	//   --test_args="--feature-gates=SuspendJob=true"
-	ginkgo.It("[Feature:SuspendJob] should not create pods when created in suspend state", func() {
+	ginkgo.It("should not create pods when created in suspend state", func() {
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(true)
@@ -111,10 +108,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	// Requires the alpha level feature gate SuspendJob. This e2e test will not
-	// pass without the following flag being passed to kubetest:
-	//   --test_args="--feature-gates=SuspendJob=true"
-	ginkgo.It("[Feature:SuspendJob] should delete pods when suspended", func() {
+	ginkgo.It("should delete pods when suspended", func() {
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(false)
@@ -153,7 +147,7 @@ var _ = SIGDescribe("Job", func() {
 		Testcase: Ensure Pods of an Indexed Job get a unique index.
 		Description: Create an Indexed Job, wait for completion, capture the output of the pods and verify that they contain the completion index.
 	*/
-	ginkgo.It("[Feature:IndexedJob] should create pods for an Indexed job with completion indexes", func() {
+	ginkgo.It("should create pods for an Indexed job with completion indexes and specified hostname", func() {
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		mode := batchv1.IndexedCompletion
@@ -171,14 +165,16 @@ var _ = SIGDescribe("Job", func() {
 		succeededIndexes := sets.NewInt()
 		for _, pod := range pods.Items {
 			if pod.Status.Phase == v1.PodSucceeded && pod.Annotations != nil {
-				ix, err := strconv.Atoi(pod.Annotations[batchv1.JobCompletionIndexAnnotationAlpha])
+				ix, err := strconv.Atoi(pod.Annotations[batchv1.JobCompletionIndexAnnotation])
 				framework.ExpectNoError(err, "failed obtaining completion index from pod in namespace: %s", f.Namespace.Name)
 				succeededIndexes.Insert(ix)
+				expectedName := fmt.Sprintf("%s-%d", job.Name, ix)
+				framework.ExpectEqual(pod.Spec.Hostname, expectedName, "expected completed pod with hostname %s, but got %s", expectedName, pod.Spec.Hostname)
 			}
 		}
 		gotIndexes := succeededIndexes.List()
 		wantIndexes := []int{0, 1, 2, 3}
-		framework.ExpectEqual(gotIndexes, wantIndexes, "expected completed indexes %s, but got %s", gotIndexes, wantIndexes)
+		framework.ExpectEqual(gotIndexes, wantIndexes, "expected completed indexes %s, but got %s", wantIndexes, gotIndexes)
 	})
 
 	/*
@@ -257,7 +253,7 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job past active deadline")
-		err = waitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+10)*time.Second, "DeadlineExceeded")
+		err = waitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+15)*time.Second, "DeadlineExceeded")
 		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 

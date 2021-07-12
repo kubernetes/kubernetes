@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This plugin has been deprecated and is only configurable through the
+// scheduler policy API and the v1beta1 component config API. It is recommended
+// to use node taints instead.
 package nodepreferavoidpods
 
 import (
@@ -24,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodePreferAvoidPods is a plugin that priorities nodes according to the node annotation
@@ -36,7 +41,7 @@ type NodePreferAvoidPods struct {
 var _ framework.ScorePlugin = &NodePreferAvoidPods{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodePreferAvoidPods"
+const Name = names.NodePreferAvoidPods
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodePreferAvoidPods) Name() string {
@@ -51,9 +56,6 @@ func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.Cycle
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.NewStatus(framework.Error, "node not found")
-	}
 
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef != nil {
@@ -88,5 +90,6 @@ func (pl *NodePreferAvoidPods) ScoreExtensions() framework.ScoreExtensions {
 
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+	klog.Warning("NodePreferAvoidPods plugin is deprecated and will be removed in a future version; use node taints instead")
 	return &NodePreferAvoidPods{handle: h}, nil
 }

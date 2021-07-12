@@ -11,7 +11,9 @@ import (
 )
 
 type ConsistOfMatcher struct {
-	Elements []interface{}
+	Elements        []interface{}
+	missingElements []interface{}
+	extraElements   []interface{}
 }
 
 func (matcher *ConsistOfMatcher) Match(actual interface{}) (success bool, err error) {
@@ -19,44 +21,63 @@ func (matcher *ConsistOfMatcher) Match(actual interface{}) (success bool, err er
 		return false, fmt.Errorf("ConsistOf matcher expects an array/slice/map.  Got:\n%s", format.Object(actual, 1))
 	}
 
-	elements := matcher.Elements
-	if len(matcher.Elements) == 1 && isArrayOrSlice(matcher.Elements[0]) {
-		elements = []interface{}{}
-		value := reflect.ValueOf(matcher.Elements[0])
-		for i := 0; i < value.Len(); i++ {
-			elements = append(elements, value.Index(i).Interface())
-		}
-	}
-
-	matchers := []interface{}{}
-	for _, element := range elements {
-		matcher, isMatcher := element.(omegaMatcher)
-		if !isMatcher {
-			matcher = &EqualMatcher{Expected: element}
-		}
-		matchers = append(matchers, matcher)
-	}
-
-	values := matcher.valuesOf(actual)
-
-	if len(values) != len(matchers) {
-		return false, nil
-	}
-
-	neighbours := func(v, m interface{}) (bool, error) {
-		match, err := m.(omegaMatcher).Match(v)
-		return match && err == nil, nil
-	}
+	matchers := matchers(matcher.Elements)
+	values := valuesOf(actual)
 
 	bipartiteGraph, err := bipartitegraph.NewBipartiteGraph(values, matchers, neighbours)
 	if err != nil {
 		return false, err
 	}
 
-	return len(bipartiteGraph.LargestMatching()) == len(values), nil
+	edges := bipartiteGraph.LargestMatching()
+	if len(edges) == len(values) && len(edges) == len(matchers) {
+		return true, nil
+	}
+
+	var missingMatchers []interface{}
+	matcher.extraElements, missingMatchers = bipartiteGraph.FreeLeftRight(edges)
+	matcher.missingElements = equalMatchersToElements(missingMatchers)
+
+	return false, nil
 }
 
-func (matcher *ConsistOfMatcher) valuesOf(actual interface{}) []interface{} {
+func neighbours(value, matcher interface{}) (bool, error) {
+	match, err := matcher.(omegaMatcher).Match(value)
+	return match && err == nil, nil
+}
+
+func equalMatchersToElements(matchers []interface{}) (elements []interface{}) {
+	for _, matcher := range matchers {
+		equalMatcher, ok := matcher.(*EqualMatcher)
+		if ok {
+			matcher = equalMatcher.Expected
+		}
+		elements = append(elements, matcher)
+	}
+	return
+}
+
+func matchers(expectedElems []interface{}) (matchers []interface{}) {
+	elems := expectedElems
+	if len(expectedElems) == 1 && isArrayOrSlice(expectedElems[0]) {
+		elems = []interface{}{}
+		value := reflect.ValueOf(expectedElems[0])
+		for i := 0; i < value.Len(); i++ {
+			elems = append(elems, value.Index(i).Interface())
+		}
+	}
+
+	for _, e := range elems {
+		matcher, isMatcher := e.(omegaMatcher)
+		if !isMatcher {
+			matcher = &EqualMatcher{Expected: e}
+		}
+		matchers = append(matchers, matcher)
+	}
+	return
+}
+
+func valuesOf(actual interface{}) []interface{} {
 	value := reflect.ValueOf(actual)
 	values := []interface{}{}
 	if isMap(actual) {
@@ -74,7 +95,21 @@ func (matcher *ConsistOfMatcher) valuesOf(actual interface{}) []interface{} {
 }
 
 func (matcher *ConsistOfMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "to consist of", matcher.Elements)
+	message = format.Message(actual, "to consist of", matcher.Elements)
+	message = appendMissingElements(message, matcher.missingElements)
+	if len(matcher.extraElements) > 0 {
+		message = fmt.Sprintf("%s\nthe extra elements were\n%s", message,
+			format.Object(matcher.extraElements, 1))
+	}
+	return
+}
+
+func appendMissingElements(message string, missingElements []interface{}) string {
+	if len(missingElements) == 0 {
+		return message
+	}
+	return fmt.Sprintf("%s\nthe missing elements were\n%s", message,
+		format.Object(missingElements, 1))
 }
 
 func (matcher *ConsistOfMatcher) NegatedFailureMessage(actual interface{}) (message string) {

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 // QueueSetFactory is used to create QueueSet objects.  Creation, like
@@ -80,7 +81,7 @@ type QueueSet interface {
 	// was idle at the moment of the return.  Otherwise idle==false
 	// and the client must call the Finish method of the Request
 	// exactly once.
-	StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
+	StartRequest(ctx context.Context, width *request.Width, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
 
 	// UpdateObservations makes sure any time-based statistics have
 	// caught up with the current clock reading

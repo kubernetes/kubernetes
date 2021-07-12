@@ -50,7 +50,7 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // ExtractIngress extracts the applied configuration owned by fieldManager from
 // ingress. If no managedFields are found in ingress for fieldManager, a
 // IngressApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // ingress must be a unmodified Ingress API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIngress(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+	return extractIngress(ingress, fieldManager, "")
+}
+
+// ExtractIngressStatus is the same as ExtractIngress except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractIngressStatus(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+	return extractIngress(ingress, fieldManager, "status")
+}
+
+func extractIngress(ingress *extensionsv1beta1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
 	b := &IngressApplyConfiguration{}
-	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Ingress"), fieldManager, b)
+	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Ingress"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

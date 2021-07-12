@@ -49,7 +49,7 @@ func Node(name string) *NodeApplyConfiguration {
 // ExtractNode extracts the applied configuration owned by fieldManager from
 // node. If no managedFields are found in node for fieldManager, a
 // NodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // node must be a unmodified Node API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Node(name string) *NodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNode(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+	return extractNode(node, fieldManager, "")
+}
+
+// ExtractNodeStatus is the same as ExtractNode except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractNodeStatus(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+	return extractNode(node, fieldManager, "status")
+}
+
+func extractNode(node *apicorev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
 	b := &NodeApplyConfiguration{}
-	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b)
+	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

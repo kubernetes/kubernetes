@@ -103,7 +103,10 @@ func (s *GenericAPIServer) installReadyz() {
 	s.readyzLock.Lock()
 	defer s.readyzLock.Unlock()
 	s.readyzChecksInstalled = true
-	healthz.InstallReadyzHandler(s.Handler.NonGoRestfulMux, s.readyzChecks...)
+	healthz.InstallReadyzHandlerWithHealthyFunc(s.Handler.NonGoRestfulMux, func() {
+		// note: InstallReadyzHandlerWithHealthyFunc guarantees that this is called only once
+		s.lifecycleSignals.HasBeenReady.Signal()
+	}, s.readyzChecks...)
 }
 
 // installLivez creates the livez endpoint for this server.

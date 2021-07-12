@@ -26,52 +26,37 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 const (
 	// RequestedToCapacityRatioName is the name of this plugin.
-	RequestedToCapacityRatioName = "RequestedToCapacityRatio"
+	RequestedToCapacityRatioName = names.RequestedToCapacityRatio
 	maxUtilization               = 100
 )
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
-func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, err := getRequestedToCapacityRatioArgs(plArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := validation.ValidateRequestedToCapacityRatioArgs(args); err != nil {
+	if err := validation.ValidateRequestedToCapacityRatioArgs(nil, &args); err != nil {
 		return nil, err
 	}
 
-	shape := make([]helper.FunctionShapePoint, 0, len(args.Shape))
-	for _, point := range args.Shape {
-		shape = append(shape, helper.FunctionShapePoint{
-			Utilization: int64(point.Utilization),
-			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
-			// therefore we need to scale the score returned by requested to capacity ratio to the score range
-			// used by the scheduler.
-			Score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
-		})
-	}
-
-	resourceToWeightMap := make(resourceToWeightMap)
-	for _, resource := range args.Resources {
-		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
-		if resource.Weight == 0 {
-			// Apply the default weight.
-			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
-		}
-	}
+	resourceToWeightMap := resourcesToWeightMap(args.Resources)
 
 	return &RequestedToCapacityRatio{
 		handle: handle,
 		resourceAllocationScorer: resourceAllocationScorer{
-			RequestedToCapacityRatioName,
-			buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
-			resourceToWeightMap,
+			Name:                RequestedToCapacityRatioName,
+			scorer:              requestedToCapacityRatioScorer(resourceToWeightMap, args.Shape),
+			resourceToWeightMap: resourceToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
@@ -112,18 +97,19 @@ func (pl *RequestedToCapacityRatio) ScoreExtensions() framework.ScoreExtensions 
 	return nil
 }
 
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap) int64 {
 	rawScoringFunction := helper.BuildBrokenLinearFunction(scoringFunctionShape)
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
 			return rawScoringFunction(maxUtilization)
 		}
 
-		return rawScoringFunction(maxUtilization - (capacity-requested)*maxUtilization/capacity)
+		return rawScoringFunction(requested * maxUtilization / capacity)
 	}
-	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
-		for resource, weight := range resourceToWeightMap {
+		for resource := range requested {
+			weight := resourceToWeightMap[resource]
 			resourceScore := resourceScoringFunction(requested[resource], allocable[resource])
 			if resourceScore > 0 {
 				nodeScore += resourceScore * weight
@@ -135,4 +121,19 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 		}
 		return int64(math.Round(float64(nodeScore) / float64(weightSum)))
 	}
+}
+
+func requestedToCapacityRatioScorer(weightMap resourceToWeightMap, shape []config.UtilizationShapePoint) func(resourceToValueMap, resourceToValueMap) int64 {
+	shapes := make([]helper.FunctionShapePoint, 0, len(shape))
+	for _, point := range shape {
+		shapes = append(shapes, helper.FunctionShapePoint{
+			Utilization: int64(point.Utilization),
+			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
+			// therefore we need to scale the score returned by requested to capacity ratio to the score range
+			// used by the scheduler.
+			Score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+		})
+	}
+
+	return buildRequestedToCapacityRatioScorerFunction(shapes, weightMap)
 }

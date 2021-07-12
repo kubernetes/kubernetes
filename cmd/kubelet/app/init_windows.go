@@ -52,7 +52,7 @@ func initForOS(windowsService bool, windowsPriorityClass string) error {
 	}
 	kubeletProcessHandle := windows.CurrentProcess()
 	// Set the priority of the kubelet process to given priority
-	klog.Infof("Setting the priority of kubelet process to %s", windowsPriorityClass)
+	klog.InfoS("Setting the priority of kubelet process", "windowsPriorityClass", windowsPriorityClass)
 	if err := windows.SetPriorityClass(kubeletProcessHandle, priority); err != nil {
 		return err
 	}

@@ -77,6 +77,11 @@ func (resourcequotaStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	return validation.ValidateResourceQuota(resourcequota, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (resourcequotaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (resourcequotaStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -91,6 +96,11 @@ func (resourcequotaStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 	newObj, oldObj := obj.(*api.ResourceQuota), old.(*api.ResourceQuota)
 	opts := getValidationOptionsFromResourceQuota(newObj, oldObj)
 	return validation.ValidateResourceQuotaUpdate(newObj, oldObj, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (resourcequotaStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (resourcequotaStrategy) AllowUnconditionalUpdate() bool {
@@ -124,6 +134,11 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 
 func (resourcequotaStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (resourcequotaStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func getValidationOptionsFromResourceQuota(newObj *api.ResourceQuota, oldObj *api.ResourceQuota) validation.ResourceQuotaValidationOptions {

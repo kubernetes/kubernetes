@@ -17,10 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 
 	"github.com/lithammer/dedent"
 )
@@ -44,17 +47,17 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Invalid v1beta1 causes error",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+			name: "Invalid v1beta2 causes error",
+			fileContents: dedent.Dedent(fmt.Sprintf(`
+				apiVersion: %s
 				kind: JoinConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectErr: true,
 		},
 		{
-			name: "valid v1beta1 is loaded",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+			name: "valid v1beta2 is loaded",
+			fileContents: dedent.Dedent(fmt.Sprintf(`
+				apiVersion: %s
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
 				discovery:
@@ -64,20 +67,20 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				    unsafeSkipCAVerification: true
 				  timeout: 5m0s
 				  tlsBootstrapToken: abcdef.0123456789abcdef
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 		},
 		{
-			name: "Invalid v1beta2 causes error",
+			name: "Invalid v1beta3 causes error",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 			`),
 			expectErr: true,
 		},
 		{
-			name: "valid v1beta2 is loaded",
+			name: "valid v1beta3 is loaded",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
 				discovery:

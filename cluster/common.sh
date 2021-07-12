@@ -221,7 +221,7 @@ function get-kubeconfig-user-basicauth() {
 #   KUBE_PASSWORD
 function gen-kube-basicauth() {
     KUBE_USER='admin'
-    KUBE_PASSWORD=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+    KUBE_PASSWORD=$(python3 -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
 }
 
 # Get the bearer token for the current-context in kubeconfig if one exists.
@@ -292,7 +292,7 @@ function set_binary_version() {
     if [[ "${path[0]}" == "release" ]]; then
       KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
     else
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
+      KUBE_VERSION=$(gsutil cat "gs://k8s-release-dev/${1}.txt")
     fi
   else
     KUBE_VERSION=${1}

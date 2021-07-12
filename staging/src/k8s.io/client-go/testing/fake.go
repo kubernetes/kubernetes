@@ -106,11 +106,15 @@ func (c *Fake) PrependReactor(verb, resource string, reaction ReactionFunc) {
 
 // AddWatchReactor appends a reactor to the end of the chain.
 func (c *Fake) AddWatchReactor(resource string, reaction WatchReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.WatchReactionChain = append(c.WatchReactionChain, &SimpleWatchReactor{resource, reaction})
 }
 
 // PrependWatchReactor adds a reactor to the beginning of the chain.
 func (c *Fake) PrependWatchReactor(resource string, reaction WatchReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.WatchReactionChain = append([]WatchReactor{&SimpleWatchReactor{resource, reaction}}, c.WatchReactionChain...)
 }
 

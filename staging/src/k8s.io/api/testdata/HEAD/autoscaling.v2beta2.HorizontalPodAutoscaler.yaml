@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -48,7 +49,7 @@ spec:
   maxReplicas: -1971381490
   metrics:
   - containerResource:
-      container: "39"
+      container: "40"
       name: Ɋł/擇ɦĽ胚O醔ɍ厶耈 
       target:
         averageUtilization: -1105572246
@@ -57,7 +58,7 @@ spec:
         value: "999"
     external:
       metric:
-        name: "40"
+        name: "41"
         selector:
           matchExpressions:
           - key: 1-1-x1z-j4kh6oqu-or---40--87-1wp6.759s-3------6tv27r-m8w-6-9-35d383-iq-ay1z25-3-vj73d/Y.t--_0..--_6yV07-_.___gO-d.iUaCw
@@ -71,11 +72,11 @@ spec:
         value: "830"
     object:
       describedObject:
-        apiVersion: "24"
-        kind: "22"
-        name: "23"
+        apiVersion: "25"
+        kind: "23"
+        name: "24"
       metric:
-        name: "25"
+        name: "26"
         selector:
           matchExpressions:
           - key: 816m59-dx8----i--5-8t36b0/D7r__.am6-4_WE-_JTrcd-2.-__E_Sv__26KX_R7
@@ -89,7 +90,7 @@ spec:
         value: "309"
     pods:
       metric:
-        name: "32"
+        name: "33"
         selector:
           matchExpressions:
           - key: w.__-___196-.dX_iv1H.__.h-J-M.9_T.q-o7.y-SQ.A
@@ -113,19 +114,19 @@ spec:
     type: 枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě
   minReplicas: 896585016
   scaleTargetRef:
-    apiVersion: "21"
-    kind: "19"
-    name: "20"
+    apiVersion: "22"
+    kind: "20"
+    name: "21"
 status:
   conditions:
   - lastTransitionTime: "2026-05-26T09:35:23Z"
-    message: "73"
-    reason: "72"
+    message: "74"
+    reason: "73"
     status: ƱÁR»淹揀
     type: 44矕
   currentMetrics:
   - containerResource:
-      container: "64"
+      container: "65"
       current:
         averageUtilization: -1945921250
         averageValue: "394"
@@ -137,7 +138,7 @@ status:
         averageValue: "797"
         value: "444"
       metric:
-        name: "65"
+        name: "66"
         selector:
           matchExpressions:
           - key: n_H-.___._D8.TS-jJ.Ys_Mop34_-2
@@ -150,11 +151,11 @@ status:
         averageValue: "472"
         value: "124"
       describedObject:
-        apiVersion: "56"
-        kind: "54"
-        name: "55"
+        apiVersion: "57"
+        kind: "55"
+        name: "56"
       metric:
-        name: "47"
+        name: "48"
         selector:
           matchExpressions:
           - key: Dp665O_4Gj._BXt.O-7___-Y_um-_8r--684._-_188
@@ -169,7 +170,7 @@ status:
         averageValue: "328"
         value: "378"
       metric:
-        name: "57"
+        name: "58"
         selector:
           matchExpressions:
           - key: 4ds4-4tz9x--j.1l11q5--uk5mj-94-8134i5k6q6--5tu-tie4-7--gm4p-8y-9-te5/H._____K_g1cXfr.4_.-_-_-...1py_8-3..s._.x.2K_2qu_0S-CqWD

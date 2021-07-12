@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	utilsnet "k8s.io/utils/net"
@@ -82,13 +82,13 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		klog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			klog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 			return false
 		}
 	}
@@ -311,6 +311,34 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 	return hasPrivileged
 }
 
+// HasWindowsHostProcessContainer returns true if any of the containers in a pod are HostProcess containers.
+func HasWindowsHostProcessContainer(pod *v1.Pod) bool {
+	var hasHostProcess bool
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		if sc.HasWindowsHostProcessRequest(pod, c) {
+			hasHostProcess = true
+			return false
+		}
+		return true
+	})
+
+	return hasHostProcess
+}
+
+// AllContainersAreWindowsHostProcess returns true if all containres in a pod are HostProcess containers.
+func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
+	allHostProcess := true
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		if !sc.HasWindowsHostProcessRequest(pod, c) {
+			allHostProcess = false
+			return false
+		}
+		return true
+	})
+
+	return allHostProcess
+}
+
 // MakePortMappings creates internal port mapping from api port mapping.
 func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 	names := make(map[string]struct{})
@@ -341,7 +369,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		// Protect against a port name being used more than once in a container.
 		if _, ok := names[name]; ok {
-			klog.Warningf("Port name conflicted, %q is defined more than once", name)
+			klog.InfoS("Port name conflicted, it is defined more than once", "portName", name)
 			continue
 		}
 		ports = append(ports, pm)

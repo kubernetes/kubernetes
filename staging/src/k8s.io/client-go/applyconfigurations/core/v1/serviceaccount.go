@@ -51,7 +51,7 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // ExtractServiceAccount extracts the applied configuration owned by fieldManager from
 // serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
 // ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
@@ -60,8 +60,19 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return extractServiceAccount(serviceAccount, fieldManager, "")
+}
+
+// ExtractServiceAccountStatus is the same as ExtractServiceAccount except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractServiceAccountStatus(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return extractServiceAccount(serviceAccount, fieldManager, "status")
+}
+
+func extractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
-	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b)
+	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

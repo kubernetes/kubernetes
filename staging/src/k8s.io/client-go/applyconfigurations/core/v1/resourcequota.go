@@ -50,7 +50,7 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // ExtractResourceQuota extracts the applied configuration owned by fieldManager from
 // resourceQuota. If no managedFields are found in resourceQuota for fieldManager, a
 // ResourceQuotaApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // resourceQuota must be a unmodified ResourceQuota API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return extractResourceQuota(resourceQuota, fieldManager, "")
+}
+
+// ExtractResourceQuotaStatus is the same as ExtractResourceQuota except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractResourceQuotaStatus(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return extractResourceQuota(resourceQuota, fieldManager, "status")
+}
+
+func extractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
-	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b)
+	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

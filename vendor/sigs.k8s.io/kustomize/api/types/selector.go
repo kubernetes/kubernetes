@@ -4,18 +4,18 @@
 package types
 
 import (
+	"fmt"
 	"regexp"
 
-	"sigs.k8s.io/kustomize/api/resid"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // Selector specifies a set of resources.
 // Any resource that matches intersection of all conditions
 // is included in this set.
 type Selector struct {
-	resid.Gvk `json:",inline,omitempty" yaml:",inline,omitempty"`
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
+	// ResId refers to a GVKN/Ns of a resource.
+	resid.ResId `json:",inline,omitempty" yaml:",inline,omitempty"`
 
 	// AnnotationSelector is a string that follows the label selection expression
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
@@ -26,6 +26,15 @@ type Selector struct {
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
 	// It matches with the resource labels.
 	LabelSelector string `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty"`
+}
+
+func (s *Selector) Copy() Selector {
+	return *s
+}
+
+func (s *Selector) String() string {
+	return fmt.Sprintf(
+		"%s:a=%s:l=%s", s.ResId, s.AnnotationSelector, s.LabelSelector)
 }
 
 // SelectorRegex is a Selector with regex in GVK

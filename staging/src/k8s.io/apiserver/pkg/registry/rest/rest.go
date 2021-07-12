@@ -92,6 +92,13 @@ type GroupVersionKindProvider interface {
 	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
 }
 
+// GroupVersionAcceptor is used to determine if a particular GroupVersion is acceptable to send to an endpoint.
+// This is used for endpoints which accept multiple versions (which is extremely rare).
+// The only known instance is pods/evictions which accepts policy/v1, but also policy/v1beta1 for backwards compatibility.
+type GroupVersionAcceptor interface {
+	AcceptsGroupVersion(gv schema.GroupVersion) bool
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

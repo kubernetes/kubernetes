@@ -185,6 +185,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.StatefulSetApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1.StatefulSetConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1.StatefulSetSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -215,6 +217,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1beta1.StatefulSetConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1beta1.StatefulSetSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -259,10 +263,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.RollingUpdateDeploymentApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("RollingUpdateStatefulSetStrategy"):
 		return &appsv1beta2.RollingUpdateStatefulSetStrategyApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("Scale"):
+		return &appsv1beta2.ScaleApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSet"):
 		return &appsv1beta2.StatefulSetApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &appsv1beta2.StatefulSetConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &appsv1beta2.StatefulSetSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -279,6 +287,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerSpecApplyConfiguration{}
 	case autoscalingv1.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("Scale"):
+		return &applyconfigurationsautoscalingv1.ScaleApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleSpec"):
+		return &applyconfigurationsautoscalingv1.ScaleSpecApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleStatus"):
+		return &applyconfigurationsautoscalingv1.ScaleStatusApplyConfiguration{}
 
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
@@ -381,6 +395,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobStatusApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobTemplateSpec"):
 		return &applyconfigurationsbatchv1.JobTemplateSpecApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("UncountedTerminatedPods"):
+		return &applyconfigurationsbatchv1.UncountedTerminatedPodsApplyConfiguration{}
 
 		// Group=batch, Version=v1beta1
 	case batchv1beta1.SchemeGroupVersion.WithKind("CronJob"):
@@ -903,6 +919,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.RunAsUserStrategyOptionsApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("RuntimeClassStrategyOptions"):
 		return &applyconfigurationsextensionsv1beta1.RuntimeClassStrategyOptionsApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("Scale"):
+		return &applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("SELinuxStrategyOptions"):
 		return &applyconfigurationsextensionsv1beta1.SELinuxStrategyOptionsApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("SupplementalGroupsStrategyOptions"):
@@ -1129,6 +1147,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnodev1beta1.SchedulingApplyConfiguration{}
 
 		// Group=policy, Version=v1
+	case policyv1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationspolicyv1.EvictionApplyConfiguration{}
 	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudget"):
 		return &applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration{}
 	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudgetSpec"):

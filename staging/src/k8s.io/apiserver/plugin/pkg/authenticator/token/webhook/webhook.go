@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authenticationv1client "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -48,21 +50,24 @@ func DefaultRetryBackoff() *wait.Backoff {
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type tokenReviewer interface {
-	Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error)
+	Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, int, error)
 }
 
 type WebhookTokenAuthenticator struct {
-	tokenReview  tokenReviewer
-	retryBackoff wait.Backoff
-	implicitAuds authenticator.Audiences
+	tokenReview    tokenReviewer
+	retryBackoff   wait.Backoff
+	implicitAuds   authenticator.Audiences
+	requestTimeout time.Duration
+	metrics        AuthenticatorMetrics
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
+func NewFromInterface(tokenReview authenticationv1client.AuthenticationV1Interface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, requestTimeout time.Duration, metrics AuthenticatorMetrics) (*WebhookTokenAuthenticator, error) {
+	tokenReviewClient := &tokenReviewV1Client{tokenReview.RESTClient()}
+	return newWithBackoff(tokenReviewClient, retryBackoff, implicitAuds, requestTimeout, metrics)
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig
@@ -74,12 +79,21 @@ func New(kubeConfigFile string, version string, implicitAuds authenticator.Audie
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds, time.Duration(0), AuthenticatorMetrics{
+		RecordRequestTotal:   noopMetrics{}.RequestTotal,
+		RecordRequestLatency: noopMetrics{}.RequestLatency,
+	})
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, retryBackoff, implicitAuds}, nil
+func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences, requestTimeout time.Duration, metrics AuthenticatorMetrics) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{
+		tokenReview,
+		retryBackoff,
+		implicitAuds,
+		requestTimeout,
+		metrics,
+	}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
@@ -105,11 +119,36 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	var (
 		result *authenticationv1.TokenReview
 		auds   authenticator.Audiences
+		cancel context.CancelFunc
 	)
+
+	// set a hard timeout if it was defined
+	// if the child has a shorter deadline then it will expire first,
+	// otherwise if the parent has a shorter deadline then the parent will expire and it will be propagate to the child
+	if w.requestTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, w.requestTimeout)
+		defer cancel()
+	}
+
 	// WithExponentialBackoff will return tokenreview create error (tokenReviewErr) if any.
 	if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 		var tokenReviewErr error
-		result, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
+		var statusCode int
+
+		start := time.Now()
+		result, statusCode, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
+		latency := time.Now().Sub(start)
+
+		if statusCode != 0 {
+			w.metrics.RecordRequestTotal(ctx, strconv.Itoa(statusCode))
+			w.metrics.RecordRequestLatency(ctx, strconv.Itoa(statusCode), latency.Seconds())
+			return tokenReviewErr
+		}
+
+		if tokenReviewErr != nil {
+			w.metrics.RecordRequestTotal(ctx, "<error>")
+			w.metrics.RecordRequestLatency(ctx, "<error>", latency.Seconds())
+		}
 		return tokenReviewErr
 	}, webhook.DefaultShouldRetry); err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
@@ -175,7 +214,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 		if err != nil {
 			return nil, err
 		}
-		return &tokenReviewV1Client{gw}, nil
+		return &tokenReviewV1ClientGW{gw.RestClient}, nil
 
 	case authenticationv1beta1.SchemeGroupVersion.Version:
 		groupVersions := []schema.GroupVersion{authenticationv1beta1.SchemeGroupVersion}
@@ -186,7 +225,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 		if err != nil {
 			return nil, err
 		}
-		return &tokenReviewV1beta1Client{gw}, nil
+		return &tokenReviewV1beta1ClientGW{gw.RestClient}, nil
 
 	default:
 		return nil, fmt.Errorf(
@@ -200,28 +239,60 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 }
 
 type tokenReviewV1Client struct {
-	w *webhook.GenericWebhook
+	client rest.Interface
 }
 
-func (t *tokenReviewV1Client) Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error) {
-	result := &authenticationv1.TokenReview{}
-	err := t.w.RestClient.Post().Body(review).Do(ctx).Into(result)
-	return result, err
+// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, HTTP status code and an error, if there is any.
+func (c *tokenReviewV1Client) Create(ctx context.Context, tokenReview *authenticationv1.TokenReview, opts metav1.CreateOptions) (result *authenticationv1.TokenReview, statusCode int, err error) {
+	result = &authenticationv1.TokenReview{}
+
+	restResult := c.client.Post().
+		Resource("tokenreviews").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(tokenReview).
+		Do(ctx)
+
+	restResult.StatusCode(&statusCode)
+	err = restResult.Into(result)
+	return
 }
 
-type tokenReviewV1beta1Client struct {
-	w *webhook.GenericWebhook
+// tokenReviewV1ClientGW used by the generic webhook, doesn't specify GVR.
+type tokenReviewV1ClientGW struct {
+	client rest.Interface
 }
 
-func (t *tokenReviewV1beta1Client) Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error) {
+// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, HTTP status code and an error, if there is any.
+func (c *tokenReviewV1ClientGW) Create(ctx context.Context, tokenReview *authenticationv1.TokenReview, opts metav1.CreateOptions) (result *authenticationv1.TokenReview, statusCode int, err error) {
+	result = &authenticationv1.TokenReview{}
+
+	restResult := c.client.Post().
+		Body(tokenReview).
+		Do(ctx)
+
+	restResult.StatusCode(&statusCode)
+	err = restResult.Into(result)
+	return
+}
+
+// tokenReviewV1beta1ClientGW used by the generic webhook, doesn't specify GVR.
+type tokenReviewV1beta1ClientGW struct {
+	client rest.Interface
+}
+
+func (t *tokenReviewV1beta1ClientGW) Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, int, error) {
+	var statusCode int
 	v1beta1Review := &authenticationv1beta1.TokenReview{Spec: v1SpecToV1beta1Spec(&review.Spec)}
 	v1beta1Result := &authenticationv1beta1.TokenReview{}
-	err := t.w.RestClient.Post().Body(v1beta1Review).Do(ctx).Into(v1beta1Result)
+
+	restResult := t.client.Post().Body(v1beta1Review).Do(ctx)
+	restResult.StatusCode(&statusCode)
+	err := restResult.Into(v1beta1Result)
 	if err != nil {
-		return nil, err
+		return nil, statusCode, err
 	}
 	review.Status = v1beta1StatusToV1Status(&v1beta1Result.Status)
-	return review, nil
+	return review, statusCode, nil
 }
 
 func v1SpecToV1beta1Spec(in *authenticationv1.TokenReviewSpec) authenticationv1beta1.TokenReviewSpec {

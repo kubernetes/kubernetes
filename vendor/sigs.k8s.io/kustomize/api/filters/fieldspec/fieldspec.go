@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -45,12 +46,11 @@ type Filter struct {
 
 func (fltr Filter) Filter(obj *yaml.RNode) (*yaml.RNode, error) {
 	// check if the FieldSpec applies to the object
-	if match, err := isMatchGVK(fltr.FieldSpec, obj); !match || err != nil {
-		return obj, errors.Wrap(err)
+	if match := isMatchGVK(fltr.FieldSpec, obj); !match {
+		return obj, nil
 	}
-	fltr.path = utils.PathSplitter(fltr.FieldSpec.Path)
-	err := fltr.filter(obj)
-	if err != nil {
+	fltr.path = utils.PathSplitter(fltr.FieldSpec.Path, "/")
+	if err := fltr.filter(obj); err != nil {
 		s, _ := obj.String()
 		return nil, errors.WrapPrefixf(err,
 			"considering field '%s' of object\n%v", fltr.FieldSpec.Path, s)
@@ -158,28 +158,24 @@ func isSequenceField(name string) (string, bool) {
 }
 
 // isMatchGVK returns true if the fs.GVK matches the obj GVK.
-func isMatchGVK(fs types.FieldSpec, obj *yaml.RNode) (bool, error) {
-	meta, err := obj.GetMeta()
-	if err != nil {
-		return false, err
-	}
-	if fs.Kind != "" && fs.Kind != meta.Kind {
+func isMatchGVK(fs types.FieldSpec, obj *yaml.RNode) bool {
+	if kind := obj.GetKind(); fs.Kind != "" && fs.Kind != kind {
 		// kind doesn't match
-		return false, err
+		return false
 	}
 
 	// parse the group and version from the apiVersion field
-	group, version := parseGV(meta.APIVersion)
+	group, version := resid.ParseGroupVersion(obj.GetApiVersion())
 
 	if fs.Group != "" && fs.Group != group {
 		// group doesn't match
-		return false, nil
+		return false
 	}
 
 	if fs.Version != "" && fs.Version != version {
 		// version doesn't match
-		return false, nil
+		return false
 	}
 
-	return true, nil
+	return true
 }

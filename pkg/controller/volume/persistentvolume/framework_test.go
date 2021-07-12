@@ -200,18 +200,18 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	for i, expected := range expectedEvents {
 		if len(gotEvents) <= i {
 			t.Errorf("Event %q not emitted", expected)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 			continue
 		}
 		received := gotEvents[i]
 		if !strings.HasPrefix(received, expected) {
 			t.Errorf("Unexpected event received, expected %q, got %q", expected, received)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 		}
 	}
 	for i := len(expectedEvents); i < len(gotEvents); i++ {
 		t.Errorf("Unexpected event received: %q", gotEvents[i])
-		err = fmt.Errorf("Events do not match")
+		err = fmt.Errorf("events do not match")
 	}
 	return err
 }

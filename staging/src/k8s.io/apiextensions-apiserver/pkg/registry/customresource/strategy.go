@@ -161,6 +161,11 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 	return errs
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (customResourceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (customResourceStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -200,6 +205,11 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	}
 
 	return errs
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -232,3 +232,27 @@
 - endpoint: replaceStorageV1VolumeAttachmentStatus
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
+- endpoint: createNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: readNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: listNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: listNetworkingV1NetworkPolicyForAllNamespaces
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: patchNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: replaceNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: deleteNetworkingV1CollectionNamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: deleteNetworkingV1NamespacedNetworkPolicy
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953

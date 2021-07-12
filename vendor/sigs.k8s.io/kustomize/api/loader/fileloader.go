@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/git"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // fileLoader is a kustomization's interface to files.
@@ -319,7 +319,6 @@ func (fl *fileLoader) Load(path string) ([]byte, error) {
 		}
 		return body, nil
 	}
-
 	if !filepath.IsAbs(path) {
 		path = fl.root.Join(path)
 	}

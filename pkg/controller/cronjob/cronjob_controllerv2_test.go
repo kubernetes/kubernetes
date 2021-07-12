@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
@@ -157,9 +157,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			if name == "this ran but done, time drifted back, F" {
-				println("hello")
-			}
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
@@ -192,6 +189,15 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 						cj.Status.Active = []v1.ObjectReference{*ref}
 					}
 					realCJ.Status.Active = []v1.ObjectReference{*ref}
+					if !tc.jobStillNotFoundInLister {
+						js = append(js, job)
+					}
+				} else {
+					job.Status.CompletionTime = &metav1.Time{Time: job.ObjectMeta.CreationTimestamp.Add(time.Second * 10)}
+					job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+					})
 					if !tc.jobStillNotFoundInLister {
 						js = append(js, job)
 					}
@@ -232,6 +238,12 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectedCreates := 0
 			if tc.expectCreate {
 				expectedCreates = 1
+			}
+			if tc.ranPreviously && !tc.stillActive {
+				completionTime := tc.jobCreationTime.Add(10 * time.Second)
+				if cjCopy.Status.LastSuccessfulTime == nil || !cjCopy.Status.LastSuccessfulTime.Time.Equal(completionTime) {
+					t.Errorf("cj.status.lastSuccessfulTime: %s expected, got %#v", completionTime, cj.Status.LastSuccessfulTime)
+				}
 			}
 			if len(jc.Jobs) != expectedCreates {
 				t.Errorf("%s: expected %d job started, actually %v", name, expectedCreates, len(jc.Jobs))

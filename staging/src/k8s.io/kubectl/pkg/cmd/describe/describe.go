@@ -30,13 +30,14 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	describeLong = templates.LongDesc(i18n.T(`
-		Show details of a specific resource or group of resources
+		Show details of a specific resource or group of resources.
 
 		Print a detailed description of the selected resources, including related resources such
 		as events or controllers. You may select a single object by name, all objects of that
@@ -64,7 +65,7 @@ var (
 		kubectl describe po -l name=myLabel
 
 		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-		# get the name of the rc as a prefix in the pod the name).
+		# get the name of the rc as a prefix in the pod the name)
 		kubectl describe pods frontend`))
 )
 
@@ -92,6 +93,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		FilenameOptions: &resource.FilenameOptions{},
 		DescriberSettings: &describe.DescriberSettings{
 			ShowEvents: true,
+			ChunkSize:  cmdutil.DefaultChunkSize,
 		},
 
 		CmdParent: parent,
@@ -105,6 +107,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Short:                 i18n.T("Show details of a specific resource or group of resources"),
 		Long:                  describeLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               describeExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Run())
@@ -115,6 +118,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
+	cmdutil.AddChunkSizeFlag(cmd, &o.DescriberSettings.ChunkSize)
 	return cmd
 }
 
@@ -156,6 +160,7 @@ func (o *DescribeOptions) Run() error {
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
+		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
 		Do()
 	err := r.Err()
@@ -220,6 +225,7 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, resource).
 		SingleResourceType().
+		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
 		Do()
 	mapping, err := r.ResourceMapping()

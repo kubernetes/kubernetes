@@ -22,7 +22,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lithammer/dedent"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +34,7 @@ import (
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	utilpointer "k8s.io/utils/pointer"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"github.com/lithammer/dedent"
 )
 
 func testKubeletConfigMap(contents string) *v1.ConfigMap {
@@ -67,8 +67,8 @@ func TestKubeletDefault(t *testing.T) {
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
-					ClusterDNS:    []string{kubeadmapiv1beta2.DefaultClusterDNSIP},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
 							ClientCAFile: constants.CACertName,
@@ -87,6 +87,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -100,7 +101,7 @@ func TestKubeletDefault(t *testing.T) {
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
@@ -120,6 +121,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -138,7 +140,7 @@ func TestKubeletDefault(t *testing.T) {
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: false,
 					},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
@@ -158,6 +160,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -176,7 +179,7 @@ func TestKubeletDefault(t *testing.T) {
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: true,
 					},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
@@ -196,6 +199,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -209,8 +213,8 @@ func TestKubeletDefault(t *testing.T) {
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
-					ClusterDNS:    []string{kubeadmapiv1beta2.DefaultClusterDNSIP},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
 					ClusterDomain: "example.com",
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
@@ -230,6 +234,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -241,8 +246,8 @@ func TestKubeletDefault(t *testing.T) {
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
-					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
-					ClusterDNS:    []string{kubeadmapiv1beta2.DefaultClusterDNSIP},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
 					Authentication: kubeletconfig.KubeletAuthentication{
 						X509: kubeletconfig.KubeletX509Authentication{
 							ClientCAFile: filepath.Join("/path/to/certs", constants.CACertName),
@@ -261,6 +266,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},

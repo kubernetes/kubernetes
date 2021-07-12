@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -164,6 +165,15 @@ func runTest(f *framework.Framework) error {
 	oldCfg, err = getCurrentKubeletConfig()
 	if err != nil {
 		return err
+	}
+
+	// Test needs to be updated to make it run properly on systemd.
+	// In its current state it will result in kubelet error since
+	// kubeReservedCgroup and systemReservedCgroup are not configured
+	// correctly for systemd.
+	// See: https://github.com/kubernetes/kubernetes/issues/102394
+	if oldCfg.CgroupDriver == "systemd" {
+		e2eskipper.Skipf("unable to run test when using systemd as cgroup driver")
 	}
 
 	// Create a cgroup manager object for manipulating cgroups.

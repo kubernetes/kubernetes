@@ -44,7 +44,10 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, downstream)
+	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:  MetaNamespaceKeyFunc,
+		KnownObjects: downstream,
+	})
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)

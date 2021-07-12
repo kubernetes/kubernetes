@@ -49,7 +49,7 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // ExtractPriorityLevelConfiguration extracts the applied configuration owned by fieldManager from
 // priorityLevelConfiguration. If no managedFields are found in priorityLevelConfiguration for fieldManager, a
 // PriorityLevelConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // priorityLevelConfiguration must be a unmodified PriorityLevelConfiguration API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1beta1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
+}
+
+// ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1beta1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
+}
+
+func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1beta1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"), fieldManager, b)
+	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

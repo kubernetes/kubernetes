@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // LeastAllocated is a score plugin that favors nodes with fewer allocation requested resources based on requested resources.
@@ -36,7 +38,7 @@ type LeastAllocated struct {
 var _ = framework.ScorePlugin(&LeastAllocated{})
 
 // LeastAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const LeastAllocatedName = "NodeResourcesLeastAllocated"
+const LeastAllocatedName = names.NodeResourcesLeastAllocated
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (la *LeastAllocated) Name() string {
@@ -65,13 +67,12 @@ func (la *LeastAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewLeastAllocated initializes a new plugin and returns it.
-func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewLeastAllocated(laArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := laArgs.(*config.NodeResourcesLeastAllocatedArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesLeastAllocatedArgs, got %T", laArgs)
 	}
-
-	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(args); err != nil {
+	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(nil, args); err != nil {
 		return nil, err
 	}
 
@@ -86,17 +87,22 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plu
 			Name:                LeastAllocatedName,
 			scorer:              leastResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
-func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
-	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap) int64 {
+	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
-		for resource, weight := range resToWeightMap {
+		for resource := range requested {
+			weight := resToWeightMap[resource]
 			resourceScore := leastRequestedScore(requested[resource], allocable[resource])
 			nodeScore += resourceScore * weight
 			weightSum += weight
+		}
+		if weightSum == 0 {
+			return 0
 		}
 		return nodeScore / weightSum
 	}

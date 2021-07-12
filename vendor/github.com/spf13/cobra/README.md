@@ -6,6 +6,7 @@ Cobra is used in many Go projects such as [Kubernetes](http://kubernetes.io/),
 [Hugo](https://gohugo.io), and [Github CLI](https://github.com/cli/cli) to
 name a few. [This list](./projects_using_cobra.md) contains a more extensive list of projects using Cobra.
 
+[![](https://img.shields.io/github/workflow/status/spf13/cobra/Test?longCache=tru&label=Test&logo=github%20actions&logoColor=fff)](https://github.com/spf13/cobra/actions?query=workflow%3ATest)
 [![Build Status](https://travis-ci.org/spf13/cobra.svg "Travis CI status")](https://travis-ci.org/spf13/cobra)
 [![GoDoc](https://godoc.org/github.com/spf13/cobra?status.svg)](https://godoc.org/github.com/spf13/cobra)
 [![Go Report Card](https://goreportcard.com/badge/github.com/spf13/cobra)](https://goreportcard.com/report/github.com/spf13/cobra)
@@ -62,8 +63,8 @@ Cobra is built on a structure of commands, arguments & flags.
 
 **Commands** represent actions, **Args** are things and **Flags** are modifiers for those actions.
 
-The best applications will read like sentences when used. Users will know how
-to use the application because they will natively understand how to use it.
+The best applications read like sentences when used, and as a result, users
+intuitively know how to interact with them.
 
 The pattern to follow is
 `APPNAME VERB NOUN --ADJECTIVE.`
@@ -234,11 +235,6 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
-func er(msg interface{}) {
-	fmt.Println("Error:", msg)
-	os.Exit(1)
-}
-
 func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -246,9 +242,7 @@ func initConfig() {
 	} else {
 		// Find home directory.
 		home, err := homedir.Dir()
-		if err != nil {
-			er(err)
-		}
+		cobra.CheckErr(err)
 
 		// Search config in home directory with name ".cobra" (without extension).
 		viper.AddConfigPath(home)
@@ -268,7 +262,7 @@ func initConfig() {
 With the root command you need to have your main function execute it.
 Execute should be run on the root for clarity, though it can be called on any command.
 
-In a Cobra app, typically the main.go file is very bare. It serves, one purpose, to initialize Cobra.
+In a Cobra app, typically the main.go file is very bare. It serves one purpose: to initialize Cobra.
 
 ```go
 package main
@@ -363,7 +357,7 @@ There are two different approaches to assign a flag.
 
 ### Persistent Flags
 
-A flag can be 'persistent' meaning that this flag will be available to the
+A flag can be 'persistent', meaning that this flag will be available to the
 command it's assigned to as well as every command under that command. For
 global flags, assign a flag as a persistent flag on the root.
 
@@ -373,7 +367,7 @@ rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose out
 
 ### Local Flags
 
-A flag can also be assigned locally which will only apply to that specific command.
+A flag can also be assigned locally, which will only apply to that specific command.
 
 ```go
 localCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
@@ -381,8 +375,8 @@ localCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to rea
 
 ### Local Flag on Parent Commands
 
-By default Cobra only parses local flags on the target command, any local flags on
-parent commands are ignored. By enabling `Command.TraverseChildren` Cobra will
+By default, Cobra only parses local flags on the target command, and any local flags on
+parent commands are ignored. By enabling `Command.TraverseChildren`, Cobra will
 parse local flags on each command before executing the target command.
 
 ```go
@@ -404,8 +398,8 @@ func init() {
 }
 ```
 
-In this example the persistent flag `author` is bound with `viper`.
-**Note**, that the variable `author` will not be set to the value from config,
+In this example, the persistent flag `author` is bound with `viper`.
+**Note**: the variable `author` will not be set to the value from config,
 when the `--author` flag is not provided by user.
 
 More in [viper documentation](https://github.com/spf13/viper#working-with-flags).
@@ -465,7 +459,7 @@ var cmd = &cobra.Command{
 
 In the example below, we have defined three commands. Two are at the top level
 and one (cmdTimes) is a child of one of the top commands. In this case the root
-is not executable meaning that a subcommand is required. This is accomplished
+is not executable, meaning that a subcommand is required. This is accomplished
 by not providing a 'Run' for the 'rootCmd'.
 
 We have only defined one flag for a single command.
@@ -759,7 +753,7 @@ Cobra can generate documentation based on subcommands, flags, etc. Read more abo
 
 ## Generating shell completions
 
-Cobra can generate a shell-completion file for the following shells: Bash, Zsh, Fish, Powershell. If you add more information to your commands, these completions can be amazingly powerful and flexible.  Read more about it in [Shell Completions](shell_completions.md).
+Cobra can generate a shell-completion file for the following shells: bash, zsh, fish, PowerShell. If you add more information to your commands, these completions can be amazingly powerful and flexible.  Read more about it in [Shell Completions](shell_completions.md).
 
 # License
 

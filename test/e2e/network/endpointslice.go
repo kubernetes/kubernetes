@@ -332,7 +332,15 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		expectEndpointsAndSlices(cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
 	})
 
-	ginkgo.It("should support creating EndpointSlice API operations", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice API
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslices resource must support create, get, list, watch, update, patch, delete, and deletecollection.
+	*/
+	framework.ConformanceIt("should support creating EndpointSlice API operations", func() {
 		// Setup
 		ns := f.Namespace.Name
 		epsVersion := "v1"

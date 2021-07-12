@@ -35,24 +35,25 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
 	attachExample = templates.Examples(i18n.T(`
-		# Get output from running pod mypod, use the kubectl.kubernetes.io/default-container annotation 
+		# Get output from running pod mypod; use the 'kubectl.kubernetes.io/default-container' annotation
 		# for selecting the container to be attached or the first container in the pod will be chosen
 		kubectl attach mypod
 
 		# Get output from ruby-container from pod mypod
 		kubectl attach mypod -c ruby-container
 
-		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
+		# Switch to raw terminal mode; sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
 		kubectl attach mypod -c ruby-container -i -t
 
-		# Get output from the first pod of a ReplicaSet named nginx
+		# Get output from the first pod of a replica set named nginx
 		kubectl attach rs/nginx
 		`))
 )
@@ -104,6 +105,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Attach to a running container"),
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
 		Example:               attachExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

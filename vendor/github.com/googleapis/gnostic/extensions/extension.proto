@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 
 syntax = "proto3";
 
+package gnostic.extension.v1;
+
 import "google/protobuf/any.proto";
-package openapiextension.v1;
 
 // This option lets the proto compiler generate Java code inside the package
 // name (see below) instead of inside an outer class. It creates a simpler
@@ -26,7 +27,7 @@ option java_multiple_files = true;
 // The Java outer classname should be the filename in UpperCamelCase. This
 // class is only used to hold proto descriptor, so developers don't need to
 // work with it directly.
-option java_outer_classname = "OpenAPIExtensionV1";
+option java_outer_classname = "GnosticExtension";
 
 // The Java package name must be proto package name with proper prefix.
 option java_package = "org.gnostic.v1";
@@ -37,9 +38,13 @@ option java_package = "org.gnostic.v1";
 // hopefully unique enough to not conflict with things that may come along in
 // the future. 'GPB' is reserved for the protocol buffer implementation itself.
 //
-option objc_class_prefix = "OAE"; // "OpenAPI Extension"
+// "Gnostic Extension"
+option objc_class_prefix = "GNX";
 
-// The version number of OpenAPI compiler.
+// The Go package name.
+option go_package = "./extensions;gnostic_extension_v1";
+
+// The version number of Gnostic.
 message Version {
   int32 major = 1;
   int32 minor = 2;
@@ -52,12 +57,11 @@ message Version {
 // An encoded Request is written to the ExtensionHandler's stdin.
 message ExtensionHandlerRequest {
 
-  // The OpenAPI descriptions that were explicitly listed on the command line.
-  // The specifications will appear in the order they are specified to gnostic.
+  // The extension to process.
   Wrapper wrapper = 1;
 
-  // The version number of openapi compiler.
-  Version compiler_version = 3;
+  // The version number of Gnostic.
+  Version compiler_version = 2;
 }
 
 // The extensions writes an encoded ExtensionHandlerResponse to stdout.
@@ -66,7 +70,7 @@ message ExtensionHandlerResponse {
   // true if the extension is handled by the extension handler; false otherwise
   bool handled = 1;
 
-  // Error message.  If non-empty, the extension handling failed.
+  // Error message(s).  If non-empty, the extension handling failed.
   // The extension handler process should exit with status code zero
   // even if it reports an error in this way.
   //
@@ -75,7 +79,7 @@ message ExtensionHandlerResponse {
   // itself -- such as the input Document being unparseable -- should be
   // reported by writing a message to stderr and exiting with a non-zero
   // status code.
-  repeated string error = 2;
+  repeated string errors = 2;
 
   // text output
   google.protobuf.Any value = 3;
@@ -85,9 +89,9 @@ message Wrapper {
   // version of the OpenAPI specification in which this extension was written.
   string version = 1;
 
-  // Name of the extension
+  // Name of the extension.
   string extension_name = 2;
 
-  // Must be a valid yaml for the proto
+  // YAML-formatted extension value.
   string yaml = 3;
 }

@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/io"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
 
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
@@ -161,12 +163,20 @@ func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUI
 	if err != nil {
 		return nil, err
 	}
-	return &iscsiDiskMapper{
+	mapper := &iscsiDiskMapper{
 		iscsiDisk:  iscsiDisk,
 		readOnly:   readOnly,
 		exec:       exec,
 		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
-	}, nil
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -210,10 +220,20 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	// Find globalPDPath from pod volume directory(mountPath)
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mounter.GetMountRefs(mountPath)
+	// Try really hard to get the global mount of the volume, an error returned from here would
+	// leave the global mount still mounted, while marking the volume as unused.
+	// The volume can then be mounted on several nodes, resulting in volume
+	// corruption.
+	paths, err := util.GetReliableMountRefs(mounter, mountPath)
+	if io.IsInconsistentReadError(err) {
+		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
+		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it and all mounts of the same device manually.", mountPath)
+		return nil, err
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	for _, path := range paths {
 		if strings.Contains(path, plugin.host.GetPluginDir(iscsiPluginName)) {
 			globalPDPath = path
@@ -385,6 +405,13 @@ type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       utilexec.Interface
 	deviceUtil ioutil.DeviceUtil
+	volume.MetricsNil
+}
+
+// SupportsMetrics returns true for SupportsMetrics as it initializes the
+// MetricsProvider.
+func (idm *iscsiDiskMapper) SupportsMetrics() bool {
+	return true
 }
 
 var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
@@ -589,11 +616,11 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 			// if secret is provideded, retrieve it
 			kubeClient := plugin.host.GetKubeClient()
 			if kubeClient == nil {
-				return nil, fmt.Errorf("Cannot get kube client")
+				return nil, fmt.Errorf("cannot get kube client")
 			}
 			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
+				err = fmt.Errorf("couldn't get secret %v/%v error: %w", secretNamespace, secretName, err)
 				return nil, err
 			}
 			secret = make(map[string]string)

@@ -76,7 +76,7 @@ func checkErr(err error, handleErr func(string, int)) {
 			// assume that the "v" flag contains a parseable Int32 as per klog's "Level" type alias,
 			// thus no error from ParseInt is handled here.
 			if v, e := strconv.ParseInt(f.Value.String(), 10, 32); e == nil {
-				// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md
+				// https://git.k8s.io/community/contributors/devel/sig-instrumentation/logging.md
 				// klog.V(5) - Trace level verbosity
 				if v > 4 {
 					msg = fmt.Sprintf("%+v", err)

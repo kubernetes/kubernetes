@@ -21,12 +21,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	goruntime "runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -127,6 +130,40 @@ func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontai
 	return &targetStatus.ID, nil
 }
 
+func calcRestartCountByLogDir(path string) (int, error) {
+	// if the path doesn't exist then it's not an error
+	if _, err := os.Stat(path); err != nil {
+		return 0, nil
+	}
+	restartCount := int(0)
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return 0, err
+	}
+	if len(files) == 0 {
+		return 0, err
+	}
+	restartCountLogFileRegex := regexp.MustCompile(`(\d+).log(\..*)?`)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		matches := restartCountLogFileRegex.FindStringSubmatch(file.Name())
+		if len(matches) == 0 {
+			continue
+		}
+		count, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return restartCount, err
+		}
+		count++
+		if count > restartCount {
+			restartCount = count
+		}
+	}
+	return restartCount, nil
+}
+
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
 // * pull the image
@@ -150,6 +187,22 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	containerStatus := podStatus.FindContainerStatusByName(container.Name)
 	if containerStatus != nil {
 		restartCount = containerStatus.RestartCount + 1
+	} else {
+		// The container runtime keeps state on container statuses and
+		// what the container restart count is. When nodes are rebooted
+		// some container runtimes clear their state which causes the
+		// restartCount to be reset to 0. This causes the logfile to
+		// start at 0.log, which either overwrites or appends to the
+		// already existing log.
+		//
+		// We are checking to see if the log directory exists, and find
+		// the latest restartCount by checking the log name -
+		// {restartCount}.log - and adding 1 to it.
+		logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
+		restartCount, err = calcRestartCountByLogDir(logDir)
+		if err != nil {
+			klog.InfoS("Log directory exists but could not calculate restartCount", "logDir", logDir, "err", err)
+		}
 	}
 
 	target, err := spec.getTargetID(podStatus)
@@ -226,12 +279,14 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		}
 		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
+			klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
+				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
 			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
-				klog.ErrorS(fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr), "Failed to kill container", "pod", klog.KObj(pod),
+				klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
 					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			}
-			return msg, fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr)
+			return msg, ErrPostStartHook
 		}
 	}
 
@@ -658,7 +713,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
-	klog.V(2).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
+	klog.V(2).InfoS("Killing container with a grace period", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
@@ -687,7 +742,8 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.ErrorS(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
+				// Use runningPod for logging as the pod passed in could be *nil*.
+				klog.ErrorS(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
 					"containerName", container.Name, "containerID", container.ID)
 			}
 			containerResults <- killContainerResult

@@ -58,6 +58,8 @@ makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
 memoryManagerPolicy: None
+memorySwap: {}
+memoryThrottlingFactor: 0.8
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
@@ -69,6 +71,7 @@ registryBurst: 10
 registryPullQPS: 5
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
+seccompDefault: false
 serializeImagePulls: true
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s

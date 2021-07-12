@@ -34,12 +34,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -191,10 +191,9 @@ type Proxier struct {
 	endpointsMap proxy.EndpointsMap
 	portsMap     map[utilnet.LocalPort]utilnet.Closeable
 	nodeLabels   map[string]string
-	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true
+	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
 	// updating iptables with some partial data after kube-proxy restart.
-	endpointsSynced      bool
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
@@ -210,7 +209,7 @@ type Proxier struct {
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilnet.PortOpener
-	recorder       record.EventRecorder
+	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -260,7 +259,7 @@ func NewProxier(ipt utiliptables.Interface,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
@@ -273,15 +272,13 @@ func NewProxier(ipt utiliptables.Interface,
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
 	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
+		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
-	klog.V(2).InfoS("using iptables mark for masquerade", "ipFamily", ipt.Protocol(), "mark", masqueradeMark)
-
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	klog.V(2).InfoS("Using iptables mark for masquerade", "ipFamily", ipt.Protocol(), "mark", masqueradeMark)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
@@ -294,7 +291,7 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses = ipFamilyMap[ipFamily]
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
-		klog.InfoS("found node IPs of the wrong family", "ipFamily", ipFamily, "ips", strings.Join(ips, ","))
+		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "ips", strings.Join(ips, ","))
 	}
 
 	proxier := &Proxier{
@@ -302,7 +299,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, nil),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
@@ -327,7 +324,7 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	burstSyncs := 2
-	klog.V(2).InfoS("iptables sync params", "ipFamily", ipt.Protocol(), "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
+	klog.V(2).InfoS("Iptables sync params", "ipFamily", ipt.Protocol(), "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
 	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
 	// time.Hour is arbitrary.
@@ -337,9 +334,9 @@ func NewProxier(ipt utiliptables.Interface,
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
 
 	if ipt.HasRandomFully() {
-		klog.V(2).InfoS("iptables supports --random-fully", "ipFamily", ipt.Protocol())
+		klog.V(2).InfoS("Iptables supports --random-fully", "ipFamily", ipt.Protocol())
 	} else {
-		klog.V(2).InfoS("iptables does not support --random-fully", "ipFamily", ipt.Protocol())
+		klog.V(2).InfoS("Iptables does not support --random-fully", "ipFamily", ipt.Protocol())
 	}
 
 	return proxier, nil
@@ -357,7 +354,7 @@ func NewDualStackProxier(
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP [2]net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
@@ -575,48 +572,31 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
-		proxier.setInitialized(proxier.endpointSlicesSynced)
-	} else {
-		proxier.setInitialized(proxier.endpointsSynced)
-	}
+	proxier.setInitialized(proxier.endpointSlicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
 }
+
+// iptables proxier only uses EndpointSlice, the following methods
+// exist to implement the Proxier interface but are noops
 
 // OnEndpointsAdd is called whenever creation of new endpoints object
 // is observed.
-func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(nil, endpoints)
-}
+func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {}
 
 // OnEndpointsUpdate is called whenever modification of an existing
 // endpoints object is observed.
-func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
-		proxier.Sync()
-	}
-}
+func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {}
 
 // OnEndpointsDelete is called whenever deletion of an existing endpoints
 // object is observed.
-func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(endpoints, nil)
-}
+func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {}
 
 // OnEndpointsSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointsSynced() {
-	proxier.mu.Lock()
-	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
-}
+func (proxier *Proxier) OnEndpointsSynced() {}
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
@@ -668,8 +648,12 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = node.Labels
+	proxier.nodeLabels = map[string]string{}
+	for k, v := range node.Labels {
+		proxier.nodeLabels[k] = v
+	}
 	proxier.mu.Unlock()
+	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.syncProxyRules()
 }
@@ -688,8 +672,12 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = node.Labels
+	proxier.nodeLabels = map[string]string{}
+	for k, v := range node.Labels {
+		proxier.nodeLabels[k] = v
+	}
 	proxier.mu.Unlock()
+	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.syncProxyRules()
 }
@@ -821,7 +809,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(2).InfoS("syncProxyRules complete", "elapsed", time.Since(start))
+		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
 	// We assume that if this was called, we really want to sync them,
@@ -985,6 +973,11 @@ func (proxier *Proxier) syncProxyRules() {
 	//   slice = append(slice[:0], ...)
 	endpoints := make([]*endpointsInfo, 0)
 	endpointChains := make([]utiliptables.Chain, 0)
+	readyEndpoints := make([]*endpointsInfo, 0)
+	readyEndpointChains := make([]utiliptables.Chain, 0)
+	localReadyEndpointChains := make([]utiliptables.Chain, 0)
+	localServingTerminatingEndpointChains := make([]utiliptables.Chain, 0)
+
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
 	// Note that even if we go over 64, it will still be correct - it
@@ -1025,16 +1018,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service does not have conflicting configuration such as
 		// externalTrafficPolicy=Local.
 		allEndpoints = proxy.FilterEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
-
-		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
-		for _, endpoint := range allEndpoints {
-			if !endpoint.IsReady() {
-				continue
-			}
-
-			readyEndpoints = append(readyEndpoints, endpoint)
-		}
-		hasEndpoints := len(readyEndpoints) > 0
+		hasEndpoints := len(allEndpoints) > 0
 
 		svcChain := svcInfo.servicePortChainName
 		if hasEndpoints {
@@ -1062,23 +1046,22 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture the clusterIP.
 		if hasEndpoints {
 			args = append(args[:0],
-				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", utilproxy.ToCIDR(svcInfo.ClusterIP()),
 				"--dport", strconv.Itoa(svcInfo.Port()),
 			)
 			if proxier.masqueradeAll {
-				utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				utilproxy.WriteRuleLine(proxier.natRules, string(svcChain), append(args, "-j", string(KubeMarkMasqChain))...)
 			} else if proxier.localDetector.IsImplemented() {
 				// This masquerades off-cluster traffic to a service VIP.  The idea
 				// is that you can establish a static route for your Service range,
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
 				// If/when we support "Local" policy for VIPs, we should update this.
-				utilproxy.WriteLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
+				utilproxy.WriteRuleLine(proxier.natRules, string(svcChain), proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
 			}
-			utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(svcChain))...)
+			utilproxy.WriteRuleLine(proxier.natRules, string(kubeServicesChain), append(args, "-j", string(svcChain))...)
 		} else {
 			// No endpoints.
 			utilproxy.WriteLine(proxier.filterRules,
@@ -1110,7 +1093,7 @@ func (proxier *Proxier) syncProxyRules() {
 				} else {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
-						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lp.String(), err)
+						msg := fmt.Sprintf("can't open port %s, skipping it", lp.String())
 
 						proxier.recorder.Eventf(
 							&v1.ObjectReference{
@@ -1118,8 +1101,8 @@ func (proxier *Proxier) syncProxyRules() {
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
-							}, v1.EventTypeWarning, err.Error(), msg)
-						klog.ErrorS(err, "can't open port, skipping externalIP", "port", lp.String())
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
+						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
 					klog.V(2).InfoS("Opened local port", "port", lp.String())
@@ -1129,7 +1112,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 			if hasEndpoints {
 				args = append(args[:0],
-					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", utilproxy.ToCIDR(net.ParseIP(externalIP)),
@@ -1145,13 +1127,13 @@ func (proxier *Proxier) syncProxyRules() {
 					destChain = svcChain
 					// This masquerades off-cluster traffic to a External IP.
 					if proxier.localDetector.IsImplemented() {
-						utilproxy.WriteLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
+						utilproxy.WriteRuleLine(proxier.natRules, string(svcChain), proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
 					} else {
-						utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+						utilproxy.WriteRuleLine(proxier.natRules, string(svcChain), append(args, "-j", string(KubeMarkMasqChain))...)
 					}
 				}
-				// Sent traffic bound for external IPs to the service chain.
-				utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(destChain))...)
+				// Send traffic bound for external IPs to the service chain.
+				utilproxy.WriteRuleLine(proxier.natRules, string(kubeServicesChain), append(args, "-j", string(destChain))...)
 
 			} else {
 				// No endpoints.
@@ -1283,7 +1265,16 @@ func (proxier *Proxier) syncProxyRules() {
 				} else if svcInfo.Protocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
-						klog.ErrorS(err, "can't open port, skipping this nodePort", "port", lp.String())
+						msg := fmt.Sprintf("can't open port %s, skipping it", lp.String())
+
+						proxier.recorder.Eventf(
+							&v1.ObjectReference{
+								Kind:      "Node",
+								Name:      proxier.hostname,
+								UID:       types.UID(proxier.hostname),
+								Namespace: "",
+							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
+						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
 						continue
 					}
 					klog.V(2).InfoS("Opened local port", "port", lp.String())
@@ -1293,16 +1284,15 @@ func (proxier *Proxier) syncProxyRules() {
 
 			if hasEndpoints {
 				args = append(args[:0],
-					"-A", string(kubeNodePortsChain),
 					"-m", "comment", "--comment", svcNameString,
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 				)
 				if !svcInfo.NodeLocalExternal() {
 					// Nodeports need SNAT, unless they're local.
-					utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					utilproxy.WriteRuleLine(proxier.natRules, string(svcChain), append(args, "-j", string(KubeMarkMasqChain))...)
 					// Jump to the service chain.
-					utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(svcChain))...)
+					utilproxy.WriteRuleLine(proxier.natRules, string(kubeNodePortsChain), append(args, "-j", string(svcChain))...)
 				} else {
 					// TODO: Make all nodePorts jump to the firewall chain.
 					// Currently we only create it for loadbalancers (#33586).
@@ -1312,8 +1302,8 @@ func (proxier *Proxier) syncProxyRules() {
 					if isIPv6 {
 						loopback = "::1/128"
 					}
-					utilproxy.WriteLine(proxier.natRules, append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
-					utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
+					utilproxy.WriteRuleLine(proxier.natRules, string(kubeNodePortsChain), append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
+					utilproxy.WriteRuleLine(proxier.natRules, string(kubeNodePortsChain), append(args, "-j", string(svcXlbChain))...)
 				}
 			} else {
 				// No endpoints.
@@ -1351,7 +1341,7 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range readyEndpoints {
+		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep.String())
@@ -1387,16 +1377,33 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Now write loadbalancing & DNAT rules.
-		n := len(endpointChains)
-		localEndpointChains := make([]utiliptables.Chain, 0)
+		// Firstly, categorize each endpoint into three buckets:
+		//   1. all endpoints that are ready and NOT terminating.
+		//   2. all endpoints that are local, ready and NOT terminating, and externalTrafficPolicy=Local
+		//   3. all endpoints that are local, serving and terminating, and externalTrafficPolicy=Local
+		readyEndpointChains = readyEndpointChains[:0]
+		readyEndpoints := readyEndpoints[:0]
+		localReadyEndpointChains := localReadyEndpointChains[:0]
+		localServingTerminatingEndpointChains := localServingTerminatingEndpointChains[:0]
 		for i, endpointChain := range endpointChains {
-			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-			if svcInfo.NodeLocalExternal() && endpoints[i].IsLocal {
-				localEndpointChains = append(localEndpointChains, endpointChains[i])
+			if endpoints[i].Ready {
+				readyEndpointChains = append(readyEndpointChains, endpointChain)
+				readyEndpoints = append(readyEndpoints, endpoints[i])
 			}
 
-			epIP := endpoints[i].IP()
+			if svc.NodeLocalExternal() && endpoints[i].IsLocal {
+				if endpoints[i].Ready {
+					localReadyEndpointChains = append(localReadyEndpointChains, endpointChain)
+				} else if endpoints[i].Serving && endpoints[i].Terminating {
+					localServingTerminatingEndpointChains = append(localServingTerminatingEndpointChains, endpointChain)
+				}
+			}
+		}
+
+		// Now write loadbalancing & DNAT rules.
+		numReadyEndpoints := len(readyEndpointChains)
+		for i, endpointChain := range readyEndpointChains {
+			epIP := readyEndpoints[i].IP()
 			if epIP == "" {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
 				continue
@@ -1405,16 +1412,26 @@ func (proxier *Proxier) syncProxyRules() {
 			// Balancing rules in the per-service chain.
 			args = append(args[:0], "-A", string(svcChain))
 			args = proxier.appendServiceCommentLocked(args, svcNameString)
-			if i < (n - 1) {
+			if i < (numReadyEndpoints - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
 					"-m", "statistic",
 					"--mode", "random",
-					"--probability", proxier.probability(n-i))
+					"--probability", proxier.probability(numReadyEndpoints-i))
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
 			utilproxy.WriteLine(proxier.natRules, args...)
+		}
+
+		// Every endpoint gets a chain, regardless of its state. This is required later since we may
+		// want to jump to endpoint chains that are terminating.
+		for i, endpointChain := range endpointChains {
+			epIP := endpoints[i].IP()
+			if epIP == "" {
+				// Error parsing this endpoint has been logged. Skip to next endpoint.
+				continue
+			}
 
 			// Rules in the per-endpoint chain.
 			args = append(args[:0], "-A", string(endpointChain))
@@ -1459,6 +1476,12 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.WriteLine(proxier.natRules, append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
+
+		// Prefer local ready endpoint chains, but fall back to ready terminating if none exist
+		localEndpointChains := localReadyEndpointChains
+		if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) && len(localEndpointChains) == 0 {
+			localEndpointChains = localServingTerminatingEndpointChains
+		}
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {

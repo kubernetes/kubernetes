@@ -7,9 +7,10 @@ package resmap
 
 import (
 	"sigs.k8s.io/kustomize/api/ifc"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -33,8 +34,10 @@ type Configurable interface {
 }
 
 // NewPluginHelpers makes an instance of PluginHelpers.
-func NewPluginHelpers(ldr ifc.Loader, v ifc.Validator, rf *Factory) *PluginHelpers {
-	return &PluginHelpers{ldr: ldr, v: v, rf: rf}
+func NewPluginHelpers(
+	ldr ifc.Loader, v ifc.Validator, rf *Factory,
+	pc *types.PluginConfig) *PluginHelpers {
+	return &PluginHelpers{ldr: ldr, v: v, rf: rf, pc: pc}
 }
 
 // PluginHelpers holds things that any or all plugins might need.
@@ -44,6 +47,11 @@ type PluginHelpers struct {
 	ldr ifc.Loader
 	v   ifc.Validator
 	rf  *Factory
+	pc  *types.PluginConfig
+}
+
+func (c *PluginHelpers) GeneralConfig() *types.PluginConfig {
+	return c.pc
 }
 
 func (c *PluginHelpers) Loader() ifc.Loader {
@@ -80,6 +88,9 @@ type TransformerPlugin interface {
 // resource to transform, try the OrgId first, and if this
 // fails or finds too many, it might make sense to then try
 // the CurrId.  Depends on the situation.
+//
+// TODO: get rid of this interface (use bare resWrangler).
+// There aren't multiple implementations any more.
 type ResMap interface {
 	// Size reports the number of resources.
 	Size() int
@@ -158,21 +169,20 @@ type ResMap interface {
 
 	// GroupedByCurrentNamespace returns a map of namespace
 	// to a slice of *Resource in that namespace.
-	// Resources for whom IsNamespaceableKind is false are
-	// are not included at all (see NonNamespaceable).
+	// Cluster-scoped Resources are not included (see ClusterScoped).
 	// Resources with an empty namespace are placed
 	// in the resid.DefaultNamespace entry.
 	GroupedByCurrentNamespace() map[string][]*resource.Resource
 
-	// GroupByOrginalNamespace performs as GroupByNamespace
+	// GroupedByOriginalNamespace performs as GroupByNamespace
 	// but use the original namespace instead of the current
 	// one to perform the grouping.
 	GroupedByOriginalNamespace() map[string][]*resource.Resource
 
-	// NonNamespaceable returns a slice of resources that
+	// ClusterScoped returns a slice of resources that
 	// cannot be placed in a namespace, e.g.
 	// Node, ClusterRole, Namespace itself, etc.
-	NonNamespaceable() []*resource.Resource
+	ClusterScoped() []*resource.Resource
 
 	// AllIds returns all CurrentIds.
 	AllIds() []resid.ResId
@@ -188,6 +198,9 @@ type ResMap interface {
 
 	// Clear removes all resources and Ids.
 	Clear()
+
+	// DropEmpties drops empty resources from the ResMap.
+	DropEmpties()
 
 	// SubsetThatCouldBeReferencedByResource returns a ResMap subset
 	// of self with resources that could be referenced by the
@@ -231,9 +244,8 @@ type ResMap interface {
 	// are selected by a Selector
 	Select(types.Selector) ([]*resource.Resource, error)
 
-	// ToRNodeSlice converts the resources in the resmp
-	// to a list of RNodes
-	ToRNodeSlice() ([]*yaml.RNode, error)
+	// ToRNodeSlice returns a copy of the resources as RNodes.
+	ToRNodeSlice() []*yaml.RNode
 
 	// ApplySmPatch applies a strategic-merge patch to the
 	// selected set of resources.
@@ -242,4 +254,14 @@ type ResMap interface {
 
 	// RemoveBuildAnnotations removes annotations created by the build process.
 	RemoveBuildAnnotations()
+
+	// ApplyFilter applies an RNode filter to all Resources in the ResMap.
+	// TODO: Send/recover ancillary Resource data to/from subprocesses.
+	// Assure that the ancillary data in Resource (everything not in the RNode)
+	// is sent to and re-captured from transformer subprocess (as the process
+	// might edit that information).  One way to do this would be to solely use
+	// RNode metadata annotation reading and writing instead of using Resource
+	// struct data members, i.e. the Resource struct is replaced by RNode
+	// and use of (slow) k8s metadata annotations inside the RNode.
+	ApplyFilter(f kio.Filter) error
 }

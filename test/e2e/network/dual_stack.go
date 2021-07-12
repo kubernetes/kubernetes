@@ -41,8 +41,8 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// Tests for ipv6 dual stack feature
-var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
+// Tests for ipv4-ipv6 dual-stack feature
+var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
 
 	var cs clientset.Interface
@@ -68,7 +68,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		}
 	})
 
-	ginkgo.It("should have ipv4 and ipv6 node podCIDRs", func() {
+	// Marking this as LinuxOnly because windows tests run against Azure CNI which doesn't publish
+	// a podCIDR for each family.
+	ginkgo.It("should have ipv4 and ipv6 node podCIDRs [LinuxOnly]", func() {
 		// TODO (aramase) can switch to new function to get all nodes
 		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
@@ -119,9 +121,8 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 	})
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
-	// this test is tagged with phase2 so we can skip this until phase 2 is completed and merged
 	// TODO (aramase) remove phase 2 tag once phase 2 of dual stack is merged
-	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func() {
 		serverDeploymentName := "dualstack-server"
 		clientDeploymentName := "dualstack-client"
 
@@ -210,7 +211,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
 
-	ginkgo.It("should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should create a single stack service with cluster ip from primary service range", func() {
 		serviceName := "defaultclusterip"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -257,7 +258,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		}
 	})
 
-	ginkgo.It("should create service with ipv4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should create service with ipv4 cluster ip", func() {
 		serviceName := "ipv4clusterip"
 		ns := f.Namespace.Name
 
@@ -302,7 +303,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		}
 	})
 
-	ginkgo.It("should create service with ipv6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should create service with ipv6 cluster ip", func() {
 		serviceName := "ipv6clusterip"
 		ns := f.Namespace.Name
 		ipv6 := v1.IPv6Protocol
@@ -347,7 +348,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		}
 	})
 
-	ginkgo.It("should create service with ipv4,v6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should create service with ipv4,v6 cluster ip", func() {
 		serviceName := "ipv4ipv6clusterip"
 		ns := f.Namespace.Name
 
@@ -392,7 +393,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 		}
 	})
 
-	ginkgo.It("should create service with ipv6,v4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+	ginkgo.It("should create service with ipv6,v4 cluster ip", func() {
 		serviceName := "ipv6ipv4clusterip"
 		ns := f.Namespace.Name
 
@@ -441,7 +442,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", fu
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
-	ginkgo.Describe("Granular Checks: Services Secondary IP Family", func() {
+	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)

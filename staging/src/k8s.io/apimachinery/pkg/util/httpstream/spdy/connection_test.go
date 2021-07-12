@@ -290,3 +290,44 @@ func TestConnectionPings(t *testing.T) {
 		t.Errorf("timed out waiting for server to exit")
 	}
 }
+
+type fakeStream struct{ id uint32 }
+
+func (*fakeStream) Read(p []byte) (int, error)  { return 0, nil }
+func (*fakeStream) Write(p []byte) (int, error) { return 0, nil }
+func (*fakeStream) Close() error                { return nil }
+func (*fakeStream) Reset() error                { return nil }
+func (*fakeStream) Headers() http.Header        { return nil }
+func (f *fakeStream) Identifier() uint32        { return f.id }
+
+func TestConnectionRemoveStreams(t *testing.T) {
+	c := &connection{streams: make(map[uint32]httpstream.Stream)}
+	stream0 := &fakeStream{id: 0}
+	stream1 := &fakeStream{id: 1}
+	stream2 := &fakeStream{id: 2}
+
+	c.registerStream(stream0)
+	c.registerStream(stream1)
+
+	if len(c.streams) != 2 {
+		t.Fatalf("should have two streams, has %d", len(c.streams))
+	}
+
+	// not exists
+	c.RemoveStreams(stream2)
+
+	if len(c.streams) != 2 {
+		t.Fatalf("should have two streams, has %d", len(c.streams))
+	}
+
+	// remove all existing
+	c.RemoveStreams(stream0, stream1)
+
+	// remove nil stream should not crash
+	c.RemoveStreams(nil)
+
+	if len(c.streams) != 0 {
+		t.Fatalf("should not have any streams, has %d", len(c.streams))
+	}
+
+}

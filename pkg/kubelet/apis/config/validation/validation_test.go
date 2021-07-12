@@ -24,6 +24,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
@@ -58,9 +60,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.8),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"MemoryQoS":               true,
+		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase1); allErrors != nil {
@@ -99,8 +106,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.NoneTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.9),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
+			"MemoryQoS":               true,
+		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
@@ -139,12 +151,16 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           kubeletconfig.NoneTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 10 * time.Minute},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
+		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.5),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"NodeSwap":                true,
+			"MemoryQoS":               true,
 		},
 		Logging: componentbaseconfig.LoggingConfiguration{
-			Format: "json",
+			Format: "text",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase3); allErrors != nil {
@@ -178,8 +194,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 100 * time.Millisecond},
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 60 * time.Second},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "",
+		},
+		MemorySwap: kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
 	}
-	const numErrsErrorCase1 = 28
+	const numErrsErrorCase1 = 30
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
@@ -216,12 +236,19 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		TopologyManagerPolicy:           "invalid",
 		ShutdownGracePeriod:             metav1.Duration{Duration: 40 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		MemorySwap:                      kubeletconfig.MemorySwapConfiguration{SwapBehavior: "invalid"},
+		MemoryThrottlingFactor:          utilpointer.Float64Ptr(1.1),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
+			"NodeSwap":                true,
+			"MemoryQoS":               true,
+		},
+		Logging: componentbaseconfig.LoggingConfiguration{
+			Format: "text",
 		},
 	}
-	const numErrsErrorCase2 = 3
+	const numErrsErrorCase2 = 5
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}

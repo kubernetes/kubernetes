@@ -64,7 +64,9 @@ func (StorageVersionCondition) SwaggerDoc() map[string]string {
 }
 
 var map_StorageVersionList = map[string]string{
-	"": "A list of StorageVersions.",
+	"":         "A list of StorageVersions.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items holds a list of StorageVersion",
 }
 
 func (StorageVersionList) SwaggerDoc() map[string]string {

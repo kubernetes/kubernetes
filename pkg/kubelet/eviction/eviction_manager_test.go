@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -46,14 +46,16 @@ const (
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
 	pod                 *v1.Pod
-	status              v1.PodStatus
+	evict               bool
+	statusFn            func(*v1.PodStatus)
 	gracePeriodOverride *int64
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
 	m.pod = pod
-	m.status = status
+	m.statusFn = statusFn
+	m.evict = evict
 	m.gracePeriodOverride = gracePeriodOverride
 	return nil
 }
@@ -886,10 +888,55 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager should not report disk pressure")
 	}
 
+	// synchronize
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// induce hard threshold
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker(".9Gi", "200Gi", podStats)
+	// make GC return disk usage bellow the threshold, but not satisfying minReclaim
+	diskGC.summaryAfterGC = summaryStatsMaker("1.1Gi", "200Gi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	}
+
+	// verify image gc was invoked
+	if !diskGC.imageGCInvoked || !diskGC.containerGCInvoked {
+		t.Errorf("Manager should have invoked image gc")
+	}
+
+	// verify a pod was killed because image gc was not enough to satisfy minReclaim
+	if podKiller.pod == nil {
+		t.Errorf("Manager should have killed a pod, but didn't")
+	}
+
+	// reset state
+	diskGC.imageGCInvoked = false
+	diskGC.containerGCInvoked = false
+	podKiller.pod = nil
+
+	// remove disk pressure
+	fakeClock.Step(20 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
 	// induce disk pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("400Mi", "200Gi", podStats)
-	// Dont reclaim any disk
+	// Don't reclaim any disk
 	diskGC.summaryAfterGC = summaryStatsMaker("400Mi", "200Gi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 

@@ -50,7 +50,7 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 // ExtractPersistentVolumeClaim extracts the applied configuration owned by fieldManager from
 // persistentVolumeClaim. If no managedFields are found in persistentVolumeClaim for fieldManager, a
 // PersistentVolumeClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // persistentVolumeClaim must be a unmodified PersistentVolumeClaim API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "")
+}
+
+// ExtractPersistentVolumeClaimStatus is the same as ExtractPersistentVolumeClaim except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPersistentVolumeClaimStatus(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "status")
+}
+
+func extractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string, subresource string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	b := &PersistentVolumeClaimApplyConfiguration{}
-	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b)
+	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

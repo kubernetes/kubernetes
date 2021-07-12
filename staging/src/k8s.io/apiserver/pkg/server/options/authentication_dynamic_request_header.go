@@ -26,7 +26,6 @@ import (
 )
 
 var _ dynamiccertificates.ControllerRunner = &DynamicRequestHeaderController{}
-var _ dynamiccertificates.Notifier = &DynamicRequestHeaderController{}
 var _ dynamiccertificates.CAContentProvider = &DynamicRequestHeaderController{}
 
 var _ headerrequest.RequestHeaderAuthRequestProvider = &DynamicRequestHeaderController{}

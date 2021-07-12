@@ -22,7 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -115,8 +116,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "system defaults constraints and a replica set",
-			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			name: "system default constraints and a replicaset",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "tar").Label("baz", "sup").OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultingType: config.SystemDefaulting,
 			},
@@ -124,7 +125,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelTopologyZone, "mars").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -147,8 +148,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "defaults constraints and a replica set",
-			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			name: "default constraints and a replicaset",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "tar").Label("baz", "sup").OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
@@ -161,7 +162,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("rack", "rack1").Label(v1.LabelHostname, "node-a").Label("planet", "mars").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -184,8 +185,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "defaults constraints and a replica set that doesn't match",
-			pod:  st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").Obj(),
+			name: "default constraints and a replicaset that doesn't match",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").OwnerReference("rs2", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
@@ -196,15 +197,16 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
 			},
 			want: &preScoreState{
 				TopologyPairToPodCounts: make(map[topologyPair]*int64),
 			},
 		},
 		{
-			name: "defaults constraints and a replica set, but pod has constraints",
-			pod: st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").
+			name: "default constraints and a replicaset, but pod has constraints",
+			pod: st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").
+				OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "bar").Obj()).
 				SpreadConstraint(2, "planet", v1.ScheduleAnyway, st.MakeLabelSelector().Label("baz", "sup").Obj()).Obj(),
 			config: config.PodTopologySpreadArgs{
@@ -217,7 +219,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{

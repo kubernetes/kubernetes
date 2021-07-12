@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -390,7 +391,7 @@ func TestReconcile1Pod(t *testing.T) {
 
 			client := newClientset()
 			setupMetrics()
-			triggerTime := time.Now()
+			triggerTime := time.Now().UTC()
 			r := newReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
 			reconcileHelper(t, r, &testCase.service, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
 
@@ -1460,9 +1461,9 @@ func TestReconcileTopology(t *testing.T) {
 			slicesChangedPerSyncTopology: 0,
 		},
 	}, {
-		name:                 "topology enabled, hintsAnnotation==auto, more slices and endpoints",
+		name:                 "topology enabled, hintsAnnotation==Auto, more slices and endpoints",
 		topologyCacheEnabled: true,
-		hintsAnnotation:      "auto",
+		hintsAnnotation:      "Auto",
 		existingSlices:       []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
 		pods:                 append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
 		nodes:                nodes,
@@ -1597,7 +1598,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		client:               client,
 		nodeLister:           corelisters.NewNodeLister(indexer),
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
-		endpointSliceTracker: newEndpointSliceTracker(),
+		endpointSliceTracker: endpointsliceutil.NewEndpointSliceTracker(),
 		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
 	}
 }
@@ -1670,8 +1671,8 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 	}
 }
 
-func expectTrackedGeneration(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedGeneration int64) {
-	gfs, ok := tracker.generationsForSliceUnsafe(slice)
+func expectTrackedGeneration(t *testing.T, tracker *endpointsliceutil.EndpointSliceTracker, slice *discovery.EndpointSlice, expectedGeneration int64) {
+	gfs, ok := tracker.GenerationsForSliceUnsafe(slice)
 	if !ok {
 		t.Fatalf("Expected Service to be tracked for EndpointSlices %s", slice.Name)
 	}
@@ -1784,13 +1785,13 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
 	}
 
-	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("disabled"))
+	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled"))
 	handleErr(t, err, "slicesChangedPerSync")
 	if actualSlicesChangedPerSync != float64(em.slicesChangedPerSync) {
 		t.Errorf("Expected slicesChangedPerSync to be %d, got %v", em.slicesChangedPerSync, actualSlicesChangedPerSync)
 	}
 
-	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("auto"))
+	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Auto"))
 	handleErr(t, err, "slicesChangedPerSyncTopology")
 	if actualSlicesChangedPerSyncTopology != float64(em.slicesChangedPerSyncTopology) {
 		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
@@ -1825,8 +1826,8 @@ func setupMetrics() {
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "disabled"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "auto"})
+	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Disabled"})
+	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Auto"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "success"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "error"})
 }

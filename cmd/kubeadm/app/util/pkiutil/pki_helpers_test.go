@@ -29,8 +29,9 @@ import (
 	"reflect"
 	"testing"
 
-	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+
+	certutil "k8s.io/client-go/util/cert"
 )
 
 var (
@@ -358,12 +359,6 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	if err != nil {
-		t.Fatalf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
 	err = WriteCert(tmpdir, "foo", rootCACert)
 	if err != nil {
 		t.Fatalf(

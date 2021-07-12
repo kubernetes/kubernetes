@@ -37,7 +37,7 @@ import (
 
 // Verifies that the 'spec.signerName' field can be correctly used as a field selector on LIST requests
 func TestCSRSignerNameFieldSelector(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

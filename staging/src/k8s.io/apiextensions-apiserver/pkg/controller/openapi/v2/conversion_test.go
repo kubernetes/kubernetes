@@ -25,10 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/spec"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	"github.com/googleapis/gnostic/compiler"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"gopkg.in/yaml.v2"
 
@@ -36,6 +34,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
 )
 
@@ -103,7 +102,7 @@ properties:
 	}
 
 	ssV2 := ToStructuralOpenAPIV2(ss)
-	schema := ssV2.ToGoOpenAPI()
+	schema := ssV2.ToKubeOpenAPI()
 
 	if _, found := schema.Properties["spec"]; !found {
 		t.Errorf("spec not found")
@@ -680,7 +679,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			}
 
 			if !test.expectError {
-				out := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+				out := ToStructuralOpenAPIV2(ss).ToKubeOpenAPI()
 				if equal := reflect.DeepEqual(*out, *test.expected); !equal && !test.expectDiff {
 					t.Errorf("unexpected result:\n  want=%v\n   got=%v\n\n%s", *test.expected, *out, cmp.Diff(*test.expected, *out, cmp.Comparer(refEqual)))
 				} else if equal && test.expectDiff {
@@ -752,7 +751,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		filtered := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+		filtered := ToStructuralOpenAPIV2(ss).ToKubeOpenAPI()
 
 		// create a doc out of it
 		filteredSwagger := &spec.Swagger{
@@ -777,14 +776,8 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 			t.Fatalf("failed to encode filtered to JSON: %v", err)
 		}
 
-		// unmarshal as yaml
-		var yml yaml.MapSlice
-		if err := yaml.Unmarshal(bs, &yml); err != nil {
-			t.Fatalf("failed to decode filtered JSON by into memory: %v", err)
-		}
-
 		// create gnostic doc
-		doc, err := openapi_v2.NewDocument(yml, compiler.NewContext("$root", nil))
+		doc, err := openapi_v2.ParseDocument(bs)
 		if err != nil {
 			t.Fatalf("failed to create gnostic doc: %v", err)
 		}

@@ -702,7 +702,7 @@ kubelet_running_containers{container_state="unknown"} 2
 			name:        "test pod count",
 			metricsName: "kubelet_running_pods",
 			wants: `
-# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
 # TYPE kubelet_running_pods gauge
 kubelet_running_pods 2
 `,

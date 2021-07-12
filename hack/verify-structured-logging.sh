@@ -45,16 +45,13 @@ kube::util::check-file-in-alphabetical-order "${migrated_packages_file}"
 
 migrated_packages=()
 while IFS='' read -r line; do
-  migrated_packages+=("$line")
+  migrated_packages+=("$KUBE_ROOT/$line")
 done < <(cat "${migrated_packages_file}")
 
 
-# TODO: Improve concurrancy here
 ret=0
-for package in "${migrated_packages[@]}"; do
-    GOOS=linux    logcheck "$KUBE_ROOT/$package" || ret=$?
-    GOOS=windows  logcheck "$KUBE_ROOT/$package" || ret=$?
-done
+GOOS=linux    logcheck "${migrated_packages[@]}" || ret=$?
+GOOS=windows  logcheck "${migrated_packages[@]}" || ret=$?
 
 if [ $ret -eq 0 ]; then
   echo "Structured logging static check is passed :)."

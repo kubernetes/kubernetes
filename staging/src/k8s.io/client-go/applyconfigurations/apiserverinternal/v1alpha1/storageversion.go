@@ -49,7 +49,7 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // ExtractStorageVersion extracts the applied configuration owned by fieldManager from
 // storageVersion. If no managedFields are found in storageVersion for fieldManager, a
 // StorageVersionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // storageVersion must be a unmodified StorageVersion API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+	return extractStorageVersion(storageVersion, fieldManager, "")
+}
+
+// ExtractStorageVersionStatus is the same as ExtractStorageVersion except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStorageVersionStatus(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+	return extractStorageVersion(storageVersion, fieldManager, "status")
+}
+
+func extractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
 	b := &StorageVersionApplyConfiguration{}
-	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b)
+	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

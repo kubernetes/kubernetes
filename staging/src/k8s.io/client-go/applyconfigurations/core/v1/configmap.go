@@ -51,7 +51,7 @@ func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 // ExtractConfigMap extracts the applied configuration owned by fieldManager from
 // configMap. If no managedFields are found in configMap for fieldManager, a
 // ConfigMapApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // configMap must be a unmodified ConfigMap API object that was retrieved from the Kubernetes API.
@@ -60,8 +60,19 @@ func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractConfigMap(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
+	return extractConfigMap(configMap, fieldManager, "")
+}
+
+// ExtractConfigMapStatus is the same as ExtractConfigMap except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractConfigMapStatus(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
+	return extractConfigMap(configMap, fieldManager, "status")
+}
+
+func extractConfigMap(configMap *corev1.ConfigMap, fieldManager string, subresource string) (*ConfigMapApplyConfiguration, error) {
 	b := &ConfigMapApplyConfiguration{}
-	err := managedfields.ExtractInto(configMap, internal.Parser().Type("io.k8s.api.core.v1.ConfigMap"), fieldManager, b)
+	err := managedfields.ExtractInto(configMap, internal.Parser().Type("io.k8s.api.core.v1.ConfigMap"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

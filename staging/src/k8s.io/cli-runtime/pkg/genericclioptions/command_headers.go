@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	kubectlCommandHeader = "X-Kubectl-Command"
-	kubectlSessionHeader = "X-Kubectl-Session"
+	kubectlCommandHeader = "Kubectl-Command"
+	kubectlSessionHeader = "Kubectl-Session"
 )
 
 // CommandHeaderRoundTripper adds a layer around the standard
@@ -48,8 +48,8 @@ func (c *CommandHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Response
 	return c.Delegate.RoundTrip(req)
 }
 
-// ParseCommandHeaders fills in a map of X-Headers into the CommandHeaderRoundTripper. These
-// headers are then filled into each request. For details on X-Headers see:
+// ParseCommandHeaders fills in a map of custom headers into the CommandHeaderRoundTripper. These
+// headers are then filled into each request. For details on the custom headers see:
 //   https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 // Each call overwrites the previously parsed command headers (not additive).
 // TODO(seans3): Parse/add flags removing PII from flag values.

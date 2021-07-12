@@ -71,7 +71,7 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 	case csilibplugins.CinderInTreePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginOpenStackUnregister)
 	case csilibplugins.VSphereInTreePluginName:
-		return pm.featureGate.Enabled(features.CSIMigrationvSphereComplete) || pm.featureGate.Enabled(features.InTreePluginvSphereUnregister)
+		return pm.featureGate.Enabled(features.InTreePluginvSphereUnregister)
 	default:
 		return false
 	}
@@ -122,19 +122,19 @@ func (pm PluginManager) IsMigratable(spec *volume.Spec) (bool, error) {
 // from references to in-tree plugins to migrated CSI plugins
 type InTreeToCSITranslator interface {
 	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 }
 
 // TranslateInTreeSpecToCSI translates a volume spec (either PV or inline volume)
 // supported by an in-tree plugin to CSI
-func TranslateInTreeSpecToCSI(spec *volume.Spec, translator InTreeToCSITranslator) (*volume.Spec, error) {
+func TranslateInTreeSpecToCSI(spec *volume.Spec, podNamespace string, translator InTreeToCSITranslator) (*volume.Spec, error) {
 	var csiPV *v1.PersistentVolume
 	var err error
 	inlineVolume := false
 	if spec.PersistentVolume != nil {
 		csiPV, err = translator.TranslateInTreePVToCSI(spec.PersistentVolume)
 	} else if spec.Volume != nil {
-		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(spec.Volume)
+		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(spec.Volume, podNamespace)
 		inlineVolume = true
 	} else {
 		err = errors.New("not a valid volume spec")
@@ -152,21 +152,13 @@ func TranslateInTreeSpecToCSI(spec *volume.Spec, translator InTreeToCSITranslato
 
 // CheckMigrationFeatureFlags checks the configuration of feature flags related
 // to CSI Migration is valid. It will return whether the migration is complete
-// by looking up the pluginMigrationComplete and pluginUnregister flag
+// by looking up the pluginUnregister flag
 func CheckMigrationFeatureFlags(f featuregate.FeatureGate, pluginMigration,
-	pluginMigrationComplete, pluginUnregister featuregate.Feature) (migrationComplete bool, err error) {
+	pluginUnregister featuregate.Feature) (migrationComplete bool, err error) {
 	if f.Enabled(pluginMigration) && !f.Enabled(features.CSIMigration) {
 		return false, fmt.Errorf("enabling %q requires CSIMigration to be enabled", pluginMigration)
 	}
-	// TODO: Remove the following two checks once the CSIMigrationXXComplete flag is removed
-	if pluginMigrationComplete != "" && f.Enabled(pluginMigrationComplete) && !f.Enabled(pluginMigration) {
-		return false, fmt.Errorf("enabling %q requires %q to be enabled", pluginMigrationComplete, pluginMigration)
-	}
-	// This is only needed for vSphere since we will deprecate the CSIMigrationvSphereComplete flag soon
-	if pluginMigrationComplete != "" && f.Enabled(features.CSIMigration) &&
-		f.Enabled(pluginMigration) && f.Enabled(pluginMigrationComplete) {
-		return true, nil
-	}
+
 	// This is for other in-tree plugin that get migration finished
 	if f.Enabled(pluginMigration) && f.Enabled(pluginUnregister) {
 		return true, nil

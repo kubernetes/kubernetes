@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
@@ -36,7 +36,6 @@ import (
 )
 
 const (
-	maxRetries         = 10
 	checkSleepDuration = time.Second
 	diskByIDPath       = "/dev/disk/by-id/"
 	diskSCSIPrefix     = "wwn-0x"
@@ -68,6 +67,15 @@ const (
 	ObjectSpaceReservationCapabilityMin = 0
 	ObjectSpaceReservationCapabilityMax = 100
 	IopsLimitCapabilityMin              = 0
+	// reduce number of characters in vsphere volume name. The reason for setting length smaller than 255 is because typically
+	// volume name also becomes part of mount path - /var/lib/kubelet/plugins/kubernetes.io/vsphere-volume/mounts/<name>
+	// and systemd has a limit of 256 chars in a unit name - https://github.com/systemd/systemd/pull/14294
+	// so if we subtract the kubelet path prefix from 256, we are left with 191 characters.
+	// Since datastore name is typically part of volumeName we are choosing a shorter length of 63
+	// and leaving room of certain characters being escaped etc.
+	// Given that volume name is typically of the form - pvc-0f13e3ad-97f8-41ab-9392-84562ef40d17.vmdk (45 chars),
+	// this should still leave plenty of room for clusterName inclusion.
+	maxVolumeLength = 63
 )
 
 var ErrProbeVolume = errors.New("error scanning attached volumes")
@@ -98,13 +106,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner, selectedN
 		return nil, err
 	}
 	volSizeKiB := volSizeMiB * 1024
-	// reduce number of characters in vsphere volume name. The reason for setting length smaller than 255 is because typically
-	// volume name also becomes part of mount path - /var/lib/kubelet/plugins/kubernetes.io/vsphere-volume/mounts/<name>
-	// and systemd has a limit of 256 chars in a unit name - https://github.com/systemd/systemd/pull/14294
-	// so if we subtract the kubelet path prefix from 256, we are left with 191 characters.
-	// Since datastore name is typically part of volumeName we are choosing a shorter length of 90
-	// and leaving room of certain characters being escaped etc.
-	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 90)
+	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, maxVolumeLength)
 	volumeOptions := &vclib.VolumeOptions{
 		CapacityKB: volSizeKiB,
 		Tags:       *v.options.CloudTags,

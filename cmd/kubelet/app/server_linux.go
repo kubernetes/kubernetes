@@ -19,6 +19,8 @@ package app
 import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/inotify"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {
@@ -29,6 +31,7 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 	}
 	if err = watcher.AddWatch(path, inotify.InOpen|inotify.InDeleteSelf); err != nil {
 		klog.ErrorS(err, "Unable to watch lockfile")
+		watcher.Close()
 		return err
 	}
 	go func() {
@@ -39,6 +42,11 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 			klog.ErrorS(err, "inotify watcher error")
 		}
 		close(done)
+		watcher.Close()
 	}()
 	return nil
+}
+
+func isCgroup2UnifiedMode() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }

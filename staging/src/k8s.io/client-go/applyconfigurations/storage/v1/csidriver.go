@@ -48,7 +48,7 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // ExtractCSIDriver extracts the applied configuration owned by fieldManager from
 // cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
 // CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.
@@ -57,8 +57,19 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	return extractCSIDriver(cSIDriver, fieldManager, "")
+}
+
+// ExtractCSIDriverStatus is the same as ExtractCSIDriver except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCSIDriverStatus(cSIDriver *apistoragev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	return extractCSIDriver(cSIDriver, fieldManager, "status")
+}
+
+func extractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
 	b := &CSIDriverApplyConfiguration{}
-	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1.CSIDriver"), fieldManager, b)
+	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1.CSIDriver"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

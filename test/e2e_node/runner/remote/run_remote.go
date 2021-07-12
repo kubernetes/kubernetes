@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -36,6 +37,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
@@ -154,12 +156,13 @@ type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageRegex string `json:"image_regex,omitempty"`
 	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
-	ImageFamily string    `json:"image_family,omitempty"`
-	ImageDesc   string    `json:"image_description,omitempty"`
-	Project     string    `json:"project"`
-	Metadata    string    `json:"metadata"`
-	Machine     string    `json:"machine,omitempty"`
-	Resources   Resources `json:"resources,omitempty"`
+	ImageFamily     string    `json:"image_family,omitempty"`
+	ImageDesc       string    `json:"image_description,omitempty"`
+	KernelArguments []string  `json:"kernel_arguments,omitempty"`
+	Project         string    `json:"project"`
+	Metadata        string    `json:"metadata"`
+	Machine         string    `json:"machine,omitempty"`
+	Resources       Resources `json:"resources,omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests,omitempty"`
 }
@@ -173,12 +176,13 @@ type internalGCEImage struct {
 	image string
 	// imageDesc is the description of the image. If empty, the value in the
 	// 'image' will be used.
-	imageDesc string
-	project   string
-	resources Resources
-	metadata  *compute.Metadata
-	machine   string
-	tests     []string
+	imageDesc       string
+	kernelArguments []string
+	project         string
+	resources       Resources
+	metadata        *compute.Metadata
+	machine         string
+	tests           []string
 }
 
 func main() {
@@ -196,6 +200,20 @@ func main() {
 	default:
 		klog.Fatalf("--test-suite must be one of default, cadvisor, or conformance")
 	}
+
+	// Listen for SIGINT and ignore the first one. In case SIGINT is sent to this
+	// process and all its children, we ignore it here, while our children ssh connections
+	// are stopped. This allows us to gather artifacts and print out test state before
+	// being killed.
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		fmt.Printf("Received SIGINT. Will exit on next SIGINT.\n")
+		<-c
+		fmt.Printf("Received another SIGINT. Will exit.\n")
+		os.Exit(1)
+	}()
 
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
@@ -252,13 +270,14 @@ func main() {
 				metadata += "," + *instanceMetadata
 			}
 			gceImage := internalGCEImage{
-				image:     image,
-				imageDesc: imageConfig.ImageDesc,
-				project:   imageConfig.Project,
-				metadata:  getImageMetadata(metadata),
-				machine:   imageConfig.Machine,
-				tests:     imageConfig.Tests,
-				resources: imageConfig.Resources,
+				image:           image,
+				imageDesc:       imageConfig.ImageDesc,
+				project:         imageConfig.Project,
+				metadata:        getImageMetadata(metadata),
+				kernelArguments: imageConfig.KernelArguments,
+				machine:         imageConfig.Machine,
+				tests:           imageConfig.Tests,
+				resources:       imageConfig.Resources,
 			}
 			if gceImage.imageDesc == "" {
 				gceImage.imageDesc = gceImage.image
@@ -553,7 +572,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 func createInstance(imageConfig *internalGCEImage) (string, error) {
 	p, err := computeService.Projects.Get(*project).Do()
 	if err != nil {
-		return "", fmt.Errorf("failed to get project info %q", *project)
+		return "", fmt.Errorf("failed to get project info %q: %v", *project, err)
 	}
 	// Use default service account
 	serviceAccount := p.DefaultServiceAccount
@@ -632,6 +651,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		insertionOperationName = op.Name
 	}
 	instanceRunning := false
+	var instance *compute.Instance
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
@@ -653,7 +673,6 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
 		}
 
-		var instance *compute.Instance
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
 			continue
@@ -702,7 +721,82 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			cloudInitFinished = true
 		}
 	}
+
+	// apply additional kernel arguments to the instance
+	if len(imageConfig.kernelArguments) > 0 {
+		klog.Info("Update kernel arguments")
+		if err := updateKernelArguments(instance, imageConfig.image, imageConfig.kernelArguments); err != nil {
+			return name, err
+		}
+	}
+
 	return name, err
+}
+
+func updateKernelArguments(instance *compute.Instance, image string, kernelArgs []string) error {
+	kernelArgsString := strings.Join(kernelArgs, " ")
+
+	var cmd []string
+	if strings.Contains(image, "cos") {
+		cmd = []string{
+			"dir=$(mktemp -d)",
+			"mount /dev/sda12 ${dir}",
+			fmt.Sprintf("sed -i -e \"s|cros_efi|cros_efi %s|g\" ${dir}/efi/boot/grub.cfg", kernelArgsString),
+			"umount ${dir}",
+			"rmdir ${dir}",
+		}
+	}
+
+	if strings.Contains(image, "ubuntu") {
+		cmd = []string{
+			fmt.Sprintf("echo \"GRUB_CMDLINE_LINUX_DEFAULT=%s ${GRUB_CMDLINE_LINUX_DEFAULT}\" > /etc/default/grub.d/99-additional-arguments.cfg", kernelArgsString),
+			"/usr/sbin/update-grub",
+		}
+	}
+
+	if len(cmd) == 0 {
+		klog.Warningf("The image %s does not support adding an additional kernel arguments", image)
+		return nil
+	}
+
+	out, err := remote.SSH(instance.Name, "sh", "-c", fmt.Sprintf("'%s'", strings.Join(cmd, "&&")))
+	if err != nil {
+		klog.Errorf("failed to run command %s: out: %s, err: %v", cmd, out, err)
+		return err
+	}
+
+	if err := rebootInstance(instance); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func rebootInstance(instance *compute.Instance) error {
+	// wait until the instance will not response to SSH
+	klog.Info("Reboot the node and wait for instance not to be available via SSH")
+	if waitErr := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "reboot"); err != nil {
+			return true, nil
+		}
+
+		return false, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s still response to SSH: %v", instance.Name, waitErr)
+	}
+
+	// wait until the instance will response again to SSH
+	klog.Info("Wait for instance to be available via SSH")
+	if waitErr := wait.PollImmediate(30*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "sh", "-c", "date"); err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s does not response to SSH: %v", instance.Name, waitErr)
+	}
+
+	return nil
 }
 
 func isCloudInitUsed(metadata *compute.Metadata) bool {

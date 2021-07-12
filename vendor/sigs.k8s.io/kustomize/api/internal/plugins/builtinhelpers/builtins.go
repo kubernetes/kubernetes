@@ -15,6 +15,7 @@ const (
 	Unknown BuiltinPluginType = iota
 	AnnotationsTransformer
 	ConfigMapGenerator
+	IAMPolicyGenerator
 	HashTransformer
 	ImageTagTransformer
 	LabelTransformer
@@ -28,6 +29,7 @@ const (
 	SecretGenerator
 	ValueAddTransformer
 	HelmChartInflationGenerator
+	ReplacementTransformer
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -57,6 +59,7 @@ func GetBuiltinPluginType(n string) BuiltinPluginType {
 
 var GeneratorFactories = map[BuiltinPluginType]func() resmap.GeneratorPlugin{
 	ConfigMapGenerator:          builtins.NewConfigMapGeneratorPlugin,
+	IAMPolicyGenerator:          builtins.NewIAMPolicyGeneratorPlugin,
 	SecretGenerator:             builtins.NewSecretGeneratorPlugin,
 	HelmChartInflationGenerator: builtins.NewHelmChartInflationGeneratorPlugin,
 }
@@ -72,6 +75,7 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	PatchStrategicMergeTransformer: builtins.NewPatchStrategicMergeTransformerPlugin,
 	PatchTransformer:               builtins.NewPatchTransformerPlugin,
 	PrefixSuffixTransformer:        builtins.NewPrefixSuffixTransformerPlugin,
+	ReplacementTransformer:         builtins.NewReplacementTransformerPlugin,
 	ReplicaCountTransformer:        builtins.NewReplicaCountTransformerPlugin,
 	ValueAddTransformer:            builtins.NewValueAddTransformerPlugin,
 }

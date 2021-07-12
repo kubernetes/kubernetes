@@ -87,6 +87,11 @@ func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	return err
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (endpointSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (endpointSliceStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -101,6 +106,11 @@ func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtim
 	newEPS := new.(*discovery.EndpointSlice)
 	oldEPS := old.(*discovery.EndpointSlice)
 	return validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (endpointSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.

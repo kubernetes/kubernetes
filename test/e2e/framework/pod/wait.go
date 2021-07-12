@@ -210,14 +210,16 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 // WaitForPodCondition waits a pods to be matched to the given condition.
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	e2elog.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
+	var lastPodError error
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+		lastPodError = err
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-				return err
+			} else {
+				e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			}
-			e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			continue
 		}
 		// log now so that current pod info is reported before calling `condition()`
@@ -229,6 +231,10 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 			}
 			return err
 		}
+	}
+	if apierrors.IsNotFound(lastPodError) {
+		// return for compatbility with other functions testing for IsNotFound
+		return lastPodError
 	}
 	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }
@@ -427,6 +433,21 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	return wait.PollImmediate(poll, podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
+}
+
+// WaitForNumberOfPods waits up to timeout to ensure there are exact
+// `num` pods in namespace `ns`.
+// It returns the matching Pods or a timeout error.
+func WaitForNumberOfPods(c clientset.Interface, ns string, num int, timeout time.Duration) (pods *v1.PodList, err error) {
+	err = wait.PollImmediate(poll, timeout, func() (bool, error) {
+		pods, err = c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		// ignore intermittent network error
+		if err != nil {
+			return false, nil
+		}
+		return len(pods.Items) == num, nil
+	})
+	return
 }
 
 // WaitForPodsWithLabelScheduled waits for all matching pods to become scheduled and at least one

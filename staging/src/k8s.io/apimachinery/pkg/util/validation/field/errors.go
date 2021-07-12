@@ -181,7 +181,7 @@ func Invalid(field *Path, value interface{}, detail string) *Error {
 // valid values).
 func NotSupported(field *Path, value interface{}, validValues []string) *Error {
 	detail := ""
-	if validValues != nil && len(validValues) > 0 {
+	if len(validValues) > 0 {
 		quotedValues := make([]string, len(validValues))
 		for i, v := range validValues {
 			quotedValues[i] = strconv.Quote(v)

@@ -630,9 +630,10 @@ func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		AuthInfo: clientcmdapi.AuthInfo{
 			Exec: &clientcmdapi.ExecConfig{
-				APIVersion:  "client.authentication.k8s.io/v1alpha1",
-				Command:     "some-command",
-				InstallHint: "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				Command:         "some-command",
+				InstallHint:     "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			},
 		},
 	}, nil)

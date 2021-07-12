@@ -50,7 +50,7 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 // ExtractPod extracts the applied configuration owned by fieldManager from
 // pod. If no managedFields are found in pod for fieldManager, a
 // PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPod(pod *apicorev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return extractPod(pod, fieldManager, "")
+}
+
+// ExtractPodStatus is the same as ExtractPod except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPodStatus(pod *apicorev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return extractPod(pod, fieldManager, "status")
+}
+
+func extractPod(pod *apicorev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
 	b := &PodApplyConfiguration{}
-	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b)
+	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

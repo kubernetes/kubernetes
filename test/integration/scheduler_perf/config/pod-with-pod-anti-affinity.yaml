@@ -14,7 +14,7 @@ spec:
         topologyKey: kubernetes.io/hostname
         namespaces: ["sched-test", "sched-setup"]
   containers:
-  - image: k8s.gcr.io/pause:3.4.1
+  - image: k8s.gcr.io/pause:3.5
     name: pause
     ports:
     - containerPort: 80

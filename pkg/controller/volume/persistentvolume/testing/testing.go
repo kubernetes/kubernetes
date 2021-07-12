@@ -108,7 +108,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		// check the volume does not exist
 		_, found := r.volumes[volume.Name]
 		if found {
-			return true, nil, fmt.Errorf("Cannot create volume %s: volume already exists", volume.Name)
+			return true, nil, fmt.Errorf("cannot create volume %s: volume already exists", volume.Name)
 		}
 
 		// mimic apiserver defaulting
@@ -134,7 +134,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		// check the claim does not exist
 		_, found := r.claims[claim.Name]
 		if found {
-			return true, nil, fmt.Errorf("Cannot create claim %s: claim already exists", claim.Name)
+			return true, nil, fmt.Errorf("cannot create claim %s: claim already exists", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -167,7 +167,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			volume = volume.DeepCopy()
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
+			return true, nil, fmt.Errorf("cannot update volume %s: volume not found", volume.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -200,7 +200,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			claim = claim.DeepCopy()
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
+			return true, nil, fmt.Errorf("cannot update claim %s: claim not found", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -245,7 +245,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		}
-		return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
+		return true, nil, fmt.Errorf("cannot delete volume %s: not found", name)
 
 	case action.Matches("delete", "persistentvolumeclaims"):
 		name := action.(core.DeleteAction).GetName()
@@ -259,7 +259,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		}
-		return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
+		return true, nil, fmt.Errorf("cannot delete claim %s: not found", name)
 	}
 
 	return false, nil, nil

@@ -73,6 +73,11 @@ func (m *MockedFakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*e
 	return args.Get(0).([]*ec2.Volume), nil
 }
 
+func (m *MockedFakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error) {
+	args := m.Called(request)
+	return args.Get(0).(*ec2.DeleteVolumeOutput), nil
+}
+
 func (m *MockedFakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
 	args := m.Called(request)
 	return args.Get(0).([]*ec2.SecurityGroup), nil
@@ -2360,6 +2365,51 @@ func TestCreateDisk(t *testing.T) {
 	volumeID, err := c.CreateDisk(volumeOptions)
 	assert.Nil(t, err, "Error creating disk: %v", err)
 	assert.Equal(t, volumeID, KubernetesVolumeID("aws://us-east-1a/vol-volumeId0"))
+	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
+}
+
+func TestCreateDiskFailDescribeVolume(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, _ := newAWSCloud(CloudConfig{}, awsServices)
+
+	volumeOptions := &VolumeOptions{
+		AvailabilityZone: "us-east-1a",
+		CapacityGB:       10,
+	}
+	request := &ec2.CreateVolumeInput{
+		AvailabilityZone: aws.String("us-east-1a"),
+		Encrypted:        aws.Bool(false),
+		VolumeType:       aws.String(DefaultVolumeType),
+		Size:             aws.Int64(10),
+		TagSpecifications: []*ec2.TagSpecification{
+			{ResourceType: aws.String(ec2.ResourceTypeVolume), Tags: []*ec2.Tag{
+				// CreateVolume from MockedFakeEC2 expects sorted tags, so we need to
+				// always have these tags sorted:
+				{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterID)},
+				{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID)), Value: aws.String(ResourceLifecycleOwned)},
+			}},
+		},
+	}
+
+	volume := &ec2.Volume{
+		AvailabilityZone: aws.String("us-east-1a"),
+		VolumeId:         aws.String("vol-volumeId0"),
+		State:            aws.String("creating"),
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("CreateVolume", request).Return(volume, nil)
+
+	describeVolumesRequest := &ec2.DescribeVolumesInput{
+		VolumeIds: []*string{aws.String("vol-volumeId0")},
+	}
+	deleteVolumeRequest := &ec2.DeleteVolumeInput{
+		VolumeId: aws.String("vol-volumeId0"),
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("DescribeVolumes", describeVolumesRequest).Return([]*ec2.Volume{volume}, nil)
+	awsServices.ec2.(*MockedFakeEC2).On("DeleteVolume", deleteVolumeRequest).Return(&ec2.DeleteVolumeOutput{}, nil)
+
+	volumeID, err := c.CreateDisk(volumeOptions)
+	assert.Error(t, err)
+	assert.Equal(t, volumeID, KubernetesVolumeID(""))
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 

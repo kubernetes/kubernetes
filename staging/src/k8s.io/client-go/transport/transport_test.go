@@ -142,6 +142,14 @@ func TestNew(t *testing.T) {
 				},
 			},
 		},
+		"bad ca data transport": {
+			Err: true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert + "this is not valid"),
+				},
+			},
+		},
 		"ca data overriding bad ca file transport": {
 			TLS: true,
 			Config: &Config{

@@ -31,6 +31,9 @@ const (
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request
+	ImpersonateUIDHeader = "Impersonate-Uid"
+
 	// ImpersonateUserExtraHeaderPrefix is a prefix for any header used to impersonate an entry in the
 	// extra map[string][]string for user.Info.  The key will be every after the prefix.
 	// It can be repeated multiplied times for multiple map keys and the same key can be repeated multiple
@@ -48,6 +51,8 @@ const (
 // plugin in the kube-apiserver.
 type TokenReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -130,10 +135,15 @@ func (t ExtraValue) String() string {
 // TokenRequest requests a token for a given service account.
 type TokenRequest struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// Spec holds information about the request being evaluated
 	Spec TokenRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status is filled in by the server and indicates whether the token can be authenticated.
 	// +optional
 	Status TokenRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }

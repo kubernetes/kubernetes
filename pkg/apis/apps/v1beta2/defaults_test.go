@@ -207,6 +207,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
@@ -234,6 +235,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
@@ -256,6 +258,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
 					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{

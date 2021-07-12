@@ -23,7 +23,7 @@ import (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -86,10 +86,10 @@ func init() {
 
 // recordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
 func recordsWatchCacheCapacityChange(objType string, old, new int) {
+	watchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 	if old < new {
 		watchCacheCapacityIncreaseTotal.WithLabelValues(objType).Inc()
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
-	watchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 }

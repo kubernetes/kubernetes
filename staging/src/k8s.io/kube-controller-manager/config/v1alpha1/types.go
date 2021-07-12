@@ -193,8 +193,8 @@ type CSRSigningControllerConfiguration struct {
 	// legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown
 	LegacyUnknownSignerConfiguration CSRSigningConfiguration
 
-	// clusterSigningDuration is the length of duration signed certificates
-	// will be given.
+	// clusterSigningDuration is the max length of duration signed certificates will be given.
+	// Individual CSRs may request shorter certs by setting spec.expirationSeconds.
 	ClusterSigningDuration metav1.Duration
 }
 
@@ -328,10 +328,6 @@ type HPAControllerConfiguration struct {
 	// HorizontalPodAutoscalerTolerance is the tolerance for when
 	// resource usage suggests upscaling/downscaling
 	HorizontalPodAutoscalerTolerance float64
-	// HorizontalPodAutoscalerUseRESTClients causes the HPA controller to use REST clients
-	// through the kube-aggregator when enabled, instead of using the legacy metrics client
-	// through the API server proxy.
-	HorizontalPodAutoscalerUseRESTClients *bool
 	// HorizontalPodAutoscalerCPUInitializationPeriod is the period after pod start when CPU samples
 	// might be skipped.
 	HorizontalPodAutoscalerCPUInitializationPeriod metav1.Duration

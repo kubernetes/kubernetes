@@ -36,7 +36,20 @@ const (
 	// present on a machine and the TopologyManager is enabled, an error will
 	// be returned and the TopologyManager will not be loaded.
 	maxAllowableNUMANodes = 8
+	// ErrorTopologyAffinity represents the type for a TopologyAffinityError
+	ErrorTopologyAffinity = "TopologyAffinityError"
 )
+
+// TopologyAffinityError represents an resource alignment error
+type TopologyAffinityError struct{}
+
+func (e TopologyAffinityError) Error() string {
+	return "Resources cannot be allocated with Topology locality"
+}
+
+func (e TopologyAffinityError) Type() string {
+	return ErrorTopologyAffinity
+}
 
 // Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
@@ -46,7 +59,7 @@ type Manager interface {
 	// wants to be consulted with when making topology hints
 	AddHintProvider(HintProvider)
 	// AddContainer adds pod to Manager for tracking
-	AddContainer(pod *v1.Pod, containerID string) error
+	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
 	RemoveContainer(containerID string) error
 	// Store is the interface for storing pod topology hints
@@ -175,8 +188,8 @@ func (m *manager) AddHintProvider(h HintProvider) {
 	m.scope.AddHintProvider(h)
 }
 
-func (m *manager) AddContainer(pod *v1.Pod, containerID string) error {
-	return m.scope.AddContainer(pod, containerID)
+func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	m.scope.AddContainer(pod, container, containerID)
 }
 
 func (m *manager) RemoveContainer(containerID string) error {

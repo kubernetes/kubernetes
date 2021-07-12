@@ -24,20 +24,22 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/pkg/errors"
-
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -120,7 +122,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		}
 
 		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
+		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName, nil)
 		if err != nil {
 			return err
 		}
@@ -156,7 +158,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 }
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
-func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientcmdapi.Config, error) {
+func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string, notAfter *time.Time) (*clientcmdapi.Config, error) {
 
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
@@ -171,7 +173,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 	}
 
 	// otherwise, create a client certs
-	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec)
+	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec, notAfter)
 
 	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
@@ -193,13 +195,14 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 	), nil
 }
 
-func newClientCertConfigFromKubeConfigSpec(spec *kubeConfigSpec) pkiutil.CertConfig {
+func newClientCertConfigFromKubeConfigSpec(spec *kubeConfigSpec, notAfter *time.Time) pkiutil.CertConfig {
 	return pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   spec.ClientName,
 			Organization: spec.ClientCertAuth.Organizations,
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
+		NotAfter: notAfter,
 	}
 }
 
@@ -279,7 +282,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 }
 
 // WriteKubeConfigWithClientCert writes a kubeconfig file - with a client certificate as authentication info  - to the given writer.
-func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string) error {
+func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string, notAfter *time.Time) error {
 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -304,11 +307,11 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName, notAfter)
 }
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
-func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string) error {
+func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string, notAfter *time.Time) error {
 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -332,14 +335,14 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName, notAfter)
 }
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
-func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string) error {
+func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string, notAfter *time.Time) error {
 
 	// builds the KubeConfig object
-	config, err := buildKubeConfigFromSpec(spec, clustername)
+	config, err := buildKubeConfigFromSpec(spec, clustername, notAfter)
 	if err != nil {
 		return err
 	}
@@ -465,7 +468,7 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 		return errors.Errorf("%s: csr: %s", errExist, kubeConfigPath)
 	}
 
-	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec)
+	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec, nil)
 
 	clientKey, err := pkiutil.NewPrivateKey(clientCertConfig.PublicKeyAlgorithm)
 	if err != nil {

@@ -35,16 +35,17 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -62,6 +63,7 @@ const (
 // CertConfig is a wrapper around certutil.Config extending it with PublicKeyAlgorithm.
 type CertConfig struct {
 	certutil.Config
+	NotAfter           *time.Time
 	PublicKeyAlgorithm x509.PublicKeyAlgorithm
 }
 
@@ -647,6 +649,11 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
 
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
+	if cfg.NotAfter != nil {
+		notAfter = *cfg.NotAfter
+	}
+
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -656,7 +663,7 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		IPAddresses:           cfg.AltNames.IPs,
 		SerialNumber:          serial,
 		NotBefore:             caCert.NotBefore,
-		NotAfter:              time.Now().Add(kubeadmconstants.CertificateValidity).UTC(),
+		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		ExtKeyUsage:           cfg.Usages,
 		BasicConstraintsValid: true,

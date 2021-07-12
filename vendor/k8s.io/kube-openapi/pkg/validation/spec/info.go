@@ -17,6 +17,8 @@ package spec
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/go-openapi/swag"
 )
 
 // Extensions vendor specific extensions
@@ -110,4 +112,44 @@ func (v *VendorExtensible) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+// InfoProps the properties for an info definition
+type InfoProps struct {
+	Description    string       `json:"description,omitempty"`
+	Title          string       `json:"title,omitempty"`
+	TermsOfService string       `json:"termsOfService,omitempty"`
+	Contact        *ContactInfo `json:"contact,omitempty"`
+	License        *License     `json:"license,omitempty"`
+	Version        string       `json:"version,omitempty"`
+}
+
+// Info object provides metadata about the API.
+// The metadata can be used by the clients if needed, and can be presented in the Swagger-UI for convenience.
+//
+// For more information: http://goo.gl/8us55a#infoObject
+type Info struct {
+	VendorExtensible
+	InfoProps
+}
+
+// MarshalJSON marshal this to JSON
+func (i Info) MarshalJSON() ([]byte, error) {
+	b1, err := json.Marshal(i.InfoProps)
+	if err != nil {
+		return nil, err
+	}
+	b2, err := json.Marshal(i.VendorExtensible)
+	if err != nil {
+		return nil, err
+	}
+	return swag.ConcatJSON(b1, b2), nil
+}
+
+// UnmarshalJSON marshal this from JSON
+func (i *Info) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &i.InfoProps); err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &i.VendorExtensible)
 }

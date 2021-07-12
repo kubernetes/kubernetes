@@ -31,9 +31,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -153,13 +156,32 @@ func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
 	return memoryManagerCheckpoint, nil
 }
 
+func getAllocatableMemoryFromStateFile(s *state.MemoryManagerCheckpoint) []state.Block {
+	var allocatableMemory []state.Block
+	for numaNodeID, numaNodeState := range s.MachineState {
+		for resourceName, memoryTable := range numaNodeState.MemoryMap {
+			if memoryTable.Allocatable == 0 {
+				continue
+			}
+
+			block := state.Block{
+				NUMAAffinity: []int{numaNodeID},
+				Type:         resourceName,
+				Size:         memoryTable.Allocatable,
+			}
+			allocatableMemory = append(allocatableMemory, block)
+		}
+	}
+	return allocatableMemory
+}
+
 type kubeletParams struct {
-	memoryManagerFeatureGate bool
-	memoryManagerPolicy      string
-	systemReservedMemory     []kubeletconfig.MemoryReservation
-	systemReserved           map[string]string
-	kubeReserved             map[string]string
-	evictionHard             map[string]string
+	podResourcesGetAllocatableFeatureGate bool
+	memoryManagerPolicy                   string
+	systemReservedMemory                  []kubeletconfig.MemoryReservation
+	systemReserved                        map[string]string
+	kubeReserved                          map[string]string
+	evictionHard                          map[string]string
 }
 
 func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params *kubeletParams) *kubeletconfig.KubeletConfiguration {
@@ -168,7 +190,9 @@ func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params 
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = map[string]bool{}
 	}
-	newCfg.FeatureGates["MemoryManager"] = params.memoryManagerFeatureGate
+
+	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = params.podResourcesGetAllocatableFeatureGate
+
 	newCfg.MemoryManagerPolicy = params.memoryManagerPolicy
 
 	// update system-reserved
@@ -243,7 +267,7 @@ func getAllNUMANodes() []int {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFeature:MemoryManager]", func() {
+var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
@@ -257,14 +281,14 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 	f := framework.NewDefaultFramework("memory-manager-test")
 
-	memoryQuantatity := resource.MustParse("1100Mi")
+	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{
-		memoryManagerFeatureGate: true,
+		podResourcesGetAllocatableFeatureGate: true,
 		systemReservedMemory: []kubeletconfig.MemoryReservation{
 			{
 				NumaNode: 0,
 				Limits: v1.ResourceList{
-					resourceMemory: memoryQuantatity,
+					resourceMemory: memoryQuantity,
 				},
 			},
 		},
@@ -305,8 +329,51 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 		// allocate hugepages
 		if *is2MiHugepagesSupported {
-			err := configureHugePages(hugepagesSize2M, 256)
-			framework.ExpectNoError(err)
+			hugepagesCount := 256
+			ginkgo.By("Configuring hugepages")
+			gomega.Eventually(func() error {
+				if err := configureHugePages(hugepagesSize2M, hugepagesCount); err != nil {
+					return err
+				}
+				return nil
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+
+			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			// wait until the kubelet health check will pass
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+
+			ginkgo.By("Waiting for hugepages resource to become available on the local node")
+			gomega.Eventually(func() error {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResourceName2Mi)]
+				if !ok {
+					return fmt.Errorf("the node does not have the resource %s", hugepagesResourceName2Mi)
+				}
+
+				size, succeed := capacity.AsInt64()
+				if !succeed {
+					return fmt.Errorf("failed to convert quantity to int64")
+				}
+
+				// 512 Mb, the expected size in bytes
+				expectedSize := int64(hugepagesCount * hugepagesSize2M * 1024)
+				if size != expectedSize {
+					return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
+				}
+				return nil
+			}, time.Minute, framework.Poll).Should(gomega.BeNil())
 		}
 
 		// get the old kubelet config
@@ -324,12 +391,14 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 			}
 		}
 
-		testPod = makeMemoryManagerPod(ctnParams[0].ctnName, initCtnParams, ctnParams)
+		if len(ctnParams) > 0 {
+			testPod = makeMemoryManagerPod(ctnParams[0].ctnName, initCtnParams, ctnParams)
+		}
 	})
 
 	ginkgo.JustAfterEach(func() {
 		// delete the test pod
-		if testPod.Name != "" {
+		if testPod != nil && testPod.Name != "" {
 			f.PodClient().DeleteSync(testPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 		}
 
@@ -340,6 +409,14 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 		// update the kubelet config with old values
 		updateKubeletConfig(f, oldCfg)
+
+		// wait until the kubelet health check will pass and will continue to pass for specified period of time
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
+		gomega.Consistently(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
 	})
 
 	ginkgo.Context("with static policy", func() {
@@ -354,6 +431,48 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 			// reset containers attributes
 			ctnParams = []memoryManagerCtnAttributes{}
 			initCtnParams = []memoryManagerCtnAttributes{}
+		})
+
+		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+		ginkgo.It("should report memory data during request to pod resources GetAllocatableResources", func() {
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err)
+			gomega.Expect(resp.Memory).ToNot(gomega.BeEmpty())
+
+			stateData, err := getMemoryManagerState()
+			framework.ExpectNoError(err)
+
+			stateAllocatableMemory := getAllocatableMemoryFromStateFile(stateData)
+			framework.ExpectEqual(len(resp.Memory), len(stateAllocatableMemory))
+
+			for _, containerMemory := range resp.Memory {
+				gomega.Expect(containerMemory.Topology).NotTo(gomega.BeNil())
+				framework.ExpectEqual(len(containerMemory.Topology.Nodes), 1)
+				gomega.Expect(containerMemory.Topology.Nodes[0]).NotTo(gomega.BeNil())
+
+				numaNodeID := int(containerMemory.Topology.Nodes[0].ID)
+				for _, numaStateMemory := range stateAllocatableMemory {
+					framework.ExpectEqual(len(numaStateMemory.NUMAAffinity), 1)
+					if numaNodeID != numaStateMemory.NUMAAffinity[0] {
+						continue
+					}
+
+					if containerMemory.MemoryType != string(numaStateMemory.Type) {
+						continue
+					}
+
+					gomega.Expect(containerMemory.Size_).To(gomega.BeEquivalentTo(numaStateMemory.Size))
+				}
+			}
+
+			gomega.Expect(resp.Memory).ToNot(gomega.BeEmpty())
 		})
 
 		ginkgo.When("guaranteed pod has init and app containers", func() {
@@ -446,6 +565,48 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 				verifyMemoryPinning(testPod, []int{0})
 				verifyMemoryPinning(testPod2, []int{0})
+			})
+
+			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+			ginkgo.It("should report memory data for each guaranteed pod and container during request to pod resources List", func() {
+				ginkgo.By("Running the test pod and the test pod 2")
+				testPod = f.PodClient().CreateSync(testPod)
+
+				ginkgo.By("Running the test pod 2")
+				testPod2 = f.PodClient().CreateSync(testPod2)
+
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+
+				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+				defer conn.Close()
+
+				resp, err := cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
+				framework.ExpectNoError(err)
+
+				for _, pod := range []*v1.Pod{testPod, testPod2} {
+					for _, podResource := range resp.PodResources {
+						if podResource.Name != pod.Name {
+							continue
+						}
+
+						for _, c := range pod.Spec.Containers {
+							for _, containerResource := range podResource.Containers {
+								if containerResource.Name != c.Name {
+									continue
+								}
+
+								for _, containerMemory := range containerResource.Memory {
+									q := c.Resources.Limits[v1.ResourceName(containerMemory.MemoryType)]
+									value, ok := q.AsInt64()
+									gomega.Expect(ok).To(gomega.BeTrue())
+									gomega.Expect(value).To(gomega.BeEquivalentTo(containerMemory.Size_))
+								}
+							}
+						}
+					}
+				}
 			})
 
 			ginkgo.JustAfterEach(func() {
@@ -550,6 +711,46 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 					cpus:    "100m",
 					memory:  "128Mi",
 				},
+			}
+		})
+
+		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+		ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func() {
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err)
+
+			gomega.Expect(resp.Memory).To(gomega.BeEmpty())
+		})
+
+		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
+		ginkgo.It("should not report any memory data during request to pod resources List", func() {
+			testPod = f.PodClient().CreateSync(testPod)
+
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			resp, err := cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
+			framework.ExpectNoError(err)
+
+			for _, podResource := range resp.PodResources {
+				if podResource.Name != testPod.Name {
+					continue
+				}
+
+				for _, containerResource := range podResource.Containers {
+					gomega.Expect(containerResource.Memory).To(gomega.BeEmpty())
+				}
 			}
 		})
 

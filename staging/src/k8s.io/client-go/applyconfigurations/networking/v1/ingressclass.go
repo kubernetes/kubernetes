@@ -48,7 +48,7 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // ExtractIngressClass extracts the applied configuration owned by fieldManager from
 // ingressClass. If no managedFields are found in ingressClass for fieldManager, a
 // IngressClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // ingressClass must be a unmodified IngressClass API object that was retrieved from the Kubernetes API.
@@ -57,8 +57,19 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIngressClass(ingressClass *apinetworkingv1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+	return extractIngressClass(ingressClass, fieldManager, "")
+}
+
+// ExtractIngressClassStatus is the same as ExtractIngressClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractIngressClassStatus(ingressClass *apinetworkingv1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+	return extractIngressClass(ingressClass, fieldManager, "status")
+}
+
+func extractIngressClass(ingressClass *apinetworkingv1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
 	b := &IngressClassApplyConfiguration{}
-	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1.IngressClass"), fieldManager, b)
+	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1.IngressClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

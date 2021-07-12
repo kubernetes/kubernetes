@@ -107,6 +107,11 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return validation.ValidatePodCreate(pod, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return podutil.GetWarningsForPod(ctx, obj.(*api.Pod), nil)
+}
+
 // Canonicalize normalizes the object after validation.
 func (podStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -123,6 +128,13 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	// skip warnings on pod update, since humans don't typically interact directly with pods,
+	// and we don't want to pay the evaluation cost on what might be a high-frequency update path
+	return nil
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -155,6 +167,11 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
 		period = 0
 	}
+
+	if period < 0 {
+		period = 1
+	}
+
 	// ensure the options and the pod are in sync
 	options.GracePeriodSeconds = &period
 	return true
@@ -198,6 +215,11 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (podStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type podEphemeralContainersStrategy struct {
 	podStrategy
 }
@@ -205,11 +227,35 @@ type podEphemeralContainersStrategy struct {
 // EphemeralContainersStrategy wraps and exports the used podStrategy for the storage package.
 var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
+// dropNonEphemeralContainerUpdates discards all changes except for pod.Spec.EphemeralContainers and certain metadata
+func dropNonEphemeralContainerUpdates(newPod, oldPod *api.Pod) *api.Pod {
+	pod := oldPod.DeepCopy()
+	pod.Name = newPod.Name
+	pod.Namespace = newPod.Namespace
+	pod.ResourceVersion = newPod.ResourceVersion
+	pod.UID = newPod.UID
+	pod.Spec.EphemeralContainers = newPod.Spec.EphemeralContainers
+	return pod
+}
+
+func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+
+	*newPod = *dropNonEphemeralContainerUpdates(newPod, oldPod)
+	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	return validation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

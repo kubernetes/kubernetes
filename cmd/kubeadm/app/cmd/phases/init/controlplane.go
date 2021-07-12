@@ -19,13 +19,13 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -101,6 +101,9 @@ func getControlPlanePhaseFlags(name string) []string {
 		options.KubernetesVersion,
 		options.ImageRepository,
 		options.Patches,
+		// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
+		options.ExperimentalPatches,
+		options.DryRun,
 	}
 	if name == "all" || name == kubeadmconstants.KubeAPIServer {
 		flags = append(flags,
@@ -145,6 +148,6 @@ func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 		cfg := data.Cfg()
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
-		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.PatchesDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, component)
+		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.PatchesDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), component)
 	}
 }

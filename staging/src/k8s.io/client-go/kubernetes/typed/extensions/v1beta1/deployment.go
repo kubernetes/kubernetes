@@ -54,6 +54,7 @@ type DeploymentInterface interface {
 	ApplyStatus(ctx context.Context, deployment *extensionsv1beta1.DeploymentApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Deployment, err error)
 	GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (*v1beta1.Scale, error)
 	UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (*v1beta1.Scale, error)
+	ApplyScale(ctx context.Context, deploymentName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (*v1beta1.Scale, error)
 
 	DeploymentExpansion
 }
@@ -282,6 +283,31 @@ func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, sc
 		SubResource("scale").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(scale).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+
+	result = &v1beta1.Scale{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deploymentName).
+		SubResource("scale").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
 		Do(ctx).
 		Into(result)
 	return

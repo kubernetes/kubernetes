@@ -31,7 +31,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 
 	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
@@ -40,10 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -197,11 +196,6 @@ func (info *endpointsInfo) IsTerminating() bool {
 	return info.terminating
 }
 
-// GetTopology returns the topology information of the endpoint.
-func (info *endpointsInfo) GetTopology() map[string]string {
-	return nil
-}
-
 // GetZoneHint returns the zone hint for the endpoint.
 func (info *endpointsInfo) GetZoneHints() sets.String {
 	return sets.String{}
@@ -220,6 +214,16 @@ func (info *endpointsInfo) Port() (int, error) {
 // Equal is part of proxy.Endpoint interface.
 func (info *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
+}
+
+// GetNodeName returns the NodeName for this endpoint.
+func (info *endpointsInfo) GetNodeName() string {
+	return ""
+}
+
+// GetZone returns the Zone for this endpoint.
+func (info *endpointsInfo) GetZone() string {
+	return ""
 }
 
 //Uses mac prefix and IPv4 address to return a mac address
@@ -354,7 +358,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 
 func (ep *endpointsInfo) Cleanup() {
 	Log(ep, "Endpoint Cleanup", 3)
-	if ep.refCount != nil {
+	if !ep.GetIsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
 		// Remove the remote hns endpoint, if no service is referring it
@@ -453,10 +457,9 @@ type Proxier struct {
 	mu                sync.Mutex // protects the following fields
 	serviceMap        proxy.ServiceMap
 	endpointsMap      proxy.EndpointsMap
-	// endpointsSynced and servicesSynced are set to true when corresponding
+	// endpointSlicesSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
-	endpointsSynced      bool
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	isIPv6Mode           bool
@@ -468,7 +471,7 @@ type Proxier struct {
 	clusterCIDR    string
 	hostname       string
 	nodeIP         net.IP
-	recorder       record.EventRecorder
+	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -526,7 +529,7 @@ func NewProxier(
 	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
@@ -622,7 +625,6 @@ func NewProxier(
 	}
 
 	isIPv6 := utilnet.IsIPv6(nodeIP)
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying)
 	proxier := &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 		serviceMap:          make(proxy.ServiceMap),
@@ -649,7 +651,7 @@ func NewProxier(
 		ipFamily = v1.IPv6Protocol
 	}
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
+	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -667,7 +669,7 @@ func NewDualStackProxier(
 	clusterCIDR string,
 	hostname string,
 	nodeIP [2]net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
@@ -825,11 +827,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying) {
-		proxier.setInitialized(proxier.endpointSlicesSynced)
-	} else {
-		proxier.setInitialized(proxier.endpointsSynced)
-	}
+	proxier.setInitialized(proxier.endpointSlicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -850,38 +848,24 @@ func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	return false
 }
 
+// The following methods exist to implement the proxier interface, however
+// winkernel proxier only uses EndpointSlice, so the following are noops.
+
 // OnEndpointsAdd is called whenever creation of new endpoints object
 // is observed.
-func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(nil, endpoints)
-}
+func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {}
 
 // OnEndpointsUpdate is called whenever modification of an existing
 // endpoints object is observed.
-func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-
-	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
-		proxier.Sync()
-	}
-}
+func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {}
 
 // OnEndpointsDelete is called whenever deletion of an existing endpoints
 // object is observed.
-func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(endpoints, nil)
-}
+func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {}
 
 // OnEndpointsSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointsSynced() {
-	proxier.mu.Lock()
-	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
-}
+func (proxier *Proxier) OnEndpointsSynced() {}
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
@@ -1157,10 +1141,10 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				// We only share the refCounts for remote endpoints
 				ep.refCount = proxier.endPointsRefCount.getRefCount(newHnsEndpoint.hnsID)
+				*ep.refCount++
 			}
 
 			ep.hnsID = newHnsEndpoint.hnsID
-			*ep.refCount++
 
 			Log(ep, "Endpoint resource found", 3)
 		}
@@ -1250,7 +1234,7 @@ func (proxier *Proxier) syncProxyRules() {
 				uint16(svcInfo.Port()),
 			)
 			if err != nil {
-				klog.ErrorS(err, "Policy creation failed", err)
+				klog.ErrorS(err, "Policy creation failed")
 				continue
 			}
 			externalIP.hnsID = hnsLoadBalancer.hnsID
@@ -1265,7 +1249,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.Protocol()),

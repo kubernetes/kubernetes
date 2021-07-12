@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics/testutil"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,6 +44,7 @@ type opCounts map[string]int64
 // migrationOpCheck validates migrated metrics.
 type migrationOpCheck struct {
 	cs         clientset.Interface
+	config     *rest.Config
 	pluginName string
 	skipCheck  bool
 
@@ -53,6 +55,7 @@ type migrationOpCheck struct {
 
 // BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
 var BaseSuites = []func() storageframework.TestSuite{
+	InitCapacityTestSuite,
 	InitVolumesTestSuite,
 	InitVolumeIOTestSuite,
 	InitVolumeModeTestSuite,
@@ -72,6 +75,7 @@ var CSISuites = append(BaseSuites,
 	InitEphemeralTestSuite,
 	InitSnapshottableTestSuite,
 	InitSnapshottableStressTestSuite,
+	InitVolumePerformanceTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
@@ -98,14 +102,14 @@ func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) op
 	return totOps
 }
 
-func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
+func getVolumeOpCounts(c clientset.Interface, config *rest.Config, pluginName string) opCounts {
 	if !framework.ProviderIs("gce", "gke", "aws") {
 		return opCounts{}
 	}
 
 	nodeLimit := 25
 
-	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
+	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, true, false, true, false, false, false)
 
 	if err != nil {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
@@ -154,7 +158,7 @@ func addOpCounts(o1 opCounts, o2 opCounts) opCounts {
 	return totOps
 }
 
-func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCounts, opCounts) {
+func getMigrationVolumeOpCounts(cs clientset.Interface, config *rest.Config, pluginName string) (opCounts, opCounts) {
 	if len(pluginName) > 0 {
 		var migratedOps opCounts
 		l := csitrans.New()
@@ -164,18 +168,19 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 			migratedOps = opCounts{}
 		} else {
 			csiName = "kubernetes.io/csi:" + csiName
-			migratedOps = getVolumeOpCounts(cs, csiName)
+			migratedOps = getVolumeOpCounts(cs, config, csiName)
 		}
-		return getVolumeOpCounts(cs, pluginName), migratedOps
+		return getVolumeOpCounts(cs, config, pluginName), migratedOps
 	}
 	// Not an in-tree driver
 	framework.Logf("Test running for native CSI Driver, not checking metrics")
 	return opCounts{}, opCounts{}
 }
 
-func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOpCheck {
+func newMigrationOpCheck(cs clientset.Interface, config *rest.Config, pluginName string) *migrationOpCheck {
 	moc := migrationOpCheck{
 		cs:         cs,
+		config:     config,
 		pluginName: pluginName,
 	}
 	if len(pluginName) == 0 {
@@ -204,7 +209,15 @@ func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOp
 		moc.skipCheck = true
 		return &moc
 	}
-	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, pluginName)
+
+	// TODO: temporarily skip metrics check due to issue #[102893](https://github.com/kubernetes/kubernetes/issues/102893)
+	// Will remove it once the issue is fixed
+	if framework.NodeOSDistroIs("windows") {
+		moc.skipCheck = true
+		return &moc
+	}
+
+	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, config, pluginName)
 	return &moc
 }
 
@@ -213,7 +226,7 @@ func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
 		return
 	}
 
-	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.pluginName)
+	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.config, moc.pluginName)
 
 	for op, count := range newInTreeOps {
 		if count != moc.oldInTreeOps[op] {

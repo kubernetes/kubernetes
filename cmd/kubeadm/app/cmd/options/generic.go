@@ -19,10 +19,12 @@ package options
 import (
 	"strings"
 
-	"github.com/spf13/pflag"
-	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+
+	cliflag "k8s.io/component-base/cli/flag"
+
+	"github.com/spf13/pflag"
 )
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
@@ -91,12 +93,16 @@ func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 
 // AddPatchesFlag adds the --patches flag to the given flagset
 func AddPatchesFlag(fs *pflag.FlagSet, patchesDir *string) {
-	fs.StringVar(patchesDir, Patches, *patchesDir, `Path to a directory that contains files named `+
-		`"target[suffix][+patchtype].extension". For example, `+
-		`"kube-apiserver0+merge.yaml" or just "etcd.json". `+
-		`"patchtype" can be one of "strategic", "merge" or "json" and they match the patch formats `+
-		`supported by kubectl. The default "patchtype" is "strategic". "extension" must be either `+
-		`"json" or "yaml". "suffix" is an optional string that can be used to determine `+
-		`which patches are applied first alpha-numerically.`,
-	)
+	const usage = `Path to a directory that contains files named ` +
+		`"target[suffix][+patchtype].extension". For example, ` +
+		`"kube-apiserver0+merge.yaml" or just "etcd.json". ` +
+		`"target" can be one of "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd". ` +
+		`"patchtype" can be one of "strategic", "merge" or "json" and they match the patch formats ` +
+		`supported by kubectl. The default "patchtype" is "strategic". "extension" must be either ` +
+		`"json" or "yaml". "suffix" is an optional string that can be used to determine ` +
+		`which patches are applied first alpha-numerically.`
+	fs.StringVar(patchesDir, Patches, *patchesDir, usage)
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
+	fs.StringVar(patchesDir, ExperimentalPatches, *patchesDir, usage)
+	fs.MarkDeprecated(ExperimentalPatches, "This flag will be removed in a future version. Please use '--patches' instead.")
 }

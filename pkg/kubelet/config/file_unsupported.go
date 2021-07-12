@@ -25,7 +25,7 @@ import (
 )
 
 func (s *sourceFile) startWatch() {
-	klog.Errorf("Watching source file is unsupported in this build")
+	klog.ErrorS(nil, "Watching source file is unsupported in this build")
 }
 
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	api "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -202,4 +203,18 @@ func createCSIOperationContext(volumeSpec *volume.Spec, timeout time.Duration) (
 	}
 	ctx := context.WithValue(context.Background(), additionalInfoKey, additionalInfo{Migrated: strconv.FormatBool(migrated)})
 	return context.WithTimeout(ctx, timeout)
+}
+
+// getPodInfoAttrs returns pod info for NodePublish
+func getPodInfoAttrs(pod *api.Pod, volumeMode storage.VolumeLifecycleMode) map[string]string {
+	attrs := map[string]string{
+		"csi.storage.k8s.io/pod.name":            pod.Name,
+		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,
+		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
+		"csi.storage.k8s.io/serviceAccount.name": pod.Spec.ServiceAccountName,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(volumeMode == storage.VolumeLifecycleEphemeral)
+	}
+	return attrs
 }

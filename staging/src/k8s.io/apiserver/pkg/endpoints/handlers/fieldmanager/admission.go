@@ -60,7 +60,10 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 	}
 	objectMeta, err := meta.Accessor(a.GetObject())
 	if err != nil {
-		return err
+		// the object we are dealing with doesn't have object metadata defined
+		// in that case we don't have to keep track of the managedField
+		// just call the wrapped admission
+		return mutationInterface.Admit(ctx, a, o)
 	}
 	managedFieldsBeforeAdmission := objectMeta.GetManagedFields()
 	if err := mutationInterface.Admit(ctx, a, o); err != nil {

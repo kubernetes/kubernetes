@@ -33,14 +33,14 @@ import (
 // genFakeForType produces a file for each top-level type.
 type genFakeForType struct {
 	generator.DefaultGen
-	outputPackage       string
-	group               string
-	version             string
-	groupGoName         string
-	inputPackage        string
-	typeToMatch         *types.Type
-	imports             namer.ImportTracker
-	applyBuilderPackage string
+	outputPackage             string
+	group                     string
+	version                   string
+	groupGoName               string
+	inputPackage              string
+	typeToMatch               *types.Type
+	imports                   namer.ImportTracker
+	applyConfigurationPackage string
 }
 
 var _ generator.Generator = &genFakeForType{}
@@ -166,11 +166,11 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
 	}
 
-	generateApply := len(g.applyBuilderPackage) > 0
+	generateApply := len(g.applyConfigurationPackage) > 0
 	if generateApply {
 		// Generated apply builder type references required for generated Apply function
 		_, gvString := util.ParsePathGroupVersion(g.inputPackage)
-		m["applyConfig"] = types.Ref(gopath.Join(g.applyBuilderPackage, gvString), t.Name.Name+"ApplyConfiguration")
+		m["inputApplyConfig"] = types.Ref(gopath.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
 	}
 
 	if tags.NonNamespaced {
@@ -223,13 +223,19 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if tags.HasVerb("applyStatus") && generateApply && genStatus(t) {
 		sw.Do(applyStatusTemplate, m)
 	}
+	_, typeGVString := util.ParsePathGroupVersion(g.inputPackage)
 
 	// generate extended client methods
 	for _, e := range tags.Extensions {
+		if e.HasVerb("apply") && !generateApply {
+			continue
+		}
 		inputType := *t
 		resultType := *t
+		inputGVString := typeGVString
 		if len(e.InputTypeOverride) > 0 {
 			if name, pkg := e.Input(); len(pkg) > 0 {
+				_, inputGVString = util.ParsePathGroupVersion(pkg)
 				newType := c.Universe.Type(types.Name{Package: pkg, Name: name})
 				inputType = *newType
 			} else {
@@ -247,6 +253,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		m["inputType"] = &inputType
 		m["resultType"] = &resultType
 		m["subresourcePath"] = e.SubResourcePath
+		if e.HasVerb("apply") {
+			m["inputApplyConfig"] = types.Ref(gopath.Join(g.applyConfigurationPackage, inputGVString), inputType.Name.Name+"ApplyConfiguration")
+		}
 
 		if e.HasVerb("get") {
 			if e.IsSubresource() {
@@ -293,8 +302,11 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		}
 
 		if e.HasVerb("apply") && generateApply {
-			// TODO: Support apply on arbitrary subresource once it is supported by the api-server.
-			sw.Do(adjustTemplate(e.VerbName, e.VerbType, applyTemplate), m)
+			if e.IsSubresource() {
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, applySubresourceTemplate), m)
+			} else {
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, applyTemplate), m)
+			}
 		}
 	}
 
@@ -506,7 +518,7 @@ func (c *Fake$.type|publicPlural$) Patch(ctx context.Context, name string, pt $.
 
 var applyTemplate = `
 // Apply takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
-func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
 		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
 	}
@@ -531,7 +543,7 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.inputType|privat
 var applyStatusTemplate = `
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *Fake$.type|publicPlural$) ApplyStatus(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *Fake$.type|publicPlural$) ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
 		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
 	}
@@ -546,6 +558,27 @@ func (c *Fake$.type|publicPlural$) ApplyStatus(ctx context.Context, $.inputType|
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})
 		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})$end$
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*$.resultType|raw$), err
+}
+`
+
+var applySubresourceTemplate = `
+// Apply takes top resource name and the apply declarative configuration for $.subresourcePath$,
+// applies it and returns the applied $.resultType|private$, and an error, if there is any.
+func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+	if $.inputType|private$ == nil {
+		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
+	}
+	data, err := $.jsonMarshal|raw$($.inputType|private$)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := c.Fake.
+		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})
+		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}

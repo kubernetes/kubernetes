@@ -37,14 +37,9 @@ func NodeOSDistroIs(distro string) bool {
 }
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateScriptCmd(command string) []string {
 	var commands []string
-	if !NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", command}
-	} else {
-		commands = []string{"powershell", "/c", command}
-	}
+	commands = []string{"/bin/sh", "-c", command}
 	return commands
 }
 

@@ -50,7 +50,7 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // ExtractStatefulSet extracts the applied configuration owned by fieldManager from
 // statefulSet. If no managedFields are found in statefulSet for fieldManager, a
 // StatefulSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // statefulSet must be a unmodified StatefulSet API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStatefulSet(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return extractStatefulSet(statefulSet, fieldManager, "")
+}
+
+// ExtractStatefulSetStatus is the same as ExtractStatefulSet except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStatefulSetStatus(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return extractStatefulSet(statefulSet, fieldManager, "status")
+}
+
+func extractStatefulSet(statefulSet *appsv1beta1.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
-	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta1.StatefulSet"), fieldManager, b)
+	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta1.StatefulSet"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

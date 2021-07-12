@@ -185,7 +185,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	supportedModes := p.plugin.GetAccessModes()
 	if maxShares < 2 {
 		// only do AccessModes validation when maxShares < 2
-		if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+		if !util.ContainsAllAccessModes(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 			return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported with maxShares(%d) < 2", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes(), maxShares)
 		}
 
@@ -361,19 +361,19 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			})
 		}
 	} else {
-		// Set node affinity labels based on fault domains.
+		// Set node affinity labels based on topology.
 		// This is required because unzoned AzureDisk can't be attached to zoned nodes.
-		// There are at most 3 fault domains available in each region.
+		// There are at most 3 Availability Zones per supported Azure region.
 		// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
 		for i := 0; i < 3; i++ {
 			requirements := []v1.NodeSelectorRequirement{
 				{
-					Key:      v1.LabelFailureDomainBetaRegion,
+					Key:      v1.LabelTopologyRegion,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{diskController.GetLocation()},
 				},
 				{
-					Key:      v1.LabelFailureDomainBetaZone,
+					Key:      v1.LabelTopologyZone,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{strconv.Itoa(i)},
 				},

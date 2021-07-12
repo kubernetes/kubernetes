@@ -273,7 +273,7 @@ func TestInlineReadOnly(t *testing.T) {
 				ReadOnly: true,
 			},
 		},
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("Failed to translate in tree inline volume to CSI: %v", err)
 	}

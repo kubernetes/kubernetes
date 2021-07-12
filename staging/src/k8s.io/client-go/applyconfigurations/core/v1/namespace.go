@@ -49,7 +49,7 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // ExtractNamespace extracts the applied configuration owned by fieldManager from
 // namespace. If no managedFields are found in namespace for fieldManager, a
 // NamespaceApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // namespace must be a unmodified Namespace API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNamespace(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
+	return extractNamespace(namespace, fieldManager, "")
+}
+
+// ExtractNamespaceStatus is the same as ExtractNamespace except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractNamespaceStatus(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
+	return extractNamespace(namespace, fieldManager, "status")
+}
+
+func extractNamespace(namespace *apicorev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
 	b := &NamespaceApplyConfiguration{}
-	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b)
+	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

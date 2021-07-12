@@ -49,6 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&VolumeBindingArgs{},
 		&NodeResourcesLeastAllocatedArgs{},
 		&NodeResourcesMostAllocatedArgs{},
+		&NodeResourcesBalancedAllocationArgs{},
 		&NodeAffinityArgs{},
 	)
 	scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &Policy{})

@@ -22,12 +22,10 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/go-openapi/spec"
-	"github.com/googleapis/gnostic/compiler"
 	openapiv2 "github.com/googleapis/gnostic/openapiv2"
-	"gopkg.in/yaml.v2"
 	"k8s.io/gengo/types"
 	utilproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type typeModels struct {
@@ -100,7 +98,7 @@ var emptyModels = &typeModels{
 }
 
 func toValidatedModels(openAPISchema *spec.Swagger) (utilproto.Models, error) {
-	// openapi_v2.NewDocument only accepts a yaml.MapSlice
+	// openapi_v2.ParseDocument only accepts a []byte of the JSON or YAML file to be parsed.
 	// so we do an inefficient marshal back to json and then read it back in as yaml
 	// but get the benefit of running the models through utilproto.NewOpenAPIData to
 	// validate all the references between types
@@ -108,14 +106,10 @@ func toValidatedModels(openAPISchema *spec.Swagger) (utilproto.Models, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal openAPI as JSON: %w", err)
 	}
-	var info yaml.MapSlice
-	err = yaml.Unmarshal(rawMinimalOpenAPISchema, &info)
+
+	document, err := openapiv2.ParseDocument(rawMinimalOpenAPISchema)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse OpenAPI file: %w", err)
-	}
-	document, err := openapiv2.NewDocument(info, compiler.NewContext("$root", nil))
-	if err != nil {
-		return nil, fmt.Errorf("failed to OpenAPI document for file: %w", err)
+		return nil, fmt.Errorf("failed to parse OpenAPI document for file: %w", err)
 	}
 	// Construct the models and validate all references are valid.
 	models, err := utilproto.NewOpenAPIData(document)

@@ -15,6 +15,9 @@ type GeneratorOptions struct {
 	// suffix to the names of generated resources that is a hash of the
 	// resource contents.
 	DisableNameSuffixHash bool `json:"disableNameSuffixHash,omitempty" yaml:"disableNameSuffixHash,omitempty"`
+
+	// Immutable if true add to all generated resources.
+	Immutable bool `json:"immutable,omitempty" yaml:"immutable,omitempty"`
 }
 
 // MergeGlobalOptionsIntoLocal merges two instances of GeneratorOptions.
@@ -41,6 +44,9 @@ func MergeGlobalOptionsIntoLocal(
 	overrideMap(&localOpts.Annotations, globalOpts.Annotations)
 	if globalOpts.DisableNameSuffixHash {
 		localOpts.DisableNameSuffixHash = true
+	}
+	if globalOpts.Immutable {
+		localOpts.Immutable = true
 	}
 	return localOpts
 }

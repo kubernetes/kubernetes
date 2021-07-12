@@ -29,12 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/x509metrics"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
@@ -201,6 +203,12 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 	newReq.URL = location
 	newReq.Host = location.Host
 
+	// If the original request has an audit ID, let's make sure we propagate this
+	// to the aggregated server.
+	if auditID, found := genericapirequest.AuditIDFrom(req.Context()); found {
+		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
+	}
+
 	return newReq, cancelFn
 }
 
@@ -250,17 +258,20 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 
 	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
 
-	newInfo := proxyHandlingInfo{
-		name: apiService.Name,
-		restConfig: &restclient.Config{
-			TLSClientConfig: restclient.TLSClientConfig{
-				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
-				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-				CertData:   proxyClientCert,
-				KeyData:    proxyClientKey,
-				CAData:     apiService.Spec.CABundle,
-			},
+	clientConfig := &restclient.Config{
+		TLSClientConfig: restclient.TLSClientConfig{
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+			CertData:   proxyClientCert,
+			KeyData:    proxyClientKey,
+			CAData:     apiService.Spec.CABundle,
 		},
+	}
+	clientConfig.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+
+	newInfo := proxyHandlingInfo{
+		name:             apiService.Name,
+		restConfig:       clientConfig,
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
 		servicePort:      *apiService.Spec.Service.Port,

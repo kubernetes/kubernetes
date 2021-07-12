@@ -65,7 +65,7 @@ func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
-func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureFile == nil {
 		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
@@ -75,6 +75,11 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	if err != nil {
 		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
+	}
+
+	secretNamespace := defaultSecretNamespace
+	if podNamespace != "" {
+		secretNamespace = podNamespace
 	}
 
 	var (
@@ -93,7 +98,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 						NodeStageSecretRef: &v1.SecretReference{
 							Name:      azureSource.SecretName,
-							Namespace: defaultSecretNamespace,
+							Namespace: secretNamespace,
 						},
 					},
 				},

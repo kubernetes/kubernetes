@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -242,7 +243,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 	}
 
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	fp.exec = &fexec
 
 	for _, tc := range testCases {
@@ -385,7 +386,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 	}
 
 	ipt := iptablestest.NewIPv6Fake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	fp.exec = &fexec
 
 	for _, tc := range testCases {
@@ -482,7 +483,7 @@ func (f *fakePortOpener) OpenLocalPort(lp *utilnet.LocalPort) (utilnet.Closeable
 
 const testHostname = "test-hostname"
 
-func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	ipfamily := v1.IPv4Protocol
@@ -495,7 +496,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, endpointSlicesEnabled, nil),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",
 		localDetector:            detectLocal,
@@ -708,9 +709,219 @@ func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
 	t.Errorf("%v", msg)
 }
 
+// TestOverallIPTablesRulesWithMultipleServices creates 4 types of services: ClusterIP,
+// LoadBalancer, ExternalIP and NodePort and verifies if the NAT table rules created
+// are exactly the same as what is expected. This test provides an overall view of how
+// the NAT table rules look like with the different jumps.
+func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	metrics.RegisterMetrics()
+	tcpProtocol := v1.ProtocolTCP
+
+	makeServiceMap(fp,
+		// create ClusterIP service
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+		// create LoadBalancer service
+		makeTestService("ns2", "svc2", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ClusterIP = "10.20.30.42"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.4",
+			}}
+			// Also ensure that invalid LoadBalancerSourceRanges will not result
+			// in a crash.
+			svc.Spec.ExternalIPs = []string{"1.2.3.4"}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
+			svc.Spec.HealthCheckNodePort = 30000
+		}),
+		// create NodePort service
+		makeTestService("ns3", "svc3", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+		}),
+		// create ExternalIP service
+		makeTestService("ns4", "svc4", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "10.20.30.44"
+			svc.Spec.ExternalIPs = []string{"50.60.70.81"}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       "p80",
+				Port:       80,
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(80),
+			}}
+		}),
+	)
+	populateEndpointSlices(fp,
+		// create ClusterIP service endpoints
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.1"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+		// create LoadBalancer endpoints
+		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.2"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+		// create NodePort service endpoints
+		makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.3"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+		// create ExternalIP service endpoints
+		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.4"},
+			}, {
+				Addresses: []string{"10.180.0.5"},
+				NodeName:  utilpointer.StringPtr(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("p80"),
+				Port:     utilpointer.Int32(80),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	expected := `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
+:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
+:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
+:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
+:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
+:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.4:80
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`
+	// Adding logic to split and sort the strings because
+	// depending on the creation order of services, the user-chains get jumbled.
+	expectedSlice := strings.Split(strings.TrimSuffix(expected, "\n"), "\n")
+	sort.Strings(expectedSlice)
+	originalSlice := strings.Split(strings.TrimSuffix(fp.iptablesData.String(), "\n"), "\n")
+	sort.Strings(originalSlice)
+
+	assert.Equal(t, expectedSlice, originalSlice)
+
+	nNatRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+	// 43 here is test specific and corresponds to one more than the number of -A lines after `*nat` in `expected`.
+	if nNatRules != 43.0 {
+		t.Fatalf("Wrong number of nat rules: expected 43 received %f", nNatRules)
+	}
+}
+
 func TestClusterIPReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -728,7 +939,6 @@ func TestClusterIPReject(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
 	fp.syncProxyRules()
 
 	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP))))
@@ -744,7 +954,7 @@ func TestClusterIPReject(t *testing.T) {
 
 func TestClusterIPEndpointsJump(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -765,17 +975,17 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIP,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
@@ -792,6 +1002,10 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	}
 
 	svcRules := ipt.GetRules(svcChain)
+	if !hasJump(svcRules, string(KubeMarkMasqChain), svcIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump from %v to KUBE-MARK-MASQ chain", svcChain), svcRules, t)
+	}
+
 	if !hasJump(svcRules, epChain, "", 0) {
 		errorf(fmt.Sprintf("Failed to jump to ep chain %v", epChain), svcRules, t)
 	}
@@ -803,7 +1017,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -835,17 +1049,17 @@ func TestLoadBalancer(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIP,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
@@ -869,7 +1083,7 @@ func TestLoadBalancer(t *testing.T) {
 
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -893,25 +1107,25 @@ func TestNodePort(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIP,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{utilproxytest.AddrStruct{Val: "127.0.0.1/16"}}
+	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
 	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{utilproxytest.AddrStruct{Val: "::1/128"}}
+	addrs1 := []net.Addr{&net.IPNet{IP: net.ParseIP("::1/128"), Mask: net.CIDRMask(128, 128)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{}
@@ -925,11 +1139,16 @@ func TestNodePort(t *testing.T) {
 	if !hasJump(kubeNodePortRules, svcChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
 	}
+	expectedNodePortNonLocalTrafficMasqueradeRule := `-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ`
+	svcRules := ipt.GetRules(svcChain)
+	if !strings.Contains(fp.iptablesData.String(), expectedNodePortNonLocalTrafficMasqueradeRule) {
+		errorf(fmt.Sprintf("Didn't find the masquerade rule for node port non-local traffic in svc chain %v", svcChain), svcRules, t)
+	}
 }
 
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.42"
 	svcPort := 80
 	svcNodePort := 3001
@@ -956,9 +1175,9 @@ func TestHealthCheckNodePort(t *testing.T) {
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{utilproxytest.AddrStruct{Val: "127.0.0.1/16"}}
+	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
 	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{utilproxytest.AddrStruct{Val: "::1/128"}}
+	addrs1 := []net.Addr{&net.IPNet{IP: net.ParseIP("::1"), Mask: net.CIDRMask(128, 128)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
 	fp.nodePortAddresses = []string{"127.0.0.1/16"}
@@ -974,9 +1193,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 func TestMasqueradeRule(t *testing.T) {
 	for _, testcase := range []bool{false, true} {
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
-		fp := NewFakeProxier(ipt, false)
-		makeServiceMap(fp)
-		makeEndpointsMap(fp)
+		fp := NewFakeProxier(ipt)
 		fp.syncProxyRules()
 
 		postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
@@ -992,7 +1209,7 @@ func TestMasqueradeRule(t *testing.T) {
 
 func TestExternalIPsReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -1014,7 +1231,6 @@ func TestExternalIPsReject(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
 
 	fp.syncProxyRules()
 
@@ -1026,7 +1242,7 @@ func TestExternalIPsReject(t *testing.T) {
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -1049,26 +1265,24 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
 	epStrLocal := fmt.Sprintf("%s:%d", epIP1, svcPort)
 	epStrNonLocal := fmt.Sprintf("%s:%d", epIP2, svcPort)
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP:       epIP1,
-					NodeName: nil,
-				}, {
-					IP:       epIP2,
-					NodeName: utilpointer.StringPtr(testHostname),
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP1},
+			}, {
+				Addresses: []string{epIP2},
+				NodeName:  utilpointer.StringPtr(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
@@ -1095,9 +1309,84 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	}
 }
 
+// TestNonLocalExternalIPs tests if we add the masquerade rule into svcChain in order to
+// SNAT packets to external IPs if externalTrafficPolicy is cluster and the traffic is NOT Local.
+func TestNonLocalExternalIPs(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcExternalIPs := "50.60.70.81"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = []string{svcExternalIPs}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcPort),
+			}}
+		}),
+	)
+	epIP1 := "10.180.0.1"
+	epIP2 := "10.180.2.1"
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP1},
+				NodeName:  nil,
+			}, {
+				Addresses: []string{epIP2},
+				NodeName:  utilpointer.StringPtr(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+	proto := strings.ToLower(string(v1.ProtocolTCP))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
+	svcChain := string(servicePortChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP))))
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, svcChain, svcExternalIPs, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeSvcRules, t)
+	}
+
+	svcRules := ipt.GetRules(svcChain)
+	if len(svcRules) != 4 {
+		t.Errorf("expected svcChain %v to have 4 rules, got %v", svcChain, len(svcRules))
+	}
+	if !hasJump(svcRules, string(KubeMarkMasqChain), svcIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump from %v to KUBE-MARK-MASQ chain", svcChain), svcRules, t)
+	}
+	expectedExternalIPNonLocalTrafficMasqueradeRule := `-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 50.60.70.81/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`
+
+	if !strings.Contains(fp.iptablesData.String(), expectedExternalIPNonLocalTrafficMasqueradeRule) {
+		errorf(fmt.Sprintf("Didn't find the masquerade rule for external-ip non-local traffic in svc chain %v", svcChain), svcRules, t)
+	}
+
+	lbRules := ipt.GetRules(lbChain)
+	if len(lbRules) != 0 {
+		t.Errorf("expected svclbChain %v to have 0 rules, got %v", lbChain, len(lbRules))
+	}
+}
+
 func TestNodePortReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1118,7 +1407,6 @@ func TestNodePortReject(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
 
 	fp.syncProxyRules()
 
@@ -1130,7 +1418,7 @@ func TestNodePortReject(t *testing.T) {
 
 func TestLoadBalancerReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1161,7 +1449,6 @@ func TestLoadBalancerReject(t *testing.T) {
 			}
 		}),
 	)
-	makeEndpointsMap(fp)
 
 	fp.syncProxyRules()
 
@@ -1179,7 +1466,7 @@ func TestLoadBalancerReject(t *testing.T) {
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1216,21 +1503,20 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	epIP2 := "10.180.2.1"
 	epStrLocal := fmt.Sprintf("%s:%d", epIP1, svcPort)
 	epStrNonLocal := fmt.Sprintf("%s:%d", epIP2, svcPort)
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP:       epIP1,
-					NodeName: nil,
-				}, {
-					IP:       epIP2,
-					NodeName: utilpointer.StringPtr(testHostname),
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP1},
+			}, {
+				Addresses: []string{epIP2},
+				NodeName:  utilpointer.StringPtr(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
@@ -1271,13 +1557,13 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	onlyLocalNodePorts(t, fp, ipt)
 }
 
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	onlyLocalNodePorts(t, fp, ipt)
 }
 
@@ -1309,27 +1595,27 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	epIP2 := "10.180.2.1"
 	epStrLocal := fmt.Sprintf("%s:%d", epIP1, svcPort)
 	epStrNonLocal := fmt.Sprintf("%s:%d", epIP2, svcPort)
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP:       epIP1,
-					NodeName: nil,
-				}, {
-					IP:       epIP2,
-					NodeName: utilpointer.StringPtr(testHostname),
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP1},
+				NodeName:  nil,
+			}, {
+				Addresses: []string{epIP2},
+				NodeName:  utilpointer.StringPtr(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
 
 	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{utilproxytest.AddrStruct{Val: "10.20.30.51/24"}}
+	addrs := []net.Addr{&net.IPNet{IP: net.ParseIP("10.20.30.51"), Mask: net.CIDRMask(24, 32)}}
 	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.nodePortAddresses = []string{"10.20.30.0/24"}
 
@@ -1426,7 +1712,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
@@ -1532,7 +1818,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *v1.Service) {
@@ -1564,7 +1850,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
@@ -1590,7 +1876,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -1669,25 +1955,22 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 }
 
-func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.Endpoints {
-	ept := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+func populateEndpointSlices(proxier *Proxier, allEndpointSlices ...*discovery.EndpointSlice) {
+	for i := range allEndpointSlices {
+		proxier.OnEndpointSliceAdd(allEndpointSlices[i])
 	}
-	eptFunc(ept)
-	return ept
 }
 
-func makeEndpointsMap(proxier *Proxier, allEndpoints ...*v1.Endpoints) {
-	for i := range allEndpoints {
-		proxier.OnEndpointsAdd(allEndpoints[i])
+func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*discovery.EndpointSlice)) *discovery.EndpointSlice {
+	eps := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%d", name, sliceNum),
+			Namespace: namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: name},
+		},
 	}
-
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.endpointsSynced = true
+	epsFunc(eps)
+	return eps
 }
 
 func makeNSN(namespace, name string) types.NamespacedName {
@@ -1739,347 +2022,340 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 
 func Test_updateEndpointsMap(t *testing.T) {
 	var nodeName = testHostname
+	udpProtocol := v1.ProtocolUDP
 
-	emptyEndpoint := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{}
+	emptyEndpointSlices := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, func(*discovery.EndpointSlice) {}),
 	}
-	unnamedPort := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subset1 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p11"),
+			Port:     utilpointer.Int32(11),
+			Protocol: &udpProtocol,
 		}}
 	}
-	unnamedPortLocal := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "1.1.1.1",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subset2 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.2"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p12"),
+			Port:     utilpointer.Int32(12),
+			Protocol: &udpProtocol,
 		}}
 	}
-	namedPortLocal := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "1.1.1.1",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+	namedPortLocal := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1,
+			func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{{
+					Addresses: []string{"1.1.1.1"},
+					NodeName:  &nodeName,
+				}}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.String("p11"),
+					Port:     utilpointer.Int32(11),
+					Protocol: &udpProtocol,
+				}}
+			}),
+	}
+	namedPort := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subset1),
+	}
+	namedPortRenamed := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1,
+			func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{{
+					Addresses: []string{"1.1.1.1"},
+				}}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.String("p11-2"),
+					Port:     utilpointer.Int32(11),
+					Protocol: &udpProtocol,
+				}}
+			}),
+	}
+	namedPortRenumbered := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1,
+			func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{{
+					Addresses: []string{"1.1.1.1"},
+				}}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.String("p11"),
+					Port:     utilpointer.Int32(22),
+					Protocol: &udpProtocol,
+				}}
+			}),
+	}
+	namedPortsLocalNoLocal := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1,
+			func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{{
+					Addresses: []string{"1.1.1.1"},
+				}, {
+					Addresses: []string{"1.1.1.2"},
+					NodeName:  &nodeName,
+				}}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.String("p11"),
+					Port:     utilpointer.Int32(11),
+					Protocol: &udpProtocol,
+				}, {
+					Name:     utilpointer.String("p12"),
+					Port:     utilpointer.Int32(12),
+					Protocol: &udpProtocol,
+				}}
+			}),
+	}
+	multipleSubsets := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subset1),
+		makeTestEndpointSlice("ns1", "ep1", 2, subset2),
+	}
+	subsetLocal := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.2"},
+			NodeName:  &nodeName,
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p12"),
+			Port:     utilpointer.Int32(12),
+			Protocol: &udpProtocol,
 		}}
 	}
-	namedPort := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
-		}}
+	multipleSubsetsWithLocal := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subset1),
+		makeTestEndpointSlice("ns1", "ep1", 2, subsetLocal),
 	}
-	namedPortRenamed := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11-2",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subsetMultiplePortsLocal := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			NodeName:  &nodeName,
 		}}
-	}
-	namedPortRenumbered := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     22,
-				Protocol: v1.ProtocolUDP,
-			}},
-		}}
-	}
-	namedPortsLocalNoLocal := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}, {
-				IP:       "1.1.1.2",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}},
-		}}
-	}
-	multipleSubsets := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p11"),
+			Port:     utilpointer.Int32(11),
+			Protocol: &udpProtocol,
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.2",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Name:     utilpointer.String("p12"),
+			Port:     utilpointer.Int32(12),
+			Protocol: &udpProtocol,
 		}}
 	}
-	multipleSubsetsWithLocal := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subset3 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.3"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p13"),
+			Port:     utilpointer.Int32(13),
+			Protocol: &udpProtocol,
+		}}
+	}
+	multipleSubsetsMultiplePortsLocal := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subsetMultiplePortsLocal),
+		makeTestEndpointSlice("ns1", "ep1", 2, subset3),
+	}
+	subsetMultipleIPsPorts1 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP:       "1.1.1.2",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Addresses: []string{"1.1.1.2"},
+			NodeName:  &nodeName,
 		}}
-	}
-	multipleSubsetsMultiplePortsLocal := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "1.1.1.1",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}},
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p11"),
+			Port:     utilpointer.Int32(11),
+			Protocol: &udpProtocol,
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.3",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p13",
-				Port:     13,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Name:     utilpointer.String("p12"),
+			Port:     utilpointer.Int32(12),
+			Protocol: &udpProtocol,
 		}}
 	}
-	multipleSubsetsIPsPorts1 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}, {
-				IP:       "1.1.1.2",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subsetMultipleIPsPorts2 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.3"},
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.3",
-			}, {
-				IP:       "1.1.1.4",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p13",
-				Port:     13,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p14",
-				Port:     14,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Addresses: []string{"1.1.1.4"},
+			NodeName:  &nodeName,
 		}}
-	}
-	multipleSubsetsIPsPorts2 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "2.2.2.1",
-			}, {
-				IP:       "2.2.2.2",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p21",
-				Port:     21,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p22",
-				Port:     22,
-				Protocol: v1.ProtocolUDP,
-			}},
-		}}
-	}
-	complexBefore1 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
-		}}
-	}
-	complexBefore2 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "2.2.2.2",
-				NodeName: &nodeName,
-			}, {
-				IP:       "2.2.2.22",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p22",
-				Port:     22,
-				Protocol: v1.ProtocolUDP,
-			}},
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p13"),
+			Port:     utilpointer.Int32(13),
+			Protocol: &udpProtocol,
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP:       "2.2.2.3",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p23",
-				Port:     23,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Name:     utilpointer.String("p14"),
+			Port:     utilpointer.Int32(14),
+			Protocol: &udpProtocol,
 		}}
 	}
-	complexBefore4 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "4.4.4.4",
-				NodeName: &nodeName,
-			}, {
-				IP:       "4.4.4.5",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p44",
-				Port:     44,
-				Protocol: v1.ProtocolUDP,
-			}},
+	subsetMultipleIPsPorts3 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"2.2.2.1"},
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP:       "4.4.4.6",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p45",
-				Port:     45,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Addresses: []string{"2.2.2.2"},
+			NodeName:  &nodeName,
 		}}
-	}
-	complexAfter1 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.1",
-			}, {
-				IP: "1.1.1.11",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p11",
-				Port:     11,
-				Protocol: v1.ProtocolUDP,
-			}},
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p21"),
+			Port:     utilpointer.Int32(21),
+			Protocol: &udpProtocol,
 		}, {
-			Addresses: []v1.EndpointAddress{{
-				IP: "1.1.1.2",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p12",
-				Port:     12,
-				Protocol: v1.ProtocolUDP,
-			}, {
-				Name:     "p122",
-				Port:     122,
-				Protocol: v1.ProtocolUDP,
-			}},
+			Name:     utilpointer.String("p22"),
+			Port:     utilpointer.Int32(22),
+			Protocol: &udpProtocol,
 		}}
 	}
-	complexAfter3 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP: "3.3.3.3",
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p33",
-				Port:     33,
-				Protocol: v1.ProtocolUDP,
-			}},
+	multipleSubsetsIPsPorts := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subsetMultipleIPsPorts1),
+		makeTestEndpointSlice("ns1", "ep1", 2, subsetMultipleIPsPorts2),
+		makeTestEndpointSlice("ns2", "ep2", 1, subsetMultipleIPsPorts3),
+	}
+	complexSubset1 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"2.2.2.2"},
+			NodeName:  &nodeName,
+		}, {
+			Addresses: []string{"2.2.2.22"},
+			NodeName:  &nodeName,
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p22"),
+			Port:     utilpointer.Int32(22),
+			Protocol: &udpProtocol,
 		}}
 	}
-	complexAfter4 := func(ept *v1.Endpoints) {
-		ept.Subsets = []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{
-				IP:       "4.4.4.4",
-				NodeName: &nodeName,
-			}},
-			Ports: []v1.EndpointPort{{
-				Name:     "p44",
-				Port:     44,
-				Protocol: v1.ProtocolUDP,
-			}},
+	complexSubset2 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"2.2.2.3"},
+			NodeName:  &nodeName,
 		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p23"),
+			Port:     utilpointer.Int32(23),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset3 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"4.4.4.4"},
+			NodeName:  &nodeName,
+		}, {
+			Addresses: []string{"4.4.4.5"},
+			NodeName:  &nodeName,
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p44"),
+			Port:     utilpointer.Int32(44),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset4 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"4.4.4.6"},
+			NodeName:  &nodeName,
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p45"),
+			Port:     utilpointer.Int32(45),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset5 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+		}, {
+			Addresses: []string{"1.1.1.11"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p11"),
+			Port:     utilpointer.Int32(11),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset6 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.2"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p12"),
+			Port:     utilpointer.Int32(12),
+			Protocol: &udpProtocol,
+		}, {
+			Name:     utilpointer.String("p122"),
+			Port:     utilpointer.Int32(122),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset7 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"3.3.3.3"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p33"),
+			Port:     utilpointer.Int32(33),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexSubset8 := func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"4.4.4.4"},
+			NodeName:  &nodeName,
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.String("p44"),
+			Port:     utilpointer.Int32(44),
+			Protocol: &udpProtocol,
+		}}
+	}
+	complexBefore := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, subset1),
+		nil,
+		makeTestEndpointSlice("ns2", "ep2", 1, complexSubset1),
+		makeTestEndpointSlice("ns2", "ep2", 2, complexSubset2),
+		nil,
+		makeTestEndpointSlice("ns4", "ep4", 1, complexSubset3),
+		makeTestEndpointSlice("ns4", "ep4", 2, complexSubset4),
+	}
+	complexAfter := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "ep1", 1, complexSubset5),
+		makeTestEndpointSlice("ns1", "ep1", 2, complexSubset6),
+		nil,
+		nil,
+		makeTestEndpointSlice("ns3", "ep3", 1, complexSubset7),
+		makeTestEndpointSlice("ns4", "ep4", 1, complexSubset8),
+		nil,
 	}
 
 	testCases := []struct {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
-		previousEndpoints         []*v1.Endpoints
-		currentEndpoints          []*v1.Endpoints
+		previousEndpoints         []*discovery.EndpointSlice
+		currentEndpoints          []*discovery.EndpointSlice
 		oldEndpoints              map[proxy.ServicePortName][]*endpointsInfo
 		expectedResult            map[proxy.ServicePortName][]*endpointsInfo
 		expectedStaleEndpoints    []proxy.ServiceEndpoint
@@ -2093,34 +2369,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[1]: no change, unnamed port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-			},
-		},
-		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-			},
-		},
-		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
-		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		// Case[2]: no change, named port, local
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortLocal),
-		},
+		// Case[1]: no change, named port, local
+		previousEndpoints: namedPortLocal,
+		currentEndpoints:  namedPortLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
@@ -2137,13 +2388,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
-		// Case[3]: no change, multiple subsets
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
+		// Case[2]: no change, multiple subsets
+		previousEndpoints: multipleSubsets,
+		currentEndpoints:  multipleSubsets,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2164,13 +2411,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[4]: no change, multiple subsets, multiple ports, local
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
-		},
+		// Case[3]: no change, multiple subsets, multiple ports, local
+		previousEndpoints: multipleSubsetsMultiplePortsLocal,
+		currentEndpoints:  multipleSubsetsMultiplePortsLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
@@ -2199,15 +2442,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
-		// Case[5]: no change, multiple endpoints, subsets, IPs, and ports
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
-			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
-			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
-		},
+		// Case[4]: no change, multiple endpoints, subsets, IPs, and ports
+		previousEndpoints: multipleSubsetsIPsPorts,
+		currentEndpoints:  multipleSubsetsIPsPorts,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2267,54 +2504,42 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns2", "ep2"): 1,
 		},
 	}, {
-		// Case[6]: add an Endpoints
-		previousEndpoints: []*v1.Endpoints{
-			nil,
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
-		},
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{},
+		// Case[5]: add an Endpoints
+		previousEndpoints: []*discovery.EndpointSlice{nil},
+		currentEndpoints:  namedPortLocal,
+		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
-		// Case[7]: remove an Endpoints
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			nil,
-		},
+		// Case[6]: remove an Endpoints
+		previousEndpoints: namedPortLocal,
+		currentEndpoints:  []*discovery.EndpointSlice{nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[8]: add an IP and port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
-		},
+		// Case[7]: add an IP and port
+		previousEndpoints: namedPort,
+		currentEndpoints:  namedPortsLocalNoLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2338,13 +2563,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
-		// Case[9]: remove an IP and port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
+		// Case[8]: remove an IP and port
+		previousEndpoints: namedPortsLocalNoLocal,
+		currentEndpoints:  namedPort,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2373,13 +2594,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[10]: add a subset
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsWithLocal),
-		},
+		// Case[9]: add a subset
+		previousEndpoints: []*discovery.EndpointSlice{namedPort[0], nil},
+		currentEndpoints:  multipleSubsetsWithLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2401,13 +2618,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns1", "ep1"): 1,
 		},
 	}, {
-		// Case[11]: remove a subset
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
+		// Case[10]: remove a subset
+		previousEndpoints: multipleSubsets,
+		currentEndpoints:  []*discovery.EndpointSlice{namedPort[0], nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2428,13 +2641,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[12]: rename a port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortRenamed),
-		},
+		// Case[11]: rename a port
+		previousEndpoints: namedPort,
+		currentEndpoints:  namedPortRenamed,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2454,13 +2663,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	}, {
-		// Case[13]: renumber a port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortRenumbered),
-		},
+		// Case[12]: renumber a port
+		previousEndpoints: namedPort,
+		currentEndpoints:  namedPortRenumbered,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2478,26 +2683,16 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
-		// Case[14]: complex add and remove
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", complexBefore1),
-			makeTestEndpoints("ns2", "ep2", complexBefore2),
-			nil,
-			makeTestEndpoints("ns4", "ep4", complexBefore4),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", complexAfter1),
-			nil,
-			makeTestEndpoints("ns3", "ep3", complexAfter3),
-			makeTestEndpoints("ns4", "ep4", complexAfter4),
-		},
+		// Case[13]: complex add and remove
+		previousEndpoints: complexBefore,
+		currentEndpoints:  complexAfter,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
@@ -2512,8 +2707,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
@@ -2553,22 +2748,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns4", "ep4"): 1,
 		},
 	}, {
-		// Case[15]: change from 0 endpoint address to 1 unnamed port
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", emptyEndpoint),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{},
+		// Case[14]: change from 0 endpoint address to 1 unnamed port
+		previousEndpoints: emptyEndpointSlices,
+		currentEndpoints:  namedPort,
+		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	},
@@ -2576,14 +2767,14 @@ func Test_updateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		ipt := iptablestest.NewFake()
-		fp := NewFakeProxier(ipt, false)
+		fp := NewFakeProxier(ipt)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,
 		// the fp.oldEndpoints is as we expect.
 		for i := range tc.previousEndpoints {
 			if tc.previousEndpoints[i] != nil {
-				fp.OnEndpointsAdd(tc.previousEndpoints[i])
+				fp.OnEndpointSliceAdd(tc.previousEndpoints[i])
 			}
 		}
 		fp.endpointsMap.Update(fp.endpointsChanges)
@@ -2599,11 +2790,11 @@ func Test_updateEndpointsMap(t *testing.T) {
 			prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
 			switch {
 			case prev == nil:
-				fp.OnEndpointsAdd(curr)
+				fp.OnEndpointSliceAdd(curr)
 			case curr == nil:
-				fp.OnEndpointsDelete(prev)
+				fp.OnEndpointSliceDelete(prev)
 			default:
-				fp.OnEndpointsUpdate(prev, curr)
+				fp.OnEndpointSliceUpdate(prev, curr)
 			}
 		}
 		result := fp.endpointsMap.Update(fp.endpointsChanges)
@@ -2667,27 +2858,30 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
 
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, true)
+	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
 	fp.OnEndpointsSynced()
 	fp.OnEndpointSlicesSynced()
@@ -2720,19 +2914,19 @@ COMMIT
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+			NodeName:   utilpointer.StringPtr("node2"),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
-		}, { // not ready endpoints should be ignored
+			NodeName:   utilpointer.StringPtr("node3"),
+		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
+			NodeName:   utilpointer.StringPtr("node4"),
 		}},
 	}
 
@@ -2767,23 +2961,26 @@ COMMIT
 :KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 :KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 :KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -2793,7 +2990,7 @@ COMMIT
 `
 
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, true)
+	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
 	fp.OnEndpointsSynced()
 	fp.OnEndpointSlicesSynced()
@@ -2830,19 +3027,19 @@ COMMIT
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+			NodeName:   utilpointer.StringPtr(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+			NodeName:   utilpointer.StringPtr("node2"),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
-		}, { // not ready endpoints should be ignored
+			NodeName:   utilpointer.StringPtr("node3"),
+		}, {
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			Topology:   map[string]string{"kubernetes.io/hostname": "node4"},
+			NodeName:   utilpointer.StringPtr("node4"),
 		}},
 	}
 	fp.OnEndpointSliceAdd(endpointSlice)
@@ -2852,6 +3049,119 @@ COMMIT
 	fp.OnServiceDelete(svc)
 	fp.syncProxyRules()
 	assert.NotEqual(t, expectedIPTables, fp.iptablesData.String())
+}
+
+// Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
+func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	fp.OnServiceSynced()
+	fp.OnEndpointsSynced()
+	fp.OnEndpointSlicesSynced()
+
+	serviceName := "svc1"
+	namespaceName := "ns1"
+
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "172.20.1.1",
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+		},
+	})
+
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr(testHostname),
+		}, {
+			Addresses:  []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr(testHostname),
+		}, {
+			Addresses:  []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr(testHostname),
+		}, { // not ready endpoints should be ignored
+			Addresses:  []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			NodeName:   utilpointer.StringPtr(testHostname),
+		}},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	result := fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 1 {
+		t.Errorf("unexpected number of health check node ports, expected 1 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
+
+	// set all endpoints to terminating
+	endpointSliceTerminating := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses: []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(false),
+			},
+			NodeName: utilpointer.StringPtr(testHostname),
+		}, {
+			Addresses: []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			NodeName: utilpointer.StringPtr(testHostname),
+		}, {
+			Addresses: []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			NodeName: utilpointer.StringPtr(testHostname),
+		}, { // not ready endpoints should be ignored
+			Addresses: []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(false),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			NodeName: utilpointer.StringPtr(testHostname),
+		}},
+	}
+
+	fp.OnEndpointSliceUpdate(endpointSlice, endpointSliceTerminating)
+	result = fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 0 {
+		t.Errorf("unexpected number of health check node ports, expected 0 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
 }
 
 func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
@@ -2873,7 +3183,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	fexec.CommandScript = append(fexec.CommandScript, execFunc)
 
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
 	fp.exec = &fexec
 
 	svcIP := "10.20.30.41"
@@ -2896,7 +3206,6 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
 
 	fp.syncProxyRules()
 	if fexec.CommandCalls != 0 {
@@ -2904,17 +3213,17 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	}
 
 	epIP := "10.180.0.1"
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP: epIP,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolUDP,
-				}},
+	udpProtocol := v1.ProtocolUDP
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIP},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &udpProtocol,
 			}}
 		}),
 	)
@@ -2940,7 +3249,8 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 
 func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt, false)
+	fp := NewFakeProxier(ipt)
+	tcpProtocol := v1.ProtocolTCP
 
 	metrics.RegisterMetrics()
 
@@ -2964,8 +3274,6 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 			}}
 		}),
 	)
-	makeEndpointsMap(fp)
-
 	fp.syncProxyRules()
 
 	nFilterRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
@@ -2999,22 +3307,18 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Fatalf("Wrong number of nat rules: expected 6 received %f", nNatRules)
 	}
 
-	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{
-					{
-						IP: "10.0.0.2",
-					},
-					{
-						IP: "10.0.0.5",
-					},
-				},
-				Ports: []v1.EndpointPort{{
-					Name:     svcPortName.Port,
-					Port:     int32(svcPort),
-					Protocol: v1.ProtocolTCP,
-				}},
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.0.0.2"},
+			}, {
+				Addresses: []string{"10.0.0.5"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(svcPort)),
+				Protocol: &tcpProtocol,
 			}}
 		}),
 	)
@@ -3094,15 +3398,15 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -3160,7 +3464,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
@@ -3220,7 +3524,7 @@ COMMIT
 	for _, tc := range testCases {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.featureGateOn)()
 		ipt := iptablestest.NewFake()
-		fp := NewFakeProxier(ipt, true)
+		fp := NewFakeProxier(ipt)
 		fp.OnServiceSynced()
 		fp.OnEndpointsSynced()
 		fp.OnEndpointSlicesSynced()
@@ -3260,7 +3564,7 @@ COMMIT
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": ep.hostname},
+				NodeName:   utilpointer.StringPtr(ep.hostname),
 			})
 		}
 
@@ -3273,5 +3577,556 @@ COMMIT
 			fp.syncProxyRules()
 			assert.NotEqual(t, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 		}
+	}
+}
+
+// Test_EndpointSliceWithTerminatingEndpoints tests that when there are local ready and ready + terminating
+// endpoints, only the ready endpoints are used.
+func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
+	tcpProtocol := v1.ProtocolTCP
+	testcases := []struct {
+		name                   string
+		terminatingFeatureGate bool
+		service                *v1.Service
+		endpointslice          *discovery.EndpointSlice
+		expectedIPTables       string
+	}{
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
+			terminatingFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints disabled, ready endpoints exist",
+			terminatingFeatureGate: false,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-3JOIVZTXZZRGORX4
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "feature gate ProxyTerminatingEndpoints enabled, only terminating endpoints exist",
+			terminatingFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						// this endpoint should be used since there are only ready terminating endpoints
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be used since there are only ready terminating endpoints
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should not be used since it is both terminating and not ready.
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						// this endpoint should be ignored for node ports since it's not local
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 0 for ns1/svc1" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Balancing rule 1 for ns1/svc1" -j KUBE-SEP-XGJFVO3L2O5SRFNT
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
+			terminatingFeatureGate: false,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
+				Spec: v1.ServiceSpec{
+					ClusterIP:             "172.20.1.1",
+					Type:                  v1.ServiceTypeNodePort,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					Selector:              map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Name:       "",
+							TargetPort: intstr.FromInt(80),
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			endpointslice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", "svc1"),
+					Namespace: "ns1",
+					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{"10.0.1.1"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.2"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.3"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
+							Terminating: utilpointer.BoolPtr(true),
+						},
+						NodeName: utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.0.1.5"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						NodeName: utilpointer.StringPtr("host-1"),
+					},
+				},
+			},
+			expectedIPTables: `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
+:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
+:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
+:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
+:KUBE-SEP-VLJB2F747S6W7EX4 - [0:0]
+:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -s 10.0.1.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-VLJB2F747S6W7EX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.4:80
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, testcase.terminatingFeatureGate)()
+
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.OnServiceSynced()
+			fp.OnEndpointsSynced()
+			fp.OnEndpointSlicesSynced()
+
+			fp.OnServiceAdd(testcase.service)
+
+			fp.OnEndpointSliceAdd(testcase.endpointslice)
+			fp.syncProxyRules()
+			t.Log(fp.iptablesData.String())
+			assert.Equal(t, testcase.expectedIPTables, fp.iptablesData.String())
+
+			fp.OnEndpointSliceDelete(testcase.endpointslice)
+			fp.syncProxyRules()
+			assert.NotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+		})
 	}
 }

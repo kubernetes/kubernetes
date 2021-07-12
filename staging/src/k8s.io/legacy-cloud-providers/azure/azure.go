@@ -92,12 +92,6 @@ const (
 
 	externalResourceGroupLabel = "kubernetes.azure.com/resource-group"
 	managedByAzureLabel        = "kubernetes.azure.com/managed"
-
-	// LabelFailureDomainBetaZone refer to https://github.com/kubernetes/api/blob/8519c5ea46199d57724725d5b969c5e8e0533692/core/v1/well_known_labels.go#L22-L23
-	LabelFailureDomainBetaZone = "failure-domain.beta.kubernetes.io/zone"
-
-	// LabelFailureDomainBetaRegion failure-domain region label
-	LabelFailureDomainBetaRegion = "failure-domain.beta.kubernetes.io/region"
 )
 
 const (
@@ -274,6 +268,8 @@ type Cloud struct {
 	ipv6DualStackEnabled bool
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.RWMutex
+	// nodeNames holds current nodes for tracking added nodes in VM caches.
+	nodeNames sets.String
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
 	nodeZones map[string]sets.String
@@ -342,6 +338,7 @@ func NewCloudWithoutFeatureGates(configReader io.Reader) (*Cloud, error) {
 	}
 
 	az := &Cloud{
+		nodeNames:          sets.NewString(),
 		nodeZones:          map[string]sets.String{},
 		nodeResourceGroups: map[string]string{},
 		unmanagedNodes:     sets.NewString(),
@@ -479,7 +476,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.Config = *config
 	az.Environment = *env
 	az.ResourceRequestBackoff = resourceRequestBackoff
-	az.metadata, err = NewInstanceMetadataService(metadataURL)
+	az.metadata, err = NewInstanceMetadataService(imdsServer)
 	if err != nil {
 		return err
 	}
@@ -748,8 +745,12 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[LabelFailureDomainBetaZone] ==
-				prevNode.Labels[LabelFailureDomainBetaZone] {
+			if newNode.Labels[v1.LabelFailureDomainBetaZone] ==
+				prevNode.Labels[v1.LabelFailureDomainBetaZone] {
+				return
+			}
+			if newNode.Labels[v1.LabelTopologyZone] ==
+				prevNode.Labels[v1.LabelTopologyZone] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -782,9 +783,23 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	defer az.nodeCachesLock.Unlock()
 
 	if prevNode != nil {
-		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[LabelFailureDomainBetaZone]
+
+		// Remove from nodeNames cache.
+		az.nodeNames.Delete(prevNode.ObjectMeta.Name)
+
+		// Remove from nodeZones cache
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelTopologyZone]
+
 		if ok && az.isAvailabilityZone(prevZone) {
+			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
+			if az.nodeZones[prevZone].Len() == 0 {
+				az.nodeZones[prevZone] = nil
+			}
+		}
+
+		//Remove from nodeZones cache if using depreciated LabelFailureDomainBetaZone
+		prevZoneFailureDomain, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
+		if ok && az.isAvailabilityZone(prevZoneFailureDomain) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
 				az.nodeZones[prevZone] = nil
@@ -805,8 +820,11 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	}
 
 	if newNode != nil {
+		// Add to nodeNames cache.
+		az.nodeNames.Insert(newNode.ObjectMeta.Name)
+
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[LabelFailureDomainBetaZone]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelTopologyZone]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()
@@ -874,6 +892,22 @@ func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
 
 	// Return resource group from cloud provider options.
 	return az.ResourceGroup, nil
+}
+
+// GetNodeNames returns a set of all node names in the k8s cluster.
+func (az *Cloud) GetNodeNames() (sets.String, error) {
+	// Kubelet won't set az.nodeInformerSynced, return nil.
+	if az.nodeInformerSynced == nil {
+		return nil, nil
+	}
+
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
+	if !az.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to GetNodeNames")
+	}
+
+	return sets.NewString(az.nodeNames.List()...), nil
 }
 
 // GetResourceGroups returns a set of resource groups that all nodes are running on.

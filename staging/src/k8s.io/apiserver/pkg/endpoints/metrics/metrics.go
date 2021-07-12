@@ -54,7 +54,7 @@ const (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -65,7 +65,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_requested_deprecated_apis",
 			Help:           "Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"group", "version", "resource", "subresource", "removed_release"},
 	)
@@ -211,6 +211,26 @@ var (
 		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 
+	// requestPostTimeoutTotal tracks the activity of the executing request handler after the associated request
+	// has been timed out by the apiserver.
+	// source: the name of the handler that is recording this metric. Currently, we have two:
+	//  - timeout-handler: the "executing" handler returns after the timeout filter times out the request.
+	//  - rest-handler: the "executing" handler returns after the rest layer times out the request.
+	// status: whether the handler panicked or threw an error, possible values:
+	//  - 'panic': the handler panicked
+	//  - 'error': the handler return an error
+	//  - 'ok': the handler returned a result (no error and no panic)
+	//  - 'pending': the handler is still running in the background and it did not return
+	//    within the wait threshold.
+	requestPostTimeoutTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_post_timeout_total",
+			Help:           "Tracks the activity of the request handlers after the associated requests have been timed out by the apiserver",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"source", "status"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -228,6 +248,7 @@ var (
 		apiSelfRequestCounter,
 		requestFilterDuration,
 		requestAbortsTotal,
+		requestPostTimeoutTotal,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -271,6 +292,36 @@ const (
 	removedReleaseAnnotationKey = "k8s.io/removed-release"
 )
 
+const (
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the timeout filter times out the request.
+	PostTimeoutSourceTimeoutHandler = "timeout-handler"
+
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the rest layer times out the request.
+	PostTimeoutSourceRestHandler = "rest-handler"
+)
+
+const (
+	// The executing request handler panicked after the request had
+	// been timed out by the apiserver.
+	PostTimeoutHandlerPanic = "panic"
+
+	// The executing request handler has returned an error to the post-timeout
+	// receiver after the request had been timed out by the apiserver.
+	PostTimeoutHandlerError = "error"
+
+	// The executing request handler has returned a result to the post-timeout
+	// receiver after the request had been timed out by the apiserver.
+	PostTimeoutHandlerOK = "ok"
+
+	// The executing request handler has not panicked or returned any error/result to
+	// the post-timeout receiver yet after the request had been timed out by the apiserver.
+	// The post-timeout receiver gives up after waiting for certain threshold and if the
+	// executing request handler has not returned yet we use the following label.
+	PostTimeoutHandlerPending = "pending"
+)
+
 var registerMetrics sync.Once
 
 // Register all metrics.
@@ -308,6 +359,10 @@ func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration
 	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
+func RecordRequestPostTimeout(source string, status string) {
+	requestPostTimeoutTotal.WithLabelValues(source, status).Inc()
+}
+
 // RecordRequestAbort records that the request was aborted possibly due to a timeout.
 func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	if requestInfo == nil {
@@ -315,7 +370,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	}
 
 	scope := CleanScope(requestInfo)
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 	resource := requestInfo.Resource
 	subresource := requestInfo.Subresource
 	group := requestInfo.APIGroup
@@ -338,7 +393,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
@@ -360,7 +415,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
@@ -379,7 +434,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
@@ -414,6 +469,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
 
+		//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 		_, cn := response.ResponseWriter.(http.CloseNotifier)
 		_, fl := response.ResponseWriter.(http.Flusher)
 		_, hj := response.ResponseWriter.(http.Hijacker)
@@ -458,11 +514,11 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
-	if requestInfo.Namespace != "" {
-		return "namespace"
-	}
 	if requestInfo.Name != "" {
 		return "resource"
+	}
+	if requestInfo.Namespace != "" {
+		return "namespace"
 	}
 	if requestInfo.IsResourceRequest {
 		return "cluster"
@@ -471,7 +527,9 @@ func CleanScope(requestInfo *request.RequestInfo) string {
 	return ""
 }
 
-func canonicalVerb(verb string, scope string) string {
+// CanonicalVerb distinguishes LISTs from GETs (and HEADs). It assumes verb is
+// UPPERCASE.
+func CanonicalVerb(verb string, scope string) string {
 	switch verb {
 	case "GET", "HEAD":
 		if scope != "resource" && scope != "" {
@@ -483,7 +541,9 @@ func canonicalVerb(verb string, scope string) string {
 	}
 }
 
-func cleanVerb(verb string, request *http.Request) string {
+// CleanVerb returns a normalized verb, so that it is easy to tell WATCH from
+// LIST and APPLY from PATCH.
+func CleanVerb(verb string, request *http.Request) string {
 	reportedVerb := verb
 	if verb == "LIST" {
 		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
@@ -500,6 +560,12 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
+	return reportedVerb
+}
+
+// cleanVerb additionally ensures that unknown verbs don't clog up the metrics.
+func cleanVerb(verb string, request *http.Request) string {
+	reportedVerb := CleanVerb(verb, request)
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb
 	}

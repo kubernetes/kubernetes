@@ -37,7 +37,7 @@ const (
 
 var (
 	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.Agnhost)
-	linuxBusyBoxImage   = "docker.io/library/nginx:1.15-alpine"
+	linuxBusyBoxImage   = imageutils.GetE2EImage(imageutils.Nginx)
 )
 
 var _ = SIGDescribe("Hybrid cluster network", func() {
@@ -89,12 +89,14 @@ var (
 )
 
 func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
-	gomega.Consistently(func() error {
+	connChecker := func() error {
 		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		// TODO, we should be retrying this similar to what is done in DialFromNode, in the test/e2e/networking/networking.go tests
 		_, _, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
 		return err
-	}, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	}
+	gomega.Eventually(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	gomega.Consistently(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func linuxCheck(address string, port int) []string {

@@ -308,6 +308,14 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 				validationErrors = append(validationErrors, fmt.Errorf("env variable name must be specified for %v to use exec authentication plugin", authInfoName))
 			}
 		}
+		switch authInfo.Exec.InteractiveMode {
+		case "":
+			validationErrors = append(validationErrors, fmt.Errorf("interactiveMode must be specified for %v to use exec authentication plugin", authInfoName))
+		case clientcmdapi.NeverExecInteractiveMode, clientcmdapi.IfAvailableExecInteractiveMode, clientcmdapi.AlwaysExecInteractiveMode:
+			// These are valid
+		default:
+			validationErrors = append(validationErrors, fmt.Errorf("invalid interactiveMode for %v: %q", authInfoName, authInfo.Exec.InteractiveMode))
+		}
 	}
 
 	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case

@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -183,6 +183,23 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{},
 		},
+		// Make sure that different endpoints with duplicate IPs are returned correctly.
+		"Different endpoints with duplicate IPs should not be filtered": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(8080)}),
+			},
+			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:8080", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:8080", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -215,26 +232,70 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					"10.0.1.1": &BaseEndpointInfo{
+					"10.0.1.1:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:80",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
 					},
-					"10.0.1.2": &BaseEndpointInfo{
+					"10.0.1.2:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:80",
 						IsLocal:     true,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host1"},
+						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
 					},
-					"10.0.1.3": &BaseEndpointInfo{
+					"10.0.1.3:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.3:80",
 						IsLocal:     false,
-						Topology:    map[string]string{"kubernetes.io/hostname": "host2"},
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+				},
+			},
+		},
+		"4 different slices with duplicate IPs": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(8080)}),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.1:80",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.2:80",
+						IsLocal:     true,
+						NodeName:    "host1",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.1:8080": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.1:8080",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.2:8080": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.2:8080",
+						IsLocal:     true,
+						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -439,9 +500,8 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		}
 
 		if len(hosts) > 0 {
-			endpoint.Topology = map[string]string{
-				"kubernetes.io/hostname": hosts[i%len(hosts)],
-			}
+			hostname := hosts[i%len(hosts)]
+			endpoint.NodeName = &hostname
 		}
 
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpoint)

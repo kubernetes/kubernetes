@@ -25,11 +25,8 @@ import (
 	"time"
 
 	api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +44,7 @@ import (
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-	defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
+	defaultFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 
 	tests := []struct {
 		name                            string
@@ -259,18 +256,18 @@ func TestCSI_VolumeAll(t *testing.T) {
 			objs := []runtime.Object{}
 			if test.driverSpec != nil {
 				driverInfo = &storage.CSIDriver{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: meta.ObjectMeta{
 						Name: test.driver,
 					},
 					Spec: *test.driverSpec,
 				}
 				objs = append(objs, driverInfo)
 			}
-			objs = append(objs, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
+			objs = append(objs, &api.Node{
+				ObjectMeta: meta.ObjectMeta{
 					Name: "fakeNode",
 				},
-				Spec: v1.NodeSpec{},
+				Spec: api.NodeSpec{},
 			})
 
 			client := fakeclient.NewSimpleClientset(objs...)
@@ -403,7 +400,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.GetdeviceMountPath failed %s", err)
 				}
-				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
+				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath, volume.DeviceMounterArgs{}); err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.MountDevice failed: %v", err)
 				}
 				t.Log("csiTest.VolumeAll device mounted at path:", devMountPath)
@@ -571,7 +568,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 					if err := csiDevUnmounter.UnmountDevice(devMountPath); err != nil {
 						t.Fatalf("csiTest.VolumeAll deviceMounter.UnmountDevice failed: %s", err)
 					}
-					t.Log("csiTest.VolumeAll deviceUmounter.UnmountDevice done OK for path", devMountPath)
+					t.Log("csiTest.VolumeAll deviceUnmounter.UnmountDevice done OK for path", devMountPath)
 				}
 			} else {
 				t.Log("csiTest.VolumeAll DeviceMountablePluginBySpec did not find a plugin, skipping unmounting.")

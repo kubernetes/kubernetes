@@ -23,24 +23,23 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.3.6
+  name: metrics-server-v0.4.4
   namespace: kube-system
   labels:
     k8s-app: metrics-server
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.3.6
+    version: v0.4.4
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.3.6
+      version: v0.4.4
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.3.6
+        version: v0.4.4
     spec:
       securityContext:
         seccompProfile:
@@ -51,7 +50,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server-amd64:v0.3.6
+        image: k8s.gcr.io/metrics-server/metrics-server:v0.4.4
         command:
         - /metrics-server
         - --metric-resolution=30s
@@ -60,12 +59,17 @@ spec:
         - --kubelet-port=10255
         - --deprecated-kubelet-completely-insecure=true
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
+        - --cert-dir=/tmp
+        - --secure-port=443
         ports:
         - containerPort: 443
           name: https
           protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.11
+        image: k8s.gcr.io/autoscaling/addon-resizer:1.8.14
         resources:
           limits:
             cpu: 100m
@@ -93,9 +97,9 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.3.6
+          - --deployment=metrics-server-v0.4.4
           - --container=metrics-server
-          - --poll-period=300000
+          - --poll-period=30000
           - --estimator=exponential
           # Specifies the smallest cluster (defined in number of nodes)
           # resources will be scaled to.
@@ -103,9 +107,11 @@ spec:
           # Use kube-apiserver metrics to avoid periodically listing nodes.
           - --use-metrics=true
       volumes:
-        - name: metrics-server-config-volume
-          configMap:
-            name: metrics-server-config
+      - name: metrics-server-config-volume
+        configMap:
+          name: metrics-server-config
+      - emptyDir: {}
+        name: tmp-dir
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"

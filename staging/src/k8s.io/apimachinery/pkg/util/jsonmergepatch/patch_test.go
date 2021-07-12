@@ -602,6 +602,57 @@ testCases:
       - false
       - b: 1
       bar: 0
+  - description: patch array with nil
+    original:
+      foo:
+      - a: true
+      - null
+      - false
+      bar: []
+      drop:
+      - 1
+    modified:
+      foo:
+      - 1
+      - false
+      - b: 1
+      bar:
+      - c
+      - null
+      - null
+      - a
+      drop:
+      - null
+    current:
+      foo:
+      - a: true
+      - 2
+      - false
+      bar:
+      - c
+      - null
+      - null
+      - a
+      drop:
+    threeWay:
+      foo:
+      - 1
+      - false
+      - b: 1
+      drop:
+      - null
+    result:
+      foo:
+      - 1
+      - false
+      - b: 1
+      drop:
+      - null
+      bar:
+      - c
+      - null
+      - null
+      - a
 `)
 
 func TestCreateThreeWayJSONMergePatch(t *testing.T) {

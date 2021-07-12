@@ -22,13 +22,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/klog/v2"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
+
+	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -85,10 +88,17 @@ func runCleanupNode(c workflow.RunData) error {
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
-	if certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
+	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
+
+	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
+		klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+		if err := users.RemoveUsersAndGroups(); err != nil {
+			klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
+		}
+	}
 
 	return nil
 }

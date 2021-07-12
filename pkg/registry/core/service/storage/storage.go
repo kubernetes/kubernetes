@@ -45,7 +45,7 @@ type GenericREST struct {
 	secondaryFamily *api.IPFamily
 }
 
-// NewREST returns a RESTStorage object that will work against services.
+// NewGenericREST returns a RESTStorage object that will work against services.
 func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet, hasSecondary bool) (*GenericREST, *StatusREST, error) {
 	strategy, _ := registry.StrategyForServiceCIDRs(serviceCIDR, hasSecondary)
 

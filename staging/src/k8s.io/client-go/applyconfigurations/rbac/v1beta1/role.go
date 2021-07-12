@@ -49,7 +49,7 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // ExtractRole extracts the applied configuration owned by fieldManager from
 // role. If no managedFields are found in role for fieldManager, a
 // RoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // role must be a unmodified Role API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	return extractRole(role, fieldManager, "")
+}
+
+// ExtractRoleStatus is the same as ExtractRole except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractRoleStatus(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	return extractRole(role, fieldManager, "status")
+}
+
+func extractRole(role *rbacv1beta1.Role, fieldManager string, subresource string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
-	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b)
+	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

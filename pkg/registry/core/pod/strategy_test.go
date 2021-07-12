@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -265,55 +267,82 @@ func TestGetPodQOS(t *testing.T) {
 func TestCheckGracefulDelete(t *testing.T) {
 	defaultGracePeriod := int64(30)
 	tcs := []struct {
-		in          *api.Pod
-		gracePeriod int64
+		name              string
+		pod               *api.Pod
+		deleteGracePeriod *int64
+		gracePeriod       int64
 	}{
 		{
-			in: &api.Pod{
+			name: "in pending phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-
-			gracePeriod: defaultGracePeriod,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       defaultGracePeriod,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase with has node name",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{NodeName: "something"},
 				Status: api.PodStatus{Phase: api.PodFailed},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in failed phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodPending},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "in succeeded phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{Phase: api.PodSucceeded},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
 		},
 		{
-			in: &api.Pod{
+			name: "no phase",
+			pod: &api.Pod{
 				Spec:   api.PodSpec{},
 				Status: api.PodStatus{},
 			},
-			gracePeriod: 0,
+			deleteGracePeriod: &defaultGracePeriod,
+			gracePeriod:       0,
+		},
+		{
+			name: "has negative grace period",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName:                      "something",
+					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				},
+				Status: api.PodStatus{},
+			},
+			gracePeriod: 1,
 		},
 	}
 	for _, tc := range tcs {
-		out := &metav1.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
-		Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.in, out)
-		if out.GracePeriodSeconds == nil {
-			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
-		}
-		if *(out.GracePeriodSeconds) != tc.gracePeriod {
-			t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			out := &metav1.DeleteOptions{}
+			if tc.deleteGracePeriod != nil {
+				out.GracePeriodSeconds = utilpointer.Int64(*tc.deleteGracePeriod)
+			}
+			Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.pod, out)
+			if out.GracePeriodSeconds == nil {
+				t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
+			}
+			if *(out.GracePeriodSeconds) != tc.gracePeriod {
+				t.Errorf("out grace period was %v but was expected to be %v", *out, tc.gracePeriod)
+			}
+		})
 	}
 }
 
@@ -1377,6 +1406,224 @@ func TestPodStrategyValidateUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
 				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+}
+
+func TestDropNonEphemeralContainerUpdates(t *testing.T) {
+	tests := []struct {
+		name                    string
+		oldPod, newPod, wantPod *api.Pod
+	}{
+		{
+			name: "simple ephemeral container append",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container",
+								Image: "image",
+							},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container",
+								Image: "image",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "whoops wrong pod",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					UID:             "blue",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "new-pod",
+					Namespace:       "new-ns",
+					ResourceVersion: "1",
+					UID:             "green",
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "new-pod",
+					Namespace:       "new-ns",
+					ResourceVersion: "1",
+					UID:             "green",
+				},
+			},
+		},
+		{
+			name: "resource conflict during update",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+					UID:             "blue",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					UID:             "blue",
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					UID:             "blue",
+				},
+			},
+		},
+		{
+			name: "drop non-ephemeral container changes",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{"foo": "bar", "whiz": "pop"},
+					ClusterName:     "milo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "newimage",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container1",
+								Image: "image",
+							},
+						},
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container2",
+								Image: "image",
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Message: "hi.",
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container1",
+								Image: "image",
+							},
+						},
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:  "container2",
+								Image: "image",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotPod := dropNonEphemeralContainerUpdates(tc.newPod, tc.oldPod)
+			if diff := cmp.Diff(tc.wantPod, gotPod); diff != "" {
+				t.Errorf("unexpected diff when dropping fields (-want, +got):\n%s", diff)
 			}
 		})
 	}

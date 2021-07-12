@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -82,6 +83,10 @@ func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cad
 	// Runtimes may not support etc hosts file (Windows with docker)
 	podEtcHostsPath, isEtcHostsSupported := h.podEtcHostsPathFunc(podUID)
 	if !isEtcHostsSupported {
+		return nil, nil
+	}
+	// Some pods have an explicit /etc/hosts mount and the Kubelet will not create an etc-hosts file for them
+	if _, err := os.Stat(podEtcHostsPath); os.IsNotExist(err) {
 		return nil, nil
 	}
 

@@ -82,6 +82,11 @@ func (flowSchemaStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	return validation.ValidateFlowSchema(obj.(*flowcontrol.FlowSchema))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (flowSchemaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (flowSchemaStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -98,6 +103,11 @@ func (flowSchemaStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (flowSchemaStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateFlowSchemaUpdate(old.(*flowcontrol.FlowSchema), obj.(*flowcontrol.FlowSchema))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (flowSchemaStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 type flowSchemaStatusStrategy struct {
@@ -138,4 +148,9 @@ func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 func (flowSchemaStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateFlowSchemaStatusUpdate(old.(*flowcontrol.FlowSchema), obj.(*flowcontrol.FlowSchema))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (flowSchemaStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

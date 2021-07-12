@@ -49,7 +49,7 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // ExtractLimitRange extracts the applied configuration owned by fieldManager from
 // limitRange. If no managedFields are found in limitRange for fieldManager, a
 // LimitRangeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // limitRange must be a unmodified LimitRange API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+	return extractLimitRange(limitRange, fieldManager, "")
+}
+
+// ExtractLimitRangeStatus is the same as ExtractLimitRange except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractLimitRangeStatus(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+	return extractLimitRange(limitRange, fieldManager, "status")
+}
+
+func extractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
-	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b)
+	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

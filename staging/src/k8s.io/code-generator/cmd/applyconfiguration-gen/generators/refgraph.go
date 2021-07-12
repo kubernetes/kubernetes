@@ -28,7 +28,7 @@ type refGraph map[types.Name]string
 
 // refGraphForReachableTypes returns a refGraph that contains all reachable types from
 // the root clientgen types of the provided packages.
-func refGraphForReachableTypes(pkgTypes map[string]*types.Package, initialTypes map[types.Name]string) refGraph {
+func refGraphForReachableTypes(universe types.Universe, pkgTypes map[string]*types.Package, initialTypes map[types.Name]string) refGraph {
 	var refs refGraph = initialTypes
 
 	// Include only types that are reachable from the root clientgen types.
@@ -41,6 +41,20 @@ func refGraphForReachableTypes(pkgTypes map[string]*types.Package, initialTypes 
 			hasApply := tags.HasVerb("apply") || tags.HasVerb("applyStatus")
 			if tags.GenerateClient && hasApply {
 				findReachableTypes(t, reachableTypes)
+			}
+			// If any apply extensions have custom inputs, add them.
+			for _, extension := range tags.Extensions {
+				if extension.HasVerb("apply") {
+					if len(extension.InputTypeOverride) > 0 {
+						inputType := *t
+						if name, pkg := extension.Input(); len(pkg) > 0 {
+							inputType = *(universe.Type(types.Name{Package: pkg, Name: name}))
+						} else {
+							inputType.Name.Name = extension.InputTypeOverride
+						}
+						findReachableTypes(&inputType, reachableTypes)
+					}
+				}
 			}
 		}
 	}

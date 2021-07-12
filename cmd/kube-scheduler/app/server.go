@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -67,6 +68,7 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
+	namedFlagSets := opts.Flags()
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
 		Long: `The Kubernetes scheduler is a control plane process which assigns
@@ -78,6 +80,10 @@ kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			if err := opts.Complete(&namedFlagSets); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 			if err := runCommand(cmd, opts, registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
@@ -93,24 +99,15 @@ for more information about scheduling and the kube-scheduler component.`,
 		},
 	}
 	fs := cmd.Flags()
-	namedFlagSets := opts.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
-	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
-		return nil
-	})
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
-	})
+	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
+
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
 	return cmd
@@ -123,6 +120,11 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	go func() {
+		stopCh := server.SetupSignalHandler()
+		<-stopCh
+		cancel()
+	}()
 
 	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {
@@ -135,7 +137,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
 func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *scheduler.Scheduler) error {
 	// To help debugging, immediately log version
-	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
+	klog.V(1).InfoS("Starting Kubernetes Scheduler version", "version", version.Get())
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
@@ -202,7 +204,15 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				select {
+				case <-ctx.Done():
+					// We were asked to terminate. Exit 0.
+					klog.Info("Requested to terminate. Exiting.")
+					os.Exit(0)
+				default:
+					// We lost the lock.
+					klog.Exitf("leaderelection lost")
+				}
 			},
 		}
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
@@ -230,6 +240,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
+	handler = genericfilters.WithHTTPLogging(handler)
 	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver)
 
 	return handler
@@ -323,8 +334,10 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		cc.InformerFactory,
 		recorderFactory,
 		ctx.Done(),
+		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
+		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
-		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
+		scheduler.WithLegacyPolicySource(cc.LegacyPolicySource),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),

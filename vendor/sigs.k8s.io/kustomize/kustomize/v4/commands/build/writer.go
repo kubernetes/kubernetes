@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/yaml"
 )
 
@@ -36,7 +36,7 @@ func (w Writer) WriteIndividualFiles(dirPath string, m resmap.ResMap) error {
 			}
 		}
 	}
-	for _, res := range m.NonNamespaceable() {
+	for _, res := range m.ClusterScoped() {
 		err := w.write(dirPath, fileName(res), res)
 		if err != nil {
 			return err

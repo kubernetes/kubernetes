@@ -48,7 +48,7 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // ExtractCSINode extracts the applied configuration owned by fieldManager from
 // cSINode. If no managedFields are found in cSINode for fieldManager, a
 // CSINodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // cSINode must be a unmodified CSINode API object that was retrieved from the Kubernetes API.
@@ -57,8 +57,19 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return extractCSINode(cSINode, fieldManager, "")
+}
+
+// ExtractCSINodeStatus is the same as ExtractCSINode except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCSINodeStatus(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return extractCSINode(cSINode, fieldManager, "status")
+}
+
+func extractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
-	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSINode"), fieldManager, b)
+	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSINode"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

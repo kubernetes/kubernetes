@@ -87,9 +87,9 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
 	epSlice.Labels[discovery.LabelManagedBy] = controllerName
 
-	// clone all annotations but EndpointsLastChangeTriggerTime
+	// clone all annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
 	for annotation, val := range endpoints.Annotations {
-		if annotation == corev1.EndpointsLastChangeTriggerTime {
+		if annotation == corev1.EndpointsLastChangeTriggerTime || annotation == corev1.LastAppliedConfigAnnotation {
 			continue
 		}
 		epSlice.Annotations[annotation] = val
@@ -161,12 +161,12 @@ func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
 	// is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return nil
 	}
 	service, ok := tombstone.Obj.(*corev1.Service)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Service resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", obj))
 		return nil
 	}
 	return service
@@ -182,12 +182,12 @@ func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
 	// final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return nil
 	}
 	endpoints, ok := tombstone.Obj.(*corev1.Endpoints)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not an Endpoints resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", obj))
 		return nil
 	}
 	return endpoints
@@ -202,12 +202,12 @@ func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice 
 	// state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return nil
 	}
 	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not an EndpointSlice resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", obj))
 		return nil
 	}
 	return endpointSlice
@@ -257,4 +257,17 @@ func cloneAndRemoveKeys(a map[string]string, keys ...string) map[string]string {
 		delete(newMap, key)
 	}
 	return newMap
+}
+
+// managedByChanged returns true if one of the provided EndpointSlices is
+// managed by the EndpointSlice controller while the other is not.
+func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) bool {
+	return managedByController(endpointSlice1) != managedByController(endpointSlice2)
+}
+
+// managedByController returns true if the controller of the provided
+// EndpointSlices is the EndpointSlice controller.
+func managedByController(endpointSlice *discovery.EndpointSlice) bool {
+	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	return managedBy == controllerName
 }

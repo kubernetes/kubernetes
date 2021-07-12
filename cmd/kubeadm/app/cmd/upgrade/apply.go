@@ -18,14 +18,7 @@ package upgrade
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -35,11 +28,15 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	utilsexec "k8s.io/utils/exec"
-)
 
-const (
-	defaultImagePullTimeout = 15 * time.Minute
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -51,7 +48,6 @@ type applyFlags struct {
 	dryRun             bool
 	etcdUpgrade        bool
 	renewCerts         bool
-	imagePullTimeout   time.Duration
 	patchesDir         string
 }
 
@@ -63,10 +59,9 @@ func (f *applyFlags) sessionIsInteractive() bool {
 // newCmdApply returns the cobra command for `kubeadm upgrade apply`
 func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
-		applyPlanFlags:   apf,
-		imagePullTimeout: defaultImagePullTimeout,
-		etcdUpgrade:      true,
-		renewCerts:       true,
+		applyPlanFlags: apf,
+		etcdUpgrade:    true,
+		renewCerts:     true,
 	}
 
 	cmd := &cobra.Command{
@@ -86,9 +81,6 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
-	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
-	// TODO: The flag was deprecated in 1.19; remove the flag following a GA deprecation policy of 12 months or 2 releases (whichever is longer)
-	cmd.Flags().MarkDeprecated("image-pull-timeout", "This flag is deprecated and will be removed in a future version.")
 	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
 	return cmd
@@ -168,13 +160,6 @@ func runApply(flags *applyFlags, args []string) error {
 	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
 		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
 	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
-		return err
-	}
-
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2375
-	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to control plane Nodes\n",
-		kubeadmconstants.LabelExcludeFromExternalLB)
-	if err := upgrade.LabelControlPlaneNodesWithExcludeFromLB(client); err != nil {
 		return err
 	}
 

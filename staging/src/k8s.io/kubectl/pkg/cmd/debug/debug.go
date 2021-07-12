@@ -18,6 +18,7 @@ package debug
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -31,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -121,7 +124,7 @@ type DebugOptions struct {
 	attachChanged         bool
 	shareProcessedChanged bool
 
-	podClient corev1client.PodsGetter
+	podClient corev1client.CoreV1Interface
 
 	genericclioptions.IOStreams
 }
@@ -272,8 +275,17 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 	}
 
 	// TargetContainer
-	if len(o.TargetContainer) > 0 && len(o.CopyTo) > 0 {
-		return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead.")
+	if len(o.TargetContainer) > 0 {
+		if len(o.CopyTo) > 0 {
+			return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead.")
+		}
+		if !o.Quiet {
+			// If the runtime doesn't support container namespace targeting this will fail silently, which has caused
+			// some confusion (ex: https://issues.k8s.io/98362), so print a warning. This can be removed when
+			// EphemeralContainers are generally available.
+			fmt.Fprintf(o.Out, "Targeting container %q. If you don't see processes from this container it may be because the container runtime doesn't support this feature.\n", o.TargetContainer)
+			// TODO(verb): Add a list of supported container runtimes to https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/ and then link here.
+		}
 	}
 
 	// TTY
@@ -360,7 +372,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 // Returns an already created pod and container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(o.Namespace)
-	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node.Name), metav1.CreateOptions{})
+	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node), metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -381,26 +393,81 @@ func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.P
 
 // debugByEphemeralContainer runs an EphemeralContainer in the target Pod for use as a debug container
 func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
-	pods := o.podClient.Pods(pod.Namespace)
-	ec, err := pods.GetEphemeralContainers(ctx, pod.Name, metav1.GetOptions{})
+	klog.V(2).Infof("existing ephemeral containers: %v", pod.Spec.EphemeralContainers)
+	podJS, err := json.Marshal(pod)
 	if err != nil {
-		// The pod has already been fetched at this point, so a NotFound error indicates the ephemeralcontainers subresource wasn't found.
-		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound {
-			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
-		}
-		return nil, "", err
+		return nil, "", fmt.Errorf("error creating JSON for pod: %v", err)
 	}
-	klog.V(2).Infof("existing ephemeral containers: %v", ec.EphemeralContainers)
 
 	debugContainer := o.generateDebugContainer(pod)
 	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
-	ec.EphemeralContainers = append(ec.EphemeralContainers, *debugContainer)
-	_, err = pods.UpdateEphemeralContainers(ctx, pod.Name, ec, metav1.UpdateOptions{})
+	debugPod := pod.DeepCopy()
+	debugPod.Spec.EphemeralContainers = append(debugPod.Spec.EphemeralContainers, *debugContainer)
+	debugJS, err := json.Marshal(debugPod)
 	if err != nil {
-		return nil, "", fmt.Errorf("error updating ephemeral containers: %v", err)
+		return nil, "", fmt.Errorf("error creating JSON for debug container: %v", err)
 	}
 
-	return pod, debugContainer.Name, nil
+	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, debugJS, pod)
+	if err != nil {
+		return nil, "", fmt.Errorf("error creating patch to add debug container: %v", err)
+	}
+	klog.V(2).Infof("generated strategic merge patch for debug container: %s", patch)
+
+	pods := o.podClient.Pods(pod.Namespace)
+	result, err := pods.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
+	if err != nil {
+		// The apiserver will return a 404 when the EphemeralContainers feature is disabled because the `/ephemeralcontainers` subresource
+		// is missing. Unlike the 404 returned by a missing pod, the status details will be empty.
+		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound && serr.ErrStatus.Details.Name == "" {
+			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+		}
+
+		// The Kind used for the /ephemeralcontainers subresource changed in 1.22. When presented with an unexpected
+		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
+		// using the old API.
+		if runtime.IsNotRegisteredError(err) {
+			klog.V(1).Infof("Falling back to legacy API because server returned error: %v", err)
+			return o.debugByEphemeralContainerLegacy(ctx, pod, debugContainer)
+		}
+
+		return nil, "", err
+	}
+
+	return result, debugContainer.Name, nil
+}
+
+// debugByEphemeralContainerLegacy adds debugContainer as an ephemeral container using the pre-1.22 /ephemeralcontainers API
+// This may be removed when we no longer wish to support releases prior to 1.22.
+func (o *DebugOptions) debugByEphemeralContainerLegacy(ctx context.Context, pod *corev1.Pod, debugContainer *corev1.EphemeralContainer) (*corev1.Pod, string, error) {
+	// We no longer have the v1.EphemeralContainers Kind since it was removed in 1.22, but
+	// we can present a JSON 6902 patch that the api server will apply.
+	patch, err := json.Marshal([]map[string]interface{}{{
+		"op":    "add",
+		"path":  "/ephemeralContainers/-",
+		"value": debugContainer,
+	}})
+	if err != nil {
+		return nil, "", fmt.Errorf("error creating JSON 6902 patch for old /ephemeralcontainers API: %s", err)
+	}
+
+	result := o.podClient.RESTClient().Patch(types.JSONPatchType).
+		Namespace(pod.Namespace).
+		Resource("pods").
+		Name(pod.Name).
+		SubResource("ephemeralcontainers").
+		Body(patch).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, "", err
+	}
+
+	newPod, err := o.podClient.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, "", err
+	}
+
+	return newPod, debugContainer.Name, nil
 }
 
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified
@@ -451,7 +518,7 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 
 // generateNodeDebugPod generates a debugging pod that schedules on the specified node.
 // The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
+func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 	cn := "debugger"
 	// Setting a user-specified container name doesn't make much difference when there's only one container,
 	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
@@ -462,9 +529,9 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 	// The name of the debugging pod is based on the target node, and it's not configurable to
 	// limit the number of command line flags. There may be a collision on the name, but this
 	// should be rare enough that it's not worth the API round trip to check.
-	pn := fmt.Sprintf("node-debugger-%s-%s", node, nameSuffixFunc(5))
+	pn := fmt.Sprintf("node-debugger-%s-%s", node.Name, nameSuffixFunc(5))
 	if !o.Quiet {
-		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node)
+		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node.Name)
 	}
 
 	p := &corev1.Pod{
@@ -492,7 +559,7 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 			HostIPC:       true,
 			HostNetwork:   true,
 			HostPID:       true,
-			NodeName:      node,
+			NodeName:      node.Name,
 			RestartPolicy: corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
 				{
@@ -500,6 +567,11 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{Path: "/"},
 					},
+				},
+			},
+			Tolerations: []corev1.Toleration{
+				{
+					Operator: corev1.TolerationOpExists,
 				},
 			},
 		},

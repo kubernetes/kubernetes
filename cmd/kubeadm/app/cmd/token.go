@@ -25,22 +25,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	clientset "k8s.io/client-go/kubernetes"
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
-	"k8s.io/klog/v2"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
@@ -52,6 +40,20 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientset "k8s.io/client-go/kubernetes"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog/v2"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // newCmdToken returns cobra.Command for token management
@@ -232,9 +234,9 @@ func newCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, certificateKey string, kubeConfigFile string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1.InitConfiguration, printJoinCommand bool, certificateKey string, kubeConfigFile string) error {
 	// ClusterConfiguration is needed just for the call to LoadOrDefaultInitConfiguration
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
+	clusterCfg := &kubeadmapiv1.ClusterConfiguration{
 		// KubernetesVersion is not used, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
 		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
@@ -278,7 +280,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 		}
 	} else {
 		if certificateKey != "" {
-			return errors.Wrap(err, "cannot use --certificate-key without --print-join-command")
+			return errors.New("cannot use --certificate-key without --print-join-command")
 		}
 		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())
 	}
@@ -382,7 +384,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 
 	for _, secret := range secrets.Items {
 		// Get the BootstrapToken struct representation from the Secret object
-		token, err := kubeadmapi.BootstrapTokenFromSecret(&secret)
+		token, err := bootstraptokenv1.BootstrapTokenFromSecret(&secret)
 		if err != nil {
 			fmt.Fprintf(errW, "%v", err)
 			continue
@@ -415,7 +417,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		klog.V(1).Info("[token] parsing token")
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
-			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
+			bts, err := bootstraptokenv1.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
 				return errors.Errorf("given token didn't match pattern %q or %q",
 					bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)

@@ -27,12 +27,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -718,14 +716,14 @@ func TestDropSubPath(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasSubpaths:
 						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasSubpaths:
 						// new pod should be changed
@@ -734,12 +732,12 @@ func TestDropSubPath(t *testing.T) {
 						}
 						// new pod should not have subpaths
 						if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
-							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutSubpaths()))
+							t.Errorf("new pod had subpaths: %v", cmp.Diff(newPod, podWithoutSubpaths()))
 						}
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -826,14 +824,14 @@ func TestDropProcMount(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasProcMount:
 						// new pod should not be changed if the feature is enabled, or if the old pod had ProcMount
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasProcMount:
 						// new pod should be changed
@@ -847,7 +845,7 @@ func TestDropProcMount(t *testing.T) {
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -936,14 +934,14 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasEmptyDirSizeLimit:
 						// new pod should not be changed if the feature is enabled, or if the old pod had EmptyDir SizeLimit
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasEmptyDirSizeLimit:
 						// new pod should be changed
@@ -952,12 +950,12 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 						}
 						// new pod should not have EmptyDir SizeLimit
 						if !reflect.DeepEqual(newPod, podWithoutEmptyDirSizeLimit()) {
-							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutEmptyDirSizeLimit()))
+							t.Errorf("new pod had EmptyDir SizeLimit: %v", cmp.Diff(newPod, podWithoutEmptyDirSizeLimit()))
 						}
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -1018,14 +1016,14 @@ func TestDropAppArmor(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasAppArmor:
 						// new pod should not be changed if the feature is enabled, or if the old pod had AppArmor
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasAppArmor:
 						// new pod should be changed
@@ -1034,12 +1032,12 @@ func TestDropAppArmor(t *testing.T) {
 						}
 						// new pod should not have AppArmor
 						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
-							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutAppArmor()))
+							t.Errorf("new pod had EmptyDir SizeLimit: %v", cmp.Diff(newPod, podWithoutAppArmor()))
 						}
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -1092,62 +1090,66 @@ func TestDropSubPathExpr(t *testing.T) {
 		},
 	}
 
-	enabled := true
-	for _, oldPodInfo := range podInfo {
-		for _, newPodInfo := range podInfo {
-			oldPodHasSubpaths, oldPod := oldPodInfo.hasSubpaths, oldPodInfo.pod()
-			newPodHasSubpaths, newPod := newPodInfo.hasSubpaths, newPodInfo.pod()
-			if newPod == nil {
-				continue
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSubpaths, oldPod := oldPodInfo.hasSubpaths, oldPodInfo.pod()
+				newPodHasSubpaths, newPod := newPodInfo.hasSubpaths, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSubpaths:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSubpaths:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have subpaths
+						if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
+							t.Errorf("new pod had subpaths: %v", cmp.Diff(newPod, podWithoutSubpaths()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
 			}
-
-			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-
-				var oldPodSpec *api.PodSpec
-				if oldPod != nil {
-					oldPodSpec = &oldPod.Spec
-				}
-				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-				// old pod should never be changed
-				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-					t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-				}
-
-				switch {
-				case enabled || oldPodHasSubpaths:
-					// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-					}
-				case newPodHasSubpaths:
-					// new pod should be changed
-					if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod was not changed")
-					}
-					// new pod should not have subpaths
-					if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
-						t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutSubpaths()))
-					}
-				default:
-					// new pod should not need to be changed
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-					}
-				}
-			})
 		}
 	}
 }
 
 func TestDropProbeGracePeriod(t *testing.T) {
-	gracePeriod := int64(10)
-	probe := api.Probe{TerminationGracePeriodSeconds: &gracePeriod}
 	podWithProbeGracePeriod := func() *api.Pod {
+		livenessGracePeriod := int64(10)
+		livenessProbe := api.Probe{TerminationGracePeriodSeconds: &livenessGracePeriod}
+		startupGracePeriod := int64(10)
+		startupProbe := api.Probe{TerminationGracePeriodSeconds: &startupGracePeriod}
 		return &api.Pod{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyNever,
-				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &probe, StartupProbe: &probe}},
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &livenessProbe, StartupProbe: &startupProbe}},
 			},
 		}
 	}
@@ -1189,50 +1191,52 @@ func TestDropProbeGracePeriod(t *testing.T) {
 		},
 	}
 
-	enabled := true
-	for _, oldPodInfo := range podInfo {
-		for _, newPodInfo := range podInfo {
-			oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
-			newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
-			if newPod == nil {
-				continue
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
+				newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasGracePeriod:
+						// new pod should not be changed if the feature is enabled, or if the old pod had terminationGracePeriod
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasGracePeriod:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have terminationGracePeriod
+						if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
+							t.Errorf("new pod had probe-level terminationGracePeriod: %v", cmp.Diff(newPod, podWithoutProbeGracePeriod()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
 			}
-
-			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-
-				var oldPodSpec *api.PodSpec
-				if oldPod != nil {
-					oldPodSpec = &oldPod.Spec
-				}
-				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-				// old pod should never be changed
-				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-					t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-				}
-
-				switch {
-				case enabled || oldPodHasGracePeriod:
-					// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-					}
-				case newPodHasGracePeriod:
-					// new pod should be changed
-					if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod was not changed")
-					}
-					// new pod should not have subpaths
-					if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
-						t.Errorf("new pod had probe-level terminationGracePeriod: %v", diff.ObjectReflectDiff(newPod, podWithoutProbeGracePeriod()))
-					}
-				default:
-					// new pod should not need to be changed
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-					}
-				}
-			})
 		}
 	}
 }
@@ -1328,11 +1332,11 @@ func TestDropStatusPodIPs(t *testing.T) {
 			old := tc.oldPodStatus.DeepCopy()
 			// old pod status should never be changed
 			if !reflect.DeepEqual(tc.oldPodStatus, old) {
-				t.Errorf("%v: old pod status changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldPodStatus, old))
+				t.Errorf("%v: old pod status changed: %v", tc.name, cmp.Diff(tc.oldPodStatus, old))
 			}
 
 			if !reflect.DeepEqual(tc.podStatus, tc.comparePodStatus) {
-				t.Errorf("%v: unexpected pod status: %v", tc.name, diff.ObjectReflectDiff(tc.podStatus, tc.comparePodStatus))
+				t.Errorf("%v: unexpected pod status: %v", tc.name, cmp.Diff(tc.podStatus, tc.comparePodStatus))
 			}
 		}()
 	}
@@ -1361,12 +1365,12 @@ func TestDropEphemeralContainers(t *testing.T) {
 		pod                    func() *api.Pod
 	}{
 		{
-			description:            "has subpaths",
+			description:            "has ephemeral containers",
 			hasEphemeralContainers: true,
 			pod:                    podWithEphemeralContainers,
 		},
 		{
-			description:            "does not have subpaths",
+			description:            "does not have ephemeral containers",
 			hasEphemeralContainers: false,
 			pod:                    podWithoutEphemeralContainers,
 		},
@@ -1397,14 +1401,14 @@ func TestDropEphemeralContainers(t *testing.T) {
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
 					}
 
 					switch {
 					case enabled || oldPodHasEphemeralContainers:
 						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					case newPodHasEphemeralContainers:
 						// new pod should be changed
@@ -1413,12 +1417,12 @@ func TestDropEphemeralContainers(t *testing.T) {
 						}
 						// new pod should not have subpaths
 						if !reflect.DeepEqual(newPod, podWithoutEphemeralContainers()) {
-							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutEphemeralContainers()))
+							t.Errorf("new pod had subpaths: %v", cmp.Diff(newPod, podWithoutEphemeralContainers()))
 						}
 					default:
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -1446,19 +1450,19 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 		},
 		{
 			name:                            "UpdateFeatureDisabled",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  false,
 			wantAllowInvalidPodDeletionCost: true,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: false,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "invalid-value"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "invalid-value"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: true,
 		},
@@ -1471,6 +1475,365 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
 			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
 				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantAllowInvalidPodDeletionCost, gotOptions.AllowInvalidPodDeletionCost)
+			}
+		})
+	}
+}
+
+func TestHaveSameExpandedDNSConfig(t *testing.T) {
+	testCases := []struct {
+		desc       string
+		podSpec    *api.PodSpec
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{
+			desc:       "nil DNSConfig",
+			podSpec:    &api.PodSpec{},
+			oldPodSpec: &api.PodSpec{},
+			want:       false,
+		},
+		{
+			desc: "empty DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			want: false,
+		},
+		{
+			desc: "same legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "same expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			desc: "update expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := haveSameExpandedDNSConfig(tc.podSpec, tc.oldPodSpec)
+			if tc.want != got {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, got)
 			}
 		})
 	}

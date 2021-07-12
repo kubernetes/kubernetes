@@ -50,7 +50,7 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // ExtractRuntimeClass extracts the applied configuration owned by fieldManager from
 // runtimeClass. If no managedFields are found in runtimeClass for fieldManager, a
 // RuntimeClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // runtimeClass must be a unmodified RuntimeClass API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractRuntimeClass(runtimeClass *nodev1beta1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+	return extractRuntimeClass(runtimeClass, fieldManager, "")
+}
+
+// ExtractRuntimeClassStatus is the same as ExtractRuntimeClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractRuntimeClassStatus(runtimeClass *nodev1beta1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+	return extractRuntimeClass(runtimeClass, fieldManager, "status")
+}
+
+func extractRuntimeClass(runtimeClass *nodev1beta1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
 	b := &RuntimeClassApplyConfiguration{}
-	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1beta1.RuntimeClass"), fieldManager, b)
+	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1beta1.RuntimeClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

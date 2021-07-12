@@ -95,7 +95,7 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 
 // Until wraps the watcherClient's watch function with RetryWatcher making sure that watcher gets restarted in case of errors.
 // The initialResourceVersion will be given to watch method when first called. It shall not be "" or "0"
-// given the underlying WATCH call issues (#74022). If you want the initial list ("", "0") done for you use ListWatchUntil instead.
+// given the underlying WATCH call issues (#74022).
 // Remaining behaviour is identical to function UntilWithoutRetry. (See above.)
 // Until can deal with API timeouts and lost connections.
 // It guarantees you to see all events and in the order they happened.

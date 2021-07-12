@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -32,9 +31,6 @@ import (
 )
 
 func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
-		return nil, false, nil
-	}
 	go job.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Batch().V1().Jobs(),
@@ -44,9 +40,6 @@ func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}] {
-		return nil, false, nil
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CronJobControllerV2) {
 		cj2c, err := cronjob.NewControllerV2(ctx.InformerFactory.Batch().V1().Jobs(),
 			ctx.InformerFactory.Batch().V1().CronJobs(),

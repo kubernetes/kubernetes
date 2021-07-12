@@ -32,13 +32,14 @@ type fakeManager struct {
 }
 
 func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Info("Start()")
+	klog.InfoS("Start()")
 	return nil
 }
 
 func (m *fakeManager) Policy() Policy {
 	klog.InfoS("Policy()")
-	return NewNonePolicy()
+	pol, _ := NewNonePolicy(nil)
+	return pol
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {

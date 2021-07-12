@@ -17,12 +17,15 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
-	"github.com/pkg/errors"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/pkg/errors"
 )
 
 func createTestRunDiffFile(contents []byte) (string, error) {
@@ -43,9 +46,9 @@ func TestRunDiff(t *testing.T) {
 	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
 
 	// create a temporary file with valid ClusterConfiguration
-	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta2\n" +
-		"kind: ClusterConfiguration\n" +
-		"kubernetesVersion: " + currentVersion)
+	testUpgradeDiffConfigContents := []byte(fmt.Sprintf("apiVersion: %s\n"+
+		"kind: ClusterConfiguration\n"+
+		"kubernetesVersion: %s", kubeadmapiv1.SchemeGroupVersion.String(), currentVersion))
 	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)
 	if err != nil {
 		t.Fatal(err)
@@ -121,4 +124,61 @@ func TestRunDiff(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateManifests(t *testing.T) {
+	// Create valid manifest paths
+	apiServerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(apiServerManifest)
+	controllerManagerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(controllerManagerManifest)
+	schedulerManifest, err := createTestRunDiffFile([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(schedulerManifest)
+	// Create a file path that does not exist
+	notExistFilePath := "./foobar123456"
+
+	testCases := []struct {
+		name          string
+		args          []string
+		expectedError bool
+	}{
+		{
+			name:          "valid: valid manifest path",
+			args:          []string{apiServerManifest, controllerManagerManifest, schedulerManifest},
+			expectedError: false,
+		},
+		{
+			name:          "invalid: one is empty path",
+			args:          []string{apiServerManifest, controllerManagerManifest, ""},
+			expectedError: true,
+		},
+		{
+			name:          "invalid: manifest path is directory",
+			args:          []string{"./"},
+			expectedError: true,
+		},
+		{
+			name:          "invalid: manifest path does not exist",
+			args:          []string{notExistFilePath},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateManifestsPath(tc.args...); (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+		})
+	}
+
 }

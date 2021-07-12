@@ -154,7 +154,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 		// Otherwise, the reconstruct process may clean up pods' volumes that are still in use because
 		// desired state of world does not contain a complete list of pods.
 		if rc.populatorHasAddedPods() && !rc.StatesHasBeenSynced() {
-			klog.Infof("Reconciler: start to sync state")
+			klog.InfoS("Reconciler: start to sync state")
 			rc.sync()
 		}
 	}
@@ -182,7 +182,7 @@ func (rc *reconciler) unmountVolumes() {
 	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
 			// Volume is mounted, unmount it
-			klog.V(5).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
+			klog.V(5).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
 				mountedVolume.MountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 			if err != nil &&
@@ -190,10 +190,10 @@ func (rc *reconciler) unmountVolumes() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				klog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+				klog.ErrorS(err, mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 			}
 			if err == nil {
-				klog.Infof(mountedVolume.GenerateMsgDetailed("operationExecutor.UnmountVolume started", ""))
+				klog.InfoS(mountedVolume.GenerateMsgDetailed("operationExecutor.UnmountVolume started", ""))
 			}
 		}
 	}
@@ -208,7 +208,7 @@ func (rc *reconciler) mountAttachVolumes() {
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
 				// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
 				// for controller to finish attaching volume.
-				klog.V(5).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""))
+				klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""))
 				err := rc.operationExecutor.VerifyControllerAttachedVolume(
 					volumeToMount.VolumeToMount,
 					rc.nodeName,
@@ -218,10 +218,10 @@ func (rc *reconciler) mountAttachVolumes() {
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					klog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+					klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
-					klog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume started", ""))
+					klog.InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume started", ""))
 				}
 			} else {
 				// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher,
@@ -231,17 +231,17 @@ func (rc *reconciler) mountAttachVolumes() {
 					VolumeSpec: volumeToMount.VolumeSpec,
 					NodeName:   rc.nodeName,
 				}
-				klog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""))
+				klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""))
 				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					klog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+					klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
-					klog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started", ""))
+					klog.InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started", ""))
 				}
 			}
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
@@ -251,7 +251,7 @@ func (rc *reconciler) mountAttachVolumes() {
 			if isRemount {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
-			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
+			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
 			err := rc.operationExecutor.MountVolume(
 				rc.waitForAttachTimeout,
 				volumeToMount.VolumeToMount,
@@ -262,18 +262,18 @@ func (rc *reconciler) mountAttachVolumes() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				klog.Errorf(volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+				klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 			}
 			if err == nil {
 				if remountingLogStr == "" {
-					klog.V(1).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
+					klog.V(1).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				} else {
-					klog.V(5).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
+					klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				}
 			}
 		} else if cache.IsFSResizeRequiredError(err) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
-			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""))
+			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""))
 			err := rc.operationExecutor.ExpandInUseVolume(
 				volumeToMount.VolumeToMount,
 				rc.actualStateOfWorld)
@@ -282,10 +282,10 @@ func (rc *reconciler) mountAttachVolumes() {
 				!exponentialbackoff.IsExponentialBackoff(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
-				klog.Errorf(volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandInUseVolume failed", err).Error())
+				klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandInUseVolume failed", err).Error())
 			}
 			if err == nil {
-				klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandInUseVolume started", ""))
+				klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandInUseVolume started", ""))
 			}
 		}
 	}
@@ -298,7 +298,7 @@ func (rc *reconciler) unmountDetachDevices() {
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
 			if attachedVolume.DeviceMayBeMounted() {
 				// Volume is globally mounted to device, unmount it
-				klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
+				klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
 				err := rc.operationExecutor.UnmountDevice(
 					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.hostutil)
 				if err != nil &&
@@ -306,20 +306,20 @@ func (rc *reconciler) unmountDetachDevices() {
 					!exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					klog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountDevice failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+					klog.ErrorS(err, attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountDevice failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 				}
 				if err == nil {
-					klog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.UnmountDevice started", ""))
+					klog.InfoS(attachedVolume.GenerateMsgDetailed("operationExecutor.UnmountDevice started", ""))
 				}
 			} else {
 				// Volume is attached to node, detach it
 				// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin.
 				if rc.controllerAttachDetachEnabled || !attachedVolume.PluginIsAttachable {
 					rc.actualStateOfWorld.MarkVolumeAsDetached(attachedVolume.VolumeName, attachedVolume.NodeName)
-					klog.Infof(attachedVolume.GenerateMsgDetailed("Volume detached", fmt.Sprintf("DevicePath %q", attachedVolume.DevicePath)))
+					klog.InfoS(attachedVolume.GenerateMsgDetailed("Volume detached", fmt.Sprintf("DevicePath %q", attachedVolume.DevicePath)))
 				} else {
 					// Only detach if kubelet detach is enabled
-					klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
+					klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
 						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 					if err != nil &&
@@ -327,10 +327,10 @@ func (rc *reconciler) unmountDetachDevices() {
 						!exponentialbackoff.IsExponentialBackoff(err) {
 						// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
-						klog.Errorf(attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
+						klog.ErrorS(err, attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 					}
 					if err == nil {
-						klog.Infof(attachedVolume.GenerateMsgDetailed("operationExecutor.DetachVolume started", ""))
+						klog.InfoS(attachedVolume.GenerateMsgDetailed("operationExecutor.DetachVolume started", ""))
 					}
 				}
 			}
@@ -386,14 +386,14 @@ func (rc *reconciler) syncStates() {
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
 	if err != nil {
-		klog.Errorf("Cannot get volumes from disk %v", err)
+		klog.ErrorS(err, "Cannot get volumes from disk")
 		return
 	}
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
 	volumeNeedReport := []v1.UniqueVolumeName{}
 	for _, volume := range podVolumes {
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			klog.V(4).Infof("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+			klog.V(4).InfoS("Volume exists in actual state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 			// There is nothing to reconstruct
 			continue
 		}
@@ -404,11 +404,11 @@ func (rc *reconciler) syncStates() {
 			if volumeInDSW {
 				// Some pod needs the volume, don't clean it up and hope that
 				// reconcile() calls SetUp and reconstructs the volume in ASW.
-				klog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+				klog.V(4).InfoS("Volume exists in desired state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 				continue
 			}
 			// No pod needs the volume.
-			klog.Warningf("Could not construct volume information, cleanup the mounts. (pod.UID %s, volume.SpecName %s): %v", volume.podName, volume.volumeSpecName, err)
+			klog.InfoS("Could not construct volume information, cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			rc.cleanupMounts(volume)
 			continue
 		}
@@ -419,22 +419,20 @@ func (rc *reconciler) syncStates() {
 			// this new kubelet so reconcile() calls SetUp and re-mounts the
 			// volume if it's necessary.
 			volumeNeedReport = append(volumeNeedReport, reconstructedVolume.volumeName)
-			klog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), marking as InUse", volume.volumeSpecName, volume.podName)
+			klog.V(4).InfoS("Volume exists in desired state, marking as InUse", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 			continue
 		}
 		// There is no pod that uses the volume.
 		if rc.operationExecutor.IsOperationPending(reconstructedVolume.volumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
-			klog.Warning("Volume is in pending operation, skip cleaning up mounts")
+			klog.InfoS("Volume is in pending operation, skip cleaning up mounts")
 		}
-		klog.V(2).Infof(
-			"Reconciler sync states: could not find pod information in desired state, update it in actual state: %+v",
-			reconstructedVolume)
+		klog.V(2).InfoS("Reconciler sync states: could not find pod information in desired state, update it in actual state", "reconstructedVolume", reconstructedVolume)
 		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
 	}
 
 	if len(volumesNeedUpdate) > 0 {
 		if err = rc.updateStates(volumesNeedUpdate); err != nil {
-			klog.Errorf("Error occurred during reconstruct volume from disk: %v", err)
+			klog.ErrorS(err, "Error occurred during reconstruct volume from disk")
 		}
 	}
 	if len(volumeNeedReport) > 0 {
@@ -443,8 +441,7 @@ func (rc *reconciler) syncStates() {
 }
 
 func (rc *reconciler) cleanupMounts(volume podVolume) {
-	klog.V(2).Infof("Reconciler sync states: could not find information (PID: %s) (Volume SpecName: %s) in desired state, clean up the mount points",
-		volume.podName, volume.volumeSpecName)
+	klog.V(2).InfoS("Reconciler sync states: could not find volume information in desired state, clean up the mount points", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 	mountedVolume := operationexecutor.MountedVolume{
 		PodName:             volume.podName,
 		VolumeName:          v1.UniqueVolumeName(volume.volumeSpecName),
@@ -456,7 +453,7 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 	// to unmount both volume and device in the same routine.
 	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
-		klog.Errorf(mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
+		klog.ErrorS(err, mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
 		return
 	}
 }
@@ -600,13 +597,13 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) {
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
-		klog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
+		klog.ErrorS(fetchErr, "UpdateStates in reconciler: could not get node status with error")
 	} else {
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
 				volume.devicePath = attachedVolume.DevicePath
 				volumesNeedUpdate[attachedVolume.Name] = volume
-				klog.V(4).Infof("Update devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
+				klog.V(4).InfoS("Update devicePath from node status for volume", "volumeName", attachedVolume.Name, "path", volume.devicePath)
 			}
 		}
 	}
@@ -636,7 +633,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
 			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
 		if err != nil {
-			klog.Errorf("Could not add volume information to actual state of world: %v", err)
+			klog.ErrorS(err, "Could not add volume information to actual state of world")
 			continue
 		}
 		markVolumeOpts := operationexecutor.MarkVolumeOpts{
@@ -652,23 +649,23 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 		}
 		err = rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
 		if err != nil {
-			klog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
+			klog.ErrorS(err, "Could not add pod to volume information to actual state of world")
 			continue
 		}
-		klog.V(4).Infof("Volume: %s (pod UID %s) is marked as mounted and added into the actual state", volume.volumeName, volume.podName)
+		klog.V(4).InfoS("Volume is marked as mounted and added into the actual state", "podName", volume.podName, "volumeName", volume.volumeName)
 		// If the volume has device to mount, we mark its device as mounted.
 		if volume.deviceMounter != nil || volume.blockVolumeMapper != nil {
 			deviceMountPath, err := getDeviceMountPath(volume)
 			if err != nil {
-				klog.Errorf("Could not find device mount path for volume %s", volume.volumeName)
+				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", volume.volumeName)
 				continue
 			}
 			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName, volume.devicePath, deviceMountPath)
 			if err != nil {
-				klog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
+				klog.ErrorS(err, "Could not mark device is mounted to actual state of world")
 				continue
 			}
-			klog.V(4).Infof("Volume: %s (pod UID %s) is marked device as mounted and added into the actual state", volume.volumeName, volume.podName)
+			klog.V(4).InfoS("Volume is marked device as mounted and added into the actual state", "podName", volume.podName, "volumeName", volume.volumeName)
 		}
 	}
 	return nil
@@ -710,13 +707,13 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 				volumePluginPath := path.Join(volumesDir, pluginName)
 				volumePluginDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 				if err != nil {
-					klog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
+					klog.ErrorS(err, "Could not read volume plugin directory", "volumePluginPath", volumePluginPath)
 					continue
 				}
 				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
 					volumePath := path.Join(volumePluginPath, volumeName)
-					klog.V(5).Infof("podName: %v, volume path from volume plugin directory: %v, ", podName, volumePath)
+					klog.V(5).InfoS("Volume path from volume plugin directory", "podName", podName, "volumePath", volumePath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
 						volumeSpecName: volumeName,
@@ -728,6 +725,6 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			}
 		}
 	}
-	klog.V(4).Infof("Get volumes from pod directory %q %+v", podDir, volumes)
+	klog.V(4).InfoS("Get volumes from pod directory", "path", podDir, "volumes", volumes)
 	return volumes, nil
 }

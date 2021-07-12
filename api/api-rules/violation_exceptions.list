@@ -93,7 +93,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommo
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Ports
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeMounts
-API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainers,EphemeralContainers
 API rule violation: list_type_missing,k8s.io/api/core/v1,ExecAction,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,FCVolumeSource,TargetWWNs
 API rule violation: list_type_missing,k8s.io/api/core/v1,FCVolumeSource,WWIDs
@@ -161,7 +160,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,ImagePul
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,Secrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,ExternalIPs
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,LoadBalancerSourceRanges
-API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorLabelRequirement,Values
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorTerm,MatchLabelExpressions
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,DaemonSetStatus,Conditions
@@ -256,14 +254,12 @@ API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,Role,Rules
 API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,RoleBinding,Subjects
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
-API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,AllowedTopologies
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/api/storage/v1alpha1,CSIStorageCapacityList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIDriverSpec,VolumeLifecycleModes
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSINodeSpec,Drivers
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIStorageCapacityList,Items
-API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,StorageClass,AllowedTopologies
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ConversionRequest,Objects
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ConversionResponse,ConvertedObjects
@@ -470,6 +466,10 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,CertificateAuthorityData
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,InsecureSkipTLSVerify
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,ProxyURL
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,CertificateAuthorityData
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,InsecureSkipTLSVerify
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,ProxyURL
@@ -540,7 +540,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,H
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUpscaleForbiddenWindow
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUseRESTClients
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController

@@ -17,11 +17,9 @@ limitations under the License.
 package resource
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -49,41 +47,23 @@ func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelS
 
 // Visit implements Visitor and uses request chunking by default.
 func (r *Selector) Visit(fn VisitorFunc) error {
-	var continueToken string
-	for {
-		list, err := NewHelper(r.Client, r.Mapping).List(
+	helper := NewHelper(r.Client, r.Mapping)
+	initialOpts := metav1.ListOptions{
+		LabelSelector: r.LabelSelector,
+		FieldSelector: r.FieldSelector,
+		Limit:         r.LimitChunks,
+	}
+	return FollowContinue(&initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
+		list, err := helper.List(
 			r.Namespace,
 			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
-			&metav1.ListOptions{
-				LabelSelector: r.LabelSelector,
-				FieldSelector: r.FieldSelector,
-				Limit:         r.LimitChunks,
-				Continue:      continueToken,
-			},
+			&options,
 		)
 		if err != nil {
-			if errors.IsResourceExpired(err) {
-				return err
-			}
-			if errors.IsBadRequest(err) || errors.IsNotFound(err) {
-				if se, ok := err.(*errors.StatusError); ok {
-					// modify the message without hiding this is an API error
-					if len(r.LabelSelector) == 0 && len(r.FieldSelector) == 0 {
-						se.ErrStatus.Message = fmt.Sprintf("Unable to list %q: %v", r.Mapping.Resource, se.ErrStatus.Message)
-					} else {
-						se.ErrStatus.Message = fmt.Sprintf("Unable to find %q that match label selector %q, field selector %q: %v", r.Mapping.Resource, r.LabelSelector, r.FieldSelector, se.ErrStatus.Message)
-					}
-					return se
-				}
-				if len(r.LabelSelector) == 0 && len(r.FieldSelector) == 0 {
-					return fmt.Errorf("Unable to list %q: %v", r.Mapping.Resource, err)
-				}
-				return fmt.Errorf("Unable to find %q that match label selector %q, field selector %q: %v", r.Mapping.Resource, r.LabelSelector, r.FieldSelector, err)
-			}
-			return err
+			return nil, EnhanceListError(err, options, r.Mapping.Resource.String())
 		}
 		resourceVersion, _ := metadataAccessor.ResourceVersion(list)
-		nextContinueToken, _ := metadataAccessor.Continue(list)
+
 		info := &Info{
 			Client:  r.Client,
 			Mapping: r.Mapping,
@@ -95,13 +75,10 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		}
 
 		if err := fn(info, nil); err != nil {
-			return err
+			return nil, err
 		}
-		if len(nextContinueToken) == 0 {
-			return nil
-		}
-		continueToken = nextContinueToken
-	}
+		return list, nil
+	})
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {

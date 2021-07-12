@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -38,6 +39,7 @@ const (
 
 type kubeAPIServerEnv struct {
 	KubeHome                     string
+	KubeAPIServerRunAsUser       string
 	EncryptionProviderConfigPath string
 	EncryptionProviderConfig     string
 	CloudKMSIntegration          bool
@@ -72,6 +74,7 @@ func TestEncryptionProviderFlag(t *testing.T) {
 
 			e := kubeAPIServerEnv{
 				KubeHome:                     c.kubeHome,
+				KubeAPIServerRunAsUser:       strconv.Itoa(os.Getuid()),
 				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
 				EncryptionProviderConfig:     tc.encryptionProviderConfig,
 			}
@@ -107,6 +110,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 	p := filepath.Join(c.kubeHome, "encryption-provider-config.yaml")
 	e := kubeAPIServerEnv{
 		KubeHome:                     c.kubeHome,
+		KubeAPIServerRunAsUser:       strconv.Itoa(os.Getuid()),
 		EncryptionProviderConfigPath: p,
 		EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
 	}
@@ -177,6 +181,7 @@ func TestKMSIntegration(t *testing.T) {
 
 			var e = kubeAPIServerEnv{
 				KubeHome:                     c.kubeHome,
+				KubeAPIServerRunAsUser:       strconv.Itoa(os.Getuid()),
 				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
 				EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
 				CloudKMSIntegration:          tc.cloudKMSIntegration,

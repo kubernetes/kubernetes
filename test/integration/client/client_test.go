@@ -1026,13 +1026,11 @@ func TestExtractModifyApply(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to apply: %v", err)
 			}
-
-			extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
-			if err != nil {
-				t.Fatalf("Failed to extract: %v", err)
-			}
-
 			if tc.modifyFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
 				tc.modifyFunc(extractedDeployment)
 				result, err := deploymentClient.Apply(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 				if err != nil {
@@ -1048,12 +1046,16 @@ func TestExtractModifyApply(t *testing.T) {
 			}
 
 			if tc.modifyStatusFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeploymentStatus(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
 				tc.modifyStatusFunc(extractedDeployment)
 				result, err := deploymentClient.ApplyStatus(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 				if err != nil {
 					t.Fatalf("Failed to apply extracted apply configuration to status: %v", err)
 				}
-				extractedResult, err := appsv1ac.ExtractDeployment(result, fieldMgr)
+				extractedResult, err := appsv1ac.ExtractDeploymentStatus(result, fieldMgr)
 				if err != nil {
 					t.Fatalf("Failed to extract: %v", err)
 				}

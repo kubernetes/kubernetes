@@ -45,9 +45,11 @@ const (
 	inodesTotal = int64(2000)
 	inodesFree  = int64(1000)
 
-	vol0         = "vol0"
-	vol1         = "vol1"
-	pvcClaimName = "pvc-fake"
+	vol0          = "vol0"
+	vol1          = "vol1"
+	vol2          = "vol2"
+	pvcClaimName0 = "pvc-fake0"
+	pvcClaimName1 = "pvc-fake1"
 )
 
 var (
@@ -66,7 +68,15 @@ var (
 			Name: vol1,
 			VolumeSource: k8sv1.VolumeSource{
 				PersistentVolumeClaim: &k8sv1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcClaimName,
+					ClaimName: pvcClaimName0,
+				},
+			},
+		},
+		{
+			Name: vol2,
+			VolumeSource: k8sv1.VolumeSource{
+				PersistentVolumeClaim: &k8sv1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcClaimName1,
 				},
 			},
 		},
@@ -91,6 +101,8 @@ func TestPVCRef(t *testing.T) {
 	mockStats := new(statstest.StatsProvider)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
 	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
+	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 1)
 	fakeEventRecorder := record.FakeRecorder{
@@ -102,7 +114,7 @@ func TestPVCRef(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
-	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 2)
+	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 3)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name:    vol0,
@@ -112,10 +124,19 @@ func TestPVCRef(t *testing.T) {
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name: vol1,
 		PVCRef: &kubestats.PVCReference{
-			Name:      pvcClaimName,
+			Name:      pvcClaimName0,
 			Namespace: namespace0,
 		},
 		FsStats: expectedFSStats(),
+	})
+	// Verify 'vol2' has a PVC reference
+	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
+		Name: vol2,
+		PVCRef: &kubestats.PVCReference{
+			Name:      pvcClaimName1,
+			Namespace: namespace0,
+		},
+		FsStats: expectedBlockStats(),
 	})
 }
 
@@ -123,6 +144,8 @@ func TestNormalVolumeEvent(t *testing.T) {
 	mockStats := new(statstest.StatsProvider)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
 	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
+	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{
@@ -144,6 +167,8 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 	mockStats := new(statstest.StatsProvider)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}}
 	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	blockVolumes := map[string]volume.BlockVolume{vol1: &fakeBlockVolume{}}
+	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{
@@ -209,5 +234,44 @@ func expectedFSStats() kubestats.FsStats {
 		Inodes:         &inodes,
 		InodesFree:     &inodesFree,
 		InodesUsed:     &inodesUsed,
+	}
+}
+
+// Fake block-volume/metrics provider, block-devices have no inodes
+var _ volume.BlockVolume = &fakeBlockVolume{}
+
+type fakeBlockVolume struct{}
+
+func (v *fakeBlockVolume) GetGlobalMapPath(*volume.Spec) (string, error) { return "", nil }
+
+func (v *fakeBlockVolume) GetPodDeviceMapPath() (string, string) { return "", "" }
+
+func (v *fakeBlockVolume) SupportsMetrics() bool { return true }
+
+func (v *fakeBlockVolume) GetMetrics() (*volume.Metrics, error) {
+	return expectedBlockMetrics(), nil
+}
+
+func expectedBlockMetrics() *volume.Metrics {
+	return &volume.Metrics{
+		Available: resource.NewQuantity(available, resource.BinarySI),
+		Capacity:  resource.NewQuantity(capacity, resource.BinarySI),
+		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
+	}
+}
+
+func expectedBlockStats() kubestats.FsStats {
+	metric := expectedBlockMetrics()
+	available := uint64(metric.Available.Value())
+	capacity := uint64(metric.Capacity.Value())
+	used := uint64(metric.Used.Value())
+	null := uint64(0)
+	return kubestats.FsStats{
+		AvailableBytes: &available,
+		CapacityBytes:  &capacity,
+		UsedBytes:      &used,
+		Inodes:         &null,
+		InodesFree:     &null,
+		InodesUsed:     &null,
 	}
 }

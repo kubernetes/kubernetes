@@ -1,14 +1,108 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: hostendpoints.crd.projectcalico.org
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+  name: hostendpoints.crd.projectcalico.org
 spec:
-  scope: Cluster
   group: crd.projectcalico.org
-  version: v1
   names:
     kind: HostEndpoint
+    listKind: HostEndpointList
     plural: hostendpoints
     singular: hostendpoint
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HostEndpointSpec contains the specification for a HostEndpoint
+              resource.
+            properties:
+              expectedIPs:
+                description: "The expected IP addresses (IPv4 and IPv6) of the endpoint.
+                  If \"InterfaceName\" is not present, Calico will look for an interface
+                  matching any of the IPs in the list and apply policy to that. Note:
+                  \tWhen using the selector match criteria in an ingress or egress
+                  security Policy \tor Profile, Calico converts the selector into
+                  a set of IP addresses. For host \tendpoints, the ExpectedIPs field
+                  is used for that purpose. (If only the interface \tname is specified,
+                  Calico does not learn the IPs of the interface for use in match
+                  \tcriteria.)"
+                items:
+                  type: string
+                type: array
+              interfaceName:
+                description: "Either \"*\", or the name of a specific Linux interface
+                  to apply policy to; or empty.  \"*\" indicates that this HostEndpoint
+                  governs all traffic to, from or through the default network namespace
+                  of the host named by the \"Node\" field; entering and leaving that
+                  namespace via any interface, including those from/to non-host-networked
+                  local workloads. \n If InterfaceName is not \"*\", this HostEndpoint
+                  only governs traffic that enters or leaves the host through the
+                  specific interface named by InterfaceName, or - when InterfaceName
+                  is empty - through the specific interface that has one of the IPs
+                  in ExpectedIPs. Therefore, when InterfaceName is empty, at least
+                  one expected IP must be specified.  Only external interfaces (such
+                  as “eth0”) are supported here; it isn't possible for a HostEndpoint
+                  to protect traffic through a specific local workload interface.
+                  \n Note: Only some kinds of policy are implemented for \"*\" HostEndpoints;
+                  initially just pre-DNAT policy.  Please check Calico documentation
+                  for the latest position."
+                type: string
+              node:
+                description: The node name identifying the Calico node instance.
+                type: string
+              ports:
+                description: Ports contains the endpoint's named ports, which may
+                  be referenced in security policy rules.
+                items:
+                  properties:
+                    name:
+                      type: string
+                    port:
+                      type: integer
+                    protocol:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^.*
+                      x-kubernetes-int-or-string: true
+                  required:
+                  - name
+                  - port
+                  - protocol
+                  type: object
+                type: array
+              profiles:
+                description: A list of identifiers of security Profile objects that
+                  apply to this endpoint. Each profile is applied in the order that
+                  they appear in this list.  Profile rules are applied after the selector-based
+                  security policy.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,6 +1,38 @@
 Releases
 ========
 
+v1.6.0 (2020-09-14)
+===================
+
+-   Actually drop library dependency on development-time tooling.
+
+
+v1.5.0 (2020-02-24)
+===================
+
+-   Drop library dependency on development-time tooling.
+
+
+v1.4.0 (2019-11-04)
+===================
+
+-   Add `AppendInto` function to more ergonomically build errors inside a
+    loop.
+
+
+v1.3.0 (2019-10-29)
+===================
+
+-   Switch to Go modules.
+
+
+v1.2.0 (2019-09-26)
+===================
+
+-   Support extracting and matching against wrapped errors with `errors.As`
+    and `errors.Is`.
+
+
 v1.1.0 (2017-06-30)
 ===================
 

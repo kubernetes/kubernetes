@@ -20,8 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,11 +38,14 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
-		ttlEnabled        bool
-		indexedJobEnabled bool
-		suspendJobEnabled bool
+		ttlEnabled                    bool
+		indexedJobEnabled             bool
+		suspendJobEnabled             bool
+		trackingWithFinalizersEnabled bool
 	}{
 		"features disabled": {},
 		"ttl enabled": {
@@ -50,12 +57,16 @@ func TestJobStrategy(t *testing.T) {
 		"suspend job enabled": {
 			suspendJobEnabled: true,
 		},
+		"new job tracking enabled": {
+			trackingWithFinalizersEnabled: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, tc.ttlEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
 			testJobStrategy(t)
 		})
 	}
@@ -65,6 +76,7 @@ func testJobStrategy(t *testing.T) {
 	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
 	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
 	suspendJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob)
+	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -90,6 +102,10 @@ func testJobStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob",
 			Namespace: metav1.NamespaceDefault,
+			Annotations: map[string]string{
+				"foo": "bar",
+			},
+			ResourceVersion: "0",
 		},
 		Spec: batch.JobSpec{
 			Selector:       validSelector,
@@ -110,6 +126,9 @@ func testJobStrategy(t *testing.T) {
 	if job.Status.Active != 0 {
 		t.Errorf("Job does not allow setting status on create")
 	}
+	if job.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", job.Generation)
+	}
 	errs := Strategy.Validate(ctx, job)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -123,10 +142,35 @@ func testJobStrategy(t *testing.T) {
 	if !suspendJobEnabled && (job.Spec.Suspend != nil) {
 		t.Errorf("Job should allow setting .spec.suspend only when %v feature is enabled", features.SuspendJob)
 	}
+	wantAnnotations := map[string]string{"foo": "bar"}
+	if trackingWithFinalizersEnabled {
+		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	}
+	if diff := cmp.Diff(wantAnnotations, job.Annotations); diff != "" {
+		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
+	}
 
 	parallelism := int32(10)
+
+	// ensure we do not change generation for non-spec updates
+	updatedLabelJob := job.DeepCopy()
+	updatedLabelJob.Labels = map[string]string{"a": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedLabelJob, job)
+	if updatedLabelJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", updatedLabelJob.Generation)
+	}
+	errs = Strategy.ValidateUpdate(ctx, updatedLabelJob, job)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected update validation error")
+	}
+
 	updatedJob := &batch.Job{
-		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "bar",
+			ResourceVersion: "4",
+			// remove one annotation and try to enforce the job tracking finalizer.
+			Annotations: map[string]string{batchv1.JobTrackingFinalizer: ""},
+		},
 		Spec: batch.JobSpec{
 			Parallelism: &parallelism,
 			Completions: pointer.Int32Ptr(2),
@@ -144,13 +188,34 @@ func testJobStrategy(t *testing.T) {
 	if updatedJob.Status.Active != 10 {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
+	if updatedJob.Generation != 2 {
+		t.Errorf("expected Generation=2, got %d", updatedJob.Generation)
+	}
 	if ttlEnabled != (updatedJob.Spec.TTLSecondsAfterFinished != nil) {
 		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+	}
+	wantAnnotations = make(map[string]string)
+	if trackingWithFinalizersEnabled {
+		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	}
+	if diff := cmp.Diff(wantAnnotations, updatedJob.Annotations); diff != "" {
+		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
 	}
 
 	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
+	}
+
+	// Ensure going from legacy tracking Job to tracking with finalizers is
+	// disallowed.
+	job = job.DeepCopy()
+	job.Annotations = nil
+	updatedJob = job.DeepCopy()
+	updatedJob.Annotations = map[string]string{batch.JobTrackingFinalizer: ""}
+	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
+	if len(errs) != 1 {
+		t.Errorf("Expected update validation error")
 	}
 
 	// Test updating suspend false->true and nil-> true when the feature gate is
@@ -183,6 +248,149 @@ func testJobStrategy(t *testing.T) {
 	if got, want := gcds.DefaultGarbageCollectionPolicy(otherVersionCtx), rest.DeleteDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
+}
+
+func TestJobStrategyValidateUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	validSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"a": "b"},
+	}
+	validPodTemplateSpec := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	cases := map[string]struct {
+		job                           *batch.Job
+		update                        func(*batch.Job)
+		wantErrs                      field.ErrorList
+		trackingWithFinalizersEnabled bool
+	}{
+		"update parallelism": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Parallelism = pointer.Int32Ptr(2)
+			},
+		},
+		"update completions disallowed": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+					Completions:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Completions = pointer.Int32Ptr(2)
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
+			},
+		},
+		"adding tracking annotation disallowed, gate disabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations[batch.JobTrackingFinalizer] = ""
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
+			},
+		},
+		"adding tracking annotation disallowed, gate enabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations[batch.JobTrackingFinalizer] = ""
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
+			},
+			trackingWithFinalizersEnabled: true,
+		},
+		"preserving tracking annotation, feature disabled": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+					Annotations: map[string]string{
+						batch.JobTrackingFinalizer: "",
+					},
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: pointer.BoolPtr(true),
+					Parallelism:    pointer.Int32Ptr(1),
+				},
+			},
+			update: func(job *batch.Job) {
+				// change something.
+				job.Annotations["foo"] = "bar"
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
+			newJob := tc.job.DeepCopy()
+			tc.update(newJob)
+			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+
 }
 
 func TestJobStrategyWithGeneration(t *testing.T) {

@@ -35,12 +35,12 @@ func readCredentialProviderConfigFile(configPath string) (*kubeletconfig.Credent
 
 	data, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %v", configPath, err)
+		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %w", configPath, err)
 	}
 
 	config, err := decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding config %s: %v", configPath, err)
+		return nil, fmt.Errorf("error decoding config %s: %w", configPath, err)
 	}
 
 	return config, nil

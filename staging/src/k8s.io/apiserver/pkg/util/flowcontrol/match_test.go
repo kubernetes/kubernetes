@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 func TestMatching(t *testing.T) {
@@ -89,7 +90,7 @@ func TestLiterals(t *testing.T) {
 	ui := &user.DefaultInfo{Name: "goodu", UID: "1",
 		Groups: []string{"goodg1", "goodg2"}}
 	reqRN := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: true,
 			Path:              "/apis/goodapig/v1/namespaces/goodns/goodrscs",
 			Verb:              "goodverb",
@@ -99,10 +100,13 @@ func TestLiterals(t *testing.T) {
 			Namespace:         "goodns",
 			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goodrscs", "eman"}},
-		ui}
+			Parts:             []string{"goodrscs", "eman"},
+		},
+		User:  ui,
+		Width: fcrequest.Width{Seats: 1},
+	}
 	reqRU := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: true,
 			Path:              "/apis/goodapig/v1/goodrscs",
 			Verb:              "goodverb",
@@ -112,14 +116,20 @@ func TestLiterals(t *testing.T) {
 			Namespace:         "",
 			Resource:          "goodrscs",
 			Name:              "eman",
-			Parts:             []string{"goodrscs", "eman"}},
-		ui}
+			Parts:             []string{"goodrscs", "eman"},
+		},
+		User:  ui,
+		Width: fcrequest.Width{Seats: 1},
+	}
 	reqN := RequestDigest{
-		&request.RequestInfo{
+		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: false,
 			Path:              "/openapi/v2",
-			Verb:              "goodverb"},
-		ui}
+			Verb:              "goodverb",
+		},
+		User:  ui,
+		Width: fcrequest.Width{Seats: 1},
+	}
 	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
 		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
 			User: &flowcontrol.UserSubject{"goodu"}}},

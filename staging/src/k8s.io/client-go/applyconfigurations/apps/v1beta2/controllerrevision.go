@@ -51,7 +51,7 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // ExtractControllerRevision extracts the applied configuration owned by fieldManager from
 // controllerRevision. If no managedFields are found in controllerRevision for fieldManager, a
 // ControllerRevisionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // controllerRevision must be a unmodified ControllerRevision API object that was retrieved from the Kubernetes API.
@@ -60,8 +60,19 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractControllerRevision(controllerRevision *v1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	return extractControllerRevision(controllerRevision, fieldManager, "")
+}
+
+// ExtractControllerRevisionStatus is the same as ExtractControllerRevision except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractControllerRevisionStatus(controllerRevision *v1beta2.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	return extractControllerRevision(controllerRevision, fieldManager, "status")
+}
+
+func extractControllerRevision(controllerRevision *v1beta2.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
-	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta2.ControllerRevision"), fieldManager, b)
+	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta2.ControllerRevision"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

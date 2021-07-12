@@ -19,31 +19,7 @@ func DefaultKustomizationFileName() string {
 	return RecognizedKustomizationFileNames()[0]
 }
 
-// IfApiMachineryElseKyaml returns true if executing the apimachinery code
-// path, else we're executing the kyaml code paths.
-func IfApiMachineryElseKyaml(s1, s2 string) string {
-	if !FlagEnableKyamlDefaultValue {
-		return s1
-	}
-	return s2
-}
-
 const (
-	// FlagEnableKyamlDefaultValue is the default value for the --enable_kyaml
-	// flag.  This value is also used in unit tests.  See provider.DepProvider.
-	//
-	// TODO(#3588): Delete this constant.
-	//
-	// All tests should pass for either true or false values
-	// of this constant, without having to check its value.
-	// In the cases where there's a different outcome, either decide
-	// that the difference is acceptable, or make the difference go away.
-	//
-	// Historically, tests passed for enable_kyaml == false, i.e. using
-	// apimachinery libs.  This doesn't mean the code was better, it just
-	// means regression tests preserved those outcomes.
-	FlagEnableKyamlDefaultValue = true
-
 	// An environment variable to consult for kustomization
 	// configuration data.  See:
 	// https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html

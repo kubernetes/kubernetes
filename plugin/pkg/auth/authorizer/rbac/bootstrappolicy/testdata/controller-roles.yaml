@@ -590,6 +590,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/finalizers
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - persistentvolumeclaims
     verbs:
     - create
@@ -785,6 +791,7 @@ items:
     verbs:
     - get
     - list
+    - patch
     - update
     - watch
   - apiGroups:

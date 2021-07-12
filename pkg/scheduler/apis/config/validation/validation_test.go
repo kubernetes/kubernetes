@@ -25,12 +25,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1beta2.SchemeGroupVersion.String(),
+		},
 		Parallelism:        8,
 		HealthzBindAddress: "0.0.0.0:10254",
 		MetricsBindAddress: "0.0.0.0:10254",
@@ -39,14 +44,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			ContentType:        "application/json",
 			QPS:                10,
 			Burst:              10,
-		},
-		AlgorithmSource: config.SchedulerAlgorithmSource{
-			Policy: &config.SchedulerPolicySource{
-				ConfigMap: &config.SchedulerPolicyConfigMapSource{
-					Namespace: "name",
-					Name:      "name",
-				},
-			},
 		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 			ResourceLock:      "configmap",
@@ -69,6 +66,12 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 					},
 					Score: config.PluginSet{
 						Disabled: []config.Plugin{{Name: "*"}},
+					},
+				},
+				PluginConfig: []config.PluginConfig{
+					{
+						Name: "DefaultPreemption",
+						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
 					},
 				},
 			},
@@ -107,11 +110,17 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	metricsBindAddrPortInvalid := validConfig.DeepCopy()
 	metricsBindAddrPortInvalid.MetricsBindAddress = "0.0.0.0:909090"
 
+	metricsBindAddrHostOnlyInvalid := validConfig.DeepCopy()
+	metricsBindAddrHostOnlyInvalid.MetricsBindAddress = "999.999.999.999"
+
 	healthzBindAddrHostInvalid := validConfig.DeepCopy()
 	healthzBindAddrHostInvalid.HealthzBindAddress = "0.0.0.0.0:9090"
 
 	healthzBindAddrPortInvalid := validConfig.DeepCopy()
 	healthzBindAddrPortInvalid.HealthzBindAddress = "0.0.0.0:909090"
+
+	healthzBindAddrHostOnlyInvalid := validConfig.DeepCopy()
+	healthzBindAddrHostOnlyInvalid.HealthzBindAddress = "999.999.999.999"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
@@ -135,6 +144,62 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	extenderNegativeWeight := validConfig.DeepCopy()
 	extenderNegativeWeight.Extenders[0].Weight = -1
 
+	invalidNodePercentage := validConfig.DeepCopy()
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "DefaultPreemption",
+			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+		},
+	}
+
+	invalidPluginArgs := validConfig.DeepCopy()
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "DefaultPreemption",
+			Args: &config.InterPodAffinityArgs{},
+		},
+	}
+
+	duplicatedPluginConfig := validConfig.DeepCopy()
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "config",
+		},
+		{
+			Name: "config",
+		},
+	}
+
+	mismatchQueueSort := validConfig.DeepCopy()
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
+		{
+			SchedulerName: "me",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "PrioritySort"}},
+				},
+			},
+			PluginConfig: []config.PluginConfig{
+				{
+					Name: "PrioritySort",
+				},
+			},
+		},
+		{
+			SchedulerName: "other",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+			},
+			PluginConfig: []config.PluginConfig{
+				{
+					Name: "CustomSort",
+				},
+			},
+		},
+	}
+
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
 		{Name: "foo", IgnoredByScheduler: false},
@@ -148,9 +213,57 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
+	badRemovedPlugins1 := validConfig.DeepCopy() // default v1beta2
+	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	badRemovedPlugins2 := validConfig.DeepCopy()
+	badRemovedPlugins2.APIVersion = "kubescheduler.config.k8s.io/v1beta3" // hypothetical, v1beta3 doesn't exist
+	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	badRemovedPlugins3 := validConfig.DeepCopy() // default v1beta2
+	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
+
+	goodRemovedPlugins1 := validConfig.DeepCopy() // ServiceAffinity is okay in v1beta1.
+	goodRemovedPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
+	goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	goodRemovedPlugins2 := validConfig.DeepCopy()
+	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+
+	goodRemovedPlugins3 := validConfig.DeepCopy()
+	goodRemovedPlugins3.APIVersion = v1beta1.SchemeGroupVersion.String()
+	goodRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
+
+	badConflictPlugins1 := validConfig.DeepCopy()
+	badConflictPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
+	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesFit", Weight: 2})
+	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
+	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
+	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
+
+	goodConflictPlugins1 := validConfig.DeepCopy()
+	goodConflictPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
+	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
+	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
+	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
+
+	goodConflictPlugins2 := validConfig.DeepCopy()
+	goodConflictPlugins2.APIVersion = v1beta1.SchemeGroupVersion.String()
+	goodConflictPlugins2.Profiles[0].Plugins.Filter.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Filter.Enabled, config.Plugin{Name: "NodeResourcesFit", Weight: 2})
+	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
+	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
+	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
+
+	deprecatedPluginsConfig := validConfig.DeepCopy()
+	deprecatedPluginsConfig.Profiles[0].PluginConfig = append(deprecatedPluginsConfig.Profiles[0].PluginConfig, config.PluginConfig{
+		Name: "NodeResourcesLeastAllocated",
+		Args: &config.NodeResourcesLeastAllocatedArgs{},
+	})
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
+		errorString    string
 	}{
 		"good": {
 			expectedToFail: false,
@@ -176,6 +289,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         healthzBindAddrHostInvalid,
 		},
+		"bad-healthz-host-only-invalid": {
+			expectedToFail: true,
+			config:         healthzBindAddrHostOnlyInvalid,
+		},
 		"bad-metrics-port-invalid": {
 			expectedToFail: true,
 			config:         metricsBindAddrPortInvalid,
@@ -183,6 +300,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"bad-metrics-host-invalid": {
 			expectedToFail: true,
 			config:         metricsBindAddrHostInvalid,
+		},
+		"bad-metrics-host-only-invalid": {
+			expectedToFail: true,
+			config:         metricsBindAddrHostOnlyInvalid,
 		},
 		"bad-percentage-of-nodes-to-score": {
 			expectedToFail: true,
@@ -216,16 +337,79 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         extenderDuplicateBind,
 		},
+		"invalid-node-percentage": {
+			expectedToFail: true,
+			config:         invalidNodePercentage,
+		},
+		"invalid-plugin-args": {
+			expectedToFail: true,
+			config:         invalidPluginArgs,
+		},
+		"duplicated-plugin-config": {
+			expectedToFail: true,
+			config:         duplicatedPluginConfig,
+		},
+		"mismatch-queue-sort": {
+			expectedToFail: true,
+			config:         mismatchQueueSort,
+		},
+		"bad-removed-plugins-1": {
+			expectedToFail: true,
+			config:         badRemovedPlugins1,
+		},
+		"bad-removed-plugins-2": {
+			expectedToFail: true,
+			config:         badRemovedPlugins2,
+		},
+		"bad-removed-plugins-3": {
+			expectedToFail: true,
+			config:         badRemovedPlugins3,
+		},
+		"good-removed-plugins-1": {
+			expectedToFail: false,
+			config:         goodRemovedPlugins1,
+		},
+		"good-removed-plugins-2": {
+			expectedToFail: false,
+			config:         goodRemovedPlugins2,
+		},
+		"good-removed-plugins-3": {
+			expectedToFail: false,
+			config:         goodRemovedPlugins3,
+		},
+		"bad-conflict-plugins-1": {
+			expectedToFail: true,
+			config:         badConflictPlugins1,
+			errorString:    "profiles[0].plugins.score.enabled[0]: Invalid value: \"NodeResourcesFit\": was conflict with [\"NodeResourcesLeastAllocated\" \"NodeResourcesMostAllocated\" \"RequestedToCapacityRatio\"] in version \"kubescheduler.config.k8s.io/v1beta1\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta1\")",
+		},
+		"good-conflict-plugins-1": {
+			expectedToFail: false,
+			config:         goodConflictPlugins1,
+		},
+		"good-conflict-plugins-2": {
+			expectedToFail: false,
+			config:         goodConflictPlugins2,
+		},
+		"bad-plugins-config": {
+			expectedToFail: true,
+			config:         deprecatedPluginsConfig,
+			errorString:    "profiles[0].pluginConfig[1]: Invalid value: \"NodeResourcesLeastAllocated\": was removed in version \"kubescheduler.config.k8s.io/v1beta2\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta2\")",
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateKubeSchedulerConfiguration(scenario.config)
-			if len(errs) == 0 && scenario.expectedToFail {
+			if errs == nil && scenario.expectedToFail {
 				t.Error("Unexpected success")
 			}
-			if len(errs) > 0 && !scenario.expectedToFail {
+			if errs != nil && !scenario.expectedToFail {
 				t.Errorf("Unexpected failure: %+v", errs)
+			}
+			fmt.Println(errs)
+
+			if errs != nil && scenario.errorString != "" && errs.Error() != scenario.errorString {
+				t.Errorf("Unexpected error string\n want:\t%s\n got:\t%s", scenario.errorString, errs.Error())
 			}
 		})
 	}
@@ -306,7 +490,7 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
 				}},
-			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": kubernetes.io/foo is an invalid extended resource name"),
+			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": is an invalid extended resource name"),
 		},
 		{
 			name: "invalid redeclared RequestedToCapacityRatio custom priority",

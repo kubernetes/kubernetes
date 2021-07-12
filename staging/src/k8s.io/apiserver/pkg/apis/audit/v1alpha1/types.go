@@ -62,15 +62,15 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

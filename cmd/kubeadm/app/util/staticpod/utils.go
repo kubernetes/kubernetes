@@ -26,18 +26,20 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -46,6 +48,11 @@ const (
 
 	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
 	kubeSchedulerBindAddressArg = "bind-address"
+)
+
+var (
+	usersAndGroups     *users.UsersAndGroups
+	usersAndGroupsOnce sync.Once
 )
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
@@ -68,6 +75,11 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 			PriorityClassName: "system-node-critical",
 			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
+			SecurityContext: &v1.PodSecurityContext{
+				SeccompProfile: &v1.SeccompProfile{
+					Type: v1.SeccompProfileTypeRuntimeDefault,
+				},
+			},
 		},
 	}
 }
@@ -246,7 +258,7 @@ func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe 
 
 // StartupProbe creates a Probe object with a HTTPGet handler
 func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
-	periodSeconds, timeoutForControlPlaneSeconds := int32(10), constants.DefaultControlPlaneTimeout.Seconds()
+	periodSeconds, timeoutForControlPlaneSeconds := int32(10), kubeadmconstants.DefaultControlPlaneTimeout.Seconds()
 	if timeoutForControlPlane != nil {
 		timeoutForControlPlaneSeconds = timeoutForControlPlane.Seconds()
 	}
@@ -373,4 +385,12 @@ func getProbeAddress(addr string) string {
 		return ""
 	}
 	return addr
+}
+
+func GetUsersAndGroups() (*users.UsersAndGroups, error) {
+	var err error
+	usersAndGroupsOnce.Do(func() {
+		usersAndGroups, err = users.AddUsersAndGroups()
+	})
+	return usersAndGroups, err
 }

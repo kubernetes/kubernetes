@@ -258,12 +258,13 @@ func TestErrConnKilled(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if strings.Count(capturedOutput, "\n") != 1 {
-		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+
+	// We don't expect stack trace from the panic to be included in the log.
+	if isStackTraceLoggedByRuntime(capturedOutput) {
+		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -348,12 +349,13 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if strings.Count(capturedOutput, "\n") != 1 {
-		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+
+	// We don't expect stack trace from the panic to be included in the log.
+	if isStackTraceLoggedByRuntime(capturedOutput) {
+		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 
@@ -364,6 +366,20 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected to receive an error")
 	}
+}
+
+func isStackTraceLoggedByRuntime(message string) bool {
+	// Check the captured output for the following patterns to find out if the
+	// stack trace is included in the log:
+	// - 'Observed a panic' (apimachinery runtime.go logs panic with this message)
+	// - 'goroutine 44 [running]:' (stack trace always starts with this)
+	if strings.Contains(message, "Observed a panic") &&
+		strings.Contains(message, "goroutine") &&
+		strings.Contains(message, "[running]:") {
+		return true
+	}
+
+	return false
 }
 
 var tsCrt = []byte(`-----BEGIN CERTIFICATE-----

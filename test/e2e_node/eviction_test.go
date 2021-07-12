@@ -597,7 +597,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 		framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
 	}
 
-	ginkgo.By("checking eviction ordering and ensuring important pods dont fail")
+	ginkgo.By("checking eviction ordering and ensuring important pods don't fail")
 	done := true
 	for _, priorityPodSpec := range testSpecs {
 		var priorityPod v1.Pod

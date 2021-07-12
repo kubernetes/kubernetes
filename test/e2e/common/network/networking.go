@@ -47,7 +47,7 @@ var _ = SIGDescribe("Networking", func() {
 			// Second time, we pass through pods more carefully...
 			framework.Logf("Going to retry %v out of %v pods....", len(failedPodsByHost), len(config.EndpointPods))
 			for host, failedPods := range failedPodsByHost {
-				framework.Logf("Doublechecking %v pods in host %v which werent seen the first time.", len(failedPods), host)
+				framework.Logf("Doublechecking %v pods in host %v which weren't seen the first time.", len(failedPods), host)
 				for _, endpointPod := range failedPods {
 					framework.Logf("Now attempting to probe pod [[[ %v ]]]", endpointPod.Status.PodIP)
 					if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {

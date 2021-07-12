@@ -20,15 +20,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/pkg/errors"
-
-	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -40,6 +31,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -223,34 +224,6 @@ func LabelOldControlPlaneNodes(client clientset.Interface) error {
 		}
 		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
 			n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane] = ""
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// LabelControlPlaneNodesWithExcludeFromLB finds all control plane nodes and applies the LabelExcludeFromExternalLB
-// label to them.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2375
-func LabelControlPlaneNodesWithExcludeFromLB(client clientset.Interface) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleControlPlane: "",
-	}))
-	nodesWithLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
-	}
-
-	for _, n := range nodesWithLabel.Items {
-		if _, hasLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB]; hasLabel {
-			continue
-		}
-		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-			n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB] = ""
 		})
 		if err != nil {
 			return err

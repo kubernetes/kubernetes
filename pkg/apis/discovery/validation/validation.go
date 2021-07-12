@@ -100,8 +100,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			switch addrType {
 			case discovery.AddressTypeIPv4:
 				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
+				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeIPv6:
 				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
+				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}
@@ -164,9 +166,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		}
 
 		if endpointPort.AppProtocol != nil {
-			for _, msg := range validation.IsQualifiedName(*endpointPort.AppProtocol) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("appProtocol"), endpointPort.AppProtocol, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateQualifiedName(*endpointPort.AppProtocol, idxPath.Child("appProtocol"))...)
 		}
 	}
 

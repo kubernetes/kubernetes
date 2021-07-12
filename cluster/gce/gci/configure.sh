@@ -24,20 +24,19 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION='v0.8.7'
-DEFAULT_CNI_HASH='8f2cbee3b5f94d59f919054dccfe99a8e3db5473b553d91da8af4763e811138533e05df4dbeab16b3f774852b4184a7994968f5e036a3f531ad1ac4620d10ede'
-DEFAULT_NPD_VERSION='v0.8.5'
-DEFAULT_NPD_HASH='3fbf97a38c06d8fcc8c46f956a6e90aa1b47cb42d50ddcfd1a644a7e624e42ee523db2f81e08fbfb21b80142d4bafdbedce16e8b62d2274a5b2b703a56d9c015'
-DEFAULT_CRICTL_VERSION='v1.20.0'
-DEFAULT_CRICTL_HASH='bf6e07c0834ead3cb17342fdd684723acd66d71dbad9a93a2c2001db0af647db124be732d9eaa58e3d0f36d7ab1026ab1380e1331e084810f1403e3656d1205d'
+DEFAULT_CNI_VERSION='v0.9.1'
+DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
+DEFAULT_NPD_VERSION='v0.8.8'
+DEFAULT_NPD_HASH_AMD64='ba8315a29368bfc33bdc602eb02d325b0b80e295c8739da35616de5b562c372bd297a2553f3ccd4daaecd67698b659b2c7068a2d2a0b9418ad29233fb75ff3f2'
+# TODO (SergeyKanzhelev): fill up for npd 0.8.9+
+DEFAULT_NPD_HASH_ARM64='N/A'
+DEFAULT_CRICTL_VERSION='v1.21.0'
+DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3bc3ea8642613df8542bf716fad903ed4d7528021ecb28b20c6330448cd2bd2b76bd776'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
-# Use --retry-connrefused opt only if it's supported by curl.
-CURL_RETRY_CONNREFUSED=""
-if curl --help | grep -q -- '--retry-connrefused'; then
-  CURL_RETRY_CONNREFUSED='--retry-connrefused'
-fi
+# Standard curl flags.
+CURL_FLAGS='--fail --silent --show-error --retry 5 --retry-delay 3 --connect-timeout 10 --retry-connrefused'
 
 function set-broken-motd {
   cat > /etc/motd <<EOF
@@ -54,23 +53,45 @@ Node instance:
 EOF
 }
 
+# A function that fetches a GCE metadata value and echoes it out.
+# Args:
+#   $1 : URL path after /computeMetadata/v1/ (without heading slash).
+#   $2 : An optional default value to echo out if the fetch fails.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function get-metadata-value {
+  local default="${2:-}"
+
+  local status
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    -H 'Metadata-Flavor: Google' \
+    "http://metadata/computeMetadata/v1/${1}" \
+  || status="$?"
+  status="${status:-0}"
+
+  if [[ "${status}" -eq 0 || -z "${default}" ]]; then
+    return "${status}"
+  else
+    echo "${default}"
+  fi
+}
+
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
   (
     umask 077
     local -r tmp_kube_env="/tmp/kube-env.yaml"
-    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+    # shellcheck disable=SC2086
+    retry-forever 10 curl ${CURL_FLAGS} \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_env}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
     # Convert the yaml format file into a shell-style file.
-    eval "$(${PYTHON} -c '''
+    eval "$(python3 -c '''
 import pipes,sys,yaml
-# check version of python and call methods appropriate for that version
-if sys.version_info[0] < 3:
-    items = yaml.load(sys.stdin).iteritems()
-else:
-    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")"
@@ -85,16 +106,13 @@ function download-kubelet-config {
   (
     umask 077
     local -r tmp_kubelet_config="/tmp/kubelet-config.yaml"
-    if curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
-        -H "X-Google-Metadata-Request: True" \
-        -o "${tmp_kubelet_config}" \
-        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config; then
-      # only write to the final location if curl succeeds
-      mv "${tmp_kubelet_config}" "${dest}"
-    elif [[ "${REQUIRE_METADATA_KUBELET_CONFIG_FILE:-false}" == "true" ]]; then
-      echo "== Failed to download required Kubelet config file from metadata server =="
-      exit 1
-    fi
+    # shellcheck disable=SC2086
+    retry-forever 10 curl ${CURL_FLAGS} \
+      -H "X-Google-Metadata-Request: True" \
+      -o "${tmp_kubelet_config}" \
+      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config
+    # only write to the final location if curl succeeds
+    mv "${tmp_kubelet_config}" "${dest}"
   )
 }
 
@@ -103,18 +121,15 @@ function download-kube-master-certs {
   (
     umask 077
     local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+    # shellcheck disable=SC2086
+    retry-forever 10 curl ${CURL_FLAGS} \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_master_certs}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
     # Convert the yaml format file into a shell-style file.
-    eval "$(${PYTHON} -c '''
+    eval "$(python3 -c '''
 import pipes,sys,yaml
-# check version of python and call methods appropriate for that version
-if sys.version_info[0] < 3:
-    items = yaml.load(sys.stdin).iteritems()
-else:
-    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")"
@@ -137,12 +152,19 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | ${PYTHON} -c \
-    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    -H "Metadata-Flavor: Google" \
+    "${GCE_METADATA_INTERNAL}/service-accounts/default/token" \
+  | python3 -c 'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
 function valid-storage-scope {
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    -H "Metadata-Flavor: Google" \
+    "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" \
+  | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -157,12 +179,35 @@ function download-or-bust {
     for url in "$@"; do
       local file="${url##*/}"
       rm -f "${file}"
-      # if the url belongs to GCS API we should use oauth2_token in the headers
+      # if the url belongs to GCS API we should use oauth2_token in the headers if the VM service account has storage scopes
       local curl_headers=""
-      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
-        curl_headers="Authorization: Bearer $(get-credentials)"
+
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] ; then
+        local canUseCredentials=0
+
+        echo "Getting the scope of service account configured for VM."
+        if ! valid-storage-scope ; then
+          canUseCredentials=$?
+          # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
+          # and try to download without SA if scope does not exist on SA
+          echo "No service account or service account without storage scope. Attempt to download without service account token."
+        fi
+
+        if [[ "${canUseCredentials}" == "0" ]] ; then
+          echo "Getting the service account access token configured for VM."
+          local access_token="";
+          if access_token=$(get-credentials); then
+            echo "Service account access token is received. Downloading ${url} using this token."
+          else
+            local exit_code=$?
+            echo "Cannot get a service account token. Exiting."
+            exit ${exit_code}
+          fi
+
+          curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
+        fi
       fi
-      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -218,6 +263,18 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
+  if [[ "${HOST_ARCH}" == "amd64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
+  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
+    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
+  else
+    # no other architectures are supported currently.
+    # Assumption is that this script only runs on linux,
+    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+    # https://github.com/kubernetes/node-problem-detector/releases/
+    DEFAULT_NPD_HASH='N/A'
+  fi
+
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
@@ -225,7 +282,7 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_hash="${DEFAULT_NPD_HASH}"
   fi
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
     echo "${npd_tar} is preloaded."
@@ -440,8 +497,11 @@ function install-docker {
   release=$(lsb_release -cs)
 
   # Add the Docker apt-repository
-  curl -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-    | apt-key add -
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    --location \
+    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
+  | apt-key add -
   add-apt-repository \
     "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
     $release stable"
@@ -476,8 +536,11 @@ function install-containerd-ubuntu {
   release=$(lsb_release -cs)
 
   # Add the Docker apt-repository (as we install containerd from there)
-  curl -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-    | apt-key add -
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    --location \
+    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
+  | apt-key add -
   add-apt-repository \
     "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
     $release stable"
@@ -496,8 +559,13 @@ function install-containerd-ubuntu {
       exit 2
     fi
     # containerd versions have slightly different url(s), so try both
-    ( curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" || \
-      curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
+    # shellcheck disable=SC2086
+    ( curl ${CURL_FLAGS} \
+        --location \
+        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
+      || curl ${CURL_FLAGS} \
+        --location \
+        "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
     | tar --overwrite -xzv -C /usr/
   fi
   if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
@@ -506,7 +574,11 @@ function install-containerd-ubuntu {
       echo "Unable to automatically install runc in non-amd64. Bailing out..."
       exit 2
     fi
-    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
+    # shellcheck disable=SC2086
+    curl ${CURL_FLAGS} \
+      --location \
+      "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /usr/sbin/runc \
+    && chmod 755 /usr/sbin/runc
   fi
   sudo systemctl start containerd
 }
@@ -666,48 +738,195 @@ function detect_host_info() {
   esac
 }
 
+# Retries a command forever with a delay between retries.
+# Args:
+#  $1    : delay between retries, in seconds.
+#  $2... : the command to run.
+function retry-forever {
+  local -r delay="$1"
+  shift 1
+
+  until "$@"; do
+    echo "== $* failed, retrying after ${delay}s"
+    sleep "${delay}"
+  done
+}
+
+# Initializes variables used by the log-* functions.
+#
+# get-metadata-value must be defined before calling this function.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-init {
+  # Used by log-* functions.
+  LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
+  LOG_INSTANCE_NAME=$(hostname)
+  LOG_BOOT_ID=$(journalctl --list-boots | grep -E '^ *0' | awk '{print $2}')
+  declare -Ag LOG_START_TIMES
+  declare -ag LOG_TRAP_STACK
+
+  LOG_STATUS_STARTED='STARTED'
+  LOG_STATUS_COMPLETED='COMPLETED'
+  LOG_STATUS_ERROR='ERROR'
+}
+
+# Sets an EXIT trap.
+# Args:
+#   $1:... : the trap command.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-trap-push {
+  local t="${*:1}"
+  LOG_TRAP_STACK+=("${t}")
+  # shellcheck disable=2064
+  trap "${t}" EXIT
+}
+
+# Removes and restores an EXIT trap.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-trap-pop {
+  # Remove current trap.
+  unset 'LOG_TRAP_STACK[-1]'
+
+  # Restore previous trap.
+  if [ ${#LOG_TRAP_STACK[@]} -ne 0 ]; then
+    local t="${LOG_TRAP_STACK[-1]}"
+    # shellcheck disable=2064
+    trap "${t}" EXIT
+  else
+    # If no traps in stack, clear.
+    trap EXIT
+  fi
+}
+
+# Logs the end of a bootstrap step that errored.
+# Args:
+#  $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-error {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_ERROR}" "encountered non-zero exit code"
+}
+
+# Wraps a command with bootstrap logging.
+# Args:
+#   $1    : bootstrap step name.
+#   $2... : the command to run.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-wrap {
+  local bootstep="$1"
+  local command="${*:2}"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+  $command
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Logs a bootstrap step start. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-start {
+  local bootstep="$1"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+}
+
+# Logs a bootstrap step end. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-end {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Writes a log proto to stdout.
+# Args:
+#   $1: bootstrap step name.
+#   $2: status. Either 'STARTED', 'COMPLETED', or 'ERROR'.
+#   $3: optional status reason.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-proto {
+  local bootstep="$1"
+  local status="$2"
+  local status_reason="${3:-}"
+
+  # Get current time.
+  local current_time
+  current_time="$(date --utc '+%s.%N')"
+  # ...formatted as UTC RFC 3339.
+  local timestamp
+  timestamp="$(date --utc --date="@${current_time}" '+%FT%T.%NZ')"
+
+  # Calculate latency.
+  local latency='null'
+  if [ "${status}" == "${LOG_STATUS_STARTED}" ]; then
+    LOG_START_TIMES["${bootstep}"]="${current_time}"
+  else
+    local start_time="${LOG_START_TIMES["${bootstep}"]}"
+    unset 'LOG_START_TIMES['"${bootstep}"']'
+
+    # Bash cannot do non-integer math, shell out to awk.
+    latency="$(echo "${current_time} ${start_time}" | awk '{print $1 - $2}')s"
+
+    # The default latency is null which cannot be wrapped as a string so we must
+    # do it here instead of the printf.
+    latency="\"${latency}\""
+  fi
+
+  printf '[cloud.kubernetes.monitoring.proto.SerialportLog] {"cluster_hash":"%s","vm_instance_name":"%s","boot_id":"%s","timestamp":"%s","bootstrap_status":{"step_name":"%s","status":"%s","status_reason":"%s","latency":%s}}\n' \
+  "${LOG_CLUSTER_ID}" "${LOG_INSTANCE_NAME}" "${LOG_BOOT_ID}" "${timestamp}" "${bootstep}" "${status}" "${status_reason}" "${latency}"
+}
+
 ######### Main Function ##########
+log-init
+log-start 'ConfigureMain'
 echo "Start to install kubernetes files"
-detect_host_info
+log-wrap 'DetectHostInfo' detect_host_info
 
 # if install fails, message-of-the-day (motd) will warn at login shell
-set-broken-motd
+log-wrap 'SetBrokenMotd' set-broken-motd
 
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
-PYTHON="python"
-
-if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
-  # found python2, just use that
-  PYTHON="python"
-elif [[ -f "/usr/bin/python2.7" ]]; then
-  # System python not defaulted to python 2 but using 2.7 during migration
-  PYTHON="/usr/bin/python2.7"
-else
-  # No python2 either by default, let's see if we can find python3
-  PYTHON="python3"
-  if ! command -v ${PYTHON} >/dev/null 2>&1; then
-    echo "ERROR Python not found. Aborting."
-    exit 2
-  fi
-fi
-echo "Version :  $(${PYTHON} -V 2>&1)"
 
 # download and source kube-env
-download-kube-env
-source "${KUBE_HOME}/kube-env"
+log-wrap 'DownloadKubeEnv' download-kube-env
+log-wrap 'SourceKubeEnv' source "${KUBE_HOME}/kube-env"
 
-download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
+log-wrap 'DownloadKubeletConfig' download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 
 # master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-  download-kube-master-certs
+  log-wrap 'DownloadKubeMasterCerts' download-kube-master-certs
 fi
 
 # ensure chosen container runtime is present
-ensure-container-runtime
+log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 
 # binaries and kube-system manifests
-install-kube-binary-config
+log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
 
 echo "Done for installing kubernetes files"
+log-end 'ConfigureMain'

@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/lithammer/dedent"
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"
@@ -60,28 +62,20 @@ func TestValidateSupportedVersion(t *testing.T) {
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
-				Version: "v1alpha3",
-			},
-			allowDeprecated: true,
-			expectedErr:     true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
 				Version: "v1beta1",
 			},
-			allowDeprecated: true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
-				Version: "v1beta1",
-			},
+			expectedErr: true,
 		},
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
 				Version: "v1beta2",
+			},
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta3",
 			},
 		},
 		{
@@ -132,8 +126,8 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta2.ClusterConfiguration{
-				APIServer: kubeadmapiv1beta2.APIServer{
+			cfg := &kubeadmapiv1.ClusterConfiguration{
+				APIServer: kubeadmapiv1.APIServer{
 					CertSANs: test.in,
 				},
 			}
@@ -217,17 +211,17 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "bad config produces error",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
-			`),
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectErr: true,
 		},
 		{
 			desc: "InitConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -236,10 +230,10 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "ClusterConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -248,15 +242,15 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "JoinConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
@@ -264,13 +258,13 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Cluster Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -279,18 +273,18 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -300,18 +294,18 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -321,21 +315,21 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -345,14 +339,14 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "component configs are not migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
@@ -365,7 +359,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			---
 			apiVersion: kubelet.config.k8s.io/v1beta1
 			kind: KubeletConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,

@@ -130,7 +130,6 @@ func GenerateSnapshotClassSpec(
 	snapshotter string,
 	parameters map[string]string,
 	ns string,
-	suffix string,
 ) *unstructured.Unstructured {
 	snapshotClass := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -138,8 +137,7 @@ func GenerateSnapshotClassSpec(
 			"apiVersion": SnapshotAPIVersion,
 			"metadata": map[string]interface{}{
 				// Name must be unique, so let's base it on namespace name and use GenerateName
-				// TODO(#96234): Remove unnecessary suffix.
-				"name": names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+				"name": names.SimpleNameGenerator.GenerateName(ns),
 			},
 			"driver":         snapshotter,
 			"parameters":     parameters,
