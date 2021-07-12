@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -132,6 +133,9 @@ func WithPriorityAndFairness(
 		var shouldStartWatchCh chan struct{}
 		var watchReq *http.Request
 
+		var watchCtx context.Context
+		var watchCtxCancel func ()
+
 		if isWatchRequest {
 			shouldStartWatchCh = make(chan struct{})
 			execute = func() {
@@ -141,8 +145,12 @@ func WithPriorityAndFairness(
 				setResponseHeaders(classification, w)
 
 				watchInitializationSignal = newInitializationSignal()
-				watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+				watchCtx = utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
 				watchReq = r.Clone(watchCtx)
+
+				// TODO: Add with cancel to let us close the context after Handle is called()
+				watchCtx, watchCtxCancel = context.WithCancel(watchCtx)
+
 
 				trace.Step("About to register watch")
 
@@ -207,6 +215,10 @@ func WithPriorityAndFairness(
 
 				trace.Step("About to handle from goroutine")
 				fcIfc.Handle(ctx, digest, note, queueNote, execute, trace)
+
+				if watchCtxCancel != nil {
+					watchCtxCancel()
+				}
 			}()
 
 			select {
