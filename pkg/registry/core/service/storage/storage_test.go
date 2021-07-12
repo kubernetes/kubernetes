@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -6032,4 +6033,985 @@ func TestUpdateDryRun(t *testing.T) {
 	}
 }
 
-//FIXME: Tests for update()
+type svcTestCase struct {
+	svc         *api.Service
+	expectError bool
+
+	// We could calculate these by looking at the Service, but that's a
+	// vector for test bugs and more importantly it makes the test cases less
+	// self-documenting.
+	expectClusterIPs          bool
+	expectHeadless            bool
+	expectNodePorts           bool
+	expectHealthCheckNodePort bool
+}
+
+func callName(before, after *api.Service) string {
+	if before == nil && after != nil {
+		return "create"
+	}
+	if before != nil && after != nil {
+		return "update"
+	}
+	if before != nil && after == nil {
+		return "delete"
+	}
+	panic("this test is broken: before and after are both nil")
+}
+
+func proveClusterIPsAllocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
+			t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
+		}
+	}
+
+	clips := []string{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		clips = after.Spec.ClusterIPs
+	} else {
+		clips = append(clips, after.Spec.ClusterIP)
+	}
+	for _, clip := range clips {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
+			t.Errorf("%s: expected clusterIP to be allocated: %q", callName(before, after), clip)
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if lc, lf := len(after.Spec.ClusterIPs), len(after.Spec.IPFamilies); lc != lf {
+			t.Errorf("%s: expected same number of clusterIPs and ipFamilies: %d != %d", callName(before, after), lc, lf)
+		}
+	}
+
+	for i, fam := range after.Spec.IPFamilies {
+		if want, got := fam, familyOf(after.Spec.ClusterIPs[i]); want != got {
+			t.Errorf("%s: clusterIP is the wrong IP family: want %s, got %s", callName(before, after), want, got)
+		}
+	}
+
+	if before != nil {
+		if before.Spec.ClusterIP != "" {
+			if want, got := before.Spec.ClusterIP, after.Spec.ClusterIP; want != got {
+				t.Errorf("%s: wrong clusterIP: wanted %q, got %q", callName(before, after), want, got)
+			}
+		}
+		for i := range before.Spec.ClusterIPs {
+			if want, got := before.Spec.ClusterIPs[i], after.Spec.ClusterIPs[i]; want != got {
+				t.Errorf("%s: wrong clusterIPs[%d]: wanted %q, got %q", callName(before, after), i, want, got)
+			}
+		}
+		for i := range before.Spec.IPFamilies {
+			if want, got := before.Spec.IPFamilies[i], after.Spec.IPFamilies[i]; want != got {
+				t.Errorf("%s: wrong IPFamilies[%d]: wanted %q, got %q", callName(before, after), i, want, got)
+			}
+		}
+	}
+}
+
+func proveClusterIPsDeallocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil && after.Spec.ClusterIP != api.ClusterIPNone {
+		if after.Spec.ClusterIP != "" {
+			t.Errorf("%s: expected clusterIP to be unset: %q", callName(before, after), after.Spec.ClusterIP)
+		}
+		if len(after.Spec.ClusterIPs) != 0 {
+			t.Errorf("%s: expected clusterIPs to be unset: %q", callName(before, after), after.Spec.ClusterIPs)
+		}
+	}
+
+	if before != nil && before.Spec.ClusterIP != api.ClusterIPNone {
+		clips := []string{}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			clips = before.Spec.ClusterIPs
+		} else {
+			clips = append(clips, before.Spec.ClusterIP)
+		}
+		for _, clip := range clips {
+			if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
+				t.Errorf("%s: expected clusterIP to be deallocated: %q", callName(before, after), clip)
+			}
+		}
+	}
+}
+
+func proveHeadless(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
+		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
+	}
+	if len(after.Spec.ClusterIPs) != 1 || after.Spec.ClusterIPs[0] != api.ClusterIPNone {
+		t.Errorf("%s: expected clusterIPs to be [%q]: %q", callName(before, after), api.ClusterIPNone, after.Spec.ClusterIPs)
+	}
+}
+
+func proveNodePortsAllocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	for _, p := range after.Spec.Ports {
+		if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+			t.Errorf("%s: expected nodePort to be allocated: %d", callName(before, after), p.NodePort)
+		}
+	}
+
+	if before != nil {
+		for i, p := range before.Spec.Ports {
+			if p.NodePort == 0 {
+				continue
+			}
+			if want, got := p.NodePort, after.Spec.Ports[i].NodePort; want != got {
+				t.Errorf("%s: wrong ports[%d].nodePort value: wanted %d, got %d", callName(before, after), i, want, got)
+			}
+		}
+	}
+}
+
+func proveNodePortsDeallocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil {
+		for _, p := range after.Spec.Ports {
+			if p.NodePort != 0 {
+				t.Errorf("%s: expected nodePort to be unset: %d", callName(before, after), p.NodePort)
+			}
+		}
+	}
+
+	if before != nil {
+		for _, p := range before.Spec.Ports {
+			if p.NodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+				t.Errorf("%s: expected nodePort to be deallocated: %d", callName(before, after), p.NodePort)
+			}
+		}
+	}
+}
+
+func proveHealthCheckNodePortAllocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, after.Spec.HealthCheckNodePort) {
+		t.Errorf("%s: expected healthCheckNodePort to be allocated: %d", callName(before, after), after.Spec.HealthCheckNodePort)
+	}
+
+	if before != nil {
+		if before.Spec.HealthCheckNodePort != 0 {
+			if want, got := before.Spec.HealthCheckNodePort, after.Spec.HealthCheckNodePort; want != got {
+				t.Errorf("%s: wrong healthCheckNodePort value: wanted %d, got %d", callName(before, after), want, got)
+			}
+		}
+	}
+}
+
+func proveHealthCheckNodePortDeallocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil {
+		if after.Spec.HealthCheckNodePort != 0 {
+			t.Errorf("%s: expected healthCheckNodePort to be unset: %d", callName(before, after), after.Spec.HealthCheckNodePort)
+		}
+	}
+
+	if before != nil {
+		if before.Spec.HealthCheckNodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, before.Spec.HealthCheckNodePort) {
+			t.Errorf("%s: expected healthCheckNodePort to be deallocated: %d", callName(before, after), before.Spec.HealthCheckNodePort)
+		}
+	}
+}
+
+type cudTestCase struct {
+	name   string
+	create svcTestCase
+	update svcTestCase
+}
+
+func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
+	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
+	// attributed to lines in this function than the caller of it.
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+
+			// Create the object as specified and check the results.
+			obj, err := storage.Create(ctx, tc.create.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tc.create.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			defer storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{}) // in case
+			if tc.create.expectError && err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			createdSvc := obj.(*api.Service)
+			if !verifyEquiv(t, "create", &tc.create, createdSvc) {
+				return
+			}
+			verifyExpectations(t, storage, tc.create, tc.create.svc, createdSvc)
+
+			// Update the object to the new state and check the results.
+			obj, created, err := storage.Update(ctx, tc.update.svc.Name,
+				rest.DefaultUpdatedObjectInfo(tc.update.svc), rest.ValidateAllObjectFunc,
+				rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if tc.update.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error updating service: %v", err)
+			}
+			if tc.update.expectError && err == nil {
+				t.Fatalf("unexpected success updating service")
+			}
+			if created {
+				t.Fatalf("unexpected create-on-update")
+			}
+			updatedSvc := obj.(*api.Service)
+			if !verifyEquiv(t, "update", &tc.update, updatedSvc) {
+				return
+			}
+			verifyExpectations(t, storage, tc.update, createdSvc, updatedSvc)
+
+			// Delete the object and check the results.
+			_, _, err = storage.Delete(ctx, tc.update.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error deleting service: %v", err)
+			}
+			verifyExpectations(t, storage, svcTestCase{ /* all false */ }, updatedSvc, nil)
+		})
+	}
+}
+
+type testingTInterface interface {
+	Helper()
+	Errorf(format string, args ...interface{})
+}
+
+type fakeTestingT struct {
+	t *testing.T
+}
+
+func (f fakeTestingT) Helper() {}
+
+func (f fakeTestingT) Errorf(format string, args ...interface{}) {
+	f.t.Logf(format, args...)
+}
+
+func verifyEquiv(t testingTInterface, call string, tc *svcTestCase, got *api.Service) bool {
+	t.Helper()
+
+	// For when we compare objects.
+	options := []cmp.Option{
+		// These are system-assigned values, we don't need to compare them.
+		cmpopts.IgnoreFields(api.Service{}, "UID", "ResourceVersion", "CreationTimestamp"),
+		// Treat nil slices and empty slices as the same (e.g. clusterIPs).
+		cmpopts.EquateEmpty(),
+	}
+
+	// For allocated fields, we want to be able to compare cleanly whether the
+	// input specified values or not.
+	want := tc.svc.DeepCopy()
+	if tc.expectClusterIPs || tc.expectHeadless {
+		if want.Spec.ClusterIP == "" {
+			want.Spec.ClusterIP = got.Spec.ClusterIP
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			if len(got.Spec.ClusterIPs) > len(want.Spec.ClusterIPs) {
+				want.Spec.ClusterIPs = append(want.Spec.ClusterIPs, got.Spec.ClusterIPs[len(want.Spec.ClusterIPs):]...)
+			}
+			if want.Spec.IPFamilyPolicy == nil {
+				want.Spec.IPFamilyPolicy = got.Spec.IPFamilyPolicy
+			}
+			if len(got.Spec.IPFamilies) > len(want.Spec.IPFamilies) {
+				want.Spec.IPFamilies = append(want.Spec.IPFamilies, got.Spec.IPFamilies[len(want.Spec.IPFamilies):]...)
+			}
+		}
+	}
+	if tc.expectNodePorts {
+		for i := range want.Spec.Ports {
+			p := &want.Spec.Ports[i]
+			if p.NodePort == 0 {
+				p.NodePort = got.Spec.Ports[i].NodePort
+			}
+		}
+	}
+	if tc.expectHealthCheckNodePort {
+		if want.Spec.HealthCheckNodePort == 0 {
+			want.Spec.HealthCheckNodePort = got.Spec.HealthCheckNodePort
+		}
+	}
+
+	if !cmp.Equal(want, got, options...) {
+		t.Errorf("unexpected result from %s:\n%s", call, cmp.Diff(want, got, options...))
+		return false
+	}
+	return true
+}
+
+// Quis custodiet ipsos custodes?
+func TestVerifyEquiv(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  svcTestCase
+		output *api.Service
+		expect bool
+	}{{
+		name: "ExternalName",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		expect: true,
+	}, {
+		name: "ClusterIPs_unspecified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "ClusterIPs_specified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "ClusterIPs_wrong",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.0", "2000:0")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: false,
+	}, {
+		name: "ClusterIPs_partial",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "NodePort_unspecified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetUniqueNodePorts),
+		expect: true,
+	}, {
+		name: "NodePort_specified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+		expect: true,
+	}, {
+		name: "NodePort_wrong",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(76)),
+		expect: false,
+	}, {
+		name: "NodePort_partial",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetNodePorts(93, 76)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_unspecified",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(93)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_specified",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetHealthCheckNodePort(93)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(93)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_wrong",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetHealthCheckNodePort(93)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(76)),
+		expect: false,
+	}}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := verifyEquiv(fakeTestingT{t}, "test", &tc.input, tc.output)
+			if result != tc.expect {
+				t.Errorf("expected %v, got %v", tc.expect, result)
+			}
+		})
+	}
+}
+
+func verifyExpectations(t *testing.T, storage *GenericREST, tc svcTestCase, before, after *api.Service) {
+	t.Helper()
+
+	if tc.expectClusterIPs {
+		proveClusterIPsAllocated(t, storage, before, after)
+	} else if tc.expectHeadless {
+		proveHeadless(t, storage, before, after)
+	} else {
+		proveClusterIPsDeallocated(t, storage, before, after)
+	}
+	if tc.expectNodePorts {
+		proveNodePortsAllocated(t, storage, before, after)
+	} else {
+		proveNodePortsDeallocated(t, storage, before, after)
+	}
+	if tc.expectHealthCheckNodePort {
+		proveHealthCheckNodePortAllocated(t, storage, before, after)
+	} else {
+		proveHealthCheckNodePortDeallocated(t, storage, before, after)
+	}
+}
+
+func TestFeatureExternalName(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "valid-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName, svctest.SetExternalName("updated.example.com")),
+		},
+	}, {
+		name: "valid-blank",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc:         svctest.MakeService("foo", svctest.SetTypeExternalName, svctest.SetExternalName("")),
+			expectError: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+func TestFeatureSelector(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "valid-valid",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					s.Spec.Selector = map[string]string{"updated": "value"}
+				}),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "valid-nil",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					s.Spec.Selector = nil
+				}),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "valid-empty",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					s.Spec.Selector = map[string]string{}
+				}),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "nil-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					s.Spec.Selector = nil
+				}),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "empty-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					s.Spec.Selector = map[string]string{}
+				}),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+func TestFeatureClusterIPs(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "clusterIP:valid-headless",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetHeadless),
+			expectError: true,
+		},
+	}, {
+		name: "clusterIP:headless-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetHeadless),
+			expectHeadless: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetClusterIP("10.0.0.93")),
+			expectError: true,
+		},
+	}, {
+		name: "clusterIP:valid-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetClusterIP("10.0.0.93")),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetClusterIP("10.0.0.76")),
+			expectError: true,
+		},
+	}, {
+		name: "clusterIPs:valid-valid",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetClusterIPs("10.0.0.93", "2000::93")),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetClusterIPs("10.0.0.76", "2000::76")),
+			expectError: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+func TestFeaturePorts(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "add",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "remove",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "swap",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP),
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "modify",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("r", 53, intstr.FromInt(53), api.ProtocolTCP),
+					svctest.MakeServicePort("s", 53, intstr.FromInt(53), api.ProtocolUDP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "wipe",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts()),
+			expectError: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+func TestFeatureSessionAffinity(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "None-ClientIPNoConfig",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityNone)),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				func(s *api.Service) {
+					// Set it without setting the config
+					s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+				}),
+			expectError: true,
+		},
+	}, {
+		name: "None-ClientIP",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityNone)),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityClientIP)),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "ClientIP-NoneWithConfig",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityClientIP)),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityClientIP),
+				func(s *api.Service) {
+					// Set it without wiping the config
+					s.Spec.SessionAffinity = api.ServiceAffinityNone
+				}),
+			expectError: true,
+		},
+	}, {
+		name: "ClientIP-None",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityClientIP)),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSessionAffinity(api.ServiceAffinityNone),
+				func(s *api.Service) {
+					s.Spec.SessionAffinityConfig = nil
+				}),
+			expectClusterIPs: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+func TestFeatureType(t *testing.T) {
+	testCases := []cudTestCase{{
+		name: "ExternalName-ClusterIP",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "ClusterIP-ExternalName",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+	}, {
+		name: "ExternalName-NodePort",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "NodePort-ExternalName",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+	}, {
+		name: "ExternalName-LoadBalancer",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "LoadBalancer-ExternalName",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+	}, {
+		name: "ClusterIP-NodePort",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "NodePort-ClusterIP",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "ClusterIP-LoadBalancer",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "LoadBalancer-ClusterIP",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "NodePort-LoadBalancer",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "LoadBalancer-NodePort",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "Headless-ExternalName",
+		create: svcTestCase{
+			svc:            svctest.MakeService("foo", svctest.SetHeadless),
+			expectHeadless: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+	}, {
+		name: "ExternalName-Headless",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		update: svcTestCase{
+			svc:            svctest.MakeService("foo", svctest.SetHeadless),
+			expectHeadless: true,
+		},
+	}, {
+		name: "Headless-NodePort",
+		create: svcTestCase{
+			svc:            svctest.MakeService("foo", svctest.SetHeadless),
+			expectHeadless: true,
+		},
+		update: svcTestCase{
+			svc:         svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectError: true,
+		},
+	}, {
+		name: "NodePort-Headless",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:         svctest.MakeService("foo", svctest.SetHeadless),
+			expectError: true,
+		},
+	}, {
+		name: "Headless-LoadBalancer",
+		create: svcTestCase{
+			svc:            svctest.MakeService("foo", svctest.SetHeadless),
+			expectHeadless: true,
+		},
+		update: svcTestCase{
+			svc:         svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectError: true,
+		},
+	}, {
+		name: "LoadBalancer-Headless",
+		create: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc:         svctest.MakeService("foo", svctest.SetHeadless),
+			expectError: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
+// FIXME: externalIPs, lbip,
+// lbsourceranges, externalname, etp, hcnp, itp, PublishNotReadyAddresses,
+// ipfamilypolicy and list,
+// AllocateLoadBalancerNodePorts, LoadBalancerClass, status
