@@ -431,7 +431,7 @@ function kube::release::create_docker_images_for_server() {
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
-  local src_dir="${KUBE_ROOT}/cluster/gce/manifests"
+  local src_dir="${KUBE_ROOT}/gke/cluster/gce/manifests"
 
   local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
   rm -rf "${release_stage}"
@@ -449,14 +449,14 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
-  if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
-    cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
+  cp "${KUBE_ROOT}/gke/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/gke/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
+  if [[ -e "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
+    cp "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi
-  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
+  cp "${KUBE_ROOT}/gke/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   # Merge GCE-specific addons with general purpose addons.
-  for d in cluster/addons cluster/gce/addons; do
+  for d in gke/cluster/addons gke/cluster/gce/addons; do
     find "${KUBE_ROOT}/${d}" \( \( -name \*.yaml -o -name \*.yaml.in -o -name \*.json \) -a ! \( -name \*demo\* \) \) -print0 | "${TAR}" c --transform "s|${KUBE_ROOT#/*}/${d}||" --null -T - | "${TAR}" x -C "${dst_dir}"
   done
 
@@ -556,7 +556,7 @@ Run cluster/get-kube-binaries.sh to download client and server binaries.
 EOF
 
   # We want everything in /cluster.
-  cp -R "${KUBE_ROOT}/cluster" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/gke/cluster" "${release_stage}/"
 
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_TARS}/kubernetes-manifests.tar.gz" "${release_stage}/server/"

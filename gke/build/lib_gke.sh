@@ -1020,7 +1020,7 @@ compile()
     -v "${KUBE_ROOT}":"${__KUBE_ROOT_MOUNT_PATH}" \
     -w "${__KUBE_ROOT_MOUNT_PATH}" \
     "${__compiler_image_full}" \
-    cluster/kubectl.sh version --client
+    gke/cluster/kubectl.sh version --client
 
   log.info "binary artifacts are in ${KUBE_ROOT}/${__output_subpath}/bin"
 }
