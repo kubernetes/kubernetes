@@ -90,7 +90,7 @@ const (
 	proxyModeUserspace   = "userspace"
 	proxyModeIPTables    = "iptables"
 	proxyModeIPVS        = "ipvs"
-	proxyModeKernelspace = "kernelspace"
+	proxyModeKernelspace = "kernelspace" //nolint:deadcode
 )
 
 // proxyRun defines the interface to run a specified ProxyServer
