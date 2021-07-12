@@ -291,14 +291,18 @@ func (r *YAMLReader) Read() ([]byte, error) {
 		if i := bytes.Index(line, []byte(separator)); i == 0 {
 			// We have a potential document terminator
 			i += sep
-			after := line[i:]
-			if len(strings.TrimRightFunc(string(after), unicode.IsSpace)) == 0 {
-				if buffer.Len() != 0 {
-					return buffer.Bytes(), nil
+			trimmed := strings.TrimSpace(string(line[i:]))
+			// We only allow comments and spaces following the yaml doc separator, otherwise we'll return an error
+			if len(trimmed) > 0 && string(trimmed[0]) != "#" {
+				return nil, YAMLSyntaxError{
+					err: fmt.Errorf("invalid Yaml document separator: %s", trimmed),
 				}
-				if err == io.EOF {
-					return nil, err
-				}
+			}
+			if buffer.Len() != 0 {
+				return buffer.Bytes(), nil
+			}
+			if err == io.EOF {
+				return nil, err
 			}
 		}
 		if err == io.EOF {

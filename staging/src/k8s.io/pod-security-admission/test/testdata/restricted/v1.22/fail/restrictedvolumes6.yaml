@@ -24,8 +24,8 @@ spec:
     seccompProfile:
       type: RuntimeDefault
   volumes:
-  - name: volume-rbd
+  - name: volume1
     rbd:
-      image: testing
+      image: test
       monitors:
-      - testing
+      - test

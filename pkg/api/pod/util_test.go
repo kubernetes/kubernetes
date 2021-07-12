@@ -1365,12 +1365,12 @@ func TestDropEphemeralContainers(t *testing.T) {
 		pod                    func() *api.Pod
 	}{
 		{
-			description:            "has subpaths",
+			description:            "has ephemeral containers",
 			hasEphemeralContainers: true,
 			pod:                    podWithEphemeralContainers,
 		},
 		{
-			description:            "does not have subpaths",
+			description:            "does not have ephemeral containers",
 			hasEphemeralContainers: false,
 			pod:                    podWithoutEphemeralContainers,
 		},

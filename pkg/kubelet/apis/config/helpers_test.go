@@ -150,6 +150,7 @@ var (
 		"CPUCFSQuota",
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",
+		"CPUManagerPolicyOptions[*]",
 		"CPUManagerReconcilePeriod.Duration",
 		"TopologyManagerPolicy",
 		"TopologyManagerScope",
@@ -249,5 +250,6 @@ var (
 		"VolumePluginDir",
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
+		"MemoryThrottlingFactor",
 	)
 )

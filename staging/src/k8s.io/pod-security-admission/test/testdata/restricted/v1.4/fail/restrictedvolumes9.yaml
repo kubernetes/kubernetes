@@ -14,5 +14,5 @@ spec:
   volumes:
   - cephfs:
       monitors:
-      - testing
-    name: volume-cephfs
+      - test
+    name: volume1

@@ -26,5 +26,5 @@ spec:
   volumes:
   - fc:
       wwids:
-      - testing
-    name: volume-fc
+      - test
+    name: volume1

@@ -26,4 +26,4 @@ spec:
   volumes:
   - gitRepo:
       repository: github.com/kubernetes/kubernetes
-    name: volume-gitrepo
+    name: volume1

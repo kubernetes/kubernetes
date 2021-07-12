@@ -474,9 +474,12 @@ func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.Conditio
 }
 
 // cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
-// be actually deleted.
+// be actually deleted.  They are removed with no grace.
 func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
-	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+	t.Helper()
+
+	zero := int64(0)
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{}); err != nil {
 		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
 		return
 	}

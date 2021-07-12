@@ -6134,7 +6134,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				TargetContainerName:      "ctr",
 			},
 		},
-		"All Whitelisted Fields": {
+		"All allowed Fields": {
 			{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 
@@ -6160,9 +6160,14 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: "File",
 					ImagePullPolicy:          "IfNotPresent",
-					Stdin:                    true,
-					StdinOnce:                true,
-					TTY:                      true,
+					SecurityContext: &core.SecurityContext{
+						Capabilities: &core.Capabilities{
+							Add: []core.Capability{"SYS_ADMIN"},
+						},
+					},
+					Stdin:     true,
+					StdinOnce: true,
+					TTY:       true,
 				},
 			},
 		},
@@ -6235,7 +6240,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			field.Error{Type: field.ErrorTypeNotFound, Field: "ephemeralContainers[0].targetContainerName"},
 		},
 		{
-			"Container uses non-whitelisted field: Lifecycle",
+			"Container uses disallowed field: Lifecycle",
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6254,7 +6259,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"},
 		},
 		{
-			"Container uses non-whitelisted field: LivenessProbe",
+			"Container uses disallowed field: LivenessProbe",
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6274,7 +6279,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].livenessProbe"},
 		},
 		{
-			"Container uses non-whitelisted field: Ports",
+			"Container uses disallowed field: Ports",
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6291,7 +6296,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].ports"},
 		},
 		{
-			"Container uses non-whitelisted field: ReadinessProbe",
+			"Container uses disallowed field: ReadinessProbe",
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6310,7 +6315,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].readinessProbe"},
 		},
 		{
-			"Container uses non-whitelisted field: Resources",
+			"Container uses disallowed field: Resources",
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{

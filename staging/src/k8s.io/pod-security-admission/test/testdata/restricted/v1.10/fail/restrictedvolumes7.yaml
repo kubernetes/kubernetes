@@ -17,5 +17,5 @@ spec:
     runAsNonRoot: true
   volumes:
   - flexVolume:
-      driver: testing
-    name: volume-flexvolume
+      driver: test
+    name: volume1

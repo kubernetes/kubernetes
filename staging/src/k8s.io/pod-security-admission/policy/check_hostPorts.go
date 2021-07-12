@@ -18,13 +18,25 @@ package policy
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
+
+/*
+HostPort ports must be forbidden.
+
+**Restricted Fields:**
+
+spec.containers[*].ports[*].hostPort
+spec.initContainers[*].ports[*].hostPort
+
+**Allowed Values:** undefined/0
+*/
 
 func init() {
 	addCheck(CheckHostPorts)
@@ -46,25 +58,32 @@ func CheckHostPorts() Check {
 }
 
 func hostPorts_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	forbiddenContainers := sets.NewString()
-	forbiddenHostPorts := sets.NewInt32()
-	visitContainersWithPath(podSpec, field.NewPath("spec"), func(container *corev1.Container, path *field.Path) {
+	var badContainers []string
+	forbiddenHostPorts := sets.NewString()
+	visitContainers(podSpec, func(container *corev1.Container) {
+		valid := true
 		for _, c := range container.Ports {
 			if c.HostPort != 0 {
-				forbiddenContainers.Insert(container.Name)
-				forbiddenHostPorts.Insert(c.HostPort)
+				valid = false
+				forbiddenHostPorts.Insert(strconv.Itoa(int(c.HostPort)))
 			}
+		}
+		if !valid {
+			badContainers = append(badContainers, container.Name)
 		}
 	})
 
-	if len(forbiddenHostPorts) > 0 {
+	if len(badContainers) > 0 {
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: "forbidden host ports",
+			ForbiddenReason: "hostPort",
 			ForbiddenDetail: fmt.Sprintf(
-				"containers %q use these host ports %d",
-				forbiddenContainers.List(),
-				forbiddenHostPorts.List(),
+				"%s %s %s %s %s",
+				pluralize("container", "containers", len(badContainers)),
+				joinQuote(badContainers),
+				pluralize("uses", "use", len(badContainers)),
+				pluralize("hostPort", "hostPorts", len(forbiddenHostPorts)),
+				strings.Join(forbiddenHostPorts.List(), ", "),
 			),
 		}
 	}

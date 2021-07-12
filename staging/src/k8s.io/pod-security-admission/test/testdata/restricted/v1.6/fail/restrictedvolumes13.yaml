@@ -12,6 +12,6 @@ spec:
   securityContext:
     runAsNonRoot: true
   volumes:
-  - name: volume-vsphere
+  - name: volume1
     vsphereVolume:
-      volumePath: testing
+      volumePath: test
