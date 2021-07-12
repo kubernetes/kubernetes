@@ -38,6 +38,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	etcdtesting "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd/testing"
 )
@@ -438,6 +439,62 @@ func TestMemberAdd(t *testing.T) {
 
 		expectedError := errors.New("an unexpected error occurred")
 		cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.5:2379"}).Times(2).Return(nil, expectedError)
+
+		client.newEtcdClientFn = newEtcdClientFnBuilder(cluster)
+
+		members, err := client.AddMember("test", "https://1.2.3.5:2379")
+		assert.Len(t, members, 0)
+		assert.EqualError(t, err, expectedError.Error())
+	})
+
+	t.Run("Member already exists success", func(t *testing.T) {
+		client, _ := New([]string{"https://1.2.3.4:2379"}, "", "", "")
+		cluster := etcdtesting.NewMockCluster(ctrl)
+		cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.5:2379"}).Times(2).Return(nil, rpctypes.ErrPeerURLExist)
+
+		// Have the first response fail to validate the retry mechanism as well.
+		gomock.InOrder(
+			cluster.EXPECT().MemberList(gomock.Any()).Times(1).Return(nil, errors.New("unexpected error occurred")),
+			cluster.EXPECT().MemberList(gomock.Any()).Times(1).Return(&clientv3.MemberListResponse{
+				Members: []*etcdserverpb.Member{
+					{
+						ID:       0,
+						PeerURLs: []string{"https://1.2.3.4:2379"},
+					},
+					{
+						ID:       1,
+						PeerURLs: []string{"https://1.2.3.5:2379"},
+					},
+				},
+			}, nil),
+		)
+
+		client.newEtcdClientFn = newEtcdClientFnBuilder(cluster)
+
+		members, err := client.AddMember("test", "https://1.2.3.5:2379")
+		assert.NoError(t, err)
+		assert.Len(t, members, 2)
+		assert.Len(t, client.Endpoints, 2)
+		assert.Contains(t, client.Endpoints, "https://1.2.3.4:2379")
+		assert.Contains(t, client.Endpoints, "https://1.2.3.5:2379")
+	})
+
+	t.Run("Member already exists, list failure", func(t *testing.T) {
+		existingEtcdBackoff := etcdBackoff
+		etcdBackoff = wait.Backoff{
+			Steps:    2,
+			Duration: 10 * time.Millisecond,
+			Factor:   1,
+			Jitter:   0.1,
+		}
+		defer func(backoff wait.Backoff) { etcdBackoff = backoff }(existingEtcdBackoff)
+
+		client, _ := New([]string{"https://1.2.3.4:2379"}, "", "", "")
+		cluster := etcdtesting.NewMockCluster(ctrl)
+
+		expectedError := errors.New("an unexpected error occurred")
+		cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.5:2379"}).Times(2).Return(nil, rpctypes.ErrPeerURLExist)
+		cluster.EXPECT().MemberList(gomock.Any()).Times(2).Return(nil, expectedError)
 
 		client.newEtcdClientFn = newEtcdClientFnBuilder(cluster)
 

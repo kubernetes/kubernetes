@@ -36,6 +36,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
@@ -344,7 +346,9 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	return ret, nil
 }
 
-// AddMember notifies an existing etcd cluster that a new member is joining
+// AddMember notifies an existing etcd cluster that a new member is joining, and
+// return the updated list of members. If the member has already been added to the
+// cluster, this will return the existing list of etcd members.
 func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	// Parse the peer address, required to add the client URL later to the list
 	// of endpoints for this client. Parsing as a first operation to make sure that
@@ -355,8 +359,10 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	}
 
 	// Adds a new member to the cluster
-	var lastError error
-	var resp *clientv3.MemberAddResponse
+	var (
+		lastError   error
+		respMembers []*etcdserverpb.Member
+	)
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		cli, err := c.newEtcdClientFn(clientv3.Config{
 			Endpoints:   c.Endpoints,
@@ -373,11 +379,29 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		defer cli.Close()
 
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		defer cancel()
+		var resp *clientv3.MemberAddResponse
 		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
-		cancel()
 		if err == nil {
+			respMembers = resp.Members
+
 			return true, nil
 		}
+
+		// If the error indicates that the peer already exists, exit early. In this situation, resp is nil, so
+		// call out to MemberList to fetch all the members before returning.
+		if errors.Is(err, rpctypes.ErrPeerURLExist) {
+			klog.V(5).Info("The peer URL for the added etcd member already exists. Fetching the existing etcd members")
+
+			var listResp *clientv3.MemberListResponse
+			listResp, err = cli.MemberList(ctx)
+			if err == nil {
+				respMembers = listResp.Members
+
+				return true, nil
+			}
+		}
+
 		klog.V(5).Infof("Failed to add etcd member: %v", err)
 		lastError = err
 		return false, nil
@@ -387,8 +411,8 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	}
 
 	// Returns the updated list of etcd members
-	ret := []Member{}
-	for _, m := range resp.Members {
+	var ret []Member
+	for _, m := range respMembers {
 		// If the peer address matches, this is the member we are adding.
 		// Use the name we passed to the function.
 		if peerAddrs == m.PeerURLs[0] {
