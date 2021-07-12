@@ -233,7 +233,10 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		result := privilegedClient.Get().AbsPath("/healthz").Do(context.TODO())
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		result := privilegedClient.Get().AbsPath("/healthz").Do(ctx)
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
