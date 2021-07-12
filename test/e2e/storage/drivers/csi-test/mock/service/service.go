@@ -157,7 +157,6 @@ const (
 	gib    int64 = mib * 1024
 	gib100 int64 = gib * 100
 	tib    int64 = gib * 1024
-	tib100 int64 = tib * 100
 )
 
 func (s *service) newVolume(name string, capcity int64) csi.Volume {
