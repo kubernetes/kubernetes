@@ -82,7 +82,10 @@ type InfrastructureStatus struct {
 	// The default is 'HighlyAvailable', which represents the behavior operators have in a "normal" cluster.
 	// The 'SingleReplica' mode will be used in single-node deployments
 	// and the operators should not configure the operand for highly-available operation
+	// The 'External' mode indicates that the control plane is hosted externally to the cluster and that
+	// its components are not visible within the cluster.
 	// +kubebuilder:default=HighlyAvailable
+	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica;External
 	ControlPlaneTopology TopologyMode `json:"controlPlaneTopology"`
 
 	// infrastructureTopology expresses the expectations for infrastructure services that do not run on control
@@ -91,12 +94,16 @@ type InfrastructureStatus struct {
 	// The default is 'HighlyAvailable', which represents the behavior operators have in a "normal" cluster.
 	// The 'SingleReplica' mode will be used in single-node deployments
 	// and the operators should not configure the operand for highly-available operation
+	// NOTE: External topology mode is not applicable for this field.
 	// +kubebuilder:default=HighlyAvailable
+	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
 	InfrastructureTopology TopologyMode `json:"infrastructureTopology"`
 }
 
 // TopologyMode defines the topology mode of the control/infra nodes.
-// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
+// NOTE: Enum validation is specified in each field that uses this type,
+// given that External value is not applicable to the InfrastructureTopology
+// field.
 type TopologyMode string
 
 const (
@@ -105,6 +112,12 @@ const (
 
 	// "SingleReplica" is for operators to avoid spending resources for high-availability purpose.
 	SingleReplicaTopologyMode TopologyMode = "SingleReplica"
+
+	// "External" indicates that the component is running externally to the cluster. When specified
+	// as the control plane topology, operators should avoid scheduling workloads to masters or assume
+	// that any of the control plane components such as kubernetes API server or etcd are visible within
+	// the cluster.
+	ExternalTopologyMode TopologyMode = "External"
 )
 
 // PlatformType is a specific supported infrastructure provider.
@@ -362,10 +375,14 @@ type AzurePlatformStatus struct {
 	// If empty, the value is equal to `AzurePublicCloud`.
 	// +optional
 	CloudName AzureCloudEnvironment `json:"cloudName,omitempty"`
+
+	// armEndpoint specifies a URL to use for resource management in non-soverign clouds such as Azure Stack.
+	// +optional
+	ARMEndpoint string `json:"armEndpoint,omitempty"`
 }
 
 // AzureCloudEnvironment is the name of the Azure cloud environment
-// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud
+// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud;AzureStackCloud
 type AzureCloudEnvironment string
 
 const (
@@ -380,6 +397,9 @@ const (
 
 	// AzureGermanCloud is the Azure cloud environment used in Germany.
 	AzureGermanCloud AzureCloudEnvironment = "AzureGermanCloud"
+
+	// AzureStackCloud is the Azure cloud environment used at the edge and on premises.
+	AzureStackCloud AzureCloudEnvironment = "AzureStackCloud"
 )
 
 // GCPPlatformSpec holds the desired state of the Google Cloud Platform infrastructure provider.
@@ -510,6 +530,10 @@ type IBMCloudPlatformStatus struct {
 
 	// ProviderType indicates the type of cluster that was created
 	ProviderType IBMCloudProviderType `json:"providerType,omitempty"`
+
+	// CISInstanceCRN is the CRN of the Cloud Internet Services instance managing
+	// the DNS zone for the cluster's base domain
+	CISInstanceCRN string `json:"cisInstanceCRN,omitempty"`
 }
 
 // KubevirtPlatformSpec holds the desired state of the kubevirt infrastructure provider.

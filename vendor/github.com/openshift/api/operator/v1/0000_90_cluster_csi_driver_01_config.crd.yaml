@@ -2,6 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/701
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
@@ -37,6 +38,7 @@ spec:
               name:
                 enum:
                 - ebs.csi.aws.com
+                - efs.csi.aws.com
                 - disk.csi.azure.com
                 - pd.csi.storage.gke.io
                 - cinder.csi.openstack.org
@@ -44,6 +46,7 @@ spec:
                 - manila.csi.openstack.org
                 - csi.ovirt.org
                 - csi.kubevirt.io
+                - csi.shared-resources.openshift.io
                 type: string
             type: object
           spec:

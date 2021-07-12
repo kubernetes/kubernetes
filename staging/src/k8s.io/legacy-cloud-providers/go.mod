@@ -47,7 +47,7 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
-	github.com/openshift/api => github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
+	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0

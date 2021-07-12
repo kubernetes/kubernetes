@@ -1064,9 +1064,10 @@ type IngressControllerTuningOptions struct {
 
 	// threadCount defines the number of threads created per HAProxy process.
 	// Creating more threads allows each ingress controller pod to handle more
-	// connections, at the cost of more system resources being used. If this
-	// field is empty, the IngressController will use the default value.  The
-	// current default is 4 threads, but this may change in future releases.
+	// connections, at the cost of more system resources being used. HAProxy
+	// currently supports up to 64 threads. If this field is empty, the
+	// IngressController will use the default value.  The current default is 4
+	// threads, but this may change in future releases.
 	//
 	// Setting this field is generally not recommended. Increasing the number
 	// of HAProxy threads allows ingress controller pods to utilize more CPU
@@ -1076,6 +1077,7 @@ type IngressControllerTuningOptions struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=64
 	// +optional
 	ThreadCount int32 `json:"threadCount,omitempty"`
 }
