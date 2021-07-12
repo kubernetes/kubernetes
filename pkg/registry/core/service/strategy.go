@@ -489,6 +489,12 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.LoadBalancerClass = nil
 	}
 
+	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
+	// AND they did not change this field, it is safe to drop it.
+	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
+		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
+	}
+
 	// NOTE: there are other fields like `selector` which we could wipe.
 	// Historically we did not wipe them and they are not allocated from
 	// finite pools, so we are (currently) choosing to leave them alone.
@@ -575,6 +581,14 @@ func sameLoadBalancerClass(oldSvc, newSvc *api.Service) bool {
 		return true // both are nil
 	}
 	return *oldSvc.Spec.LoadBalancerClass == *newSvc.Spec.LoadBalancerClass
+}
+
+func needsExternalTrafficPolicy(svc *api.Service) bool {
+	return svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer
+}
+
+func sameExternalTrafficPolicy(oldSvc, newSvc *api.Service) bool {
+	return oldSvc.Spec.ExternalTrafficPolicy == newSvc.Spec.ExternalTrafficPolicy
 }
 
 // this func allows user to downgrade a service by just changing
