@@ -17,10 +17,12 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -32,7 +34,12 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	etcdtesting "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd/testing"
 )
 
 func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.APIEndpoint) string, port int) {
@@ -350,4 +357,92 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMemberAdd(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	newEtcdClientFnBuilder := func(cluster clientv3.Cluster) func(cfg clientv3.Config) (*clientv3.Client, error) {
+		return func(cfg clientv3.Config) (*clientv3.Client, error) {
+			c := clientv3.NewCtxClient(context.Background())
+			c.Cluster = cluster
+			return c, nil
+		}
+	}
+
+	t.Run("Successful Add Member", func(t *testing.T) {
+		client, _ := New([]string{"https://1.2.3.4:2379"}, "", "", "")
+		cluster := etcdtesting.NewMockCluster(ctrl)
+
+		// Have the first response fail to validate the retry mechanism as well.
+		gomock.InOrder(
+			cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.6:2379"}).Times(1).Return(nil, errors.New("an error occurred")),
+			cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.6:2379"}).Times(1).Return(
+				&clientv3.MemberAddResponse{
+					Member: &etcdserverpb.Member{
+						ID:       2,
+						PeerURLs: []string{"https://1.2.3.5:2379"},
+					},
+					Members: []*etcdserverpb.Member{
+						{
+							ID:       0,
+							Name:     "host-1",
+							PeerURLs: []string{"https://1.2.3.4:2379"},
+						},
+						{
+							ID:       1,
+							PeerURLs: []string{"https://1.2.3.5:2379"},
+						},
+						{
+							ID:       2,
+							PeerURLs: []string{"https://1.2.3.6:2379"},
+						},
+					},
+				}, nil),
+		)
+
+		client.newEtcdClientFn = newEtcdClientFnBuilder(cluster)
+
+		members, err := client.AddMember("test", "https://1.2.3.6:2379")
+		assert.NoError(t, err)
+		assert.Len(t, members, 3)
+		assert.Len(t, client.Endpoints, 2)
+		assert.Contains(t, client.Endpoints, "https://1.2.3.4:2379")
+		assert.Contains(t, client.Endpoints, "https://1.2.3.6:2379")
+		for _, m := range members {
+			switch m.PeerURL {
+			case "https://1.2.3.4:2379":
+				assert.Equal(t, "host-1", m.Name) // The peer's name should be used as the name if given.
+			case "https://1.2.3.5:2379":
+				assert.Equal(t, "1", m.Name) // The peer's ID should be used as the name if not given.
+			case "https://1.2.3.6:2379":
+				assert.Equal(t, "test", m.Name) // The added peer's name should be given if not returned.
+			default:
+				t.FailNow()
+			}
+		}
+	})
+
+	t.Run("Fail to add member", func(t *testing.T) {
+		existingEtcdBackoff := etcdBackoff
+		etcdBackoff = wait.Backoff{
+			Steps:    2,
+			Duration: 10 * time.Millisecond,
+			Factor:   1,
+			Jitter:   0.1,
+		}
+		defer func(backoff wait.Backoff) { etcdBackoff = backoff }(existingEtcdBackoff)
+
+		client, _ := New([]string{"https://1.2.3.4:2379"}, "", "", "")
+		cluster := etcdtesting.NewMockCluster(ctrl)
+
+		expectedError := errors.New("an unexpected error occurred")
+		cluster.EXPECT().MemberAdd(gomock.Any(), []string{"https://1.2.3.5:2379"}).Times(2).Return(nil, expectedError)
+
+		client.newEtcdClientFn = newEtcdClientFnBuilder(cluster)
+
+		members, err := client.AddMember("test", "https://1.2.3.5:2379")
+		assert.Len(t, members, 0)
+		assert.EqualError(t, err, expectedError.Error())
+	})
 }

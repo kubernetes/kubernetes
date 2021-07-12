@@ -66,11 +66,16 @@ type ClusterInterrogator interface {
 type Client struct {
 	Endpoints []string
 	TLS       *tls.Config
+
+	newEtcdClientFn func(cfg clientv3.Config) (*clientv3.Client, error)
 }
 
 // New creates a new EtcdCluster client
 func New(endpoints []string, ca, cert, key string) (*Client, error) {
-	client := Client{Endpoints: endpoints}
+	client := Client{
+		Endpoints:       endpoints,
+		newEtcdClientFn: clientv3.New,
+	}
 
 	if ca != "" || cert != "" || key != "" {
 		tlsInfo := transport.TLSInfo{
@@ -192,7 +197,7 @@ func (c *Client) Sync() error {
 	var lastError error
 	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		var err error
-		cli, err = clientv3.New(clientv3.Config{
+		cli, err = c.newEtcdClientFn(clientv3.Config{
 			Endpoints:   c.Endpoints,
 			DialTimeout: etcdTimeout,
 			DialOptions: []grpc.DialOption{
@@ -237,7 +242,7 @@ func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
 	var lastError error
 	var resp *clientv3.MemberListResponse
 	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := clientv3.New(clientv3.Config{
+		cli, err := c.newEtcdClientFn(clientv3.Config{
 			Endpoints:   c.Endpoints,
 			DialTimeout: etcdTimeout,
 			DialOptions: []grpc.DialOption{
@@ -302,7 +307,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	var lastError error
 	var resp *clientv3.MemberRemoveResponse
 	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := clientv3.New(clientv3.Config{
+		cli, err := c.newEtcdClientFn(clientv3.Config{
 			Endpoints:   c.Endpoints,
 			DialTimeout: etcdTimeout,
 			DialOptions: []grpc.DialOption{
@@ -353,7 +358,7 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	var lastError error
 	var resp *clientv3.MemberAddResponse
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := clientv3.New(clientv3.Config{
+		cli, err := c.newEtcdClientFn(clientv3.Config{
 			Endpoints:   c.Endpoints,
 			DialTimeout: etcdTimeout,
 			DialOptions: []grpc.DialOption{
@@ -420,7 +425,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 		var lastError error
 		var resp *clientv3.StatusResponse
 		err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-			cli, err := clientv3.New(clientv3.Config{
+			cli, err := c.newEtcdClientFn(clientv3.Config{
 				Endpoints:   c.Endpoints,
 				DialTimeout: etcdTimeout,
 				DialOptions: []grpc.DialOption{
