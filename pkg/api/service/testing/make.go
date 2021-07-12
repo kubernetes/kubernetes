@@ -205,3 +205,28 @@ func SetHealthCheckNodePort(value int32) Tweak {
 		svc.Spec.HealthCheckNodePort = value
 	}
 }
+
+// SetSessionAffinity sets the SessionAffinity field.
+func SetSessionAffinity(affinity api.ServiceAffinity) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.SessionAffinity = affinity
+		switch affinity {
+		case api.ServiceAffinityNone:
+			svc.Spec.SessionAffinityConfig = nil
+		case api.ServiceAffinityClientIP:
+			timeout := int32(10)
+			svc.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+				ClientIP: &api.ClientIPConfig{
+					TimeoutSeconds: &timeout,
+				},
+			}
+		}
+	}
+}
+
+// SetExternalName sets the ExternalName field.
+func SetExternalName(val string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.ExternalName = val
+	}
+}

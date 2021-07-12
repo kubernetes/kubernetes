@@ -303,41 +303,6 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 	return net
 }
 
-func TestServiceRegistryUpdate(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-
-	_, err := storage.Create(ctx, svctest.MakeService("foo"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Expected no error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error :%v", err)
-	}
-	svc := obj.(*api.Service)
-
-	// update selector
-	svc.Spec.Selector = map[string]string{"bar": "baz2"}
-
-	updatedSvc, created, err := storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(svc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatalf("Expected no error: %v", err)
-	}
-	if updatedSvc == nil {
-		t.Errorf("Expected non-nil object")
-	}
-	if created {
-		t.Errorf("expected not created")
-	}
-	updatedService := updatedSvc.(*api.Service)
-	if updatedService.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", updatedService.Name)
-	}
-}
-
 func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 	type proof func(t *testing.T, s *api.Service)
 	prove := func(proofs ...proof) []proof {
