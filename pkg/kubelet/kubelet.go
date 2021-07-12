@@ -1832,6 +1832,9 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
+	if nil == podStatus {
+		return fmt.Errorf("PodStatus for %q not found", pod.UID)
+	}
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
