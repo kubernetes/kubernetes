@@ -20,7 +20,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-source "${KUBE_ROOT}/cluster/skeleton/util.sh"
+source "${KUBE_ROOT}/gke/cluster/skeleton/util.sh"
 
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     KUBERNETES_PROVIDER=""
@@ -33,7 +33,7 @@ fi
 # variables. Providers can add variables to be appended to kube-env.
 # (see `build-kube-env`).
 
-PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+PROVIDER_UTILS="${KUBE_ROOT}/gke/cluster/${KUBERNETES_PROVIDER}/util.sh"
 if [ -f "${PROVIDER_UTILS}" ]; then
     source "${PROVIDER_UTILS}"
 fi

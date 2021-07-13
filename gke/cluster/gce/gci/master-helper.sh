@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # A library of helper functions and constant for GCI distro
-source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
+source "${KUBE_ROOT}/gke/cluster/gce/gci/helper.sh"
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
@@ -153,8 +153,8 @@ function create-master-instance-internal() {
 
   local metadata="kube-env=${KUBE_TEMP}/master-kube-env.yaml"
   metadata="${metadata},kubelet-config=${KUBE_TEMP}/master-kubelet-config.yaml"
-  metadata="${metadata},user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml"
-  metadata="${metadata},configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh"
+  metadata="${metadata},user-data=${KUBE_ROOT}/gke/cluster/gce/gci/master.yaml"
+  metadata="${metadata},configure-sh=${KUBE_ROOT}/gke/cluster/gce/gci/configure.sh"
   metadata="${metadata},cluster-location=${KUBE_TEMP}/cluster-location.txt"
   metadata="${metadata},cluster-name=${KUBE_TEMP}/cluster-name.txt"
   metadata="${metadata},gci-update-strategy=${KUBE_TEMP}/gci-update.txt"
@@ -162,7 +162,7 @@ function create-master-instance-internal() {
   metadata="${metadata},gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
   metadata="${metadata},kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml"
   metadata="${metadata},cluster-location=${KUBE_TEMP}/cluster-location.txt"
-  metadata="${metadata},kube-master-internal-route=${KUBE_ROOT}/cluster/gce/gci/kube-master-internal-route.sh"
+  metadata="${metadata},kube-master-internal-route=${KUBE_ROOT}/gke/cluster/gce/gci/kube-master-internal-route.sh"
   metadata="${metadata},${MASTER_EXTRA_METADATA}"
 
   local disk="name=${master_name}-pd"

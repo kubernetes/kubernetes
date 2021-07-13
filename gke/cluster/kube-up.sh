@@ -26,11 +26,11 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
-    source "${KUBE_ROOT}/cluster/env.sh"
+if [ -f "${KUBE_ROOT}/gke/cluster/env.sh" ]; then
+    source "${KUBE_ROOT}/gke/cluster/env.sh"
 fi
 
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
 
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
@@ -73,7 +73,7 @@ if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
 fi
 
 echo -e "Done, listing cluster services:\n" >&2
-"${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
+"${KUBE_ROOT}/gke/cluster/kubectl.sh" cluster-info
 echo
 
 exit 0

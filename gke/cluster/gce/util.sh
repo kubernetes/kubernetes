@@ -21,21 +21,21 @@
 readonly GCE_MAX_LOCAL_SSD=8
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
-source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
-source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/gke/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/gke/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
-  source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
+  source "${KUBE_ROOT}/gke/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
   exit 1
 fi
 
-source "${KUBE_ROOT}/cluster/gce/windows/node-helper.sh"
+source "${KUBE_ROOT}/gke/cluster/gce/windows/node-helper.sh"
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
+  source "${KUBE_ROOT}/gke/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
 else
   echo "Cannot operate on cluster using master os distro: ${MASTER_OS_DISTRIBUTION}" >&2
   exit 1
@@ -3891,11 +3891,11 @@ function test-setup() {
 
   if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
     for KUBE_GCE_ZONE in ${E2E_ZONES}; do
-      KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" "${KUBE_ROOT}/cluster/kube-up.sh"
+      KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" "${KUBE_ROOT}/gke/cluster/kube-up.sh"
       KUBE_USE_EXISTING_MASTER="true" # For subsequent zones we use the existing master
     done
   else
-    "${KUBE_ROOT}/cluster/kube-up.sh"
+    "${KUBE_ROOT}/gke/cluster/kube-up.sh"
   fi
 
   # Open up port 80 & 8080 so common containers on minions can be reached
@@ -3950,11 +3950,11 @@ function test-teardown() {
     read -r -a zones <<< "${E2E_ZONES}"
     # tear them down in reverse order, finally tearing down the master too.
     for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--)); do
-      KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
+      KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/gke/cluster/kube-down.sh"
     done
-    KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
+    KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/gke/cluster/kube-down.sh"
   else
-    "${KUBE_ROOT}/cluster/kube-down.sh"
+    "${KUBE_ROOT}/gke/cluster/kube-down.sh"
   fi
 }
 

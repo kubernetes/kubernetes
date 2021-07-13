@@ -20,7 +20,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 
-source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/gke/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 function detect-project() {

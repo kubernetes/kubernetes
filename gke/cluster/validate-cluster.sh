@@ -26,17 +26,17 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
-  source "${KUBE_ROOT}/cluster/env.sh"
+if [ -f "${KUBE_ROOT}/gke/cluster/env.sh" ]; then
+  source "${KUBE_ROOT}/gke/cluster/env.sh"
 fi
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
 
 # Run kubectl and retry upon failure.
 function kubectl_retry() {
   tries=3
-  while ! "${KUBE_ROOT}/cluster/kubectl.sh" "$@"; do
+  while ! "${KUBE_ROOT}/gke/cluster/kubectl.sh" "$@"; do
     tries=$((tries-1))
     if [[ ${tries} -le 0 ]]; then
       echo "('kubectl $*' failed, giving up)" >&2

@@ -42,7 +42,7 @@ function verify-prereqs {
 function validate-cluster {
 	# by default call the generic validate-cluster.sh script, customizable by
 	# any cluster provider if this does not fit.
-	"${KUBE_ROOT}/cluster/validate-cluster.sh"
+	"${KUBE_ROOT}/gke/cluster/validate-cluster.sh"
 }
 
 # Instantiate a kubernetes cluster

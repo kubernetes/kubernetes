@@ -86,7 +86,7 @@ function setup() {
   if [[ -z "${use_custom_instance_list}" ]]; then
     : "${KUBE_CONFIG_FILE:=config-test.sh}"
     echo 'Sourcing kube-util.sh'
-    source "${KUBE_ROOT}/cluster/kube-util.sh"
+    source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
     echo 'Detecting project'
     detect-project 2>&1
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
@@ -94,7 +94,7 @@ function setup() {
     # Source the below script for the ssh-to-node utility function.
     # Hack to save and restore the value of the ZONE env as the script overwrites it.
     local gke_zone="${ZONE:-}"
-    source "${KUBE_ROOT}/cluster/gce/util.sh"
+    source "${KUBE_ROOT}/gke/cluster/gce/util.sh"
     ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo 'LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances'
@@ -545,7 +545,7 @@ function dump_nodes_with_logexporter() {
   local -r tmp="${KUBE_TEMP}/logexporter"
   local -r manifest_yaml="${tmp}/logexporter-daemonset.yaml"
   mkdir -p "${tmp}"
-  cp "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
+  cp "${KUBE_ROOT}/gke/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
 
   sed -i'' -e "s@{{.NodeSelector}}@${node_selector:-}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${manifest_yaml}"
@@ -558,7 +558,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+  KUBECTL="${KUBE_ROOT}/gke/cluster/kubectl.sh"
   if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
     "${KUBECTL}" delete namespace "${logexporter_namespace}" || true

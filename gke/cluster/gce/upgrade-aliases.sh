@@ -28,7 +28,7 @@ fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
 
 # Print the number of routes used for K8s cluster node connectivity.
 #
@@ -174,7 +174,7 @@ export ETCD_IMAGE=3.5.0-0
 export ETCD_VERSION=3.5.0
 
 # Upgrade master with updated kube envs
-"${KUBE_ROOT}/cluster/gce/upgrade.sh" -M -l
+"${KUBE_ROOT}/gke/cluster/gce/upgrade.sh" -M -l
 
 delete-k8s-node-routes
 set-allow-subnet-cidr-routes-overlap false
