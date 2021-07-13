@@ -293,6 +293,35 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 	}
 }
 
+func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
+	podWorkers, processed := createPodWorkers()
+
+	now := time.Now()
+	podWorkers.podSyncStatuses[types.UID("1")] = &podSyncStatus{
+		startedTerminating: true,
+		terminatedAt:       now.Add(-time.Second),
+		terminatingAt:      now.Add(-2 * time.Second),
+		gracePeriod:        1,
+	}
+
+	// creates synthetic pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: &kubecontainer.Pod{ID: "1", Name: "1", Namespace: "test"},
+	})
+	drainAllWorkers(podWorkers)
+	if len(processed) != 0 {
+		t.Fatalf("Not all pods processed: %v", processed)
+	}
+	updates := processed["1"]
+	if len(updates) != 0 {
+		t.Fatalf("unexpected updates: %v", updates)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Fatalf("Unexpected undelivered work")
+	}
+}
+
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 	numPods := 20
