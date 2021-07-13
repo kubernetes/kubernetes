@@ -351,6 +351,23 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	})
 }
 
+func TestApfCancelWaitRequest(t *testing.T) {
+	epmetrics.Register()
+
+	server := newApfServerWithSingleRequest(t, decisionCancelWait)
+	defer server.Close()
+
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
+		t.Error(err)
+	}
+
+	checkForExpectedMetrics(t, []string{
+		"apiserver_current_inflight_requests",
+		"apiserver_request_terminations_total",
+		"apiserver_dropped_requests_total",
+	})
+}
+
 type fakeWatchApfFilter struct {
 	lock     sync.Mutex
 	inflight int
@@ -554,23 +571,6 @@ func TestContextClosesOnRequestProcessed(t *testing.T) {
 	}
 
 	wg.Wait()
-}
-
-func TestApfCancelWaitRequest(t *testing.T) {
-	epmetrics.Register()
-
-	server := newApfServerWithSingleRequest(t, decisionCancelWait)
-	defer server.Close()
-
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
-		t.Error(err)
-	}
-
-	checkForExpectedMetrics(t, []string{
-		"apiserver_current_inflight_requests",
-		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
-	})
 }
 
 type fakeFilterRequestDigest struct {
