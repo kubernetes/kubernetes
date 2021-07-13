@@ -288,22 +288,26 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
-	tlsInfo := transport.TLSInfo{
-		CertFile:      storageConfig.Transport.CertFile,
-		KeyFile:       storageConfig.Transport.KeyFile,
-		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return result, err
-	}
 	etcdConfig := clientv3.Config{
 		Endpoints:   storageConfig.Transport.ServerList,
 		DialTimeout: 20 * time.Second,
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: tlsConfig,
+	}
+	// enable TLS if required
+	if len(storageConfig.Transport.CertFile) > 0 {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      storageConfig.Transport.CertFile,
+			KeyFile:       storageConfig.Transport.KeyFile,
+			TrustedCAFile: storageConfig.Transport.TrustedCAFile,
+		}
+
+		tlsConfig, err := tlsInfo.ClientConfig()
+		if err != nil {
+			return result, err
+		}
+		etcdConfig.TLS = tlsConfig
 	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {

@@ -49,21 +49,7 @@ kube::test::find_integration_test_dirs() {
   )
 }
 
-CLEANUP_REQUIRED=
-cleanup() {
-  if [[ -z "${CLEANUP_REQUIRED}" ]]; then
-    return
-  fi
-  kube::log::status "Cleaning up etcd"
-  kube::etcd::cleanup
-  CLEANUP_REQUIRED=
-  kube::log::status "Integration test cleanup complete"
-}
-
 runTests() {
-  kube::log::status "Starting etcd instance"
-  CLEANUP_REQUIRED=1
-  kube::etcd::start
   kube::log::status "Running integration test cases"
 
   make -C "${KUBE_ROOT}" test \
@@ -72,22 +58,6 @@ runTests() {
       KUBE_TEST_ARGS="--alsologtostderr=true ${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE=""
-
-  cleanup
 }
-
-checkEtcdOnPath() {
-  kube::log::status "Checking etcd is on PATH"
-  which etcd && return
-  kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions."
-  kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
-  return 1
-}
-
-checkEtcdOnPath
-
-# Run cleanup to stop etcd on interrupt or other kill signal.
-trap cleanup EXIT
 
 runTests

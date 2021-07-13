@@ -17,153 +17,99 @@ limitations under the License.
 package framework
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
-	"strings"
+	"strconv"
 	"time"
 
-	"google.golang.org/grpc/grpclog"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	"go.etcd.io/etcd/server/v3/embed"
 	"k8s.io/klog/v2"
-
-	"k8s.io/kubernetes/pkg/util/env"
 )
 
 var etcdURL = ""
 
-const installEtcd = `
-Cannot find etcd, cannot run integration tests
-Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions.
-
-You can use 'hack/install-etcd.sh' to install a copy in third_party/.
-
-`
-
-// getEtcdPath returns a path to an etcd executable.
-func getEtcdPath() (string, error) {
-	return exec.LookPath("etcd")
-}
-
 // getAvailablePort returns a TCP port that is available for binding.
-func getAvailablePort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, fmt.Errorf("could not bind to a port: %v", err)
+func getAvailablePorts(count int) ([]int, error) {
+	ports := []int{}
+	for i := 0; i < count; i++ {
+		l, err := net.Listen("tcp", ":0")
+		if err != nil {
+			return nil, fmt.Errorf("could not bind to a port: %v", err)
+		}
+		// It is possible but unlikely that someone else will bind this port before we get a chance to use it.
+		defer l.Close()
+		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
 	}
-	// It is possible but unlikely that someone else will bind this port before we
-	// get a chance to use it.
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
+	return ports, nil
 }
 
-// startEtcd executes an etcd instance. The returned function will signal the
-// etcd process and wait for it to exit.
+// startEtcd executes an embedded etcd instance.
 func startEtcd() (func(), error) {
-	if runtime.GOARCH == "arm64" {
-		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
+	dataDir := "integration_test_etcd_data"
+	etcdDir, err := ioutil.TempDir(os.TempDir(), dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
 	}
+	klog.Infof("storing etcd data in: %v", etcdDir)
+	os.Chmod(etcdDir, 0700)
 
-	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
-	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
+	cfg := embed.NewConfig()
+	cfg.Dir = etcdDir
+	cfg.Name = "etcd-integration"
+
+	cfg.UnsafeNoFsync = true
+
+	// use standard ports if they are free
+	ports := []int{2379, 2380}
+	conn, err := net.Dial("tcp", "127.0.0.1:2379")
 	if err == nil {
-		klog.Infof("etcd already running at %s", etcdURL)
+		klog.Infof("etcd ports are not free at 127.0.0.1:2379")
 		conn.Close()
-		return func() {}, nil
+		ports, err = getAvailablePorts(2)
+		if err != nil {
+			return nil, err
+		}
 	}
-	klog.V(1).Infof("could not connect to etcd: %v", err)
+	clientURL := url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(ports[0]))}
+	etcdURL = clientURL.String()
+	peerURL := url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(ports[1]))}
 
-	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil)
+	cfg.LPUrls = []url.URL{peerURL}
+	cfg.APUrls = []url.URL{peerURL}
+	cfg.LCUrls = []url.URL{clientURL}
+	cfg.ACUrls = []url.URL{clientURL}
+	cfg.ClientAutoTLS = false
+	cfg.PeerAutoTLS = false
+	cfg.AuthToken = ""
+	cfg.ClientTLSInfo = transport.TLSInfo{}
+	cfg.PeerTLSInfo = transport.TLSInfo{}
+	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
+	cfg.LogLevel = "debug"
+
+	e, err := embed.StartEtcd(cfg)
 	if err != nil {
 		return nil, err
 	}
-
-	etcdURL = currentURL
-	os.Setenv("KUBE_INTEGRATION_ETCD_URL", etcdURL)
-
-	return stop, nil
-}
-
-// RunCustomEtcd starts a custom etcd instance for test purposes.
-func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn func(), err error) {
-	// TODO: Check for valid etcd version.
-	etcdPath, err := getEtcdPath()
-	if err != nil {
-		fmt.Fprint(os.Stderr, installEtcd)
-		return "", nil, fmt.Errorf("could not find etcd in PATH: %v", err)
-	}
-	etcdPort, err := getAvailablePort()
-	if err != nil {
-		return "", nil, fmt.Errorf("could not get a port: %v", err)
-	}
-	customURL := fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
-
-	klog.Infof("starting etcd on %s", customURL)
-
-	etcdDataDir, err := ioutil.TempDir(os.TempDir(), dataDir)
-	if err != nil {
-		return "", nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
-	}
-	klog.Infof("storing etcd data in: %v", etcdDataDir)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	args := []string{
-		"--data-dir",
-		etcdDataDir,
-		"--listen-client-urls",
-		customURL,
-		"--advertise-client-urls",
-		customURL,
-		"--listen-peer-urls",
-		"http://127.0.0.1:0",
-		"-log-level",
-		"warn", // set to info or debug for more logs
-	}
-	args = append(args, customFlags...)
-	cmd := exec.CommandContext(ctx, etcdPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	stop := func() {
-		cancel()
-		err := cmd.Wait()
-		klog.Infof("etcd exit status: %v", err)
-		err = os.RemoveAll(etcdDataDir)
+		e.Close()
+		err = os.RemoveAll(etcdDir)
 		if err != nil {
 			klog.Warningf("error during etcd cleanup: %v", err)
 		}
 	}
 
-	// Quiet etcd logs for integration tests
-	// Comment out to get verbose logs if desired
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
-
-	if err := cmd.Start(); err != nil {
-		return "", nil, fmt.Errorf("failed to run etcd: %v", err)
+	select {
+	case <-e.Server.ReadyNotify():
+	case <-time.After(60 * time.Second):
+		e.Server.Stop() // trigger a shutdown
+		return nil, err
 	}
 
-	var i int32 = 1
-	const pollCount = int32(300)
-
-	for i <= pollCount {
-		conn, err := net.DialTimeout("tcp", strings.TrimPrefix(customURL, "http://"), 1*time.Second)
-		if err == nil {
-			conn.Close()
-			break
-		}
-
-		if i == pollCount {
-			stop()
-			return "", nil, fmt.Errorf("could not start etcd")
-		}
-
-		time.Sleep(100 * time.Millisecond)
-		i = i + 1
-	}
-
-	return customURL, stop, nil
+	return stop, nil
 }
 
 // EtcdMain starts an etcd instance before running tests.
