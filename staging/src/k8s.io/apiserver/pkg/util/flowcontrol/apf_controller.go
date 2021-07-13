@@ -327,7 +327,7 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 
 	func(obj interface{}) {
 		defer cfgCtlr.configQueue.Done(obj)
-		specificDelay, err := cfgCtlr.syncOne(map[string]string{})
+		specificDelay, err := cfgCtlr.syncOne()
 		switch {
 		case err != nil:
 			klog.Error(err)
@@ -346,7 +346,7 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 // objects that configure API Priority and Fairness and updates the
 // local configController accordingly.
 // Only invoke this in the one and only worker goroutine
-func (cfgCtlr *configController) syncOne(flowSchemaRVs map[string]string) (specificDelay time.Duration, err error) {
+func (cfgCtlr *configController) syncOne() (specificDelay time.Duration, err error) {
 	klog.V(5).Infof("%s syncOne at %s", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt))
 	all := labels.Everything()
 	newPLs, err := cfgCtlr.plLister.List(all)
@@ -357,7 +357,7 @@ func (cfgCtlr *configController) syncOne(flowSchemaRVs map[string]string) (speci
 	if err != nil {
 		return 0, fmt.Errorf("unable to list FlowSchema objects: %w", err)
 	}
-	return cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
+	return cfgCtlr.digestConfigObjects(newPLs, newFSs)
 }
 
 // cfgMeal is the data involved in the process of digesting the API
@@ -398,7 +398,7 @@ type fsStatusUpdate struct {
 // digestConfigObjects is given all the API objects that configure
 // cfgCtlr and writes its consequent new configState.
 // Only invoke this in the one and only worker goroutine
-func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema, flowSchemaRVs map[string]string) (time.Duration, error) {
+func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) (time.Duration, error) {
 	fsStatusUpdates := cfgCtlr.lockAndDigestConfigObjects(newPLs, newFSs)
 	var errs []error
 	currResult := updateAttempt{
@@ -427,16 +427,15 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
 		patchBytes := []byte(fmt.Sprintf(`{"status": {"conditions": [ %s ] } }`, string(enc)))
 		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
-		patchedFlowSchema, err := fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
-		if err == nil {
-			key, _ := cache.MetaNamespaceKeyFunc(patchedFlowSchema)
-			flowSchemaRVs[key] = patchedFlowSchema.ResourceVersion
-		} else if apierrors.IsNotFound(err) {
-			// This object has been deleted.  A notification is coming
-			// and nothing more needs to be done here.
-			klog.V(5).Infof("%s at %s: attempted update of concurrently deleted FlowSchema %s; nothing more needs to be done", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt), fsu.flowSchema.Name)
-		} else {
-			errs = append(errs, fmt.Errorf("failed to set a status.condition for FlowSchema %s: %w", fsu.flowSchema.Name, err))
+		_, err = fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// This object has been deleted.  A notification is coming
+				// and nothing more needs to be done here.
+				klog.V(5).Infof("%s at %s: attempted update of concurrently deleted FlowSchema %s; nothing more needs to be done", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt), fsu.flowSchema.Name)
+			} else {
+				errs = append(errs, fmt.Errorf("failed to set a status.condition for FlowSchema %s: %w", fsu.flowSchema.Name, err))
+			}
 		}
 	}
 	cfgCtlr.addUpdateResult(currResult)
