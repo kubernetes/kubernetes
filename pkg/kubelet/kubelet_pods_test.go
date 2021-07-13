@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -3218,5 +3219,35 @@ func TestSortPodIPs(t *testing.T) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedIPs, podIPs)
 			}
 		})
+	}
+}
+
+func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+
+	testTimestamp := time.Unix(123456789, 987654321)
+
+	criStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{Name: "containerA", CreatedAt: testTimestamp},
+			{Name: "containerB", CreatedAt: testTimestamp.Add(1)},
+		},
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	// convertToAPIContainerStatuses is purely transformative and shouldn't alter the state of the kubelet
+	// as there are no synchronisation events in that function (no locks, no channels, ...) each test routine
+	// should have its own vector clock increased independently. Golang race detector uses pure happens-before
+	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
+	for i := 0; i < 2; i++ {
+		go func() {
+			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false)
+		}()
 	}
 }
