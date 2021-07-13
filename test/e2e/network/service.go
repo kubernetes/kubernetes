@@ -2008,7 +2008,7 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 
 		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
-		framework.Logf("waiting up to %v to connect to %v", e2eservice.KubeProxyEndpointLagTimeout, serviceAddress)
+		framework.Logf("waiting up to 3s to connect to %v", serviceAddress)
 		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
