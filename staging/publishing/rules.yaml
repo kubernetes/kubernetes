@@ -7,7 +7,7 @@ recursive-delete-patterns:
 - BUILD.bazel
 - "*/BUILD.bazel"
 - Gopkg.toml
-default-go-version: 1.16.5
+default-go-version: 1.16.6
 rules:
 - destination: code-generator
   branches:
