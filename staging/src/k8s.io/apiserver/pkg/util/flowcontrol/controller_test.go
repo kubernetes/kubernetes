@@ -140,7 +140,7 @@ func (cqs *ctlrTestQueueSet) IsIdle() bool {
 	return cqs.countActive == 0
 }
 
-func (cqs *ctlrTestQueueSet) StartRequest(ctx context.Context, width *fcrequest.Width, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (req fq.Request, idle bool) {
+func (cqs *ctlrTestQueueSet) StartRequest(ctx context.Context, width *fcrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (req fq.Request, idle bool) {
 	cqs.cts.lock.Lock()
 	defer cqs.cts.lock.Unlock()
 	cqs.countActive++

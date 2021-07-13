@@ -60,7 +60,7 @@ func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
-	widthEstimator flowcontrolrequest.WidthEstimatorFunc,
+	workEstimator flowcontrolrequest.WorkEstimatorFunc,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
@@ -165,11 +165,14 @@ func WithPriorityAndFairness(
 			}
 		}
 
-		// find the estimated "width" of the request
-		// TODO: Maybe just make it costEstimator and let it return additionalLatency too for the watch?
+		// find the estimated amount of work of the request
 		// TODO: Estimate cost should also take fcIfc.GetWatchCount(requestInfo) as a parameter.
-		width := widthEstimator.EstimateWidth(r)
-		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user, Width: width}
+		workEstimate := workEstimator.EstimateWork(r)
+		digest := utilflowcontrol.RequestDigest{
+			RequestInfo:  requestInfo,
+			User:         user,
+			WorkEstimate: workEstimate,
+		}
 
 		fcIfc.Handle(ctx, digest, note, func(inQueue bool) {
 			if inQueue {

@@ -80,9 +80,9 @@ type StartFunction func(ctx context.Context, hashValue uint64) (execute bool, af
 
 // RequestDigest holds necessary info from request for flow-control
 type RequestDigest struct {
-	RequestInfo *request.RequestInfo
-	User        user.Info
-	Width       fcrequest.Width
+	RequestInfo  *request.RequestInfo
+	User         user.Info
+	WorkEstimate fcrequest.WorkEstimate
 }
 
 // `*configController` maintains eventual consistency with the API
@@ -809,7 +809,7 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	}
 	startWaitingTime = time.Now()
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
-	req, idle := plState.queues.StartRequest(ctx, &rd.Width, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
+	req, idle := plState.queues.StartRequest(ctx, &rd.WorkEstimate, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
 	if idle {
 		cfgCtlr.maybeReapLocked(plName, plState)
 	}

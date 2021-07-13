@@ -44,8 +44,8 @@ type request struct {
 	// startTime is the real time when the request began executing
 	startTime time.Time
 
-	// width of the request
-	width fcrequest.Width
+	// estimated amount of work of the request
+	workEstimate fcrequest.WorkEstimate
 
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request

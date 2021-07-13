@@ -20,28 +20,28 @@ import (
 	"net/http"
 )
 
-type Width struct {
+type WorkEstimate struct {
 	// Seats represents the number of seats associated with this request
 	Seats uint
 }
 
-// DefaultWidthEstimator returns returns '1' as the "width"
-// of the given request.
+// DefaultWorkEstimator returns estimation with default number of seats
+// of 1.
 //
-// TODO: when we plumb in actual "width" handling for different
+// TODO: when we plumb in actual work estimate handling for different
 //  type of request(s) this function will iterate through a chain
-//  of widthEstimator instance(s).
-func DefaultWidthEstimator(_ *http.Request) Width {
-	return Width{
+//  of workEstimator instance(s).
+func DefaultWorkEstimator(_ *http.Request) WorkEstimate {
+	return WorkEstimate{
 		Seats: 1,
 	}
 }
 
-// WidthEstimatorFunc returns the estimated "width" of a given request.
+// WorkEstimatorFunc returns the estimated work of a given request.
 // This function will be used by the Priority & Fairness filter to
-// estimate the "width" of incoming requests.
-type WidthEstimatorFunc func(*http.Request) Width
+// estimate the work of of incoming requests.
+type WorkEstimatorFunc func(*http.Request) WorkEstimate
 
-func (e WidthEstimatorFunc) EstimateWidth(r *http.Request) Width {
+func (e WorkEstimatorFunc) EstimateWork(r *http.Request) WorkEstimate {
 	return e(r)
 }
