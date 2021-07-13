@@ -46,7 +46,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
+var _ = SIGDescribe("AppArmor [NodeFeature] [Feature:AppArmor]", func() {
 	if isAppArmorEnabled() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Loading AppArmor profiles for testing")

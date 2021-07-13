@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -62,7 +62,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 
 var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
-	ginkgo.Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
+	ginkgo.Describe("Validate Node Allocatable [NodeFeature]", func() {
 		ginkgo.It("sets up the node and runs the test", func() {
 			framework.ExpectNoError(runTest(f))
 		})

@@ -43,7 +43,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
+var _ = SIGDescribe("NodeProblemDetector [NodeFeature] [Serial]", func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second

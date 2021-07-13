@@ -18,7 +18,8 @@ package e2enode
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -28,7 +29,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
+var _ = SIGDescribe("ImageID [NodeFeature]", func() {
 
 	busyBoxImage := "k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff"
 

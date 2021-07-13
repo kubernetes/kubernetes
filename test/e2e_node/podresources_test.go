@@ -477,7 +477,7 @@ func podresourcesGetAllocatableResourcesTests(f *framework.Framework, cli kubele
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
+var _ = SIGDescribe("POD Resources [Serial] [NodeFeature] [Feature:PodResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
 
 	reservedSystemCPUs := cpuset.MustParse("1")

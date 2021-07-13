@@ -56,7 +56,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -72,7 +72,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithoutMappings(f, true, 1001, nil)
@@ -107,7 +107,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithMappings(f, true, 1001, nil)

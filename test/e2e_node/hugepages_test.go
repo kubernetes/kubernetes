@@ -189,7 +189,7 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages]", func() {
+var _ = SIGDescribe("HugePages [Serial] [NodeSpecialFeature] [Feature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
 	ginkgo.It("should remove resources for huge page sizes no longer supported", func() {

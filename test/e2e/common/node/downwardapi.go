@@ -284,7 +284,7 @@ var _ = SIGDescribe("Downward API", func() {
 	})
 })
 
-var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages]", func() {
+var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	ginkgo.Context("Downward API tests for hugepages", func() {

@@ -485,7 +485,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature]", func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (

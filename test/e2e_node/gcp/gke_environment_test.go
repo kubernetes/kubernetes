@@ -320,7 +320,7 @@ func checkDockerStorageDriver() error {
 	return fmt.Errorf("failed to find storage driver")
 }
 
-var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
+var _ = SIGDescribe("GKE system requirements [NodeConformance] [NodeFeature] [Feature:GKEEnv]", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.RunIfSystemSpecNameIs("gke")
 	})

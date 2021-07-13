@@ -42,12 +42,12 @@ import (
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature:RuntimeHandler]", func() {
+	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature]", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature]", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		defer deleteRuntimeClass(f, rcName)
@@ -70,7 +70,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
-	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature]", func() {
 		// The built-in docker runtime does not support configuring runtime handlers.
 		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
 
@@ -80,7 +80,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		expectPodSuccess(f, pod)
 	})
 
-	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature:RuntimeHandler]", func() {
+	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature]", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 

@@ -30,7 +30,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
+var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {

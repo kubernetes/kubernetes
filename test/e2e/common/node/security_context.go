@@ -279,7 +279,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]", func() {
+		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature]", func() {
 			podName := createAndWaitUserPod(true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {

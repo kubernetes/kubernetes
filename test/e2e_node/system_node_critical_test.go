@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
+var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true

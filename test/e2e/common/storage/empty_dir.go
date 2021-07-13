@@ -45,7 +45,7 @@ var (
 var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature]", func() {
 
 		ginkgo.BeforeEach(func() {
 			// Windows does not support the FSGroup SecurityContext option.

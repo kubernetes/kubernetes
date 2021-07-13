@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -70,7 +70,7 @@ type testRun struct {
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
 // http://kubernetes.io/docs/admin/garbage-collection/
-var _ = SIGDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
+var _ = SIGDescribe("GarbageCollect [Serial] [NodeFeature]", func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"
