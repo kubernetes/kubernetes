@@ -3913,6 +3913,7 @@ message Probe {
   // Value must be non-negative integer. The value zero indicates stop immediately via
   // the kill signal (no opportunity to shut down).
   // This is an alpha field and requires enabling ProbeTerminationGracePeriod feature gate.
+  // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
 }
