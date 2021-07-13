@@ -51,7 +51,7 @@ func TestExtractFromNonExistentFile(t *testing.T) {
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
-	ch := make(chan interface{})
+	ch := make(chan interface{}, 1)
 	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:

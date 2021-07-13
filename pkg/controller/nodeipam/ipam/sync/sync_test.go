@@ -235,7 +235,10 @@ func TestNodeSyncResync(t *testing.T) {
 	close(sync.opChan)
 	// Unblock loop().
 	go func() {
-		<-fake.reportChan
+		select {
+		case <-fake.reportChan:
+		case <-doneChan:
+		}
 	}()
 	<-doneChan
 	fake.dumpTrace()

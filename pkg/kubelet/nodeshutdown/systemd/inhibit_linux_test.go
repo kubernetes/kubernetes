@@ -184,6 +184,7 @@ func TestMonitorShutdown(t *testing.T) {
 			signal := &dbus.Signal{Body: []interface{}{tc.shutdownActive}}
 			fakeSystemBus.signalChannel <- signal
 			<-done
+			close(fakeSystemBus.signalChannel)
 		})
 	}
 }

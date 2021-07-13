@@ -501,6 +501,10 @@ udpIdleTimeout: 250ms`)
 		errCh := make(chan error, 1)
 		go func() {
 			errCh <- opt.runLoop()
+			select {
+			case <-opt.errCh:
+			case <-time.After(10 * time.Second):
+			}
 		}()
 
 		if tc.append {

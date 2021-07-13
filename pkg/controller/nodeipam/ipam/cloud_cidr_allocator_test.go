@@ -42,6 +42,7 @@ func TestBoundedRetries(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
 	updateChan := make(chan string, 1) // need to buffer as we are using only on go routine
 	stopChan := make(chan struct{})
+	defer close(stopChan)
 	sharedInfomer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ca := &cloudCIDRAllocator{
 		client:            clientSet,
