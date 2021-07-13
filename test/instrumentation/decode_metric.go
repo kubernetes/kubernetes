@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -182,7 +183,24 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				if err != nil {
 					return m, err
 				}
+			case *ast.SelectorExpr:
+				packageName := fmt.Sprintf("%v", v.X)
+
+				variableExpr, found := c.variables[packageName + "." + v.Sel.Name]
+				if !found {
+					return m, newDecodeErrorf(expr, errBadVariableAttribute)
+				}
+				bl, ok := variableExpr.(*ast.BasicLit)
+				if !ok {
+					return m, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				value, err = stringValue(bl)
+				if err != nil {
+					return m, err
+				}
+
 			default:
+				fmt.Fprintf(os.Stdout, "key %s is type %T from Default\n", key, v)
 				return m, newDecodeErrorf(expr, errNonStringAttribute)
 			}
 			switch key {
