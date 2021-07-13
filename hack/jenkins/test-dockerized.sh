@@ -45,6 +45,10 @@ export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
+# Increase ephemeral port range
+sysctl -w net.ipv4.ip_local_port_range="20000 60999"
+sysctl -w net.ipv4.tcp_fin_timeout=30
+
 cd "${GOPATH}/src/k8s.io/kubernetes"
 
 make generated_files
