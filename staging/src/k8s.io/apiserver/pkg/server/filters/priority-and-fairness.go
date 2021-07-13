@@ -215,7 +215,7 @@ func WithPriorityAndFairness(
 				}()
 
 				trace.Step("About to handle from goroutine")
-				fcIfc.Handle(ctx, digest, note, queueNote, execute, trace)
+				fcIfc.Handle(watchCtx, digest, note, queueNote, execute, trace)
 
 				if watchCtxCancel != nil {
 					watchCtxCancel()
