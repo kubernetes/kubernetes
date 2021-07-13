@@ -18,7 +18,7 @@
 # pre-existing Kubernetes master. See test/kubemark/pre-existing/README.md
 # for me details on using a pre-existing provider.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"

@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
 DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 

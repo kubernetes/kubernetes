@@ -16,7 +16,7 @@
 
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 # Specifying KUBE_GCE_API_ENDPOINT will override the default GCE Compute API endpoint (https://www.googleapis.com/compute/v1/).

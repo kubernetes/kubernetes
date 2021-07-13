@@ -30,7 +30,7 @@ set -o pipefail
 # echo "-=-=-=-=-=-=-=-=-=-="
 
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 

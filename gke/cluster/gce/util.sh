@@ -20,7 +20,7 @@
 # config-default.sh.
 readonly GCE_MAX_LOCAL_SSD=8
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"

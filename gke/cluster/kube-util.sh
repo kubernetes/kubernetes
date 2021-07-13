@@ -18,7 +18,7 @@
 # cluster/${KUBERNETES_PROVIDER}/util.sh where KUBERNETES_PROVIDER, if unset,
 # will use its default value (gce).
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
 source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 

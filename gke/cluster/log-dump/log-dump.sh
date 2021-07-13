@@ -82,7 +82,7 @@ function print-deprecation-note() {
 
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
   if [[ -z "${use_custom_instance_list}" ]]; then
     : "${KUBE_CONFIG_FILE:=config-test.sh}"
     echo 'Sourcing kube-util.sh'

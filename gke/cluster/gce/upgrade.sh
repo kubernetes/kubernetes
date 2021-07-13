@@ -27,7 +27,7 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
   exit 1
 fi
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 

@@ -54,7 +54,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
