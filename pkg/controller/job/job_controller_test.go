@@ -1792,6 +1792,98 @@ func TestSyncJobPastDeadline(t *testing.T) {
 	}
 }
 
+func TestSyncJobStartTime(t *testing.T) {
+	testCases := map[string]struct {
+		// job setup
+		parallelism           int32
+		completions           int32
+		activeDeadlineSeconds int64
+		startTime             int64
+		backoffLimit          int32
+		suspend               bool
+
+		// pod setup
+		activePods    int
+		succeededPods int
+		failedPods    int
+
+		// expectations
+		expectedSetStartTime    bool
+		expectedDeletions       int32
+		expectedActive          int32
+		expectedSucceeded       int32
+		expectedFailed          int32
+		expectedCondition       batch.JobConditionType
+		expectedConditionReason string
+
+		// features
+		suspendJobEnabled bool
+	}{
+		"job first start sync": {
+			parallelism:          1,
+			completions:          2,
+			backoffLimit:         6,
+			activePods:           0,
+			succeededPods:        0,
+			expectedSetStartTime: true,
+		},
+		"sync job again by pod creation with startTime set": {
+			parallelism:          1,
+			completions:          2,
+			backoffLimit:         6,
+			activePods:           1,
+			succeededPods:        1,
+			expectedSetStartTime: false,
+			startTime:            100,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// job manager setup
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			var actual *batch.Job
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				actual = job
+				return job, nil
+			}
+
+			// job & pods setup
+			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, batch.NonIndexedCompletion)
+			if tc.startTime != 0 {
+				start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
+				manager.setJobStartTime(testutil.GetKey(job, t), &start)
+			}
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods, 0)
+
+			// run
+			_, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+			if err != nil {
+				t.Errorf("Unexpected error when syncing jobs %v", err)
+			}
+
+			if tc.expectedSetStartTime && actual.Status.StartTime == nil {
+				t.Error("Missing .status.startTime")
+			}
+
+			if tc.startTime != 0 {
+				_, startTime := manager.hasJobStartTimeSet(testutil.GetKey(job, t))
+				if !tc.expectedSetStartTime && !actual.Status.StartTime.Equal(startTime) {
+					t.Error("Re-set .status.startTime")
+				}
+			}
+
+		})
+	}
+}
+
 func getCondition(job *batch.Job, condition batch.JobConditionType, status v1.ConditionStatus, reason string) bool {
 	for _, v := range job.Status.Conditions {
 		if v.Type == condition && v.Status == status && v.Reason == reason {

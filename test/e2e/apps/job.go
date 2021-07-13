@@ -280,7 +280,7 @@ var _ = SIGDescribe("Job", func() {
 
 	ginkgo.It("should fail when exceeds active deadline", func() {
 		ginkgo.By("Creating a job")
-		var activeDeadlineSeconds int64 = 1
+		var activeDeadlineSeconds int64 = 30
 		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
@@ -289,6 +289,22 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
+	ginkgo.It("should all fail when exceeds active deadline for batch jobs", func() {
+		ginkgo.By("Creating 10 jobs")
+		var jobs []*batchv1.Job
+		var activeDeadlineSeconds int64 = 30
+		for i := 0; i < 10; i++ {
+			job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline-batch-"+strconv.Itoa(i), v1.RestartPolicyNever, 1, 1, &activeDeadlineSeconds, backoffLimit)
+			jobs = append(jobs, job)
+		}
+		for _, job := range jobs {
+			_, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+		}
+		ginkgo.By("Ensuring job past active deadline")
+		err := waitForJobsFailure(f.ClientSet, f.Namespace.Name, jobs, 2*time.Minute, "DeadlineExceeded")
+		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
+	})
 	/*
 		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
@@ -678,5 +694,36 @@ func waitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 			}
 		}
 		return false, nil
+	})
+}
+
+// waitForJobsFailure uses c to wait for up to timeout for all the Jobs in namespace ns to fail.
+func waitForJobsFailure(c clientset.Interface, ns string, jobs []*batchv1.Job, timeout time.Duration, reason string) error {
+	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
+		result := true
+		var resultErr error
+		for _, job := range jobs {
+			curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			if err != nil {
+				result = false
+				resultErr = err
+				break
+			}
+			jobFailed := false
+			for _, c := range curr.Status.Conditions {
+				if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
+					if reason == "" || reason == c.Reason {
+						jobFailed = true
+						break
+					}
+				}
+			}
+			if jobFailed {
+				continue
+			}
+			result = false
+			break
+		}
+		return result, resultErr
 	})
 }

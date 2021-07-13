@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -117,6 +117,10 @@ type Controller struct {
 	recorder record.EventRecorder
 
 	podUpdateBatchPeriod time.Duration
+
+	// track job startTime has been set
+	jobStartTimeCache     map[string]*metav1.Time
+	jobStartTimeCacheLock *sync.RWMutex
 }
 
 // NewController creates a new Job controller that keeps the relevant pods
@@ -141,6 +145,8 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
 		orphanQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job_orphan_pod"),
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		jobStartTimeCache:     map[string]*metav1.Time{},
+		jobStartTimeCacheLock: &sync.RWMutex{},
 	}
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		jm.podUpdateBatchPeriod = podUpdateBatchPeriod
@@ -674,6 +680,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			klog.V(4).Infof("Job has been deleted: %v", key)
 			jm.expectations.DeleteExpectations(key)
 			jm.finalizerExpectations.deleteExpectations(key)
+			jm.removeJobStartTime(key)
 			return true, nil
 		}
 		return false, err
@@ -742,13 +749,19 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	// Job first start. Set StartTime and start the ActiveDeadlineSeconds timer
 	// only if the job is not in the suspended state.
 	if job.Status.StartTime == nil && !jobSuspended(&job) {
-		now := metav1.Now()
-		job.Status.StartTime = &now
-		// enqueue a sync to check if job past ActiveDeadlineSeconds
-		if job.Spec.ActiveDeadlineSeconds != nil {
-			klog.V(4).Infof("Job %s has ActiveDeadlineSeconds will sync after %d seconds",
-				key, *job.Spec.ActiveDeadlineSeconds)
-			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
+		hasSetStartTime, startTime := jm.hasJobStartTimeSet(key)
+		if hasSetStartTime {
+			job.Status.StartTime = startTime
+		} else {
+			now := metav1.Now()
+			jm.setJobStartTime(key, &now)
+			job.Status.StartTime = &now
+			// enqueue a sync to check if job past ActiveDeadlineSeconds
+			if job.Spec.ActiveDeadlineSeconds != nil {
+				klog.V(4).Infof("Job %s has ActiveDeadlineSeconds will sync after %d seconds",
+					key, *job.Spec.ActiveDeadlineSeconds)
+				jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
+			}
 		}
 	}
 
@@ -1693,4 +1706,30 @@ func equalReady(a, b *int32) bool {
 		return *a == *b
 	}
 	return a == b
+}
+
+// set job startTime
+func (jm *Controller) setJobStartTime(jobKey string, startTime *metav1.Time) {
+	jm.jobStartTimeCacheLock.Lock()
+	defer jm.jobStartTimeCacheLock.Unlock()
+	jm.jobStartTimeCache[jobKey] = startTime
+}
+
+// check whether job startTime set
+func (jm *Controller) hasJobStartTimeSet(jobKey string) (bool, *metav1.Time) {
+	jm.jobStartTimeCacheLock.RLock()
+	defer jm.jobStartTimeCacheLock.RUnlock()
+	if v, ok := jm.jobStartTimeCache[jobKey]; ok {
+		return true, v
+	}
+	return false, nil
+}
+
+// remove job startTime
+func (jm *Controller) removeJobStartTime(jobKey string) {
+	jm.jobStartTimeCacheLock.Lock()
+	defer jm.jobStartTimeCacheLock.Unlock()
+	if _, ok := jm.jobStartTimeCache[jobKey]; ok {
+		delete(jm.jobStartTimeCache, jobKey)
+	}
 }
