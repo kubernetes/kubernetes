@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"reflect"
+	"sort"
 	"sync"
 	"time"
 
@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/slice"
+	stringslices "k8s.io/utils/strings/slices"
 )
 
 var (
@@ -263,7 +263,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 			curEndpoints = state.endpoints
 		}
 
-		if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
+		if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(stringslices.Clone(curEndpoints), newEndpoints) {
 			klog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
 			lb.removeStaleAffinity(svcPort, newEndpoints)
 			// OnEndpointsUpdate can be called without NewService being called externally.
@@ -320,10 +320,9 @@ func slicesEquiv(lhs, rhs []string) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
-	if reflect.DeepEqual(slice.SortStrings(lhs), slice.SortStrings(rhs)) {
-		return true
-	}
-	return false
+	sort.Strings(lhs)
+	sort.Strings(rhs)
+	return stringslices.Equal(lhs, rhs)
 }
 
 func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortName) {
