@@ -94,6 +94,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				defaultGVK := scope.MetaGroupVersion.WithKind("DeleteOptions")
 				obj, gvk, err := metainternalversionscheme.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
+					panic(fmt.Sprintf("decode the delete options defaultGVK %v body %s: %v", defaultGVK, body, err))
 					scope.err(err, w, req)
 					return
 				}
@@ -242,6 +243,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
 				obj, gvk, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
+					panic(fmt.Sprintf("decode the delete options defaultGVK %v body %s: %v", defaultGVK, body, err))
 					scope.err(err, w, req)
 					return
 				}
