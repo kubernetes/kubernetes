@@ -391,7 +391,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantGetCertificateErrorPrefix: "exec: fork/exec ./testdata/exec-plugin-not-executable.sh: permission denied",
 			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "client_internal_error"}}},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
 		},
 		{
 			name: "binary fails",
