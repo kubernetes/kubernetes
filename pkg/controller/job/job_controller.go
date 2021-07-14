@@ -1143,9 +1143,13 @@ func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPod
 		return p.Status.Phase == v1.PodSucceeded
 	}))
 	failed += int32(countValidPodsWithFilter(job, pods, uncounted.Failed(), func(p *v1.Pod) bool {
-		// Counting deleted Pods as failures to account for orphan Pods that never
-		// have a chance to reach the Failed phase.
-		return p.Status.Phase == v1.PodFailed || (p.DeletionTimestamp != nil && p.Status.Phase != v1.PodSucceeded)
+		if p.Status.Phase == v1.PodFailed {
+			return true
+		}
+		// When tracking with finalizers: counting deleted Pods as failures to
+		// account for orphan Pods that never have a chance to reach the Failed
+		// phase.
+		return uncounted != nil && p.DeletionTimestamp != nil && p.Status.Phase != v1.PodSucceeded
 	}))
 	return succeeded, failed
 }

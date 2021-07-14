@@ -1066,6 +1066,16 @@ func TestGetStatus(t *testing.T) {
 			wantFailed:    4,
 		},
 		"deleted pods": {
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodSucceeded).deletionTimestamp().Pod,
+				buildPod().uid("b").phase(v1.PodFailed).deletionTimestamp().Pod,
+				buildPod().uid("c").phase(v1.PodRunning).deletionTimestamp().Pod,
+				buildPod().uid("d").phase(v1.PodPending).deletionTimestamp().Pod,
+			},
+			wantSucceeded: 1,
+			wantFailed:    1,
+		},
+		"deleted pods, tracking with finalizers": {
 			job: batch.Job{
 				Status: batch.JobStatus{
 					Succeeded:               1,
