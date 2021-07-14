@@ -52,6 +52,8 @@ type ProviderConfiguration struct {
 	Identity *IdentityConfiguration `json:"identity,omitempty"`
 	// kms contains the name, cache size and path to configuration file for a KMS based envelope transformer.
 	KMS *KMSConfiguration `json:"kms,omitempty"`
+	// gzip configures whether compression is enabled and at what compression level
+	Gzip *GzipConfiguration `json:"gzip,omitempty"`
 }
 
 // AESConfiguration contains the API configuration for an AES transformer.
@@ -97,4 +99,9 @@ type KMSConfiguration struct {
 	// timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+}
+
+// GzipConfiguration sets the level used for gzip compression
+type GzipConfiguration struct {
+	Level int `json:"level"`
 }

@@ -42,7 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/compress/gzip"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/traces"
@@ -274,7 +274,7 @@ func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (st
 	}
 	transformer := c.Transformer
 	if transformer == nil {
-		transformer = value.IdentityTransformer
+		transformer = gzip.NewGzipTransformer(gzip.BestSpeed)
 	}
 	return etcd3.New(client, c.Codec, newFunc, c.Prefix, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
 }

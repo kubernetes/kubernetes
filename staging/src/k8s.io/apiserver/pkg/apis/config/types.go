@@ -52,6 +52,13 @@ type ProviderConfiguration struct {
 	Identity *IdentityConfiguration
 	// kms contains the name, cache size and path to configuration file for a KMS based envelope transformer.
 	KMS *KMSConfiguration
+
+	// gzip
+	Gzip *GzipConfiguration
+}
+
+type GzipConfiguration struct {
+	Level int
 }
 
 // AESConfiguration contains the API configuration for an AES transformer.

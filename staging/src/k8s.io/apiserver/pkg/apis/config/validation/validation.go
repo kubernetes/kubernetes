@@ -112,9 +112,12 @@ func validateSingleProvider(provider config.ProviderConfiguration, filedPath *fi
 	if provider.Identity != nil {
 		found++
 	}
+	if provider.Gzip != nil {
+		found++
+	}
 
 	if found == 0 {
-		return append(allErrs, field.Invalid(filedPath, provider, "provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity"))
+		return append(allErrs, field.Invalid(filedPath, provider, "provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity, Gzip"))
 	}
 
 	if found > 1 {

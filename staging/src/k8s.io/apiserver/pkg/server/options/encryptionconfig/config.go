@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/apiserver/pkg/storage/value/compress/gzip"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -44,6 +46,7 @@ import (
 )
 
 const (
+	gzipTransformerPrefixV1      = "k8s:cmp:gzip:v1:"
 	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
@@ -253,8 +256,13 @@ func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.
 				Transformer: identity.NewEncryptCheckTransformer(),
 				Prefix:      []byte{},
 			}
+		case provider.Gzip != nil:
+			transformer = value.PrefixTransformer{
+				Transformer: gzip.NewGzipTransformer(provider.Gzip.Level),
+				Prefix:      []byte(gzipTransformerPrefixV1 + strconv.Itoa(provider.Gzip.Level) + ":"),
+			}
 		default:
-			return nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity")
+			return nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity, Gzip")
 		}
 
 		if err != nil {
