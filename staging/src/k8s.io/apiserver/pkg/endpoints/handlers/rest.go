@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -196,6 +197,9 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 			scope.err(err, w, req)
 			return
 		}
+
+		audit.LogRequestObject(ae, opts, scope.Kind.GroupVersion(), scope.Resource, scope.Subresource, scope.Serializer)
+
 		if admit != nil && admit.Handles(admission.Connect) {
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
