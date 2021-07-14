@@ -36,6 +36,17 @@ const (
 	kubeMetricImportPath = `"k8s.io/component-base/metrics"`
 	// Should equal to final directory name of kubeMetricImportPath
 	kubeMetricsDefaultImportName = "metrics"
+
+	kubeURLRoot = "k8s.io/kubernetes"
+)
+
+var (
+	// env configs
+	GOROOT string = os.Getenv("GOROOT")
+	GOOS string = os.Getenv("GOOS")
+	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
+
+	kubeRootDeSuffixed string = strings.Replace(KUBE_ROOT, kubeURLRoot, "", 1) // k8s/k8s refs need this stripped
 )
 
 func main() {
@@ -180,17 +191,32 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 	return consts
 }
 
-func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {
-	// to test the import will be rooted at GOPATH, so probably import will be something like /test/instrumentation/testpackage
 
-	// env gets
-	//GOMODCACHE := os.Getenv("GOMODCACHE")
-	GOROOT := os.Getenv("GOROOT")
-	GOOS := os.Getenv("GOOS")
-	KUBE_ROOT := os.Getenv("KUBE_ROOT")
-	KUBE_URL_ROOT := "k8s.io/kubernetes"
-	KUBE_ROOT_INTERNAL := strings.Replace(KUBE_ROOT, KUBE_URL_ROOT, "", 1) // k8s/k8s refs need this stripped
-	
+func localImportPath(importExpr string) (string, error) {
+	// parse directory path
+	pathPrefix := "unknown"
+	if strings.Contains(importExpr, kubeURLRoot) {
+		// search k/k local checkout
+		pathPrefix = kubeRootDeSuffixed
+	} else if strings.Contains(importExpr, "k8s.io/") {
+		// search k/k/staging local checkout
+		pathPrefix = strings.Join([]string{KUBE_ROOT, "staging", "src"}, string(os.PathSeparator))
+	} else if strings.Contains(importExpr, ".") {
+		// not stdlib -> prefix with GOMODCACHE
+		// pathPrefix = strings.Join([]string{KUBE_ROOT, "vendor"}, string(os.PathSeparator))
+
+		//  this requires implementing SIV, skip for now
+		return "", fmt.Errorf("unable to handle general, non STL imports for metric analysis")
+	} else {
+		// stdlib -> prefix with GOROOT
+		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
+	} // ToDo: support non go mod
+	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(importExpr, "\"")}, string(os.PathSeparator))
+
+	return importDirectory, nil
+}
+
+func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {
 	for _, im := range imports {
 		// get imported label
 		importAlias := "unknown"
@@ -201,25 +227,12 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			importAlias = im.Name.String()
 		}
 
-		// parse directory path
-		pathPrefix := "unknown"
-		if strings.Contains(im.Path.Value, KUBE_URL_ROOT) {
-			// search k/k local checkout
-			pathPrefix = KUBE_ROOT_INTERNAL
-		} else if strings.Contains(im.Path.Value, "k8s.io/") {
-			// search k/k/staging local checkout
-			pathPrefix = KUBE_ROOT + string(os.PathSeparator) + "staging" + string(os.PathSeparator) + "src"  //KUBE_ROOT + string(os.PathSeparator) + "vendor" //
-		} else if strings.Contains(im.Path.Value, ".") {
-			// not stdlib -> prefix with GOMODCACHE
-			// pathPrefix = KUBE_ROOT + string(os.PathSeparator) + "vendor"
-
-			//  this requires implementing SIV, skip for now
+		// find local path on disk for listed import
+		importDirectory, err := localImportPath(im.Path.Value)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
 			continue
-		} else {
-			// stdlib -> prefix with GOROOT
-			pathPrefix = GOROOT + string(os.PathSeparator) + "src"
-		} // ToDo: support non go mod
-		importDirectory := pathPrefix + string(os.PathSeparator) + strings.Trim(im.Path.Value, "\"")
+		}
 
 		files, err := ioutil.ReadDir(importDirectory)
 		if err != nil {
@@ -244,7 +257,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			}
 
 			fileset := token.NewFileSet()
-			tree, err := parser.ParseFile(fileset, importDirectory+string(os.PathSeparator)+file.Name(), nil, parser.AllErrors)
+			tree, err := parser.ParseFile(fileset, strings.Join([]string{importDirectory,file.Name()}, string(os.PathSeparator)), nil, parser.AllErrors)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse path %s with error %w", im.Path.Value, err)
 			}
@@ -254,7 +267,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 
 			// add returned map into supplied map and prepend import label to all keys
 			for k, v := range variables {
-				importK := importAlias + "." + k
+				importK := strings.Join([]string{importAlias, k}, ".")
 				if _, ok := localVariables[importK]; !ok {
 					localVariables[importK] = v
 				} else {

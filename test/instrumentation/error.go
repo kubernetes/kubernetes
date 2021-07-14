@@ -34,6 +34,7 @@ const (
 	errBuckets              = "Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"
 	errLabels               = "Labels were not set to list of strings"
 	errImport               = `Importing using "." is not supported`
+	errExprNotIdent         = "expr selector does not refer to type ast.Ident, is type %s"
 )
 
 type decodeError struct {
