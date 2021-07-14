@@ -373,6 +373,9 @@ type fakeWatchApfFilter struct {
 	inflight int
 	capacity int
 
+	postExecutePanic bool
+	preExecutePanic  bool
+
 	utilflowcontrol.WatchTracker
 }
 
@@ -402,7 +405,13 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 		return
 	}
 
+	if f.preExecutePanic {
+		panic("pre-exec-panic")
+	}
 	execFn()
+	if f.postExecutePanic {
+		panic("post-exec-panic")
+	}
 
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -543,6 +552,53 @@ func TestApfWatchPanic(t *testing.T) {
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestApfWatchHandlePanic(t *testing.T) {
+	preExecutePanicingFilter := newFakeWatchApfFilter(1)
+	preExecutePanicingFilter.preExecutePanic = true
+
+	postExecutePanicingFilter := newFakeWatchApfFilter(1)
+	postExecutePanicingFilter.postExecutePanic = true
+
+	testCases := []struct {
+		name   string
+		filter *fakeWatchApfFilter
+	}{
+		{
+			name:   "pre-execute panic",
+			filter: preExecutePanicingFilter,
+		},
+		{
+			name:   "post-execute panic",
+			filter: postExecutePanicingFilter,
+		},
+	}
+
+	onExecuteFunc := func() {
+		time.Sleep(5 * time.Second)
+	}
+	postExecuteFunc := func() {}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc)
+			handler := func(w http.ResponseWriter, r *http.Request) {
+				defer func() {
+					if err := recover(); err == nil {
+						t.Errorf("expected panic, got %v", err)
+					}
+				}()
+				apfHandler.ServeHTTP(w, r)
+			}
+			server := httptest.NewServer(http.HandlerFunc(handler))
+			defer server.Close()
+
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
