@@ -118,9 +118,10 @@ var _ = NewCounter(
 
 func TestStableMetric(t *testing.T) {
 	for _, test := range []struct {
-		testName string
-		src      string
-		metric   metric
+		testName  string
+		src       string
+		metric    metric
+		kubeRoot string
 	}{
 		{
 			testName: "Counter",
@@ -435,8 +436,60 @@ var _ = metrics.NewHistogram(
 		},
 	)
 `},
+		{
+			testName: "Imported stdlib constant",
+			metric: metric{
+				Name:           "importedCounter",
+				StabilityLevel: "STABLE",
+				Subsystem:      "GET",
+				Type:           counterMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "net/http"
+var _ = metrics.NewCounter(
+	&metrics.CounterOpts{
+			Name: "importedCounter",
+			StabilityLevel: metrics.STABLE,
+			Subsystem: http.MethodGet,
+		},
+	)
+`},
+		{
+			testName: "Imported k8s.io constant",
+			metric: metric{
+				Name:           "importedCounter",
+				StabilityLevel: "STABLE",
+				Subsystem:      "kubelet",
+				Type:           counterMetricType,
+			},
+			kubeRoot:  "/home/pchristopher/go/src/k8s.io/kubernetes",
+			src: `
+package test
+import compbasemetrics "k8s.io/component-base/metrics"
+import "k8s.io/kubernetes/pkg/kubelet/metrics"
+var _ = compbasemetrics.NewCounter(
+	&compbasemetrics.CounterOpts{
+			Name: "importedCounter",
+			StabilityLevel: compbasemetrics.STABLE,
+			Subsystem: metrics.KubeletSubsystem,
+	},
+	)
+`},
 	} {
 		t.Run(test.testName, func(t *testing.T) {
+			// these sub-tests cannot be run in parallel with the below
+			if test.kubeRoot != "" {
+				priorKRoot := KUBE_ROOT
+				KUBE_ROOT = test.kubeRoot
+				kubeRootDeSuffixed = kubeRootDesuffix(KUBE_ROOT)
+				defer func(){
+					KUBE_ROOT = priorKRoot
+					kubeRootDeSuffixed = kubeRootDesuffix(KUBE_ROOT)
+				}()
+			}
+
 			metrics, errors := searchFileForStableMetrics(fakeFilename, test.src)
 			if len(errors) != 0 {
 				t.Errorf("Unexpected errors: %s", errors)

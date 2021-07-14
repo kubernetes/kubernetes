@@ -46,7 +46,7 @@ var (
 	GOOS string = os.Getenv("GOOS")
 	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
 
-	kubeRootDeSuffixed string = strings.Replace(KUBE_ROOT, kubeURLRoot, "", 1) // k8s/k8s refs need this stripped
+	kubeRootDeSuffixed string = kubeRootDesuffix(KUBE_ROOT)
 )
 
 func main() {
@@ -191,6 +191,9 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 	return consts
 }
 
+func kubeRootDesuffix(kubeRoot string) string {
+	return strings.Replace(kubeRoot, kubeURLRoot, "", 1) // k8s/k8s refs need this stripped
+}
 
 func localImportPath(importExpr string) (string, error) {
 	// parse directory path
@@ -233,7 +236,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			fmt.Fprint(os.Stderr, err.Error())
 			continue
 		}
-
+	
 		files, err := ioutil.ReadDir(importDirectory)
 		if err != nil {
 			//fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %w, skipping\n", importDirectory, err)
