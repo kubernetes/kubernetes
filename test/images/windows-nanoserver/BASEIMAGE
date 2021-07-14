@@ -1,0 +1,5 @@
+windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
+windows/amd64/1903=mcr.microsoft.com/windows/nanoserver:1903
+windows/amd64/1909=mcr.microsoft.com/windows/nanoserver:1909
+windows/amd64/2004=mcr.microsoft.com/windows/nanoserver:2004
+windows/amd64/20H2=mcr.microsoft.com/windows/nanoserver:20H2

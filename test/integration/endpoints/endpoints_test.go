@@ -18,10 +18,13 @@ package endpoints
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -291,6 +294,20 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 
 	// poll until endpoint for deleted Pod is no longer in Endpoints.
 	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		// Ensure that the recently deleted Pod exists but with a deletion timestamp. If the Pod does not exist,
+		// we should fail the test since it is no longer validating against a terminating pod.
+		pod, err := client.CoreV1().Pods(ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("expected Pod %q to exist with deletion timestamp but was not found: %v", pod.Name, err)
+		}
+		if err != nil {
+			return false, nil
+		}
+
+		if pod.DeletionTimestamp == nil {
+			return false, errors.New("pod did not have deletion timestamp set")
+		}
+
 		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
