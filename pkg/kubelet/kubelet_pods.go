@@ -1695,11 +1695,15 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		statuses[container.Name] = status
 	}
 
+	// Copy the slice before sorting it
+	containerStatusesCopy := make([]*kubecontainer.Status, len(podStatus.ContainerStatuses))
+	copy(containerStatusesCopy, podStatus.ContainerStatuses)
+
 	// Make the latest container status comes first.
-	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(containerStatusesCopy)))
 	// Set container statuses according to the statuses seen in pod status
 	containerSeen := map[string]int{}
-	for _, cStatus := range podStatus.ContainerStatuses {
+	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
 		if _, ok := statuses[cName]; !ok {
 			// This would also ignore the infra container.
