@@ -145,12 +145,9 @@ message BuildConfigStatus {
   // lastVersion is used to inform about number of last triggered build.
   optional int64 lastVersion = 1;
 
-  // ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
-  // including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID.  There will be a single entry
-  // in this array for each entry in the BuildConfigSpec.Triggers array where the BuildTriggerPolicy.ImageChange
-  // pointer is set to a non-nil value.  The logical key for each entry in this array is expressed by the
-  // ImageStreamTagReference type.  That type captures the required elements for identifying the ImageStreamTag referenced by the more
-  // generic ObjectReference BuildTriggerPolicy.ImageChange.From.
+  // ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+  // including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
+  // in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
   repeated ImageChangeTriggerStatus imageChangeTriggers = 2;
 }
 
@@ -597,6 +594,60 @@ message BuildTriggerPolicy {
   optional WebHookTrigger bitbucket = 6;
 }
 
+// BuildVolume describes a volume that is made available to build pods,
+// such that it can be mounted into buildah's runtime environment.
+// Only a subset of Kubernetes Volume sources are supported.
+message BuildVolume {
+  // name is a unique identifier for this BuildVolume.
+  // It must conform to the Kubernetes DNS label standard and be unique within the pod.
+  // Names that collide with those added by the build controller will result in a
+  // failed build with an error message detailing which name caused the error.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
+  optional string name = 1;
+
+  // source represents the location and type of the mounted volume.
+  // +required
+  optional BuildVolumeSource source = 2;
+
+  // mounts represents the location of the volume in the image build container
+  // +required
+  // +listType=map
+  // +listMapKey=destinationPath
+  // +patchMergeKey=destinationPath
+  // +patchStrategy=merge
+  repeated BuildVolumeMount mounts = 3;
+}
+
+// BuildVolumeMount describes the mounting of a Volume within buildah's runtime environment.
+message BuildVolumeMount {
+  // destinationPath is the path within the buildah runtime environment at which the volume should be mounted.
+  // The transient mount within the build image and the backing volume will both be mounted read only.
+  // Must be an absolute path, must not contain '..' or ':', and must not collide with a destination path generated
+  // by the builder process
+  // Paths that collide with those added by the build controller will result in a
+  // failed build with an error message detailing which path caused the error.
+  optional string destinationPath = 1;
+}
+
+// BuildVolumeSource represents the source of a volume to mount
+// Only one of its supported types may be specified at any given time.
+message BuildVolumeSource {
+  // type is the BuildVolumeSourceType for the volume source.
+  // Type must match the populated volume source.
+  // Valid types are: Secret, ConfigMap
+  optional string type = 1;
+
+  // secret represents a Secret that should populate this volume.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#secret
+  // +optional
+  optional k8s.io.api.core.v1.SecretVolumeSource secret = 2;
+
+  // configMap represents a ConfigMap that should populate this volume
+  // +optional
+  optional k8s.io.api.core.v1.ConfigMapVolumeSource configMap = 3;
+}
+
 // CommonSpec encapsulates all the inputs necessary to represent a build.
 message CommonSpec {
   // serviceAccount is the name of the ServiceAccount to use to run the pod
@@ -736,6 +787,8 @@ message DockerBuildStrategy {
 
   // buildArgs contains build arguments that will be resolved in the Dockerfile.  See
   // https://docs.docker.com/engine/reference/builder/#/arg for more details.
+  // NOTE: Only the 'name' and 'value' fields are supported. Any settings on the 'valueFrom' field
+  // are ignored.
   repeated k8s.io.api.core.v1.EnvVar buildArgs = 7;
 
   // imageOptimizationPolicy describes what optimizations the system can use when building images
@@ -746,6 +799,15 @@ message DockerBuildStrategy {
   // policy. An additional experimental policy 'SkipLayersAndWarn' is the same as
   // 'SkipLayers' but simply warns if compatibility cannot be preserved.
   optional string imageOptimizationPolicy = 8;
+
+  // volumes is a list of input volumes that can be mounted into the builds runtime environment.
+  // Only a subset of Kubernetes Volume sources are supported by builds.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes
+  // +listType=map
+  // +listMapKey=name
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  repeated BuildVolume volumes = 9;
 }
 
 // DockerStrategyOptions contains extra strategy options for container image builds
@@ -882,35 +944,15 @@ message ImageChangeTrigger {
 // ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy
 // specified in the BuildConfigSpec.Triggers struct.
 message ImageChangeTriggerStatus {
-  // lastTriggeredImageID represents, at the last time a Build for this BuildConfig was instantiated, the sha/id of
-  // the image referenced by the the ImageStreamTag cited in the 'from' of this struct.
-  // The lastTriggeredImageID field will be updated by the OpenShift APIServer on all instantiations of a Build from
-  // the BuildConfig it processes, regardless of what is considered the cause of instantiation.
-  // Specifically, an instantiation of a Build could have been manually requested, or could have resulted from
-  // changes with any of the Triggers defined in BuildConfigSpec.Triggers.
-  // The reason for always updating this field across all ImageChangeTriggerStatus instances is to prevent
-  // multiple builds being instantiated concurrently when multiple ImageChangeTriggers fire concurrently.  The system
-  // compares the the sha/id stored here with the associated ImageStreamTag's sha/id for the image.  If they match,
-  // then this trigger is not a valid reason for instantiating a Build.  So when ImageChangeTriggers fire concurrently,
-  // only one of them can "win", meaning selected as the cause for a Build instantiation request.
-  // Lastly, to clarify exactly what is meant by "Build instantiation", from a REST perspective, it is a HTTP POST of a
-  // BuildRequest object as the HTTP Body that is made to the OpenShift APIServer, where that HTTP POST also specifies
-  // the "buildconfigs" resource,  "instantiate" subresource, as well as the namespace and name of the BuildConfig.
+  // lastTriggeredImageID represents the sha/id of the ImageStreamTag when a Build for this BuildConfig was started.
+  // The lastTriggeredImageID is updated each time a Build for this BuildConfig is started, even if this ImageStreamTag is not the reason the Build is started.
   optional string lastTriggeredImageID = 1;
 
-  // from is the ImageStreamTag that is used as the source of the trigger.
-  // This can come from an ImageStream tag referenced in this BuildConfig's Spec ImageChange Triggers, or the "from"
-  //  this BuildConfig's build strategy if it happens to be an ImageStreamTag (where the user has specified an
-  // ImageChange Trigger in the spec with a 'nil' for its 'from'.
+  // from is the ImageStreamTag that is the source of the trigger.
   optional ImageStreamTagReference from = 2;
 
-  // lastTriggerTime is the last time this particular ImageChangeTrigger fired, and that trigger firing was chosen as the cause for the Build being instantiated
-  // from this BuildConfig.  So on each Build instantiation, while lastTriggeredImageID will be updated regardless of
-  // whether this ImageChangeTrigger fired and deemed the cause for the Build Instantiation, this field is only updated
-  // when this trigger was in fact deemed the cause.  As such, it is valid that this field may not be set across all the
-  // ImageChangeTriggers, as they may have not yet been deemed to be the cause of a Build instantiation.  It is also
-  // valid that the times stored in lastTriggerTime will vary across all the ImageChangeTriggers, as the system
-  // explicitly picks only one trigger cause for a given Build.
+  // lastTriggerTime is the last time this particular ImageStreamTag triggered a Build to start.
+  // This field is only updated when this trigger specifically started a Build.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTriggerTime = 3;
 }
 
@@ -967,15 +1009,12 @@ message ImageSourcePath {
   optional string destinationDir = 2;
 }
 
-// ImageStreamTagReference captures the required elements for identifying the ImageStreamTag referenced by the more
-// generic ObjectReference BuildTriggerPolicy.ImageChange.From.  It is used by ImageChangeTriggerStatus, where a
-// specific instance of ImageChangeTriggerStatus in maintained in BuildConfigStatus.ImageChangeTriggers for each entry
-// in the BuildConfigSpec.Triggers array where the BuildTriggerPolicy.ImageChange pointer is set to a non-nil value
+// ImageStreamTagReference references the ImageStreamTag in an image change trigger by namespace and name.
 message ImageStreamTagReference {
-  // namespace is the namespace where the ImageStreamTag used for an ImageChangeTrigger is located
+  // namespace is the namespace where the ImageStreamTag for an ImageChangeTrigger is located
   optional string namespace = 1;
 
-  // name is the name of the ImageStreamTag used for an ImageChangeTrigger
+  // name is the name of the ImageStreamTag for an ImageChangeTrigger
   optional string name = 2;
 }
 
@@ -1071,6 +1110,15 @@ message SourceBuildStrategy {
 
   // forcePull describes if the builder should pull the images from registry prior to building.
   optional bool forcePull = 6;
+
+  // volumes is a list of input volumes that can be mounted into the builds runtime environment.
+  // Only a subset of Kubernetes Volume sources are supported by builds.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes
+  // +listType=map
+  // +listMapKey=name
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  repeated BuildVolume volumes = 9;
 }
 
 // SourceControlUser defines the identity of a user of source control

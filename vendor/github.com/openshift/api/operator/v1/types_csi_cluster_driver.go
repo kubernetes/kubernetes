@@ -37,17 +37,18 @@ type ClusterCSIDriver struct {
 // CSIDriverName is the name of the CSI driver
 type CSIDriverName string
 
-// If you are adding a new driver name here, ensure that kubebuilder:validation:Enum is updated above
-// and 0000_90_cluster_csi_driver_01_config.crd.yaml-merge-patch file is also updated with new driver name.
+// If you are adding a new driver name here, ensure that 0000_90_cluster_csi_driver_01_config.crd.yaml-merge-patch file is also updated with new driver name.
 const (
-	AWSEBSCSIDriver    CSIDriverName = "ebs.csi.aws.com"
-	AzureDiskCSIDriver CSIDriverName = "disk.csi.azure.com"
-	GCPPDCSIDriver     CSIDriverName = "pd.csi.storage.gke.io"
-	CinderCSIDriver    CSIDriverName = "cinder.csi.openstack.org"
-	VSphereCSIDriver   CSIDriverName = "csi.vsphere.vmware.com"
-	ManilaCSIDriver    CSIDriverName = "manila.csi.openstack.org"
-	OvirtCSIDriver     CSIDriverName = "csi.ovirt.org"
-	KubevirtCSIDriver  CSIDriverName = "csi.kubevirt.io"
+	AWSEBSCSIDriver          CSIDriverName = "ebs.csi.aws.com"
+	AWSEFSCSIDriver          CSIDriverName = "efs.csi.aws.com"
+	AzureDiskCSIDriver       CSIDriverName = "disk.csi.azure.com"
+	GCPPDCSIDriver           CSIDriverName = "pd.csi.storage.gke.io"
+	CinderCSIDriver          CSIDriverName = "cinder.csi.openstack.org"
+	VSphereCSIDriver         CSIDriverName = "csi.vsphere.vmware.com"
+	ManilaCSIDriver          CSIDriverName = "manila.csi.openstack.org"
+	OvirtCSIDriver           CSIDriverName = "csi.ovirt.org"
+	KubevirtCSIDriver        CSIDriverName = "csi.kubevirt.io"
+	SharedResourcesCSIDriver CSIDriverName = "csi.shared-resources.openshift.io"
 )
 
 // ClusterCSIDriverSpec is the desired behavior of CSI driver operator

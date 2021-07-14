@@ -46,9 +46,9 @@ type APIServerSpec struct {
 	Encryption APIServerEncryption `json:"encryption"`
 	// tlsSecurityProfile specifies settings for TLS connections for externally exposed servers.
 	//
-	// If unset, a default (which may change between releases) is chosen. Note that only Old and
-	// Intermediate profiles are currently supported, and the maximum available MinTLSVersions
-	// is VersionTLS12.
+	// If unset, a default (which may change between releases) is chosen. Note that only Old,
+	// Intermediate and Custom profiles are currently supported, and the maximum available
+	// MinTLSVersions is VersionTLS12.
 	// +optional
 	TLSSecurityProfile *TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
 	// audit specifies the settings for audit configuration to be applied to all OpenShift-provided
@@ -59,12 +59,15 @@ type APIServerSpec struct {
 }
 
 // AuditProfileType defines the audit policy profile type.
-// +kubebuilder:validation:Enum=Default;WriteRequestBodies;AllRequestBodies
+// +kubebuilder:validation:Enum=Default;WriteRequestBodies;AllRequestBodies;None
 type AuditProfileType string
 
 const (
+	// "None" disables audit logs.
+	NoneAuditProfileType AuditProfileType = "None"
+
 	// "Default" is the existing default audit configuration policy.
-	AuditProfileDefaultType AuditProfileType = "Default"
+	DefaultAuditProfileType AuditProfileType = "Default"
 
 	// "WriteRequestBodies" is similar to Default but it logs request and response
 	// HTTP payloads for write requests (create, update, patch)
@@ -76,6 +79,47 @@ const (
 )
 
 type Audit struct {
+	// profile specifies the name of the desired top-level audit profile to be applied to all requests
+	// sent to any of the OpenShift-provided API servers in the cluster (kube-apiserver,
+	// openshift-apiserver and oauth-apiserver), with the exception of those requests that match
+	// one or more of the customRules.
+	//
+	// The following profiles are provided:
+	// - Default: default policy which means MetaData level logging with the exception of events
+	//   (not logged at all), oauthaccesstokens and oauthauthorizetokens (both logged at RequestBody
+	//   level).
+	// - WriteRequestBodies: like 'Default', but logs request and response HTTP payloads for
+	// write requests (create, update, patch).
+	// - AllRequestBodies: like 'WriteRequestBodies', but also logs request and response
+	// HTTP payloads for read requests (get, list).
+	// - None: no requests are logged at all, not even oauthaccesstokens and oauthauthorizetokens.
+	//
+	// Warning: to raise a Red Hat support request, it is required to set this to Default,
+	// WriteRequestBodies, or AllRequestBodies to generate audit log events that can be
+	// analyzed by support.
+	//
+	// If unset, the 'Default' profile is used as the default.
+	//
+	// +kubebuilder:default=Default
+	Profile AuditProfileType `json:"profile,omitempty"`
+	// customRules specify profiles per group. These profile take precedence over the
+	// top-level profile field if they apply. They are evaluation from top to bottom and
+	// the first one that matches, applies.
+	// +listType=map
+	// +listMapKey=group
+	// +optional
+	CustomRules []AuditCustomRule `json:"customRules,omitempty"`
+}
+
+// AuditCustomRule describes a custom rule for an audit profile that takes precedence over
+// the top-level profile.
+type AuditCustomRule struct {
+	// group is a name of group a request user must be member of in order to this profile to apply.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Group string `json:"group"`
 	// profile specifies the name of the desired audit policy configuration to be deployed to
 	// all OpenShift-provided API servers in the cluster.
 	//
@@ -85,9 +129,12 @@ type Audit struct {
 	// write requests (create, update, patch).
 	// - AllRequestBodies: like 'WriteRequestBodies', but also logs request and response
 	// HTTP payloads for read requests (get, list).
+	// - None: no requests are logged at all, not even oauthaccesstokens and oauthauthorizetokens.
 	//
 	// If unset, the 'Default' profile is used as the default.
-	// +kubebuilder:default=Default
+	//
+	// +kubebuilder:validation:Required
+	// +required
 	Profile AuditProfileType `json:"profile,omitempty"`
 }
 
