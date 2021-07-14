@@ -213,6 +213,15 @@ type GenericAPIServer struct {
 
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
+
+	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
+	// Server during the graceful termination of the apiserver. If true, we wait
+	// for non longrunning requests in flight to be drained and then initiate a
+	// shutdown of the HTTP Server. If false, we initiate a shutdown of the HTTP
+	// Server as soon as ShutdownDelayDuration has elapsed.
+	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
+	// rejected with a 429 status code and a 'Retry-After' response.
+	ShutdownSendRetryAfter bool
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -352,7 +361,22 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}()
 
 	// close socket after delayed stopCh
-	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(delayedStopCh.Signaled())
+	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
+	stopHttpServerCh := delayedStopCh.Signaled()
+	shutdownTimeout := s.ShutdownTimeout
+	if s.ShutdownSendRetryAfter {
+		// when this mode is enabled, we do the following:
+		// - the server will continue to listen until all existing requests in flight
+		//   (not including active long runnning requests) have been drained.
+		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
+		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
+		//   we should wait for a minimum of 2s
+		stopHttpServerCh = drainedCh.Signaled()
+		shutdownTimeout = 2 * time.Second
+		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
+	}
+
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
 		return err
 	}
@@ -363,7 +387,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
 	}()
 
-	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
 	go func() {
 		defer drainedCh.Signal()
 		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
@@ -397,7 +420,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
-func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
@@ -416,8 +439,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
-		klog.V(1).Infof("[graceful-termination] ShutdownTimeout=%s", s.ShutdownTimeout)
-		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.ServeWithListenerStopped(s.Handler, s.ShutdownTimeout, internalStopCh)
+		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.ServeWithListenerStopped(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
 			close(auditStopCh)
