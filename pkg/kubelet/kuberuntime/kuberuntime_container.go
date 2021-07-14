@@ -675,16 +675,14 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	case pod.Spec.TerminationGracePeriodSeconds != nil:
 		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) {
-			switch reason {
-			case reasonStartupProbe:
-				if containerSpec.StartupProbe != nil && containerSpec.StartupProbe.TerminationGracePeriodSeconds != nil {
-					gracePeriod = *containerSpec.StartupProbe.TerminationGracePeriodSeconds
-				}
-			case reasonLivenessProbe:
-				if containerSpec.LivenessProbe != nil && containerSpec.LivenessProbe.TerminationGracePeriodSeconds != nil {
-					gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
-				}
+		switch reason {
+		case reasonStartupProbe:
+			if containerSpec.StartupProbe != nil && containerSpec.StartupProbe.TerminationGracePeriodSeconds != nil {
+				gracePeriod = *containerSpec.StartupProbe.TerminationGracePeriodSeconds
+			}
+		case reasonLivenessProbe:
+			if containerSpec.LivenessProbe != nil && containerSpec.LivenessProbe.TerminationGracePeriodSeconds != nil {
+				gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
 			}
 		}
 	}
