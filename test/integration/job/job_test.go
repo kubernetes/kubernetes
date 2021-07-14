@@ -163,6 +163,62 @@ func TestParallelJob(t *testing.T) {
 	}
 }
 
+func TestParallelJobParallelism(t *testing.T) {
+	for _, wFinalizers := range []bool{false, true} {
+		t.Run(fmt.Sprintf("finalizers=%t", wFinalizers), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
+
+			closeFn, restConfig, clientSet, ns := setup(t, "parallel")
+			defer closeFn()
+			ctx, cancel := startJobController(restConfig, clientSet)
+			defer cancel()
+
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					BackoffLimit: pointer.Int32(2),
+					Parallelism:  pointer.Int32Ptr(5),
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+				Active: 5,
+			}, wFinalizers)
+
+			// Reduce parallelism by a number greater than backoffLimit.
+			patch := []byte(`{"spec":{"parallelism":2}}`)
+			jobObj, err = clientSet.BatchV1().Jobs(ns.Name).Patch(ctx, jobObj.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+			if err != nil {
+				t.Fatalf("Updating Job: %v", err)
+			}
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+				Active: 2,
+			}, wFinalizers)
+
+			// Increase parallelism again.
+			patch = []byte(`{"spec":{"parallelism":4}}`)
+			jobObj, err = clientSet.BatchV1().Jobs(ns.Name).Patch(ctx, jobObj.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+			if err != nil {
+				t.Fatalf("Updating Job: %v", err)
+			}
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+				Active: 4,
+			}, wFinalizers)
+
+			// Succeed Job
+			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 4); err != nil {
+				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
+			}
+			validateJobSucceeded(ctx, t, clientSet, jobObj)
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+				Succeeded: 4,
+			}, false)
+			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
+		})
+	}
+}
+
 func TestParallelJobWithCompletions(t *testing.T) {
 	for _, wFinalizers := range []bool{false, true} {
 		t.Run(fmt.Sprintf("finalizers=%t", wFinalizers), func(t *testing.T) {
