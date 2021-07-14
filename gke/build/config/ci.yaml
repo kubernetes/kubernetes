@@ -1,8 +1,8 @@
 # This is used for the `pull-gob-kubernetes-build` job.
 build-env:
   target-platforms:
-  # Skip windows.
   - "linux/amd64"
+  - "windows/amd64"
 push:
   gcs:
     to:
