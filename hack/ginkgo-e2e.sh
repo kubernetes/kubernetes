@@ -191,6 +191,7 @@ fi
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${CONTAINER_RUNTIME:+"--container-runtime=${CONTAINER_RUNTIME}"} \
+  ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${CONTROL_PLANE_OS_DISTRIBUTION:+"--control-plane-os-distro=${CONTROL_PLANE_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
