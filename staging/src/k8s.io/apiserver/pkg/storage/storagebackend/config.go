@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 const (
@@ -84,6 +85,10 @@ type Config struct {
 	HealthcheckTimeout time.Duration
 
 	LeaseManagerConfig etcd3.LeaseManagerConfig
+
+	// StorageObjectCountTracker is used to keep track of the total
+	// number of objects in the storage per resource.
+	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
