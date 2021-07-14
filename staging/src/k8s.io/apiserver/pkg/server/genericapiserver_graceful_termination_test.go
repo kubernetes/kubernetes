@@ -53,12 +53,12 @@ type result struct {
 }
 
 // wrap a lifecycleSignal so the test can inject its own callback
-type wrappedTerminationSignal struct {
+type wrappedLifecycleSignal struct {
 	lifecycleSignal
 	callback func(bool, string, lifecycleSignal)
 }
 
-func (w *wrappedTerminationSignal) Signal() {
+func (w *wrappedLifecycleSignal) Signal() {
 	var name string
 	if ncw, ok := w.lifecycleSignal.(*namedChannelWrapper); ok {
 		name = ncw.name
@@ -74,18 +74,18 @@ func (w *wrappedTerminationSignal) Signal() {
 	}
 }
 
-func wrapTerminationSignals(t *testing.T, ts *lifecycleSignals, callback func(bool, string, lifecycleSignal)) {
-	newWrappedTerminationSignal := func(delegated lifecycleSignal) lifecycleSignal {
-		return &wrappedTerminationSignal{
+func wrapLifecycleSignals(t *testing.T, ts *lifecycleSignals, callback func(bool, string, lifecycleSignal)) {
+	newWrappedLifecycleSignal := func(delegated lifecycleSignal) lifecycleSignal {
+		return &wrappedLifecycleSignal{
 			lifecycleSignal: delegated,
 			callback:        callback,
 		}
 	}
 
-	ts.AfterShutdownDelayDuration = newWrappedTerminationSignal(ts.AfterShutdownDelayDuration)
-	ts.HTTPServerStoppedListening = newWrappedTerminationSignal(ts.HTTPServerStoppedListening)
-	ts.InFlightRequestsDrained = newWrappedTerminationSignal(ts.InFlightRequestsDrained)
-	ts.ShutdownInitiated = newWrappedTerminationSignal(ts.ShutdownInitiated)
+	ts.AfterShutdownDelayDuration = newWrappedLifecycleSignal(ts.AfterShutdownDelayDuration)
+	ts.HTTPServerStoppedListening = newWrappedLifecycleSignal(ts.HTTPServerStoppedListening)
+	ts.InFlightRequestsDrained = newWrappedLifecycleSignal(ts.InFlightRequestsDrained)
+	ts.ShutdownInitiated = newWrappedLifecycleSignal(ts.ShutdownInitiated)
 }
 
 type step struct {
@@ -157,7 +157,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// wrap the termination signals of the GenericAPIServer so the test can inject its own callback
-	wrapTerminationSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
+	wrapLifecycleSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
 		recordOrderFn(before, name, e)
 		steps(before, name, e)
 	})
@@ -217,7 +217,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		t.Fatal("Expected the apiserver Run method to return")
 	}
 
-	terminationSignalOrderExpected := []string{
+	lifecycleSignalOrderExpected := []string{
 		string("ShutdownInitiated"),
 		string("AfterShutdownDelayDuration"),
 		string("HTTPServerStoppedListening"),
@@ -226,8 +226,8 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	func() {
 		signalOrderLock.Lock()
 		defer signalOrderLock.Unlock()
-		if !reflect.DeepEqual(terminationSignalOrderExpected, signalOrderGot) {
-			t.Errorf("Expected order of termination event signal to match, diff: %s", cmp.Diff(terminationSignalOrderExpected, signalOrderGot))
+		if !reflect.DeepEqual(lifecycleSignalOrderExpected, signalOrderGot) {
+			t.Errorf("Expected order of termination event signal to match, diff: %s", cmp.Diff(lifecycleSignalOrderExpected, signalOrderGot))
 		}
 	}()
 }
