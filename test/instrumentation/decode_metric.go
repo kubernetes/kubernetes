@@ -188,7 +188,7 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 					return m, newDecodeErrorf(expr, errExprNotIdent, v.X)
 				}
 
-				variableExpr, found := c.variables[strings.Join([]string{s.Name,v.Sel.Name}, "."]
+				variableExpr, found := c.variables[strings.Join([]string{s.Name,v.Sel.Name}, ".")]
 				if !found {
 					return m, newDecodeErrorf(expr, errBadVariableAttribute)
 				}
