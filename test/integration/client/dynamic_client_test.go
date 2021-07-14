@@ -244,6 +244,7 @@ func TestUnstructuredExtract(t *testing.T) {
 		t.Fatalf("failed to marshal pod into bytes: %v", err)
 	}
 
+	// apply the unstructured object to the cluster
 	actual, err := dynamicClient.Resource(resource).Namespace("default").Patch(
 		context.TODO(),
 		name,

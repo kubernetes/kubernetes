@@ -1,6 +1,10 @@
 package v1
 
 import (
+	"crypto/sha512"
+	"encoding/json"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
@@ -26,7 +30,11 @@ type objectTypeCache interface {
 // (i.e. it downloads the OpenAPISchema every time)
 // Useful during the proof-of-concept stage until we agree on a caching solution.
 type nonCachingObjectTypeCache struct {
-	discoveryClient *discovery.DiscoveryClient
+	// TODO: lock this?
+	discoveryClient discovery.DiscoveryInterface
+	docHash         [sha512.Size]uint8
+	gvkParser       *fieldmanager.GvkParser
+	typeForGVK      map[schema.GroupVersionKind]*typed.ParseableType
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
@@ -36,17 +44,47 @@ func (c *nonCachingObjectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind
 		return nil, err
 	}
 
-	models, err := proto.NewOpenAPIData(doc)
+	docBytes, err := json.Marshal(doc)
 	if err != nil {
 		return nil, err
 	}
+	docHash := sha512.Sum512(docBytes)
 
-	gvkParser, err := fieldmanager.NewGVKParser(models, false)
-	if err != nil {
-		return nil, err
+	// cache hit
+	if c.docHash == docHash {
+		fmt.Println("cache hit")
+		fmt.Printf("docHash = %+v\n", docHash)
+		objType, ok := c.typeForGVK[gvk]
+		if ok {
+			fmt.Println("gvk recognized")
+			fmt.Printf("gvk = %+v\n", gvk)
+			return objType, nil
+		}
+		objType = c.gvkParser.Type(gvk)
+		c.typeForGVK[gvk] = objType
+		return objType, nil
+	} else {
+		fmt.Println("cache miss")
+		// cache miss
+		models, err := proto.NewOpenAPIData(doc)
+		if err != nil {
+			return nil, err
+		}
+
+		gvkParser, err := fieldmanager.NewGVKParser(models, false)
+		if err != nil {
+			return nil, err
+		}
+
+		objType := gvkParser.Type(gvk)
+		c.docHash = docHash
+		c.gvkParser = gvkParser
+		c.typeForGVK = map[schema.GroupVersionKind]*typed.ParseableType{
+			gvk: objType,
+		}
+
+		return objType, nil
 	}
-
-	return gvkParser.Type(gvk), nil
 }
 
 type extractor struct {
@@ -55,9 +93,11 @@ type extractor struct {
 
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
-func NewUnstructuredExtractor(dc *discovery.DiscoveryClient) UnstructuredExtractor {
+func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) UnstructuredExtractor {
 	return &extractor{
-		cache: &nonCachingObjectTypeCache{dc},
+		cache: &nonCachingObjectTypeCache{
+			discoveryClient: dc,
+		},
 	}
 }
 

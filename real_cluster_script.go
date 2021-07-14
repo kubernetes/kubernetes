@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,6 +16,7 @@ import (
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -24,17 +25,12 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
-// This is a small hacky script that tests the extract config against a real cluster
-// to demonstrate a bug I'm seeing with the GVKParser where it claims there
-// are duplicate GVK entries
-// TODO: don't commit this, delete it before merging.
-// Any and all functionality from this script should be captured in the appropriate integration test.
 func main() {
+	fmt.Println("vim-go")
 	defaultNS := "default"
 	mydep := "mydep"
 	mgr := "mymanager"
-	// TODO: make this an arg
-	kubeconfig := os.Getenv("KUBECONFIG")
+	kubeconfig := "/usr/local/google/home/kevindelgado/.kube/config"
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
@@ -173,7 +169,10 @@ func main() {
 	fmt.Printf("appliedGuestbook = %+v\n", appliedGuestbook)
 	fmt.Println("---")
 
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+	discoveryClient, err := disk.NewCachedDiscoveryClientForConfig(config, ".", ".", time.Hour)
+	if err != nil {
+		panic(err)
+	}
 	//// OLD WAY
 	//extractedGuestbook, err := extractUnstructured(appliedGuestbook, guestbookGVR, discoveryClient, mgr)
 	//if err != nil {
@@ -187,6 +186,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// do it again see if we get a 304
+	extractedGuestbook, err = extractor.ExtractUnstructured(appliedGuestbook, mgr)
 	fmt.Println("---")
 	fmt.Printf("extractedGuestbook = %+v\n", extractedGuestbook)
 
