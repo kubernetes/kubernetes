@@ -487,7 +487,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Fail on stable metric with attribute set to local function return",
-			err:      fmt.Errorf("testdata/metric.go:9:4: Non string attribute it not supported"),
+			err:      fmt.Errorf("testdata/metric.go:9:4: Non string attribute is not supported"),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -503,7 +503,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Fail on stable metric with attribute set to imported function return",
-			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute it not supported"),
+			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute is not supported"),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
