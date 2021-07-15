@@ -98,9 +98,8 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
-	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, PodStartTimeout))
+	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, p.Namespace, PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
@@ -146,16 +145,21 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	}))
 }
 
-// DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
-// disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
-	namespace := c.f.Namespace.Name
+// DeleteSyncOnNamespace deletes the pod in the given namespace and wait for the pod to disappear
+// for `timeout`. If the pod doesn't disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSyncOnNamespace(namespace, name string, options metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
+}
+
+// DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
+// disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
+	c.DeleteSyncOnNamespace(c.f.Namespace.Name, name, options, timeout)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.

@@ -102,7 +102,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSyncOnNamespace(kubeapi.NamespaceSystem, criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
