@@ -78,6 +78,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 		ginkgo.By("wait for the bootstrap token secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenID)
+		framework.ExpectNoError(err)
 
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		framework.ExpectNoError(err)
