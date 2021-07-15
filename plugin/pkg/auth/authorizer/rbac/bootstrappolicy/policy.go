@@ -287,8 +287,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Write...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
-
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
