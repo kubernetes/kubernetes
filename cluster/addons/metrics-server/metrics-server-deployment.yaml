@@ -54,10 +54,8 @@ spec:
         command:
         - /metrics-server
         - --metric-resolution=30s
-        # These are needed for GKE, which doesn't support secure communication yet.
-        # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
-        - --kubelet-port=10255
-        - --deprecated-kubelet-completely-insecure=true
+        - --kubelet-use-node-status-port
+        - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
         - --cert-dir=/tmp
         - --secure-port=443
@@ -65,6 +63,20 @@ spec:
         - containerPort: 443
           name: https
           protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
         volumeMounts:
         - mountPath: /tmp
           name: tmp-dir
