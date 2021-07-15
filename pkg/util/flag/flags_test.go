@@ -50,7 +50,7 @@ func TestIPVar(t *testing.T) {
 	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
 		ip := defaultIP
-		fs.Var(IPVar{&ip}, "ip", "the ip")
+		fs.Var(&IPVar{&ip}, "ip", "the ip")
 
 		var err error
 		func() {
@@ -144,7 +144,7 @@ func TestIPPortVar(t *testing.T) {
 	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
 		ipport := defaultIPPort
-		fs.Var(IPPortVar{&ipport}, "ipport", "the ip:port")
+		fs.Var(&IPPortVar{&ipport}, "ipport", "the ip:port")
 
 		var err error
 		func() {
