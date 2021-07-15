@@ -78,10 +78,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pods, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pod")
 			framework.ExpectEqual(len(pods.Items), 0)
-			options = metav1.ListOptions{
-				LabelSelector:   selector.String(),
-				ResourceVersion: pods.ListMeta.ResourceVersion,
-			}
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(pod)

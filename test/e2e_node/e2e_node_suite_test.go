@@ -41,6 +41,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/util/rlimit"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
@@ -121,6 +122,12 @@ func TestMain(m *testing.M) {
 const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
+
+	// Make sure we are not limited by sshd when it comes to open files
+	if err := rlimit.SetNumFiles(1000000); err != nil {
+		klog.Infof("failed to set rlimit on max file handles: %v", err)
+	}
+
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices(t)
