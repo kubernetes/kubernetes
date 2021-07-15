@@ -624,6 +624,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 	})
 
 	//lint:ignore SA1019 See the Metrics Stability Migration KEP
+	//nolint:staticcheck
 	proxyMux.Handle("/metrics", legacyregistry.Handler())
 
 	if enableProfiling {
