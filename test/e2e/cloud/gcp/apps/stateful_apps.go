@@ -34,6 +34,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
+	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
@@ -45,7 +46,7 @@ var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
 
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
