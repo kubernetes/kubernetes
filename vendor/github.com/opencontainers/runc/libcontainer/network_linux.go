@@ -83,8 +83,7 @@ func readSysfsNetworkStats(ethInterface, statsFile string) (uint64, error) {
 }
 
 // loopback is a network strategy that provides a basic loopback device
-type loopback struct {
-}
+type loopback struct{}
 
 func (l *loopback) create(n *network, nspid int) error {
 	return nil

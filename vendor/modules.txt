@@ -143,6 +143,8 @@ github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1 => github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
+# github.com/bits-and-blooms/bitset v1.2.0 => github.com/bits-and-blooms/bitset v1.2.0
+github.com/bits-and-blooms/bitset
 # github.com/blang/semver v3.5.1+incompatible => github.com/blang/semver v3.5.1+incompatible
 ## explicit
 github.com/blang/semver
@@ -158,7 +160,7 @@ github.com/chai2010/gettext-go/gettext/po
 # github.com/checkpoint-restore/go-criu/v5 v5.0.0 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
 github.com/checkpoint-restore/go-criu/v5
 github.com/checkpoint-restore/go-criu/v5/rpc
-# github.com/cilium/ebpf v0.5.0 => github.com/cilium/ebpf v0.5.0
+# github.com/cilium/ebpf v0.6.2 => github.com/cilium/ebpf v0.5.0
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
@@ -615,7 +617,7 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1 => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc95 => github.com/opencontainers/runc v1.0.0-rc95
+# github.com/opencontainers/runc v1.0.1-0.20210715023952-725058715668 => github.com/opencontainers/runc v1.0.1-0.20210715023952-725058715668
 ## explicit
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
@@ -644,7 +646,7 @@ github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
 # github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.8.0 => github.com/opencontainers/selinux v1.8.0
+# github.com/opencontainers/selinux v1.8.2 => github.com/opencontainers/selinux v1.8.0
 ## explicit
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
@@ -695,7 +697,7 @@ github.com/russross/blackfriday/v2
 github.com/seccomp/libseccomp-golang
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
-# github.com/sirupsen/logrus v1.7.0 => github.com/sirupsen/logrus v1.7.0
+# github.com/sirupsen/logrus v1.8.1 => github.com/sirupsen/logrus v1.7.0
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.5 => github.com/soheilhy/cmux v0.1.5
 github.com/soheilhy/cmux
@@ -2418,6 +2420,7 @@ sigs.k8s.io/yaml
 # github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.0.3
 # github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 # github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
+# github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 # github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 # github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 # github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
@@ -2605,7 +2608,7 @@ sigs.k8s.io/yaml
 # github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 # github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc95
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1-0.20210715023952-725058715668
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 # github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0

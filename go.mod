@@ -66,8 +66,8 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v1.0.0-rc95
-	github.com/opencontainers/selinux v1.8.0
+	github.com/opencontainers/runc v1.0.1-0.20210715023952-725058715668
+	github.com/opencontainers/selinux v1.8.2
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.11.0
@@ -179,6 +179,7 @@ replace (
 	github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.0.3
 	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
+	github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 	github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 	github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
@@ -366,7 +367,7 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc95
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1-0.20210715023952-725058715668
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 	github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0

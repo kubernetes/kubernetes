@@ -32,6 +32,7 @@ require (
 )
 
 replace (
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.7.0
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
