@@ -43,11 +43,6 @@ popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
+# The config is in ${REPOROOT}/.golangci.yaml
 echo 'running golangci-lint '
-golangci-lint run \
-  --timeout 30m \
-  --disable-all \
-  -E deadcode \
-  -E unused \
-  -E varcheck \
-  -E ineffassign
+golangci-lint -v run "$@"
