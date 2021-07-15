@@ -37,16 +37,14 @@ const (
 	// Should equal to final directory name of kubeMetricImportPath
 	kubeMetricsDefaultImportName = "metrics"
 
-	kubeURLRoot = "k8s.io/kubernetes"
+	kubeURLRoot = "k8s.io/kubernetes/"
 )
 
 var (
 	// env configs
-	GOROOT string = os.Getenv("GOROOT")
-	GOOS string = os.Getenv("GOOS")
+	GOROOT    string = os.Getenv("GOROOT")
+	GOOS      string = os.Getenv("GOOS")
 	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
-
-	kubeRootDeSuffixed string = kubeRootDesuffix(KUBE_ROOT)
 )
 
 func main() {
@@ -191,16 +189,13 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 	return consts
 }
 
-func kubeRootDesuffix(kubeRoot string) string {
-	return strings.Replace(kubeRoot, kubeURLRoot, "", 1) // k8s/k8s refs need this stripped
-}
-
 func localImportPath(importExpr string) (string, error) {
 	// parse directory path
 	pathPrefix := "unknown"
 	if strings.Contains(importExpr, kubeURLRoot) {
 		// search k/k local checkout
-		pathPrefix = kubeRootDeSuffixed
+		pathPrefix = KUBE_ROOT
+		importExpr = strings.Replace(importExpr, kubeURLRoot, "", 1)
 	} else if strings.Contains(importExpr, "k8s.io/") {
 		// search k/k/staging local checkout
 		pathPrefix = strings.Join([]string{KUBE_ROOT, "staging", "src"}, string(os.PathSeparator))
@@ -214,7 +209,9 @@ func localImportPath(importExpr string) (string, error) {
 		// stdlib -> prefix with GOROOT
 		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
 	} // ToDo: support non go mod
-	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(importExpr, "\"")}, string(os.PathSeparator))
+
+	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), 0)
+	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(crossPlatformImportExpr, "\"")}, string(os.PathSeparator))
 
 	return importDirectory, nil
 }
@@ -236,7 +233,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			fmt.Fprint(os.Stderr, err.Error())
 			continue
 		}
-	
+
 		files, err := ioutil.ReadDir(importDirectory)
 		if err != nil {
 			//fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %w, skipping\n", importDirectory, err)
@@ -260,7 +257,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			}
 
 			fileset := token.NewFileSet()
-			tree, err := parser.ParseFile(fileset, strings.Join([]string{importDirectory,file.Name()}, string(os.PathSeparator)), nil, parser.AllErrors)
+			tree, err := parser.ParseFile(fileset, strings.Join([]string{importDirectory, file.Name()}, string(os.PathSeparator)), nil, parser.AllErrors)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse path %s with error %w", im.Path.Value, err)
 			}
