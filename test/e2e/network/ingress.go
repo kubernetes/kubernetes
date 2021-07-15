@@ -47,8 +47,7 @@ import (
 )
 
 const (
-	negUpdateTimeout        = 2 * time.Minute
-	instanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
+	negUpdateTimeout = 2 * time.Minute
 )
 
 var _ = common.SIGDescribe("Loadbalancing: L7", func() {

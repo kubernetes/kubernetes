@@ -245,10 +245,6 @@ var _ = SIGDescribe("Pods", func() {
 		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pods")
 		framework.ExpectEqual(len(pods.Items), 0)
-		options = metav1.ListOptions{
-			LabelSelector:   selector.String(),
-			ResourceVersion: pods.ListMeta.ResourceVersion,
-		}
 
 		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{

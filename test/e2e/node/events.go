@@ -83,6 +83,7 @@ var _ = SIGDescribe("Events", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(context.TODO(), options)
+		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("retrieving the pod")

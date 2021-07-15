@@ -1696,8 +1696,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	storageCapacity := true
 	notStorageCapacity := false
 	supportedFSGroupPolicy := storage.FileFSGroupPolicy
-	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	invalidFSGroupPolicy = "invalid-mode"
+	invalidFSGroupPolicy := storage.FSGroupPolicy("invalid-mode")
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -2051,8 +2050,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		{
 			name: "FSGroupPolicy invalidated",
 			modify: func(new *storage.CSIDriver) {
-				invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-				invalidFSGroupPolicy = "invalid"
+				invalidFSGroupPolicy := storage.FSGroupPolicy("invalid")
 				new.Spec.FSGroupPolicy = &invalidFSGroupPolicy
 			},
 		},
