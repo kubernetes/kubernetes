@@ -834,12 +834,6 @@ func Test_findELBSubnets(t *testing.T) {
 	subnetA0000002 := &ec2.Subnet{
 		AvailabilityZone: aws.String("us-west-2a"),
 		SubnetId:         aws.String("subnet-a0000002"),
-		Tags: []*ec2.Tag{
-			{
-				Key:   aws.String(TagNameSubnetPublicELB),
-				Value: aws.String("1"),
-			},
-		},
 	}
 	subnetA0000003 := &ec2.Subnet{
 		AvailabilityZone: aws.String("us-west-2a"),
@@ -946,6 +940,26 @@ func Test_findELBSubnets(t *testing.T) {
 				"subnet-a0000002": false,
 			},
 			want: nil,
+		},
+		{
+			name: "public subnet using route table",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000002": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "public subnet using the elb tag",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000002": false,
+			},
+			want: []string{"subnet-a0000001"},
 		},
 		{
 			name: "prefer role over cluster tag",

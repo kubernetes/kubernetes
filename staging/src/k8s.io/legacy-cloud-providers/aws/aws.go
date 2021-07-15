@@ -3458,7 +3458,7 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
-		isPublic, err := isSubnetPublic(rt, id)
+		isPublic, err := isSubnetPublic(rt, subnet)
 		if err != nil {
 			return nil, err
 		}
@@ -3611,7 +3611,8 @@ func (c *Cloud) resolveSubnetNameOrIDs(subnetNameOrIDs []string) ([]string, erro
 	return subnets, nil
 }
 
-func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
+func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet) (bool, error) {
+	subnetID := aws.StringValue(subnet.SubnetId)
 	var subnetTable *ec2.RouteTable
 	for _, table := range rt {
 		for _, assoc := range table.Associations {
@@ -3651,6 +3652,14 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 		if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw") {
 			return true, nil
 		}
+	}
+
+	// If we couldn't use the subnet table to figure out whether the subnet is public,
+	// we let the users define whether this subnet should be used for internet-facing things
+	// by looking for TagNameSubnetPublicELB tag.
+	tagVal, subnetHasTag := findTag(subnet.Tags, TagNameSubnetPublicELB)
+	if subnetHasTag && (tagVal == "" || tagVal == "1") {
+		return true, nil
 	}
 
 	return false, nil
