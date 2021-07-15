@@ -291,7 +291,7 @@ ExecStop=
 )
 
 func overlayDbusConfig() error {
-	err := os.MkdirAll(filepath.Dir(dbusConf), 0755)
+	err := os.MkdirAll(filepath.Dir(dbusConfPath), 0755)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func overlayDbusConfig() error {
 }
 
 func restoreDbusConfig() error {
-	err := os.Remove(dbusConf)
+	err := os.Remove(dbusConfPath)
 	if err != nil {
 		return err
 	}
