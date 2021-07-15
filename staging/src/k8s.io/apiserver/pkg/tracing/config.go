@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -93,23 +94,26 @@ func validateSamplingRate(rate int32, fldPath *field.Path) field.ErrorList {
 
 func validateEndpoint(endpoint string, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
-	if url, err := url.Parse(endpoint); err != nil {
+	if !strings.Contains(endpoint, "//") {
+		endpoint = "dns://" + endpoint
+	}
+	url, err := url.Parse(endpoint)
+	if err != nil {
 		errs = append(errs, field.Invalid(
 			fldPath, endpoint,
 			err.Error(),
 		))
-		// If the Host is empty, it indicates no scheme was specified, which is valid.
-	} else if url.Host != "" {
-		switch url.Scheme {
-		case "dns":
-		case "unix":
-		case "unix-abstract":
-		default:
-			errs = append(errs, field.Invalid(
-				fldPath, endpoint,
-				fmt.Sprintf("unsupported scheme: %v.  Options are none, dns, unix, or unix-abstract.  See https://github.com/grpc/grpc/blob/master/doc/naming.md", url.Scheme),
-			))
-		}
+		return errs
+	}
+	switch url.Scheme {
+	case "dns":
+	case "unix":
+	case "unix-abstract":
+	default:
+		errs = append(errs, field.Invalid(
+			fldPath, endpoint,
+			fmt.Sprintf("unsupported scheme: %v.  Options are none, dns, unix, or unix-abstract.  See https://github.com/grpc/grpc/blob/master/doc/naming.md", url.Scheme),
+		))
 	}
 	return errs
 }

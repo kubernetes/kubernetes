@@ -909,6 +909,7 @@ go.opentelemetry.io/otel/metric/global
 go.opentelemetry.io/otel/metric/number
 go.opentelemetry.io/otel/metric/registry
 # go.opentelemetry.io/otel/sdk v0.20.0 => go.opentelemetry.io/otel/sdk v0.20.0
+## explicit
 go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal
 go.opentelemetry.io/otel/sdk/resource
@@ -932,6 +933,7 @@ go.opentelemetry.io/otel/sdk/metric/selector/simple
 ## explicit
 go.opentelemetry.io/otel/trace
 # go.opentelemetry.io/proto/otlp v0.7.0 => go.opentelemetry.io/proto/otlp v0.7.0
+## explicit
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
 go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
