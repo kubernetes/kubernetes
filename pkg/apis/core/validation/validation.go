@@ -5303,21 +5303,17 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(core.DockerConfigJSONKey), "<secret contents redacted>", err.Error()))
 		}
 	case core.SecretTypeBasicAuth:
-		_, usernameFieldExists := secret.Data[core.BasicAuthUsernameKey]
-		_, passwordFieldExists := secret.Data[core.BasicAuthPasswordKey]
-
-		// username or password might be empty, but the field must be present
-		if !usernameFieldExists && !passwordFieldExists {
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.BasicAuthUsernameKey), ""))
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.BasicAuthPasswordKey), ""))
-			break
+		// username or password might be empty, but the fields must be present
+		if _, exists := secret.Data[core.BasicAuthUsernameKey]; !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.BasicAuthUsernameKey), ""))
+		}
+		if _, exists := secret.Data[core.BasicAuthPasswordKey]; !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.BasicAuthPasswordKey), ""))
 		}
 	case core.SecretTypeSSHAuth:
 		if len(secret.Data[core.SSHAuthPrivateKey]) == 0 {
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.SSHAuthPrivateKey), ""))
-			break
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.SSHAuthPrivateKey), ""))
 		}
-
 	case core.SecretTypeTLS:
 		if _, exists := secret.Data[core.TLSCertKey]; !exists {
 			allErrs = append(allErrs, field.Required(dataPath.Key(core.TLSCertKey), ""))
