@@ -808,10 +808,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 				loopCount--
 				return false, err
 			}
-			//lint:ignore SA5011 If err != nil we are already returning.
 			defer r.Body.Close()
 
-			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
+			if r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
 				return false, errors.Errorf("server responded with non-successful status: %s", r.Status)
 			}
