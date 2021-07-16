@@ -35,7 +35,7 @@ func registerMemoryEvent(cgDir string, evName string, arg string) (<-chan struct
 
 	eventControlPath := filepath.Join(cgDir, "cgroup.event_control")
 	data := fmt.Sprintf("%d %d %s", eventfd.Fd(), evFile.Fd(), arg)
-	if err := ioutil.WriteFile(eventControlPath, []byte(data), 0700); err != nil {
+	if err := ioutil.WriteFile(eventControlPath, []byte(data), 0o700); err != nil {
 		eventfd.Close()
 		evFile.Close()
 		return nil, err

@@ -12,6 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -23,13 +24,13 @@ func New() Validator {
 	return &ConfigValidator{}
 }
 
-type ConfigValidator struct {
-}
+type ConfigValidator struct{}
 
 type check func(config *configs.Config) error
 
 func (v *ConfigValidator) Validate(config *configs.Config) error {
 	checks := []check{
+		v.cgroups,
 		v.rootfs,
 		v.network,
 		v.hostname,
@@ -39,17 +40,21 @@ func (v *ConfigValidator) Validate(config *configs.Config) error {
 		v.sysctl,
 		v.intelrdt,
 		v.rootlessEUID,
-		v.mounts,
 	}
 	for _, c := range checks {
 		if err := c(config); err != nil {
 			return err
 		}
 	}
-	if err := v.cgroups(config); err != nil {
-		return err
+	// Relaxed validation rules for backward compatibility
+	warns := []check{
+		v.mounts, // TODO (runc v1.x.x): make this an error instead of a warning
 	}
-
+	for _, c := range warns {
+		if err := c(config); err != nil {
+			logrus.WithError(err).Warnf("invalid configuration")
+		}
+	}
 	return nil
 }
 

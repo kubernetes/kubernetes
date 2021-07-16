@@ -64,8 +64,10 @@ func NewManager(cg *configs.Cgroup, paths map[string]string, rootless bool) cgro
 }
 
 // The absolute path to the root of the cgroup hierarchies.
-var cgroupRootLock sync.Mutex
-var cgroupRoot string
+var (
+	cgroupRootLock sync.Mutex
+	cgroupRoot     string
+)
 
 const defaultCgroupRoot = "/sys/fs/cgroup"
 
@@ -393,7 +395,7 @@ func join(path string, pid int) error {
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		return err
 	}
 	return cgroups.WriteCgroupProc(path, pid)

@@ -108,12 +108,16 @@ func fixupJumpsAndCalls(insns asm.Instructions) error {
 		offset := iter.Offset
 		ins := iter.Ins
 
+		if ins.Reference == "" {
+			continue
+		}
+
 		switch {
 		case ins.IsFunctionCall() && ins.Constant == -1:
 			// Rewrite bpf to bpf call
 			callOffset, ok := symbolOffsets[ins.Reference]
 			if !ok {
-				return fmt.Errorf("instruction %d: reference to missing symbol %q", i, ins.Reference)
+				return fmt.Errorf("call at %d: reference to missing symbol %q", i, ins.Reference)
 			}
 
 			ins.Constant = int64(callOffset - offset - 1)
@@ -122,10 +126,13 @@ func fixupJumpsAndCalls(insns asm.Instructions) error {
 			// Rewrite jump to label
 			jumpOffset, ok := symbolOffsets[ins.Reference]
 			if !ok {
-				return fmt.Errorf("instruction %d: reference to missing symbol %q", i, ins.Reference)
+				return fmt.Errorf("jump at %d: reference to missing symbol %q", i, ins.Reference)
 			}
 
 			ins.Offset = int16(jumpOffset - offset - 1)
+
+		case ins.IsLoadFromMap() && ins.MapPtr() == -1:
+			return fmt.Errorf("map %s: %w", ins.Reference, errUnsatisfiedReference)
 		}
 	}
 

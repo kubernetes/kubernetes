@@ -21,7 +21,7 @@ func setHugeTlb(dirPath string, r *configs.Resources) error {
 		return nil
 	}
 	for _, hugetlb := range r.HugetlbLimit {
-		if err := fscommon.WriteFile(dirPath, "hugetlb."+hugetlb.Pagesize+".max", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
+		if err := cgroups.WriteFile(dirPath, "hugetlb."+hugetlb.Pagesize+".max", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}
 	}

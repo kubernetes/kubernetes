@@ -10,9 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	enabledMonFeatures monFeatures
-)
+var enabledMonFeatures monFeatures
 
 type monFeatures struct {
 	mbmTotalBytes bool
