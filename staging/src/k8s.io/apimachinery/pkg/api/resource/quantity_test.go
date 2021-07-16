@@ -1207,11 +1207,11 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(1024, 0, BinarySI), 1024},
 		{decQuantity(8*1024, 0, BinarySI), 8 * 1024},
 		{decQuantity(7*1024*1024, 0, BinarySI), 7 * 1024 * 1024},
-		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 1024},
-		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024)},
-		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)},
-		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) / float64(1024)},
-		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(1024*1024*1024*1024*1024*1024*1024*1024)},
+		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(100000000)},
 
 		{decQuantity(1024, 0, DecimalSI), 1024},
 		{decQuantity(8*1024, 0, DecimalSI), 8 * 1024},
