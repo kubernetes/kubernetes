@@ -64,7 +64,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				Name:      "[sig-cloud-provider-gcp] master-upgrade",
 				Classname: "upgrade_tests",
 			}
-			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
+			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
 
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
