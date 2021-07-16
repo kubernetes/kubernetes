@@ -29,4 +29,10 @@ type AttachDetachControllerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// ReconcilerMaxWaitForUnmountDuration is the maximum amount of time the
+	// attach detach controller will wait for a volume to be safely unmounted
+	// from its node. Once this time has expired, the controller will assume the
+	// node or kubelet are unresponsive and will detach the volume anyway.
+	// Is set to 6 minutes by default.
+	ReconcilerMaxWaitForUnmountDuration metav1.Duration
 }

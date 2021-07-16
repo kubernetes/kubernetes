@@ -98,6 +98,14 @@ var DefaultTimerConfig TimerConfig = TimerConfig{
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
 }
 
+// NewAttachDetachTimerConfig returns a new instance of TimerConfig where max wait
+// for umount duration is overriden with the desired value.
+func NewAttachDetachTimerConfig(reconcilerMaxWaitForUnmountDuration time.Duration) TimerConfig {
+	timerConfig := DefaultTimerConfig
+	timerConfig.ReconcilerMaxWaitForUnmountDuration = reconcilerMaxWaitForUnmountDuration
+	return timerConfig
+}
+
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
 	Run(stopCh <-chan struct{})

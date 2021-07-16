@@ -28,6 +28,7 @@ import (
 func (in *AttachDetachControllerConfiguration) DeepCopyInto(out *AttachDetachControllerConfiguration) {
 	*out = *in
 	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
+	out.ReconcilerMaxWaitForUnmountDuration = in.ReconcilerMaxWaitForUnmountDuration
 	return
 }
 

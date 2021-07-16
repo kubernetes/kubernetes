@@ -223,6 +223,7 @@ func TestAddFlags(t *testing.T) {
 		AttachDetachController: &AttachDetachControllerOptions{
 			&attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
+				ReconcilerMaxWaitForUnmountDuration: metav1.Duration{Duration: 6 * time.Minute},
 				DisableAttachDetachReconcilerSync: true,
 			},
 		},
@@ -497,6 +498,7 @@ func TestApplyTo(t *testing.T) {
 			},
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
+				ReconcilerMaxWaitForUnmountDuration: metav1.Duration{Duration: 6 * time.Minute},
 				DisableAttachDetachReconcilerSync: true,
 			},
 			CSRSigningController: csrsigningconfig.CSRSigningControllerConfiguration{
