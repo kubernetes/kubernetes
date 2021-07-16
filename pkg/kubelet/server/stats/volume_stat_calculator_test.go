@@ -19,6 +19,7 @@ package stats
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/sync/semaphore"
 	"testing"
 	"time"
 
@@ -50,6 +51,7 @@ const (
 	vol2          = "vol2"
 	pvcClaimName0 = "pvc-fake0"
 	pvcClaimName1 = "pvc-fake1"
+	limitSize     = 100
 )
 
 var (
@@ -110,7 +112,7 @@ func TestPVCRef(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder, semaphore.NewWeighted(limitSize))
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
@@ -153,7 +155,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder, semaphore.NewWeighted(limitSize))
 	statsCalculator.calcAndStoreStats()
 
 	event, err := WatchEvent(eventStore)
@@ -178,7 +180,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 	// Calculate stats for pod
 	volumeCondition.Message = "The target path of the volume doesn't exist"
 	volumeCondition.Abnormal = true
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder, semaphore.NewWeighted(limitSize))
 	statsCalculator.calcAndStoreStats()
 
 	event, err := WatchEvent(eventStore)

@@ -17,7 +17,9 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
+	"golang.org/x/sync/semaphore"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,6 +45,7 @@ type volumeStatCalculator struct {
 	stopO         sync.Once
 	latest        atomic.Value
 	eventRecorder record.EventRecorder
+	semaphore     *semaphore.Weighted
 }
 
 // PodVolumeStats encapsulates the VolumeStats for a pod.
@@ -53,13 +56,14 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder) *volumeStatCalculator {
+func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder, semaphore *semaphore.Weighted) *volumeStatCalculator {
 	return &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
 		pod:           pod,
 		stopChannel:   make(chan struct{}),
 		eventRecorder: eventRecorder,
+		semaphore:     semaphore,
 	}
 }
 
@@ -127,6 +131,13 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	for _, v := range s.pod.Spec.Volumes {
 		volumesSpec[v.Name] = v
 	}
+
+	// bounding parallel
+	// refer issue #103728 for detail
+	s.semaphore.Acquire(context.Background(), 1)
+	defer func() {
+		s.semaphore.Release(1)
+	}()
 
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
 	var ephemeralStats []stats.VolumeStats

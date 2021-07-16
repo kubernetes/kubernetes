@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"golang.org/x/sync/semaphore"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,9 @@ import (
 
 	"k8s.io/klog/v2"
 )
+
+// limit burst size
+const LimitSize = int64(100)
 
 type statCache map[types.UID]*volumeStatCalculator
 
@@ -65,19 +69,20 @@ func (s *fsResourceAnalyzer) Start() {
 			return
 		}
 		klog.InfoS("Starting FS ResourceAnalyzer")
-		go wait.Forever(func() { s.updateCachedPodVolumeStats() }, s.calcPeriod)
+		semaphore := semaphore.NewWeighted(LimitSize)
+		go wait.Forever(func() { s.updateCachedPodVolumeStats(semaphore) }, s.calcPeriod)
 	})
 }
 
 // updateCachedPodVolumeStats calculates and caches the PodVolumeStats for every Pod known to the kubelet.
-func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
+func (s *fsResourceAnalyzer) updateCachedPodVolumeStats(semaphore *semaphore.Weighted) {
 	oldCache := s.cachedVolumeStats.Load().(statCache)
 	newCache := make(statCache)
 
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
 	for _, pod := range s.statsProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce()
+			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder, semaphore).StartOnce()
 		} else {
 			newCache[pod.GetUID()] = value
 		}
