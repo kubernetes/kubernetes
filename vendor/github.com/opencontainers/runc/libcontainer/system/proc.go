@@ -96,7 +96,7 @@ func parseStat(data string) (stat Stat_t, err error) {
 	// one (PID) and two (Name) in the paren-split.
 	parts = strings.Split(data[i+2:], " ")
 	var state int
-	fmt.Sscanf(parts[3-3], "%c", &state)
+	fmt.Sscanf(parts[3-3], "%c", &state) //nolint:staticcheck // "3-3" is more readable in this context.
 	stat.State = State(state)
 	fmt.Sscanf(parts[22-3], "%d", &stat.StartTime)
 	return stat, nil

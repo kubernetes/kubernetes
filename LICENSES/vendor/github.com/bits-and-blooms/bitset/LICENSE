@@ -1,4 +1,4 @@
-= vendor/github.com/willf/bitset licensed under: =
+= vendor/github.com/bits-and-blooms/bitset licensed under: =
 
 Copyright (c) 2014 Will Fitzgerald. All rights reserved.
 
@@ -28,4 +28,4 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/github.com/willf/bitset/LICENSE 0d2b5d66dabaff0df8e1ffe191a21bd1
+= vendor/github.com/bits-and-blooms/bitset/LICENSE 0d2b5d66dabaff0df8e1ffe191a21bd1

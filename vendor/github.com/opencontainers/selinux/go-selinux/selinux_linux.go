@@ -16,9 +16,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bits-and-blooms/bitset"
 	"github.com/opencontainers/selinux/pkg/pwalk"
 	"github.com/pkg/errors"
-	"github.com/willf/bitset"
 	"golang.org/x/sys/unix"
 )
 
@@ -892,13 +892,13 @@ func openContextFile() (*os.File, error) {
 	return os.Open(lxcPath)
 }
 
-var labels = loadLabels()
+var labels, privContainerMountLabel = loadLabels()
 
-func loadLabels() map[string]string {
+func loadLabels() (map[string]string, string) {
 	labels := make(map[string]string)
 	in, err := openContextFile()
 	if err != nil {
-		return labels
+		return labels, ""
 	}
 	defer in.Close()
 
@@ -920,7 +920,10 @@ func loadLabels() map[string]string {
 		}
 	}
 
-	return labels
+	con, _ := NewContext(labels["file"])
+	con["level"] = fmt.Sprintf("s0:c%d,c%d", maxCategory-2, maxCategory-1)
+	reserveLabel(con.get())
+	return labels, con.get()
 }
 
 // kvmContainerLabels returns the default processLabel and mountLabel to be used

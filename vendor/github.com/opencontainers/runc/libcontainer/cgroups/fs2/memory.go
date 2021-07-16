@@ -52,13 +52,13 @@ func setMemory(dirPath string, r *configs.Resources) error {
 	}
 	// never write empty string to `memory.swap.max`, it means set to 0.
 	if swapStr != "" {
-		if err := fscommon.WriteFile(dirPath, "memory.swap.max", swapStr); err != nil {
+		if err := cgroups.WriteFile(dirPath, "memory.swap.max", swapStr); err != nil {
 			return err
 		}
 	}
 
 	if val := numToStr(r.Memory); val != "" {
-		if err := fscommon.WriteFile(dirPath, "memory.max", val); err != nil {
+		if err := cgroups.WriteFile(dirPath, "memory.max", val); err != nil {
 			return err
 		}
 	}
@@ -66,7 +66,7 @@ func setMemory(dirPath string, r *configs.Resources) error {
 	// cgroup.Resources.KernelMemory is ignored
 
 	if val := numToStr(r.MemoryReservation); val != "" {
-		if err := fscommon.WriteFile(dirPath, "memory.low", val); err != nil {
+		if err := cgroups.WriteFile(dirPath, "memory.low", val); err != nil {
 			return err
 		}
 	}
@@ -76,7 +76,7 @@ func setMemory(dirPath string, r *configs.Resources) error {
 
 func statMemory(dirPath string, stats *cgroups.Stats) error {
 	// Set stats from memory.stat.
-	statsFile, err := fscommon.OpenFile(dirPath, "memory.stat", os.O_RDONLY)
+	statsFile, err := cgroups.OpenFile(dirPath, "memory.stat", os.O_RDONLY)
 	if err != nil {
 		return err
 	}
