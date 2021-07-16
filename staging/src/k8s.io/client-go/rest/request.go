@@ -1062,6 +1062,12 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 
 // transformResponse converts an API response into a structured API object
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
+	var etag string
+	etagHeader, ok := resp.Header["Etag"]
+	if ok && len(etagHeader) == 1 {
+		etag = etagHeader[0]
+	}
+
 	var body []byte
 	if resp.Body != nil {
 		data, err := ioutil.ReadAll(resp.Body)
@@ -1146,6 +1152,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
 		warnings:    handleWarnings(resp.Header, r.warningHandler),
+		etag:        etag,
 	}
 }
 
@@ -1272,6 +1279,7 @@ type Result struct {
 	contentType string
 	err         error
 	statusCode  int
+	etag        string
 
 	decoder runtime.Decoder
 }
@@ -1306,6 +1314,10 @@ func (r Result) Get() (runtime.Object, error) {
 		}
 	}
 	return out, nil
+}
+
+func (r Result) Etag() string {
+	return r.etag
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no

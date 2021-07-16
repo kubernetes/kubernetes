@@ -240,6 +240,10 @@ func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
+func (d *CachedDiscoveryClient) HasOpenAPISchemaChanged() bool {
+	return d.delegate.HasOpenAPISchemaChanged()
+}
+
 // Fresh is supposed to tell the caller whether or not to retry if the cache
 // fails to find something (false = retry, true = no need to retry).
 func (d *CachedDiscoveryClient) Fresh() bool {
