@@ -100,7 +100,6 @@ var (
 		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		SampleRegistry:           "gcr.io/google-samples",
-		GcrReleaseRegistry:       "gcr.io/gke-release",
 		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
@@ -393,8 +392,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.PrivateRegistry
 	case initRegistry.SampleRegistry:
 		registryAndUser = reg.SampleRegistry
-	case initRegistry.GcrReleaseRegistry:
-		registryAndUser = reg.GcrReleaseRegistry
 	case initRegistry.InvalidRegistry:
 		registryAndUser = reg.InvalidRegistry
 	case initRegistry.MicrosoftRegistry:
