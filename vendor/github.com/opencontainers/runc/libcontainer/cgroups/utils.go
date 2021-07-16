@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -88,7 +87,7 @@ func GetAllSubsystems() ([]string, error) {
 		// - freezer: implemented in kernel 5.2
 		// We assume these are always available, as it is hard to detect availability.
 		pseudo := []string{"devices", "freezer"}
-		data, err := fscommon.ReadFile("/sys/fs/cgroup", "cgroup.controllers")
+		data, err := ReadFile("/sys/fs/cgroup", "cgroup.controllers")
 		if err != nil {
 			return nil, err
 		}
@@ -267,7 +266,6 @@ func RemovePaths(paths map[string]string) (err error) {
 				case retries - 1:
 					logrus.WithError(err).Error("Failed to remove cgroup")
 				}
-
 			}
 			_, err := os.Stat(p)
 			// We need this strange way of checking cgroups existence because
@@ -376,7 +374,7 @@ func WriteCgroupProc(dir string, pid int) error {
 		return nil
 	}
 
-	file, err := fscommon.OpenFile(dir, CgroupProcesses, os.O_WRONLY)
+	file, err := OpenFile(dir, CgroupProcesses, os.O_WRONLY)
 	if err != nil {
 		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
 	}

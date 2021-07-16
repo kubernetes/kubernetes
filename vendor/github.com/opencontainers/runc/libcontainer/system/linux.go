@@ -35,7 +35,16 @@ func Execv(cmd string, args []string, env []string) error {
 		return err
 	}
 
-	return unix.Exec(name, args, env)
+	return Exec(name, args, env)
+}
+
+func Exec(cmd string, args []string, env []string) error {
+	for {
+		err := unix.Exec(cmd, args, env)
+		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
+			return err
+		}
+	}
 }
 
 func Prlimit(pid, resource int, limit unix.Rlimit) error {

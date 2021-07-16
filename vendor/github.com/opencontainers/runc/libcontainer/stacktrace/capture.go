@@ -13,8 +13,8 @@ func Capture(userSkip int) Stacktrace {
 	)
 	for i := skip; ; i++ {
 		pc, file, line, ok := runtime.Caller(i)
-		//detect if caller is repeated to avoid loop, gccgo
-		//currently runs  into a loop without this check
+		// detect if caller is repeated to avoid loop, gccgo
+		// currently runs  into a loop without this check
 		if !ok || pc == prevPc {
 			break
 		}
