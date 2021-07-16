@@ -92,5 +92,4 @@ ENV PATH="C:\dig\;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files
     # Persist %PSCORE% ENV variable for user convenience
     PSCORE="C:\Program Files\PowerShell\pwsh.exe"
 
-LABEL image_version="1.29-1"
 ENTRYPOINT ["cmd.exe", "/s", "/c"]

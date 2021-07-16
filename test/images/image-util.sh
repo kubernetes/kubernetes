@@ -36,6 +36,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
 
+GIT_COMMIT_ID=$(git log -1 --format=%h)
 windows_os_versions=(1809 1903 1909 2004 20H2)
 declare -A WINDOWS_OS_VERSIONS_MAP
 
@@ -182,7 +183,9 @@ build() {
 
     docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
         --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
-        -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" .
+        -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" \
+	--label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
+	--label "git_url=https://github.com/kubernetes/kubernetes/tree/${GIT_COMMIT_ID}/test/images/${img_folder}" .
 
     popd
   done
