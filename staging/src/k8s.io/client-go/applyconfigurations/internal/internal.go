@@ -907,24 +907,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy
-  map:
-    fields:
-    - name: whenDeleted
-      type:
-        scalar: string
-    - name: whenScaled
-      type:
-        scalar: string
 - name: io.k8s.api.apps.v1.StatefulSetSpec
   map:
     fields:
     - name: minReadySeconds
       type:
         scalar: numeric
-    - name: persistentVolumeClaimRetentionPolicy
-      type:
-        namedType: io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy
     - name: podManagementPolicy
       type:
         scalar: string
@@ -1206,24 +1194,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.apps.v1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy
-  map:
-    fields:
-    - name: whenDeleted
-      type:
-        scalar: string
-    - name: whenScaled
-      type:
-        scalar: string
 - name: io.k8s.api.apps.v1beta1.StatefulSetSpec
   map:
     fields:
     - name: minReadySeconds
       type:
         scalar: numeric
-    - name: persistentVolumeClaimRetentionPolicy
-      type:
-        namedType: io.k8s.api.apps.v1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy
     - name: podManagementPolicy
       type:
         scalar: string
@@ -1703,24 +1679,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.apps.v1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy
-  map:
-    fields:
-    - name: whenDeleted
-      type:
-        scalar: string
-    - name: whenScaled
-      type:
-        scalar: string
 - name: io.k8s.api.apps.v1beta2.StatefulSetSpec
   map:
     fields:
     - name: minReadySeconds
       type:
         scalar: numeric
-    - name: persistentVolumeClaimRetentionPolicy
-      type:
-        namedType: io.k8s.api.apps.v1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy
     - name: podManagementPolicy
       type:
         scalar: string
