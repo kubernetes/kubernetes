@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -5650,6 +5651,112 @@ func TestDeleteTypes(t *testing.T) {
 				t.Fatalf("expected service to be deleted")
 			}
 		})
+	}
+}
+
+func TestDeleteWithFinalizer(t *testing.T) {
+	svcName := "foo"
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	// This will allocate cluster IPs, NodePort, and HealthCheckNodePort.
+	svc := svctest.MakeService(svcName, svctest.SetTypeLoadBalancer,
+		svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+		func(s *api.Service) {
+			s.Finalizers = []string{"example.com/test"}
+		})
+
+	ctx := genericapirequest.NewDefaultContext()
+
+	// Create it with finalizer.
+	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error creating service: %v", err)
+	}
+	createdSvc := obj.(*api.Service)
+
+	// Prove everything was allocated.
+	obj, err = storage.Get(ctx, svcName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error getting service: %v", err)
+	}
+	if !cmp.Equal(createdSvc, obj) {
+		t.Errorf("expected the result of Create() and Get() to match: %v", cmp.Diff(createdSvc, obj))
+	}
+	for i, fam := range createdSvc.Spec.IPFamilies {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+			t.Errorf("expected IP to be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+		}
+	}
+	for _, p := range createdSvc.Spec.Ports {
+		if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+			t.Errorf("expected port to be allocated: %v", p.NodePort)
+		}
+	}
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+		t.Errorf("expected port to be allocated: %v", createdSvc.Spec.HealthCheckNodePort)
+	}
+
+	// Try to delete it, but it should be blocked by the finalizer.
+	obj, deleted, err := storage.Delete(ctx, svcName, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error deleting service: %v", err)
+	}
+	if deleted {
+		t.Fatalf("expected service to not be deleted")
+	}
+	deletedSvc := obj.(*api.Service)
+
+	// Prove everything is still allocated.
+	_, err = storage.Get(ctx, svcName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error getting service: %v", err)
+	}
+	for i, fam := range createdSvc.Spec.IPFamilies {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+			t.Errorf("expected IP to be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+		}
+	}
+	for _, p := range createdSvc.Spec.Ports {
+		if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+			t.Errorf("expected port to be allocated: %v", p.NodePort)
+		}
+	}
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+		t.Errorf("expected port to be allocated: %v", createdSvc.Spec.HealthCheckNodePort)
+	}
+
+	// Clear the finalizer - should delete.
+	deletedSvc.Finalizers = nil
+	_, _, err = storage.Update(ctx, svcName,
+		rest.DefaultUpdatedObjectInfo(deletedSvc), rest.ValidateAllObjectFunc,
+		rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error updating service: %v", err)
+	}
+
+	// Prove everything is deallocated.
+	_, err = storage.Get(ctx, svcName, &metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("unexpected success getting service")
+	}
+	for i, fam := range createdSvc.Spec.IPFamilies {
+		if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+			t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+		}
+	}
+	for _, p := range createdSvc.Spec.Ports {
+		if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+			t.Errorf("expected port to not be allocated: %v", p.NodePort)
+		}
+	}
+	if portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+		t.Errorf("expected port to not be allocated: %v", createdSvc.Spec.HealthCheckNodePort)
 	}
 }
 
