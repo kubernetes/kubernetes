@@ -7,8 +7,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type PerfEventGroup struct {
-}
+type PerfEventGroup struct{}
 
 func (s *PerfEventGroup) Name() string {
 	return "perf_event"

@@ -22,10 +22,6 @@ func NewSlicePointer(buf []byte) Pointer {
 
 // NewStringPointer creates a 64-bit pointer from a string.
 func NewStringPointer(str string) Pointer {
-	if str == "" {
-		return Pointer{}
-	}
-
 	p, err := unix.BytePtrFromString(str)
 	if err != nil {
 		return Pointer{}
