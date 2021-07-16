@@ -1035,6 +1035,10 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
+	// Capacity of the channel for receiving pod lifecycle events.
+	// Default: 1000
+	// +optional
+	PLEGChannelCapacity int32 `json:"plegChannelCapacity,omitempty"`
 }
 
 type KubeletAuthorizationMode string

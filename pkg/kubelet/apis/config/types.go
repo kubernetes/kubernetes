@@ -426,6 +426,8 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+	// Capacity of the channel for receiving pod lifecycle events. Defaults to 1000.
+	PLEGChannelCapacity int32
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

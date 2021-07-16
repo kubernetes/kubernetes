@@ -151,10 +151,6 @@ const (
 	linuxEtcHostsPath   = "/etc/hosts"
 	windowsEtcHostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 
-	// Capacity of the channel for receiving pod lifecycle events. This number
-	// is a bit arbitrary and may be adjusted in the future.
-	plegChannelCapacity = 1000
-
 	// Generic PLEG relies on relisting for discovering container events.
 	// A longer period means that kubelet will take longer to detect container
 	// changes and to update pod status. On the other hand, a shorter period
@@ -727,7 +723,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics))
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, int(kubeCfg.PLEGChannelCapacity), plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {

@@ -261,4 +261,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor)
 	}
+	if obj.PLEGChannelCapacity == 0 {
+		obj.PLEGChannelCapacity = 1000
+	}
 }

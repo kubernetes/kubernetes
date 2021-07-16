@@ -251,5 +251,6 @@ var (
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
+		"PLEGChannelCapacity",
 	)
 )

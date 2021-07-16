@@ -201,7 +201,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 			allErrors = append(allErrors, fmt.Errorf("unable to parse reservedSystemCPUs (--reserved-cpus), error: %v", err))
 		}
 	}
-
+	if kc.PLEGChannelCapacity < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: PLEGChannelCapacity (--pleg-channel-capacity) %v must not be a negative number", kc.PLEGChannelCapacity))
+	}
 	allErrors = append(allErrors, validateReservedMemoryConfiguration(kc)...)
 
 	if err := validateKubeletOSConfiguration(kc); err != nil {

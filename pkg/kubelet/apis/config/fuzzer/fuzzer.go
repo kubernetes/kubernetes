@@ -110,6 +110,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			if obj.PLEGChannelCapacity == 0 {
+				obj.PLEGChannelCapacity = 1000
+			}
 		},
 	}
 }
