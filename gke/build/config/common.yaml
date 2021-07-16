@@ -52,18 +52,18 @@ build-env:
       #
       # Set the <VALUE> to something low like `go1.13.0' to allow
       # experimentation with a wide range of go compilers.
-      golang-image: "golang:1.16.5"
+      golang-image: "golang:1.16.6"
       # Determines whether we use the "BoringCrypto" flavor of the Golang
       # compiler. If the string is non-empty, it will take precedence over the
       # "golang-image" field, and will be used instead as the build environment.
-      golang-boringcrypto-image: "goboring/golang:1.16.5b7"
+      golang-boringcrypto-image: "goboring/golang:1.16.6b7"
       protobuf: "3.0.2"
       etcd: "v3.4.13"
     fips:
       go-boringcrypto:
         # golang-boringcrypto-image was last updated for
         # /build/build-image/cross/VERSION:
-        last-updated-for-oss-kubecross-version: v1.16.5-1
+        last-updated-for-oss-kubecross-version: v1.16.6-1
 
   # This is a separate image that is used for the package-tarballs.sh step,
   # which requires Docker.
