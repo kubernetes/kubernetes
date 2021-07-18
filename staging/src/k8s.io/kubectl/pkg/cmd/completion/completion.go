@@ -44,7 +44,7 @@ const defaultBoilerPlate = `
 
 var (
 	completionLong = templates.LongDesc(i18n.T(`
-		Output shell completion code for the specified shell (bash, zsh or fish).
+		Output shell completion code for the specified shell (bash, zsh, fish, or powershell).
 		The shell code must be evaluated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
 		the .bash_profile.
@@ -96,6 +96,9 @@ var (
 		    kubectl completion fish | source
 		# To load completions for each session, execute once: 
 		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish`))
+
+		# Load the kubectl completion code for powershell into the current shell
+			kubectl completion powershell | Out-String | Invoke-Expression`))
 )
 
 var (
@@ -103,6 +106,7 @@ var (
 		"bash": runCompletionBash,
 		"zsh":  runCompletionZsh,
 		"fish": runCompletionFish,
+		"powershell":  runCompletionPwsh,
 	}
 )
 
@@ -178,4 +182,16 @@ func runCompletionFish(out io.Writer, boilerPlate string, kubectl *cobra.Command
 	}
 
 	return kubectl.GenFishCompletion(out, true)
+}
+
+func runCompletionPwsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
+	if len(boilerPlate) == 0 {
+		boilerPlate = defaultBoilerPlate
+	}
+
+	if _, err := out.Write([]byte(boilerPlate)); err != nil {
+		return err
+	}
+
+	return kubectl.GenPowerShellCompletion(out)
 }
