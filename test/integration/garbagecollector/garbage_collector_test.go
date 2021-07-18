@@ -599,12 +599,12 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	orphan := false
 	switch {
 	//lint:file-ignore SA1019 Keep testing deprecated OrphanDependents option until it's being removed
-	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0:
+	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0: //nolint:staticcheck
 		// if there are no deletion options, the default policy for replication controllers is orphan
 		orphan = true
-	case options.OrphanDependents != nil:
+	case options.OrphanDependents != nil: //nolint:staticcheck
 		// if the deletion options explicitly specify whether to orphan, that controls
-		orphan = *options.OrphanDependents
+		orphan = *options.OrphanDependents //nolint:staticcheck
 	case options.PropagationPolicy != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.PropagationPolicy == metav1.DeletePropagationOrphan

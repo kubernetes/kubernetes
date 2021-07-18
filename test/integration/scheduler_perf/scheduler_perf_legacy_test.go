@@ -440,7 +440,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	b *testing.B) {
 	if b.N < minPods {
 		//lint:ignore SA3001 Set a minimum for b.N to get more meaningful results
-		b.N = minPods
+		b.N = minPods //nolint:staticcheck
 	}
 	finalFunc, podInformer, clientset, _ := mustSetupScheduler(nil)
 	defer finalFunc()
