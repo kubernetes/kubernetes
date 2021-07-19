@@ -165,7 +165,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
 	f.RegisterWithTaints = opt.RegisterWithTaints
-	f.RemoteImageEndpoint = "/run/containerd/containerd.sock"
+	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
