@@ -153,7 +153,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 		qs = &queueSet{
 			clock:                qsc.factory.clock,
 			counter:              qsc.factory.counter,
-			estimatedServiceTime: 60,
+			estimatedServiceTime: 1,
 			obsPair:              qsc.obsPair,
 			qCfg:                 qsc.qCfg,
 			virtualTime:          0,
@@ -731,7 +731,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 			//  - requests complete really fast, S=1ms on q1
 			// in this scenario we will execute roughly 60,000 requests
 			// from q1 before we pick the request from q2.
-			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceTime
+			currentVirtualFinish := queue.GetNextFinish(qs.estimatedServiceTime)
 
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
@@ -810,17 +810,12 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		return
 	}
 
-	S := now.Sub(r.startTime).Seconds()
-
-	// When a request finishes being served, and the actual service time was S,
-	// the queue’s virtual start time is decremented by (G - S)*width.
-	r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
-
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--
 	r.queue.seatsInUse -= r.Seats()
 
 	if klog.V(6).Enabled() {
+		S := now.Sub(r.startTime).Seconds()
 		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing",
 			qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index,
 			r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting)
