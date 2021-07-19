@@ -1062,12 +1062,6 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 
 // transformResponse converts an API response into a structured API object
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
-	var etag string
-	etagHeader, ok := resp.Header["Etag"]
-	if ok && len(etagHeader) == 1 {
-		etag = etagHeader[0]
-	}
-
 	var body []byte
 	if resp.Body != nil {
 		data, err := ioutil.ReadAll(resp.Body)
@@ -1144,6 +1138,14 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			err:         err,
 			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
+	}
+
+	// store the etag header so that we can check whether the document
+	// has changed or not.
+	var etag string
+	etagHeader, ok := resp.Header["Etag"]
+	if ok && len(etagHeader) == 1 {
+		etag = etagHeader[0]
 	}
 
 	return Result{

@@ -122,11 +122,14 @@ type ServerVersionInterface interface {
 	ServerVersion() (*version.Info, error)
 }
 
-// OpenAPISchemaInterface has a method to retrieve the open API schema.
+// OpenAPISchemaInterface has a method to retrieve the open API schema
+// and a method to check whether the open API schema has changed.
 type OpenAPISchemaInterface interface {
 	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 	OpenAPISchema() (*openapi_v2.Document, error)
 
+	// HasOpenAPISchema changed checks whether the API schema being served
+	// by the apiserver is cached (and thus has not changed).
 	HasOpenAPISchemaChanged() bool
 }
 
@@ -423,6 +426,8 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
+// HasOpenAPISchemaChanged checks whether a HEAD request to openapi endpoint returns
+// a 304 StatusNotModified meaning it has not changed.
 func (d *DiscoveryClient) HasOpenAPISchemaChanged() bool {
 	result := d.restClient.Verb("HEAD").AbsPath("/openapi/v2").SetHeader("If-None-Match", d.etag).SetHeader("Accept", mimePb).Do(context.TODO())
 	var status int

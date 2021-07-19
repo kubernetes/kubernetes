@@ -153,6 +153,7 @@ func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
 }
 
+// HasOpenAPISchemaChanged checks wether the open API schema being served is cached or not.
 func (c *FakeDiscovery) HasOpenAPISchemaChanged() bool {
 	return true
 }
