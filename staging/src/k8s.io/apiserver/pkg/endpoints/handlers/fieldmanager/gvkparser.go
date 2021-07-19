@@ -69,7 +69,6 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 			if len(gvk.Kind) > 0 {
 				_, ok := parser.gvks[gvk]
 				if ok {
-					// TODO: double check why this is failing in real_cluster_script.go
 					return nil, fmt.Errorf("duplicate entry for %v", gvk)
 				}
 				parser.gvks[gvk] = modelName

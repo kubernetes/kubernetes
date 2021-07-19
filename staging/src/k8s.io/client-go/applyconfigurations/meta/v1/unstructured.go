@@ -19,22 +19,22 @@ type UnstructuredExtractor interface {
 	ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 }
 
-// objectTypeCache is a cache of typed.ParseableTypes
-type objectTypeCache interface {
-	objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error)
-}
+//// objectTypeCache is a cache of typed.ParseableTypes
+//type objectTypeCache interface {
+//	objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error)
+//}
 
-// nonCachingObjectTypeCache is a objectTypeCache that does no caching
+// objectTypeCache is a objectTypeCache that does no caching
 // (i.e. it downloads the OpenAPISchema every time)
 // Useful during the proof-of-concept stage until we agree on a caching solution.
-type nonCachingObjectTypeCache struct {
+type objectTypeCache struct {
 	// TODO: lock this?
 	discoveryClient discovery.DiscoveryInterface
 	gvkParser       *fieldmanager.GvkParser
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
-func (c *nonCachingObjectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
+func (c *objectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
 
 	if !c.discoveryClient.HasOpenAPISchemaChanged() && c.gvkParser != nil {
 		// cache hit
@@ -67,14 +67,14 @@ func (c *nonCachingObjectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind
 }
 
 type extractor struct {
-	cache objectTypeCache
+	cache *objectTypeCache
 }
 
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) UnstructuredExtractor {
 	return &extractor{
-		cache: &nonCachingObjectTypeCache{
+		cache: &objectTypeCache{
 			discoveryClient: dc,
 		},
 	}
