@@ -908,15 +908,11 @@ message ContainerStatus {
   // Specifies whether the container has passed its readiness probe.
   optional bool ready = 4;
 
-  // The number of times the container has been restarted, currently based on
-  // the number of dead containers that have not yet been removed.
-  // Note that this is calculated from dead containers. But those containers are subject to
-  // garbage collection. This value will get capped at 5 by GC.
+  // The number of times the container has been restarted.
   optional int32 restartCount = 5;
 
   // The image the container is running.
-  // More info: https://kubernetes.io/docs/concepts/containers/images
-  // TODO(dchen1107): Which image the container is running with?
+  // More info: https://kubernetes.io/docs/concepts/containers/images.
   optional string image = 6;
 
   // ImageID of the container's image.
