@@ -510,10 +510,12 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 //
 // It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
-	switch err.(type) {
-	case *exec.Error: // Binary does not exist (see exec.Error).
+	execError := &exec.Error{}
+	exitError := &exec.ExitError{}
+	switch {
+	case errors.As(err, &execError): // Binary does not exist (see exec.Error).
 		builder := strings.Builder{}
-		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
+		fmt.Fprintf(&builder, "exec: binary %s not found", a.cmd)
 
 		a.sometimes.Do(func() {
 			fmt.Fprint(&builder, installHintVerboseHelp)
@@ -524,13 +526,15 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 
 		return errors.New(builder.String())
 
-	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
-		e := err.(*exec.ExitError)
+	case errors.As(err, &exitError): // Binary execution failed (see exec.Cmd.Run()).
 		return fmt.Errorf(
-			"exec: executable %s failed with exit code %d",
+			"exec: binary %s failed with exit code %d",
 			a.cmd,
-			e.ProcessState.ExitCode(),
+			exitError.ProcessState.ExitCode(),
 		)
+
+	case os.IsPermission(err):
+		return fmt.Errorf("exec: binary %s not executable", a.cmd)
 
 	default:
 		return fmt.Errorf("exec: %v", err)

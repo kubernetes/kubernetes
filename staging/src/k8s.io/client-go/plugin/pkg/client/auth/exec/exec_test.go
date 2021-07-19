@@ -318,7 +318,7 @@ func TestRefreshCreds(t *testing.T) {
 		wantCreds        credentials
 		wantExpiry       time.Time
 		wantErr          bool
-		wantErrSubstr    string
+		wantErrSubstrs   []string
 	}{
 		{
 			name: "basic-request",
@@ -701,8 +701,8 @@ func TestRefreshCreds(t *testing.T) {
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: api.AlwaysExecInteractiveMode,
 			},
-			wantErr:       true,
-			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is not a terminal",
+			wantErr:        true,
+			wantErrSubstrs: []string{"exec plugin cannot support interactive mode: standard input is not a terminal"},
 		},
 		{
 			name: "beta-basic-request-with-always-interactive-mode-and-terminal-and-stdin-unavailable",
@@ -711,9 +711,9 @@ func TestRefreshCreds(t *testing.T) {
 				InteractiveMode:  api.AlwaysExecInteractiveMode,
 				StdinUnavailable: true,
 			},
-			isTerminal:    true,
-			wantErr:       true,
-			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is unavailable",
+			isTerminal:     true,
+			wantErr:        true,
+			wantErrSubstrs: []string{"exec plugin cannot support interactive mode: standard input is unavailable"},
 		},
 		{
 			name: "beta-basic-request-with-always-interactive-mode-and-terminal-and-stdin-unavailable-with-message",
@@ -723,9 +723,9 @@ func TestRefreshCreds(t *testing.T) {
 				StdinUnavailable:        true,
 				StdinUnavailableMessage: "some message",
 			},
-			isTerminal:    true,
-			wantErr:       true,
-			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is unavailable: some message",
+			isTerminal:     true,
+			wantErr:        true,
+			wantErrSubstrs: []string{"exec plugin cannot support interactive mode: standard input is unavailable: some message"},
 		},
 		{
 			name: "beta-basic-request-with-always-interactive-mode-and-terminal",
@@ -821,8 +821,19 @@ func TestRefreshCreds(t *testing.T) {
 				InstallHint:     "some install hint",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
-			wantErr:       true,
-			wantErrSubstr: "some install hint",
+			wantErr:        true,
+			wantErrSubstrs: []string{"binary does not exist not found", "some install hint"},
+		},
+		{
+			name: "binary-not-executable",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				Command:         "./testdata/not-executable.sh",
+				InstallHint:     "some install hint",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantErr:        true,
+			wantErrSubstrs: []string{"binary ./testdata/not-executable.sh not executable"},
 		},
 		{
 			name: "binary-fails",
@@ -830,9 +841,9 @@ func TestRefreshCreds(t *testing.T) {
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
-			exitCode:      73,
-			wantErr:       true,
-			wantErrSubstr: "73",
+			exitCode:       73,
+			wantErr:        true,
+			wantErrSubstrs: []string{"73"},
 		},
 		{
 			name: "alpha-with-cluster-is-ignored",
@@ -1007,8 +1018,8 @@ func TestRefreshCreds(t *testing.T) {
 			config: api.ExecConfig{
 				APIVersion: "client.authentication.k8s.io/v1",
 			},
-			wantErr:       true,
-			wantErrSubstr: `exec plugin cannot support interactive mode: unknown interactiveMode: ""`,
+			wantErr:        true,
+			wantErrSubstrs: []string{`exec plugin cannot support interactive mode: unknown interactiveMode: ""`},
 		},
 	}
 
@@ -1040,8 +1051,12 @@ func TestRefreshCreds(t *testing.T) {
 			if err := a.refreshCredsLocked(test.response); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
-				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
-					t.Errorf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+				} else {
+					for _, wantErrSubstr := range test.wantErrSubstrs {
+						if !strings.Contains(err.Error(), wantErrSubstr) {
+							t.Errorf("expected error with substring '%v' got '%v'", wantErrSubstr, err.Error())
+						}
+					}
 				}
 				return
 			}

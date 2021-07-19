@@ -380,7 +380,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.Command = "does not exist"
 			},
-			wantGetCertificateErrorPrefix: "exec: executable does not exist not found",
+			wantGetCertificateErrorPrefix: "exec: binary does not exist not found",
 			wantClientErrorPrefix:         `Get "https`,
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
 		},
@@ -389,7 +389,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.Command = "./testdata/exec-plugin-not-executable.sh"
 			},
-			wantGetCertificateErrorPrefix: "exec: fork/exec ./testdata/exec-plugin-not-executable.sh: permission denied",
+			wantGetCertificateErrorPrefix: "exec: binary ./testdata/exec-plugin-not-executable.sh not executable",
 			wantClientErrorPrefix:         `Get "https`,
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
 		},
@@ -403,7 +403,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 					},
 				}
 			},
-			wantGetCertificateErrorPrefix: "exec: executable testdata/exec-plugin.sh failed with exit code 10",
+			wantGetCertificateErrorPrefix: "exec: binary testdata/exec-plugin.sh failed with exit code 10",
 			wantClientErrorPrefix:         `Get "https`,
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}}},
 		},
