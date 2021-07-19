@@ -18,6 +18,7 @@ package volumerestrictions
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
@@ -52,6 +53,8 @@ const (
 	ErrReasonDiskConflict = "node(s) had no available disk"
 	// ErrReasonReadWriteOncePodConflict is used when a pod is found using the same PVC with the ReadWriteOncePod access mode.
 	ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
+	// InfoReasonReadWriteOncePodPreempt is used when a pod can preempt pods that use the same pvc on the same node
+	InfoReasonReadWriteOncePodPreempt = "Can be scheduled through preemption"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -130,13 +133,11 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 // isReadWriteOncePodAccessModeConflict checks if a pod uses a PVC with the ReadWriteOncePod access mode.
 // This access mode restricts volume access to a single pod on a single node. Since only a single pod can
 // use a ReadWriteOncePod PVC, mark any other pods attempting to use this PVC as UnschedulableAndUnresolvable.
-// TODO(#103132): Mark pod as Unschedulable and add preemption logic.
 func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(pod *v1.Pod) *framework.Status {
 	nodeInfos, err := pl.nodeInfoLister.NodeInfos().List()
 	if err != nil {
 		return framework.NewStatus(framework.Error, "error while getting node info")
 	}
-
 	var pvcKeys []string
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
@@ -162,24 +163,34 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(pod *v1.Pod) 
 	ctx, cancel := context.WithCancel(context.Background())
 	var conflicts uint32
 
+	var preemetStatus *framework.Status
 	processNode := func(i int) {
 		nodeInfo := nodeInfos[i]
+		pvcKeyslength := len(pvcKeys)
 		for _, key := range pvcKeys {
 			refCount := nodeInfo.PVCRefCounts[key]
-			if refCount > 0 {
+			if refCount > 1 {
 				atomic.AddUint32(&conflicts, 1)
 				cancel()
+			} else if refCount == 1 {
+				if canBePreempt(nodeInfo, key) {
+					pvcKeyslength--
+				}
 			}
+		}
+		// node can meet all pvc
+		if pvcKeyslength == 0 {
+			preemetStatus = framework.NewStatus(framework.Unschedulable, InfoReasonReadWriteOncePodPreempt)
+			cancel()
 		}
 	}
 	pl.parallelizer.Until(ctx, len(nodeInfos), processNode)
-
 	// Enforce ReadWriteOncePod access mode. This is also enforced during volume mount in kubelet.
 	if conflicts > 0 {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
+		preemetStatus = framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
 	}
 
-	return nil
+	return preemetStatus
 }
 
 func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtensions {
@@ -216,10 +227,9 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleStat
 // failed by this plugin schedulable.
 func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
-		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
-		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Resource: framework.Pod, ActionType: framework.Delete},
+		// Add/update/delete may change the state of the node pod.Spec.Volumes,
+		// thereby changing the state of whether the pod can be preempted
+		{Resource: framework.Pod, ActionType: framework.Delete | framework.Add | framework.Update},
 		// A new Node may make a pod schedulable.
 		{Resource: framework.Node, ActionType: framework.Add},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
@@ -240,4 +250,22 @@ func New(_ runtime.Object, handle framework.Handle, fts feature.Features) (frame
 		nodeInfoLister:         nodeInfoLister,
 		enableReadWriteOncePod: fts.EnableReadWriteOncePod,
 	}, nil
+}
+
+// canBePreempt only verifies the volume, not the resource/affinity..
+func canBePreempt(nodeInfo *framework.NodeInfo, key string) bool {
+	namespace, pvcName := strings.Split(key, "/")[0], strings.Split(key, "/")[1]
+	anotherNodeInfo := nodeInfo.Clone()
+	for _, podInfo := range anotherNodeInfo.Pods {
+		pod := podInfo.Pod
+		if pod.Namespace != namespace {
+			continue
+		}
+		for _, vol := range pod.Spec.Volumes {
+			if vol.PersistentVolumeClaim.ClaimName == pvcName {
+				return true
+			}
+		}
+	}
+	return false
 }

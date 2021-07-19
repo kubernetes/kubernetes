@@ -260,6 +260,51 @@ func TestAccessModeConflicts(t *testing.T) {
 			},
 		},
 	}
+	podWithReadWriteOncePodPVC2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			// Required for querying lister for PVCs in the same namespace.
+			Namespace: "default",
+			Name:      "pod-with-rwop2",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "node-1",
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claim-with-rwop",
+						},
+					},
+				},
+			},
+		},
+	}
+	podWithReadWriteOncePodPVC3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			// Required for querying lister for PVCs in the same namespace.
+			Namespace: "default",
+			Name:      "pod-with-rwop3",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "node-1",
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claim-with-rwop",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claim-with-rwop2",
+						},
+					},
+				},
+			},
+		},
+	}
 	podWithReadWriteManyPVC := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			// Required for querying lister for PVCs in the same namespace.
@@ -343,13 +388,22 @@ func TestAccessModeConflicts(t *testing.T) {
 			wantStatus:             nil,
 		},
 		{
-			name:                   "access mode conflict",
-			pod:                    podWithReadWriteOncePodPVC,
+			name:                   "access mode conflict ,can be preempted",
+			pod:                    podWithReadWriteOncePodPVC2,
 			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC, podWithReadWriteManyPVC},
 			existingNodes:          []*v1.Node{node},
 			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict),
+			wantStatus:             framework.NewStatus(framework.Unschedulable, InfoReasonReadWriteOncePodPreempt),
+		},
+		{
+			name:                   "access mode conflict ,can't preempt",
+			pod:                    podWithReadWriteOncePodPVC3,
+			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC},
+			existingNodes:          []*v1.Node{node},
+			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC},
+			enableReadWriteOncePod: true,
+			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, "persistentvolumeclaim \"claim-with-rwop2\" not found"),
 		},
 	}
 
