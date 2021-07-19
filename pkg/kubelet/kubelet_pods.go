@@ -1782,7 +1782,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	if isInitContainer {
 		return kubetypes.SortStatusesOfInitContainers(pod, statuses)
 	}
-	var containerStatuses []v1.ContainerStatus
+	containerStatuses := make([]v1.ContainerStatus, 0, len(statuses))
 	for _, status := range statuses {
 		containerStatuses = append(containerStatuses, *status)
 	}
