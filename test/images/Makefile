@@ -29,7 +29,7 @@ endif
 #   WHAT: Directory names to build.
 #
 # Example:
-#   make all WHAT=clusterapi-tester
+#   make all WHAT=httpd
 all: all-container
 
 all-container:
