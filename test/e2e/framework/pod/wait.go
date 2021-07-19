@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -114,8 +113,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 	start := time.Now()
 	e2elog.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	var ignoreNotReady bool
 	badPods := []v1.Pod{}
 	desiredPods := 0
