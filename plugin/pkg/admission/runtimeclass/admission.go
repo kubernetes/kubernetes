@@ -25,13 +25,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-
+	admissionv1 "k8s.io/api/admission/v1"
 	nodev1 "k8s.io/api/node/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	nodev1client "k8s.io/client-go/kubernetes/typed/node/v1"
@@ -145,7 +146,14 @@ func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attrib
 			return err
 		}
 	}
-
+	// Validate Windows Pods
+	result, err := validateWindowsPod(attributes, pod, runtimeClass)
+	if err != nil {
+		return err
+	}
+	for _, w := range result.Warnings {
+		warning.AddWarning(ctx, "", w)
+	}
 	return nil
 }
 
@@ -252,6 +260,43 @@ func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1
 	}
 
 	return nil
+}
+
+// TODO: We will make this an error in future. Think if we need to build a separate admission plugin to do all
+// these validations for Windows pods.
+func validateWindowsPod(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.RuntimeClass) (*admissionv1.AdmissionResponse, error) {
+	hasWindowsLabelInPodNodeSelector := false
+	podNodeSelector := pod.Spec.NodeSelector
+	if value, ok := podNodeSelector["kubernetes.io/os"]; ok {
+		if value == "windows" {
+			hasWindowsLabelInPodNodeSelector = true
+		}
+	}
+	hasWindowsLabelInRuntimeClass := false
+	if runtimeClass != nil && runtimeClass.Scheduling != nil {
+		scheduling := &node.Scheduling{}
+		if err := apinodev1.Convert_v1_Scheduling_To_node_Scheduling(runtimeClass.Scheduling, scheduling, nil); err != nil {
+			return nil, err
+		}
+		if value, ok := scheduling.NodeSelector["kubernetes.io/os"]; ok {
+			if value == "windows" {
+				hasWindowsLabelInRuntimeClass = true
+			}
+		}
+	}
+	res := allowedResponse()
+	if hasWindowsLabelInPodNodeSelector && !hasWindowsLabelInRuntimeClass {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("Pod %s has Windows specific nodeSelector set in "+
+			"pod spec directly but no associated Windows Runtimeclass. Runtimeclasses are made mandatory for Windows "+
+			"pods in 1.24", pod.Name))
+		return res, nil
+	}
+	return res, nil
+}
+
+// allowedResponse is the response used when the admission decision is allow.
+func allowedResponse() *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{Allowed: true}
 }
 
 func shouldIgnore(attributes admission.Attributes) bool {
