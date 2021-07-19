@@ -1421,21 +1421,26 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
-	spec := &pod.Spec
-
 	// ensure the probe managers have up to date status for containers
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
-	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.Conditions, s.ContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(spec, s.ContainerStatuses, s.Phase))
-	// Status manager will take care of the LastTransitionTimestamp, either preserve
-	// the timestamp from apiserver, or set a new one. When kubelet sees the pod,
-	// `PodScheduled` condition must be true.
+
+	// preserve all conditions not owned by the kubelet
+	s.Conditions = make([]v1.PodCondition, 0, len(pod.Status.Conditions)+1)
+	for _, c := range pod.Status.Conditions {
+		if !kubetypes.PodConditionByKubelet(c.Type) {
+			s.Conditions = append(s.Conditions, c)
+		}
+	}
+	// set all Kubelet-owned conditions
+	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, s.InitContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, s.ContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(&pod.Spec, s.ContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, v1.PodCondition{
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})
 
+	// set HostIP and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()
 		if err != nil {
@@ -1539,13 +1544,6 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 			len(pod.Spec.InitContainers) > 0,
 			false,
 		)
-	}
-
-	// Preserves conditions not controlled by kubelet
-	for _, c := range pod.Status.Conditions {
-		if !kubetypes.PodConditionByKubelet(c.Type) {
-			apiPodStatus.Conditions = append(apiPodStatus.Conditions, c)
-		}
 	}
 
 	return &apiPodStatus
