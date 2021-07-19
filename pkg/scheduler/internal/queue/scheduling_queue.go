@@ -250,7 +250,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	pInfo := p.newQueuedPodInfo(pod)
 	if err := p.activeQ.Add(pInfo); err != nil {
-		klog.Errorf("Error adding pod %v to the scheduling queue: %v", nsNameForPod(pod), err)
+		klog.Errorf("Error adding pod %v to the active queue: %v", nsNameForPod(pod), err)
 		return err
 	}
 	if p.unschedulableQ.get(pod) != nil {
