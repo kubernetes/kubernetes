@@ -649,14 +649,17 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name                string
-		accessModes         []api.PersistentVolumeAccessMode
-		readOnly            bool
-		fsType              string
-		setFsGroup          bool
-		fsGroup             int64
-		driverFSGroupPolicy bool
-		supportMode         storage.FSGroupPolicy
+		name                           string
+		accessModes                    []api.PersistentVolumeAccessMode
+		readOnly                       bool
+		fsType                         string
+		setFsGroup                     bool
+		fsGroup                        int64
+		driverFSGroupPolicy            bool
+		supportMode                    storage.FSGroupPolicy
+		delegateFSGroupFeatureGate     bool
+		driverSupportsVolumeMountGroup bool
+		expectedFSGroupInNodePublish   string
 	}{
 		{
 			name: "default fstype, with no fsgroup (should not apply fsgroup)",
@@ -785,12 +788,48 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			driverFSGroupPolicy: true,
 			supportMode:         storage.FileFSGroupPolicy,
 		},
+		{
+			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodePublishVolume",
+			fsType:                         "ext4",
+			setFsGroup:                     true,
+			fsGroup:                        3000,
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: true,
+			expectedFSGroupInNodePublish:   "3000",
+		},
+		{
+			name:                           "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			fsType:                         "ext4",
+			setFsGroup:                     false,
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: true,
+			expectedFSGroupInNodePublish:   "",
+		},
+		{
+			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			fsType:                         "ext4",
+			setFsGroup:                     true,
+			fsGroup:                        3000,
+			delegateFSGroupFeatureGate:     true,
+			driverSupportsVolumeMountGroup: false,
+			expectedFSGroupInNodePublish:   "",
+		},
+		{
+			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			fsType:                         "ext4",
+			setFsGroup:                     true,
+			fsGroup:                        3000,
+			delegateFSGroupFeatureGate:     false,
+			driverSupportsVolumeMountGroup: true,
+			expectedFSGroupInNodePublish:   "",
+		},
 	}
 
 	for i, tc := range testCases {
 		t.Logf("Running test %s", tc.name)
 
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, tc.driverFSGroupPolicy)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -821,7 +860,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		if tc.driverFSGroupPolicy {
 			csiMounter.fsGroupPolicy = tc.supportMode
 		}
-		csiMounter.csiClient = setupClient(t, true)
+		csiMounter.csiClient = setupClientWithVolumeMountGroup(t, true /* stageUnstageSet */, tc.driverSupportsVolumeMountGroup)
 
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
@@ -853,6 +892,9 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		pubs := csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
 		if pubs[csiMounter.volumeID].Path != csiMounter.GetPath() {
 			t.Error("csi server may not have received NodePublishVolume call")
+		}
+		if pubs[csiMounter.volumeID].VolumeMountGroup != tc.expectedFSGroupInNodePublish {
+			t.Errorf("expected VolumeMountGroup parameter in NodePublishVolumeRequest to be %q, got: %q", tc.expectedFSGroupInNodePublish, pubs[csiMounter.volumeID].VolumeMountGroup)
 		}
 	}
 }

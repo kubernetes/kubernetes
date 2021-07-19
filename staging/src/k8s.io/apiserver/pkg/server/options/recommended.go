@@ -104,6 +104,14 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
+	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
+		return err
+	}
+	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+		if err := o.Traces.ApplyTo(config.Config.EgressSelector, &config.Config); err != nil {
+			return err
+		}
+	}
 	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -127,9 +135,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, o.FeatureGate, initializers...); err != nil {
 		return err
 	}
-	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
-		return err
-	}
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 		if config.ClientConfig != nil {
 			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
@@ -144,11 +149,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 			)
 		} else {
 			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
-		}
-	}
-	if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-		if err := o.Traces.ApplyTo(config.Config.EgressSelector, &config.Config); err != nil {
-			return err
 		}
 	}
 	return nil

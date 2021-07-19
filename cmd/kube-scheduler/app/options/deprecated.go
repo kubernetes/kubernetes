@@ -69,7 +69,7 @@ func (o *DeprecatedOptions) Validate() []error {
 	return errs
 }
 
-// ApplyPolicySourceTo sets cfg.PolicySource from flags passed on the command line in the following precedence order:
+// ApplyTo sets cfg.PolicySource from flags passed on the command line in the following precedence order:
 //
 // 1. --use-legacy-policy-config to use a policy file.
 // 2. --policy-configmap to use a policy config map value.

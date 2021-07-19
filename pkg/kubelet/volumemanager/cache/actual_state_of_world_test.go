@@ -241,6 +241,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
+	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
 }
 
 // Populates data struct with a volume
@@ -321,6 +322,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
+	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
 }
 
 // Populates data struct with a volume
@@ -451,6 +453,8 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName2, volumeSpec2.Name(), asw)
 	verifyVolumeSpecNameInVolumeAsw(t, podName1, []*volume.Spec{volumeSpec1}, asw)
 	verifyVolumeSpecNameInVolumeAsw(t, podName2, []*volume.Spec{volumeSpec2}, asw)
+	verifyVolumeMountedElsewhere(t, podName1, generatedVolumeName1, true /*expectedMountedElsewhere */, asw)
+	verifyVolumeMountedElsewhere(t, podName2, generatedVolumeName2, true /*expectedMountedElsewhere */, asw)
 }
 
 // Calls AddPodToVolume() to add pod to empty data struct
@@ -487,6 +491,10 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 			volumeSpec,
 			err)
 	}
+
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(
+		plugin, volumeSpec)
+	require.NoError(t, err)
 
 	blockplugin, err := volumePluginMgr.FindMapperPluginBySpec(volumeSpec)
 	if err != nil {
@@ -538,6 +546,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		false, /* expectVolumeToExist */
 		asw)
 	verifyVolumeDoesntExistWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
+	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
 }
 
 // Calls MarkVolumeAsAttached() once to add volume
@@ -770,6 +779,21 @@ func verifyPodExistsInVolumeAsw(
 			"Invalid devicePath. Expected: <%q> Actual: <%q> ",
 			expectedDevicePath,
 			devicePath)
+	}
+}
+
+func verifyVolumeMountedElsewhere(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeName v1.UniqueVolumeName,
+	expectedMountedElsewhere bool,
+	asw ActualStateOfWorld) {
+	mountedElsewhere := asw.IsVolumeMountedElsewhere(expectedVolumeName, expectedPodName)
+	if mountedElsewhere != expectedMountedElsewhere {
+		t.Fatalf(
+			"IsVolumeMountedElsewhere assertion failure. Expected : <%t> Actual: <%t>",
+			expectedMountedElsewhere,
+			mountedElsewhere)
 	}
 }
 

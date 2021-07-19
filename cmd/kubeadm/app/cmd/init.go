@@ -23,12 +23,6 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -44,6 +38,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -386,9 +388,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := options.kubeconfigDir
-		if options.dryRun {
-			kubeconfigDir = dryRunDir
-		}
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
@@ -556,7 +555,14 @@ func (d *initData) Tokens() []string {
 
 // PatchesDir returns the folder where patches for components are stored
 func (d *initData) PatchesDir() string {
-	return d.patchesDir
+	// If provided, make the flag value override the one in config.
+	if len(d.patchesDir) > 0 {
+		return d.patchesDir
+	}
+	if d.cfg.Patches != nil {
+		return d.cfg.Patches.Directory
+	}
+	return ""
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {

@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
@@ -307,11 +306,6 @@ func setupSuite() {
 	if framework.TestContext.NodeKiller.Enabled {
 		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
 		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
-	}
-
-	err = metrics.SetupMetricsProxy(c)
-	if err != nil {
-		framework.Logf("Fail to setup metrics proxy: %v", err)
 	}
 }
 

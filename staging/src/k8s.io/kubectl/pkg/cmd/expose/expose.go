@@ -59,10 +59,10 @@ var (
 		`) + exposeResources)
 
 	exposeExample = templates.Examples(i18n.T(`
-		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000
 		kubectl expose rc nginx --port=80 --target-port=8000
 
-		# Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
+		# Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000
 		kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
 
 		# Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
@@ -74,10 +74,10 @@ var (
 		# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
 		kubectl expose rc streamer --port=4100 --protocol=UDP --name=video-stream
 
-		# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
+		# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000
 		kubectl expose rs nginx --port=80 --target-port=8000
 
-		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
+		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000
 		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
@@ -131,7 +131,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:                   "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
+		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes service"),
 		Long:                  exposeLong,
 		Example:               exposeExample,
 		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

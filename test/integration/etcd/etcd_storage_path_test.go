@@ -41,7 +41,7 @@ import (
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
 // store into it's kind.  We've used this downstream for mappings before.
-var kindWhiteList = sets.NewString()
+var kindAllowList = sets.NewString()
 
 // namespace used for all tests, do not change this
 const testNamespace = "etcdstoragepathtestnamespace"
@@ -95,9 +95,9 @@ func TestEtcdStoragePath(t *testing.T) {
 			gvResource := resourceToPersist.Mapping.Resource
 			kind := gvk.Kind
 
-			if kindWhiteList.Has(kind) {
+			if kindAllowList.Has(kind) {
 				kindSeen.Insert(kind)
-				t.Skip("whitelisted")
+				t.Skip("allowlisted")
 			}
 
 			etcdSeen[gvResource] = empty{}
@@ -210,8 +210,8 @@ func TestEtcdStoragePath(t *testing.T) {
 	if inEtcdData, inEtcdSeen := diffMaps(etcdStorageData, etcdSeen); len(inEtcdData) != 0 || len(inEtcdSeen) != 0 {
 		t.Errorf("etcd data does not match the types we saw:\nin etcd data but not seen:\n%s\nseen but not in etcd data:\n%s", inEtcdData, inEtcdSeen)
 	}
-	if inKindData, inKindSeen := diffMaps(kindWhiteList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
-		t.Errorf("kind whitelist data does not match the types we saw:\nin kind whitelist but not seen:\n%s\nseen but not in kind whitelist:\n%s", inKindData, inKindSeen)
+	if inKindData, inKindSeen := diffMaps(kindAllowList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
+		t.Errorf("kind allowlist data does not match the types we saw:\nin kind allowlist but not seen:\n%s\nseen but not in kind allowlist:\n%s", inKindData, inKindSeen)
 	}
 
 	for bucket, gvks := range cohabitatingResources {

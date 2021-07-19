@@ -561,6 +561,31 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	return zones, nil
 }
 
+// GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
+func GetSchedulableClusterZones(c clientset.Interface) (sets.String, error) {
+	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
+	}
+
+	// collect values of zone label from all nodes
+	zones := sets.NewString()
+	for _, node := range nodes.Items {
+		// We should have at least 1 node in the zone which is schedulable.
+		if !IsNodeSchedulable(&node) {
+			continue
+		}
+		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
+			zones.Insert(zone)
+		}
+
+		if zone, found := node.Labels[v1.LabelTopologyZone]; found {
+			zones.Insert(zone)
+		}
+	}
+	return zones, nil
+}
+
 // CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
 func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
 	nodes, err := GetBoundedReadySchedulableNodes(c, maxCount)

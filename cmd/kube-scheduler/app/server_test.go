@@ -249,6 +249,18 @@ profiles:
 				t.Fatal(err)
 			}
 
+			nfs := opts.Flags()
+			for _, f := range nfs.FlagSets {
+				fs.AddFlagSet(f)
+			}
+			if err := fs.Parse(tc.flags); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := opts.Complete(&nfs); err != nil {
+				t.Fatal(err)
+			}
+
 			// use listeners instead of static ports so parallel test runs don't conflict
 			opts.SecureServing.Listener = makeListener(t)
 			defer opts.SecureServing.Listener.Close()
@@ -256,13 +268,6 @@ profiles:
 			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
 			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
 			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
-
-			for _, f := range opts.Flags().FlagSets {
-				fs.AddFlagSet(f)
-			}
-			if err := fs.Parse(tc.flags); err != nil {
-				t.Fatal(err)
-			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

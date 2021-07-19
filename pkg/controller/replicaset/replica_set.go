@@ -55,10 +55,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/utils/integer"
 )
 
@@ -112,6 +114,9 @@ func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInf
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	if err := metrics.Register(legacyregistry.Register); err != nil {
+		klog.ErrorS(err, "unable to register metrics")
+	}
 	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
@@ -802,8 +807,29 @@ func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 	if diff < len(filteredPods) {
 		podsWithRanks := getPodsRankedByRelatedPodsOnSameNode(filteredPods, relatedPods)
 		sort.Sort(podsWithRanks)
+		reportSortingDeletionAgeRatioMetric(filteredPods, diff)
 	}
 	return filteredPods[:diff]
+}
+
+func reportSortingDeletionAgeRatioMetric(filteredPods []*v1.Pod, diff int) {
+	now := time.Now()
+	youngestTime := time.Time{}
+	// first we need to check all of the ready pods to get the youngest, as they may not necessarily be sorted by timestamp alone
+	for _, pod := range filteredPods {
+		if pod.CreationTimestamp.Time.After(youngestTime) && podutil.IsPodReady(pod) {
+			youngestTime = pod.CreationTimestamp.Time
+		}
+	}
+
+	// for each pod chosen for deletion, report the ratio of its age to the youngest pod's age
+	for _, pod := range filteredPods[:diff] {
+		if !podutil.IsPodReady(pod) {
+			continue
+		}
+		ratio := float64(now.Sub(pod.CreationTimestamp.Time).Milliseconds() / now.Sub(youngestTime).Milliseconds())
+		metrics.SortingDeletionAgeRatio.Observe(ratio)
+	}
 }
 
 // getPodsRankedByRelatedPodsOnSameNode returns an ActivePodsWithRanks value

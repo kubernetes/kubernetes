@@ -29,7 +29,7 @@ import (
 
 var (
 	getClustersExample = templates.Examples(`
-		# List the clusters kubectl knows about
+		# List the clusters that kubectl knows about
 		kubectl config get-clusters`)
 )
 

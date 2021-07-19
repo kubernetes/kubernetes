@@ -55,182 +55,182 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 
 func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("Failed to create object with non-retriable error: %v ", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.ReplicationController) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *apps.Deployment) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().Deployments(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *apps.DaemonSet) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().DaemonSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Job) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.BatchV1().Jobs(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Secret) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1.ConfigMap) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.Service) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageClass) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.StorageV1().StorageClasses().Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj *v1.ResourceQuota) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.PersistentVolume) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
 
 func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace string, obj *v1.PersistentVolumeClaim) error {
 	if obj == nil {
-		return fmt.Errorf("Object provided to create is empty")
+		return fmt.Errorf("object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }

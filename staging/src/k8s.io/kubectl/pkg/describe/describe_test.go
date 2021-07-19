@@ -4066,7 +4066,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 				corev1.ResourceName(corev1.ResourceLimitsMemory):   resource.MustParse("0G"),
 				corev1.ResourceName(corev1.ResourceMemory):         resource.MustParse("0G"),
 				corev1.ResourceName(corev1.ResourceRequestsCPU):    resource.MustParse("0"),
-				corev1.ResourceName(corev1.ResourceRequestsMemory): resource.MustParse("0G"),
+				corev1.ResourceName(corev1.ResourceRequestsMemory): resource.MustParse("1000Ki"),
 			},
 		},
 	})
@@ -4076,7 +4076,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1G"}
+	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1024k", "1G"}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

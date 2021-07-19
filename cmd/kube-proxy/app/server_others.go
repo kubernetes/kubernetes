@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/events"
 
 	"k8s.io/apimachinery/pkg/fields"
 
@@ -45,14 +46,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
@@ -140,8 +140,8 @@ func newProxyServer(
 	klog.Infof("Detected node IP %s", nodeIP.String())
 
 	// Create event recorder
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "kube-proxy")
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -364,7 +364,7 @@ func newProxyServer(
 		}
 	}
 
-	useEndpointSlices := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	useEndpointSlices := true
 	if proxyMode == proxyModeUserspace {
 		// userspace mode doesn't support endpointslice.
 		useEndpointSlices = false
@@ -426,23 +426,6 @@ func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, erro
 		return n, nil
 	}
 	return nil, fmt.Errorf("event object not of type node")
-}
-
-// detectNodeIP returns the nodeIP used by the proxier
-// The order of precedence is:
-// 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
-// 2. the primary IP from the Node object, if set
-// 3. if no IP is found it defaults to 127.0.0.1 and IPv4
-func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
-	nodeIP := net.ParseIP(bindAddress)
-	if nodeIP.IsUnspecified() {
-		nodeIP = utilnode.GetNodeIP(client, hostname)
-	}
-	if nodeIP == nil {
-		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = net.ParseIP("127.0.0.1")
-	}
-	return nodeIP
 }
 
 func detectNumCPU() int {
@@ -568,22 +551,6 @@ func cidrTuple(cidrList string) [2]string {
 	}
 
 	return cidrs
-}
-
-// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
-// will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
-
-	adr := net.ParseIP(bindAddress)
-	if utilsnet.IsIPv6(adr) {
-		nodes[1] = adr
-	} else {
-		nodes[0] = adr
-	}
-
-	return nodes
 }
 
 func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {

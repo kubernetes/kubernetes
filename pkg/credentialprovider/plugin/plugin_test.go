@@ -18,12 +18,17 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/rand"
+
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
@@ -48,6 +53,7 @@ func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image string) (*credent
 }
 
 func Test_Provide(t *testing.T) {
+	tclock := clock.RealClock{}
 	testcases := []struct {
 		name           string
 		pluginProvider *pluginProvider
@@ -57,8 +63,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"test.registry.io"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -80,8 +88,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Image cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"test.registry.io/foo/bar"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io/foo/bar"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.ImagePluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -103,8 +113,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Global cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"test.registry.io"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.GlobalPluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -126,8 +138,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"*.registry.io:8080"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.registry.io:8080"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -149,8 +163,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Image cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"*.*.registry.io"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.*.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.ImagePluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -172,8 +188,10 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Global cache key",
 			pluginProvider: &pluginProvider{
-				matchImages: []string{"*.registry.io"},
-				cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					cacheKeyType: credentialproviderapi.GlobalPluginCacheKeyType,
 					auth: map[string]credentialproviderapi.AuthConfig{
@@ -195,12 +213,192 @@ func Test_Provide(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
+		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
+			t.Parallel()
 			dockerconfig := testcase.pluginProvider.Provide(testcase.image)
 			if !reflect.DeepEqual(dockerconfig, testcase.dockerconfig) {
 				t.Logf("actual docker config: %v", dockerconfig)
 				t.Logf("expected docker config: %v", testcase.dockerconfig)
 				t.Error("unexpected docker config")
+			}
+		})
+	}
+}
+
+// This test calls Provide in parallel for different registries and images
+// The purpose of this is to detect any race conditions while cache rw.
+func Test_ProvideParallel(t *testing.T) {
+	tclock := clock.RealClock{}
+
+	testcases := []struct {
+		name     string
+		registry string
+	}{
+		{
+			name:     "provide for registry 1",
+			registry: "test1.registry.io",
+		},
+		{
+			name:     "provide for registry 2",
+			registry: "test2.registry.io",
+		},
+		{
+			name:     "provide for registry 3",
+			registry: "test3.registry.io",
+		},
+		{
+			name:     "provide for registry 4",
+			registry: "test4.registry.io",
+		},
+	}
+
+	pluginProvider := &pluginProvider{
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"test1.registry.io", "test2.registry.io", "test3.registry.io", "test4.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+		plugin: &fakeExecPlugin{
+			cacheDuration: time.Minute * 1,
+			cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
+			auth: map[string]credentialproviderapi.AuthConfig{
+				"test.registry.io": {
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+	}
+
+	dockerconfig := credentialprovider.DockerConfig{
+		"test.registry.io": credentialprovider.DockerConfigEntry{
+			Username: "user",
+			Password: "password",
+		},
+	}
+
+	for _, testcase := range testcases {
+		testcase := testcase
+		t.Run(testcase.name, func(t *testing.T) {
+			t.Parallel()
+			var wg sync.WaitGroup
+			wg.Add(5)
+
+			for i := 0; i < 5; i++ {
+				go func(w *sync.WaitGroup) {
+					image := fmt.Sprintf(testcase.registry+"/%s", rand.String(5))
+					dockerconfigResponse := pluginProvider.Provide(image)
+					if !reflect.DeepEqual(dockerconfigResponse, dockerconfig) {
+						t.Logf("actual docker config: %v", dockerconfigResponse)
+						t.Logf("expected docker config: %v", dockerconfig)
+						t.Error("unexpected docker config")
+					}
+					w.Done()
+				}(&wg)
+			}
+			wg.Wait()
+
+		})
+	}
+}
+
+func Test_getCachedCredentials(t *testing.T) {
+	fakeClock := clock.NewFakeClock(time.Now())
+	p := &pluginProvider{
+		clock:          fakeClock,
+		lastCachePurge: fakeClock.Now(),
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: fakeClock}),
+		plugin:         &fakeExecPlugin{},
+	}
+
+	testcases := []struct {
+		name             string
+		step             time.Duration
+		cacheEntry       cacheEntry
+		expectedResponse credentialprovider.DockerConfig
+		keyLength        int
+		getKey           string
+	}{
+		{
+			name:      "It should return not expired credential",
+			step:      1 * time.Second,
+			keyLength: 1,
+			getKey:    "image1",
+			expectedResponse: map[string]credentialprovider.DockerConfigEntry{
+				"image1": {
+					Username: "user1",
+					Password: "pass1",
+				},
+			},
+			cacheEntry: cacheEntry{
+				key:       "image1",
+				expiresAt: fakeClock.Now().Add(1 * time.Minute),
+				credentials: map[string]credentialprovider.DockerConfigEntry{
+					"image1": {
+						Username: "user1",
+						Password: "pass1",
+					},
+				},
+			},
+		},
+
+		{
+			name:      "It should not return expired credential",
+			step:      2 * time.Minute,
+			getKey:    "image2",
+			keyLength: 1,
+			cacheEntry: cacheEntry{
+				key:       "image2",
+				expiresAt: fakeClock.Now(),
+				credentials: map[string]credentialprovider.DockerConfigEntry{
+					"image2": {
+						Username: "user2",
+						Password: "pass2",
+					},
+				},
+			},
+		},
+
+		{
+			name:      "It should delete expired credential during purge",
+			step:      18 * time.Minute,
+			keyLength: 0,
+			// while get call for random, cache purge will be called and it will delete expired
+			// image3 credentials. We cannot use image3 as getKey here, as it will get deleted during
+			// get only, we will not be able verify the purge call.
+			getKey: "random",
+			cacheEntry: cacheEntry{
+				key:       "image3",
+				expiresAt: fakeClock.Now().Add(2 * time.Minute),
+				credentials: map[string]credentialprovider.DockerConfigEntry{
+					"image3": {
+						Username: "user3",
+						Password: "pass3",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			p.cache.Add(&tc.cacheEntry)
+			fakeClock.Step(tc.step)
+
+			// getCachedCredentials returns unexpired credentials.
+			res, _, err := p.getCachedCredentials(tc.getKey)
+			if err != nil {
+				t.Errorf("Unexpected error %v", err)
+			}
+			if !reflect.DeepEqual(res, tc.expectedResponse) {
+				t.Logf("response %v", res)
+				t.Logf("expected response %v", tc.expectedResponse)
+				t.Errorf("Unexpected response")
+			}
+
+			// Listkeys returns all the keys present in cache including expired keys.
+			if len(p.cache.ListKeys()) != tc.keyLength {
+				t.Errorf("Unexpected cache key length")
 			}
 		})
 	}
@@ -316,9 +514,12 @@ func Test_decodeResponse(t *testing.T) {
 }
 
 func Test_RegistryCacheKeyType(t *testing.T) {
+	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
-		matchImages: []string{"*.registry.io"},
-		cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"*.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
 			cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
 			cacheDuration: time.Hour,
@@ -366,9 +567,12 @@ func Test_RegistryCacheKeyType(t *testing.T) {
 }
 
 func Test_ImageCacheKeyType(t *testing.T) {
+	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
-		matchImages: []string{"*.registry.io"},
-		cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"*.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
 			cacheKeyType:  credentialproviderapi.ImagePluginCacheKeyType,
 			cacheDuration: time.Hour,
@@ -416,9 +620,12 @@ func Test_ImageCacheKeyType(t *testing.T) {
 }
 
 func Test_GlobalCacheKeyType(t *testing.T) {
+	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
-		matchImages: []string{"*.registry.io"},
-		cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"*.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
 			cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
 			cacheDuration: time.Hour,
@@ -466,9 +673,12 @@ func Test_GlobalCacheKeyType(t *testing.T) {
 }
 
 func Test_NoCacheResponse(t *testing.T) {
+	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
-		matchImages: []string{"*.registry.io"},
-		cache:       cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{}),
+		clock:          tclock,
+		lastCachePurge: tclock.Now(),
+		matchImages:    []string{"*.registry.io"},
+		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
 			cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
 			cacheDuration: 0, // no cache

@@ -34,8 +34,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/purell"
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,14 +47,12 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
+
+	"github.com/PuerkitoBio/purell"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -833,9 +835,6 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	policy := ipc.imagePullPolicy
-	if len(policy) == 0 {
-		policy = v1.PullIfNotPresent // Default behavior if the policy is unset
-	}
 	klog.V(1).Infof("using image pull policy: %s", policy)
 	for _, image := range ipc.imageList {
 		switch policy {

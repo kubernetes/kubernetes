@@ -32,6 +32,7 @@ var PluginsV1beta1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.NodeResourcesFit},
 			{Name: names.NodePorts},
+			{Name: names.VolumeRestrictions},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
@@ -102,6 +103,61 @@ var PluginsV1beta1 = &config.Plugins{
 	},
 }
 
+// PluginConfigsV1beta1 default plugin configurations. This could get versioned, but since
+// all available versions produce the same defaults, we just have one for now.
+var PluginConfigsV1beta1 = []config.PluginConfig{
+	{
+		Name: "DefaultPreemption",
+		Args: &config.DefaultPreemptionArgs{
+			MinCandidateNodesPercentage: 10,
+			MinCandidateNodesAbsolute:   100,
+		},
+	},
+	{
+		Name: "InterPodAffinity",
+		Args: &config.InterPodAffinityArgs{
+			HardPodAffinityWeight: 1,
+		},
+	},
+	{
+		Name: "NodeAffinity",
+		Args: &config.NodeAffinityArgs{},
+	},
+	{
+		Name: "NodeResourcesBalancedAllocation",
+		Args: &config.NodeResourcesBalancedAllocationArgs{
+			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		},
+	},
+	{
+		Name: "NodeResourcesFit",
+		Args: &config.NodeResourcesFitArgs{
+			ScoringStrategy: &config.ScoringStrategy{
+				Type:      config.LeastAllocated,
+				Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+			},
+		},
+	},
+	{
+		Name: "NodeResourcesLeastAllocated",
+		Args: &config.NodeResourcesLeastAllocatedArgs{
+			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		},
+	},
+	{
+		Name: "PodTopologySpread",
+		Args: &config.PodTopologySpreadArgs{
+			DefaultingType: config.SystemDefaulting,
+		},
+	},
+	{
+		Name: "VolumeBinding",
+		Args: &config.VolumeBindingArgs{
+			BindTimeoutSeconds: 600,
+		},
+	},
+}
+
 // PluginsV1beta2 default set of v1beta2 plugins.
 var PluginsV1beta2 = &config.Plugins{
 	QueueSort: config.PluginSet{
@@ -113,6 +169,7 @@ var PluginsV1beta2 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.NodeResourcesFit},
 			{Name: names.NodePorts},
+			{Name: names.VolumeRestrictions},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
@@ -156,7 +213,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.InterPodAffinity, Weight: 1},
-			{Name: names.NodeResourcesLeastAllocated, Weight: 1},
+			{Name: names.NodeResourcesFit, Weight: 1},
 			{Name: names.NodeAffinity, Weight: 1},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
@@ -182,9 +239,9 @@ var PluginsV1beta2 = &config.Plugins{
 	},
 }
 
-// PluginConfigs default plugin configurations. This could get versioned, but since
+// PluginConfigsV1beta2 default plugin configurations. This could get versioned, but since
 // all available versions produce the same defaults, we just have one for now.
-var PluginConfigs = []config.PluginConfig{
+var PluginConfigsV1beta2 = []config.PluginConfig{
 	{
 		Name: "DefaultPreemption",
 		Args: &config.DefaultPreemptionArgs{
@@ -203,13 +260,18 @@ var PluginConfigs = []config.PluginConfig{
 		Args: &config.NodeAffinityArgs{},
 	},
 	{
-		Name: "NodeResourcesFit",
-		Args: &config.NodeResourcesFitArgs{},
+		Name: "NodeResourcesBalancedAllocation",
+		Args: &config.NodeResourcesBalancedAllocationArgs{
+			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		},
 	},
 	{
-		Name: "NodeResourcesLeastAllocated",
-		Args: &config.NodeResourcesLeastAllocatedArgs{
-			Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		Name: "NodeResourcesFit",
+		Args: &config.NodeResourcesFitArgs{
+			ScoringStrategy: &config.ScoringStrategy{
+				Type:      config.LeastAllocated,
+				Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+			},
 		},
 	},
 	{

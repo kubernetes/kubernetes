@@ -5117,6 +5117,7 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.DataSource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
+	out.DataSourceRef = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
 	return nil
 }
 
@@ -5135,6 +5136,7 @@ func autoConvert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.DataSource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
+	out.DataSourceRef = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
 	return nil
 }
 

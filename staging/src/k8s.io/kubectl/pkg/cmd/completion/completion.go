@@ -60,7 +60,7 @@ var (
         for windows:
         https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/#enable-shell-autocompletion
 
-		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`))
+		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2.`))
 
 	completionExample = templates.Examples(i18n.T(`
 		# Installing bash completion on macOS using homebrew
@@ -68,13 +68,13 @@ var (
 		    brew install bash-completion
 		## or, if running Bash 4.1+
 		    brew install bash-completion@2
-		## If kubectl is installed via homebrew, this should start working immediately.
+		## If kubectl is installed via homebrew, this should start working immediately
 		## If you've installed via other means, you may need add the completion to your completion directory
 		    kubectl completion bash > $(brew --prefix)/etc/bash_completion.d/kubectl
 
 
 		# Installing bash completion on Linux
-		## If bash-completion is not installed on Linux, please install the 'bash-completion' package
+		## If bash-completion is not installed on Linux, install the 'bash-completion' package
 		## via your distribution's package manager.
 		## Load the kubectl completion code for bash into the current shell
 		    source <(kubectl completion bash)

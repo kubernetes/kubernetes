@@ -485,7 +485,14 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
 	})
 
-	ginkgo.It("should validate Deployment Status endpoints", func() {
+	/*
+		Release: v1.22
+		Testname: Deployment, status sub-resource
+		Description: When a Deployment is created it MUST succeed.
+		Attempt to read, update and patch its status sub-resource; all
+		mutating sub-resource operations MUST be visible to subsequent reads.
+	*/
+	framework.ConformanceIt("should validate Deployment Status endpoints", func() {
 		dClient := c.AppsV1().Deployments(ns)
 		dName := "test-deployment-" + utilrand.String(5)
 		labelSelector := "e2e=testing"

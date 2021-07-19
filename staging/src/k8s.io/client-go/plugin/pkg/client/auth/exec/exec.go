@@ -35,15 +35,15 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/term"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/clock"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
-	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
-	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
+	"k8s.io/client-go/pkg/apis/clientauthentication/install"
+	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
+	clientauthenticationv1alpha1 "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
+	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
@@ -63,10 +63,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 func init() {
-	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(v1beta1.AddToScheme(scheme))
-	utilruntime.Must(clientauthentication.AddToScheme(scheme))
+	install.Install(scheme)
 }
 
 var (
@@ -75,8 +72,9 @@ var (
 	globalCache = newCache()
 	// The list of API versions we accept.
 	apiVersions = map[string]schema.GroupVersion{
-		v1alpha1.SchemeGroupVersion.String(): v1alpha1.SchemeGroupVersion,
-		v1beta1.SchemeGroupVersion.String():  v1beta1.SchemeGroupVersion,
+		clientauthenticationv1alpha1.SchemeGroupVersion.String(): clientauthenticationv1alpha1.SchemeGroupVersion,
+		clientauthenticationv1beta1.SchemeGroupVersion.String():  clientauthenticationv1beta1.SchemeGroupVersion,
+		clientauthenticationv1.SchemeGroupVersion.String():       clientauthenticationv1.SchemeGroupVersion,
 	}
 )
 

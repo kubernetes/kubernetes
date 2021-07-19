@@ -7,7 +7,7 @@ recursive-delete-patterns:
 - BUILD.bazel
 - "*/BUILD.bazel"
 - Gopkg.toml
-default-go-version: 1.16.5
+default-go-version: 1.16.6
 rules:
 - destination: code-generator
   branches:
@@ -1469,3 +1469,14 @@ rules:
       branch: master
       dir: staging/src/k8s.io/pod-security-admission
     name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: apiserver
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master

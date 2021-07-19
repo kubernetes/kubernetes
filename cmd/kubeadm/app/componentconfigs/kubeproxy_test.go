@@ -21,19 +21,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
-	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
+
+	"github.com/lithammer/dedent"
 )
 
 func testKubeProxyConfigMap(contents string) *v1.ConfigMap {

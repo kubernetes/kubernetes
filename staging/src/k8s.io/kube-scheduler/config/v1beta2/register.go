@@ -40,11 +40,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KubeSchedulerConfiguration{},
 		&DefaultPreemptionArgs{},
 		&InterPodAffinityArgs{},
+		&NodeResourcesBalancedAllocationArgs{},
 		&NodeResourcesFitArgs{},
 		&PodTopologySpreadArgs{},
-		&RequestedToCapacityRatioArgs{},
-		&NodeResourcesLeastAllocatedArgs{},
-		&NodeResourcesMostAllocatedArgs{},
 		&VolumeBindingArgs{},
 		&NodeAffinityArgs{},
 	)

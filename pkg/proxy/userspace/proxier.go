@@ -26,14 +26,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -231,7 +234,11 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 
 	err = setRLimit(64 * 1000)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletInUserNamespace) && libcontaineruserns.RunningInUserNS() {
+			klog.V(2).InfoS("Failed to set open file handler limit to 64000 (running in UserNS, ignoring)", "err", err)
+		} else {
+			return nil, fmt.Errorf("failed to set open file handler limit to 64000: %w", err)
+		}
 	}
 
 	proxyPorts := newPortAllocator(pr)

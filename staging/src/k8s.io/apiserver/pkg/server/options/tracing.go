@@ -35,7 +35,7 @@ import (
 	"k8s.io/utils/path"
 )
 
-const apiserverService = "kube-apiserver"
+const apiserverService = "apiserver"
 
 // TracingOptions contain configuration options for tracing
 // exporters
@@ -106,6 +106,9 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	}
 	tp := traces.NewProvider(context.Background(), sampler, resourceOpts, opts...)
 	c.TracerProvider = &tp
+	if c.LoopbackClientConfig != nil {
+		c.LoopbackClientConfig.Wrap(traces.WrapperFor(c.TracerProvider))
+	}
 	return nil
 }
 

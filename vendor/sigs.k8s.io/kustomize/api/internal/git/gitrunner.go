@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/internal/utils"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // gitRunner runs the external git binary.

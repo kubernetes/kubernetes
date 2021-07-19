@@ -212,7 +212,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.3"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-1"}
 	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
-	configs[CudaVectorAdd] = Config{list.E2eRegistry, "cuda-vector-add", "1.0"}
+	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.5"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.3"}

@@ -71,7 +71,7 @@ var (
 
 		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
 		TYPE is a Kubernetes resource. Shortcuts and groups will be resolved.
-		NONRESOURCEURL is a partial URL starts with "/".
+		NONRESOURCEURL is a partial URL that starts with "/".
 		NAME is the name of a particular Kubernetes resource.`)
 
 	canIExample = templates.Examples(`

@@ -544,7 +544,7 @@ func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (strin
 	return "", nil
 }
 
-func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	attacher.pluginLock.Lock()
 	defer attacher.pluginLock.Unlock()
 	if spec == nil {

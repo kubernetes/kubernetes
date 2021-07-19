@@ -69,11 +69,25 @@ var pluginConfigs = []v1beta1.PluginConfig{
 		}},
 	},
 	{
+		Name: "NodeResourcesBalancedAllocation",
+		Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesBalancedAllocationArgs{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "NodeResourcesBalancedAllocationArgs",
+				APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+			},
+			Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		}},
+	},
+	{
 		Name: "NodeResourcesFit",
 		Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesFitArgs{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "NodeResourcesFitArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+			},
+			ScoringStrategy: &v1beta1.ScoringStrategy{
+				Type:      v1beta1.LeastAllocated,
+				Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 			},
 		}},
 	},
@@ -277,11 +291,25 @@ func TestSchedulerDefaults(t *testing.T) {
 								}},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesBalancedAllocationArgs{
+									TypeMeta: metav1.TypeMeta{
+										Kind:       "NodeResourcesBalancedAllocationArgs",
+										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+									},
+									Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								}},
+							},
+							{
 								Name: "NodeResourcesFit",
 								Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesFitArgs{
 									TypeMeta: metav1.TypeMeta{
 										Kind:       "NodeResourcesFitArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+									},
+									ScoringStrategy: &v1beta1.ScoringStrategy{
+										Type:      v1beta1.LeastAllocated,
+										Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 									},
 								}},
 							},
@@ -329,6 +357,7 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []v1beta1.Plugin{
 									{Name: names.NodeResourcesFit},
 									{Name: names.NodePorts},
+									{Name: names.VolumeRestrictions},
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
@@ -629,6 +658,60 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
+			name: "NodeResourcesBalancedAllocationArgs resources empty",
+			in:   &v1beta1.NodeResourcesBalancedAllocationArgs{},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs with scalar resource",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs with mixed resources",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs have resource no weight",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU)},
+					{Name: "scalar.io/scalar0"},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar0", Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+		},
+		{
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
@@ -666,6 +749,54 @@ func TestPluginArgsDefaults(t *testing.T) {
 			in: &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
 				DefaultingType: v1beta1.ListDefaulting,
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs not set",
+			in:   &v1beta1.NodeResourcesFitArgs{},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs Resources empty",
+			in: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type: v1beta1.MostAllocated,
+				},
+			},
+			want: &v1beta1.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta1.ScoringStrategy{
+					Type:      v1beta1.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority disabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+			},
+		},
+		{
+			name: "VolumeBindingArgs empty, VolumeCapacityPriority enabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			in: &v1beta1.VolumeBindingArgs{},
+			want: &v1beta1.VolumeBindingArgs{
+				BindTimeoutSeconds: pointer.Int64Ptr(600),
+				Shape: []v1beta1.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
 			},
 		},
 	}

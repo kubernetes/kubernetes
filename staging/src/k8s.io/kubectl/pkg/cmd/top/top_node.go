@@ -55,7 +55,7 @@ type TopNodeOptions struct {
 
 var (
 	topNodeLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory) usage of nodes.
+		Display resource (CPU/memory) usage of nodes.
 
 		The top-node command allows you to see the resource consumption of nodes.`))
 
@@ -78,7 +78,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd := &cobra.Command{
 		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory) usage of nodes"),
+		Short:                 i18n.T("Display resource (CPU/memory) usage of nodes"),
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
 		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),

@@ -24,11 +24,11 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -51,7 +51,7 @@ type EndpointSliceCache struct {
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
 	ipFamily         v1.IPFamily
-	recorder         record.EventRecorder
+	recorder         events.EventRecorder
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -76,11 +76,11 @@ type endpointSliceInfo struct {
 
 // endpointInfo contains just the attributes kube-proxy cares about.
 // Used for caching. Intentionally small to limit memory util.
-// Addresses and Topology are copied from EndpointSlice Endpoints.
+// Addresses, NodeName, and Zone are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
-	Topology  map[string]string
+	Zone      *string
 	ZoneHints sets.String
 
 	Ready       bool
@@ -93,7 +93,7 @@ type endpointInfo struct {
 type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
@@ -130,15 +130,14 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 		for _, endpoint := range endpointSlice.Endpoints {
 			epInfo := &endpointInfo{
 				Addresses: endpoint.Addresses,
-				Topology:  endpoint.Topology,
+				Zone:      endpoint.Zone,
+				NodeName:  endpoint.NodeName,
 
 				// conditions
 				Ready:       endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready,
 				Serving:     endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving,
 				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
-
-			epInfo.NodeName = endpoint.NodeName
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
@@ -281,13 +280,18 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 		}
 
 		isLocal := false
+		nodeName := ""
 		if endpoint.NodeName != nil {
 			isLocal = cache.isLocal(*endpoint.NodeName)
-		} else {
-			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
+			nodeName = *endpoint.NodeName
 		}
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology,
+		zone := ""
+		if endpoint.Zone != nil {
+			zone = *endpoint.Zone
+		}
+
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], nodeName, zone, portNum, isLocal,
 			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints

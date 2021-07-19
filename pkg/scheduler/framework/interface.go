@@ -23,6 +23,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -104,6 +105,30 @@ const (
 	// MaxTotalScore is the maximum total score.
 	MaxTotalScore int64 = math.MaxInt64
 )
+
+// PodsToActivateKey is a reserved state key for stashing pods.
+// If the stashed pods are present in unschedulableQ or backoffQ，they will be
+// activated (i.e., moved to activeQ) in two phases:
+// - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
+// - end of a binding cycle if it succeeds
+var PodsToActivateKey StateKey = "kubernetes.io/pods-to-activate"
+
+// PodsToActivate stores pods to be activated.
+type PodsToActivate struct {
+	sync.Mutex
+	// Map is keyed with namespaced pod name, and valued with the pod.
+	Map map[string]*v1.Pod
+}
+
+// Clone just returns the same state.
+func (s *PodsToActivate) Clone() StateData {
+	return s
+}
+
+// NewPodsToActivate instantiates a PodsToActivate object.
+func NewPodsToActivate() *PodsToActivate {
+	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
 
 // Status indicates the result of running a plugin. It consists of a code, a
 // message, (optionally) an error and an plugin name it fails by. When the status

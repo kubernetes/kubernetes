@@ -181,7 +181,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		c := &pod.Spec.Containers[i]
 		if c.ImagePullPolicy == v1.PullAlways {
 			// If the image pull policy is PullAlways, the image doesn't need to be in
-			// the white list or pre-pulled, because the image is expected to be pulled
+			// the allow list or pre-pulled, because the image is expected to be pulled
 			// in the test anyway.
 			continue
 		}

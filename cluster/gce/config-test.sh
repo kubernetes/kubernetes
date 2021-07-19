@@ -212,7 +212,7 @@ HEAPSTER_MACHINE_TYPE=${HEAPSTER_MACHINE_TYPE:-}
 NUM_ADDITIONAL_NODES=${NUM_ADDITIONAL_NODES:-}
 ADDITIONAL_MACHINE_TYPE=${ADDITIONAL_MACHINE_TYPE:-}
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.0-rc.0-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.0-0) if you need
 # non-default version.
 export ETCD_IMAGE=${TEST_ETCD_IMAGE:-}
 export ETCD_DOCKER_REPOSITORY=${TEST_ETCD_DOCKER_REPOSITORY:-}
@@ -235,6 +235,10 @@ TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}
 
 # ContentType used by all components to communicate with apiserver.
 TEST_CLUSTER_API_CONTENT_TYPE=${TEST_CLUSTER_API_CONTENT_TYPE:-}
+
+# Enable debug handlers (port forwarding, exec, container logs, etc.).
+KUBELET_ENABLE_DEBUGGING_HANDLERS=${KUBELET_ENABLE_DEBUGGING_HANDLERS:-true}
+MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS=${MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS:-${KUBELET_ENABLE_DEBUGGING_HANDLERS}}
 
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
 if [[ "${NODE_OS_DISTRIBUTION}" = 'gci' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'ubuntu' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'custom' ]]; then

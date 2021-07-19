@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-var kindWhiteList = sets.NewString(
+var kindAllowList = sets.NewString(
 	// k8s.io/api/core
 	"APIGroup",
 	"APIVersions",
@@ -187,7 +187,7 @@ func TestServerSidePrint(t *testing.T) {
 		if gvk.Version == runtime.APIVersionInternal || strings.HasSuffix(apiType.Name(), "List") {
 			continue
 		}
-		if kindWhiteList.Has(gvk.Kind) || missingHanlders.Has(gvk.Kind) {
+		if kindAllowList.Has(gvk.Kind) || missingHanlders.Has(gvk.Kind) {
 			continue
 		}
 

@@ -116,7 +116,7 @@ type execPluginClientTestData struct {
 }
 
 func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byte, clientAuthorizedToken, clientCertFileName, clientKeyFileName string) []execPluginClientTestData {
-	return []execPluginClientTestData{
+	v1Tests := []execPluginClientTestData{
 		{
 			name: "unauthorized token",
 			clientConfigFunc: func(c *rest.Config) {
@@ -125,7 +125,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: `{
 										"kind": "ExecCredential",
-										"apiVersion": "client.authentication.k8s.io/v1beta1",
+										"apiVersion": "client.authentication.k8s.io/v1",
 										"status": {
 											"token": "unauthorized"
 										}
@@ -152,7 +152,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"clientCertificateData": %q,
 								"clientKeyData": %q
@@ -180,7 +180,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 						"kind": "ExecCredential",
-						"apiVersion": "client.authentication.k8s.io/v1beta1",
+						"apiVersion": "client.authentication.k8s.io/v1",
 						"status": {
 							"token": "%s"
 						}
@@ -200,7 +200,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"clientCertificateData": %s,
 								"clientKeyData": %s
@@ -221,7 +221,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s",
 								"clientCertificateData": %s,
@@ -243,7 +243,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s",
 								"clientCertificateData": %s,
@@ -265,7 +265,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s",
 								"clientCertificateData": %q,
@@ -287,7 +287,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s",
 								"clientCertificateData": %q,
@@ -316,7 +316,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s"
 							}
@@ -338,7 +338,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s"
 							}
@@ -361,7 +361,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": "%s"
 							}
@@ -391,7 +391,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			},
 			wantGetCertificateErrorPrefix: "exec: fork/exec ./testdata/exec-plugin-not-executable.sh: permission denied",
 			wantClientErrorPrefix:         `Get "https`,
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "client_internal_error"}}},
+			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 1, callStatus: "plugin_not_found_error"}}},
 		},
 		{
 			name: "binary fails",
@@ -408,6 +408,30 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 10, callStatus: "plugin_execution_error"}}},
 		},
 	}
+	return append(v1Tests, v1beta1TestsFromV1Tests(v1Tests)...)
+}
+
+func v1beta1TestsFromV1Tests(v1Tests []execPluginClientTestData) []execPluginClientTestData {
+	v1beta1Tests := make([]execPluginClientTestData, 0, len(v1Tests))
+	for _, v1Test := range v1Tests {
+		v1Test := v1Test
+
+		v1beta1Test := v1Test
+		v1beta1Test.name = fmt.Sprintf("%s v1beta1", v1Test.name)
+		v1beta1Test.clientConfigFunc = func(c *rest.Config) {
+			v1Test.clientConfigFunc(c)
+			c.ExecProvider.APIVersion = "client.authentication.k8s.io/v1beta1"
+			for j, oldOutputEnvVar := range c.ExecProvider.Env {
+				if oldOutputEnvVar.Name == outputEnvVar {
+					c.ExecProvider.Env[j].Value = strings.Replace(oldOutputEnvVar.Value, "client.authentication.k8s.io/v1", "client.authentication.k8s.io/v1beta1", 1)
+					break
+				}
+			}
+		}
+
+		v1beta1Tests = append(v1beta1Tests, v1beta1Test)
+	}
+	return v1beta1Tests
 }
 
 func TestExecPluginViaClient(t *testing.T) {
@@ -428,9 +452,8 @@ func TestExecPluginViaClient(t *testing.T) {
 			var authorizationHeaderValues syncedHeaderValues
 			clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
-				Command: "testdata/exec-plugin.sh",
-				// TODO(ankeesler): move to v1 once exec plugins go GA.
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				Command:    "testdata/exec-plugin.sh",
+				APIVersion: "client.authentication.k8s.io/v1",
 				Args: []string{
 					// If we didn't have this arg, then some metrics assertions might fail because
 					// the authenticator may be pulled from a globalCache and therefore it may have
@@ -620,7 +643,7 @@ func TestExecPluginViaInformer(t *testing.T) {
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"token": %q
 							}
@@ -637,7 +660,7 @@ func TestExecPluginViaInformer(t *testing.T) {
 						Name: outputEnvVar,
 						Value: fmt.Sprintf(`{
 							"kind": "ExecCredential",
-							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"apiVersion": "client.authentication.k8s.io/v1",
 							"status": {
 								"clientCertificateData": %s,
 								"clientKeyData": %s
@@ -652,9 +675,8 @@ func TestExecPluginViaInformer(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
-				Command: "testdata/exec-plugin.sh",
-				// TODO(ankeesler): move to v1 once exec plugins go GA.
-				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				Command:         "testdata/exec-plugin.sh",
+				APIVersion:      "client.authentication.k8s.io/v1",
 				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			}
 
@@ -687,9 +709,8 @@ func newExecPlugin(t *testing.T) *execPlugin {
 
 func (e *execPlugin) config() *clientcmdapi.ExecConfig {
 	return &clientcmdapi.ExecConfig{
-		Command: "testdata/exec-plugin.sh",
-		// TODO(ankeesler): move to v1 once exec plugins go GA.
-		APIVersion:      "client.authentication.k8s.io/v1beta1",
+		Command:         "testdata/exec-plugin.sh",
+		APIVersion:      "client.authentication.k8s.io/v1",
 		InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		Env: []clientcmdapi.ExecEnvVar{
 			{
@@ -706,7 +727,7 @@ func (e *execPlugin) rotateToken(newToken string, lifetime time.Duration) {
 	expirationTimestamp := metav1.NewTime(time.Now().Add(lifetime)).Format(time.RFC3339Nano)
 	newOutput := fmt.Sprintf(`{
 		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1beta1",
+		"apiVersion": "client.authentication.k8s.io/v1",
 		"status": {
 			"expirationTimestamp": %q,
 			"token": %q
@@ -994,9 +1015,8 @@ func TestExecPluginGlobalCache(t *testing.T) {
 			t.Run(test.name+" "+suffix, func(t *testing.T) {
 				clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 				clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
-					Command: "testdata/exec-plugin.sh",
-					// TODO(ankeesler): move to v1 once exec plugins go GA.
-					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Command:    "testdata/exec-plugin.sh",
+					APIVersion: "client.authentication.k8s.io/v1",
 					Args: []string{
 						// carefully control what the global cache sees as the same exec plugin
 						"--random-arg-to-avoid-authenticator-cache-hits",

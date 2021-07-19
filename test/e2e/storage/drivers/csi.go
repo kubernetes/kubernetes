@@ -235,6 +235,9 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 			// testsuites/volumelimits.go `should support volume limits`
 			// test.
 			"--maxvolumespernode=10",
+			// Enable volume lifecycle checks, to report failure if
+			// the volume is not unpublished / unstaged correctly.
+			"--check-volume-lifecycle=true",
 		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",

@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -269,6 +271,23 @@ func validateResources(resources []config.ResourceSpec, p *field.Path) field.Err
 	return allErrs
 }
 
+// ValidateNodeResourcesBalancedAllocationArgs validates that NodeResourcesBalancedAllocationArgs are set correctly.
+func ValidateNodeResourcesBalancedAllocationArgs(path *field.Path, args *config.NodeResourcesBalancedAllocationArgs) error {
+	var allErrs field.ErrorList
+	seenResources := sets.NewString()
+	for i, resource := range args.Resources {
+		if seenResources.Has(resource.Name) {
+			allErrs = append(allErrs, field.Duplicate(path.Child("resources").Index(i).Child("name"), resource.Name))
+		} else {
+			seenResources.Insert(resource.Name)
+		}
+		if resource.Weight != 1 {
+			allErrs = append(allErrs, field.Invalid(path.Child("resources").Index(i).Child("weight"), resource.Weight, "must be 1"))
+		}
+	}
+	return allErrs.ToAggregate()
+}
+
 // ValidateNodeAffinityArgs validates that NodeAffinityArgs are correct.
 func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) error {
 	if args.AddedAffinity == nil {
@@ -294,13 +313,21 @@ func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) e
 
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
-	var err error
+	var allErrs field.ErrorList
 
 	if args.BindTimeoutSeconds < 0 {
-		err = field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value")
+		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
 	}
 
-	return err
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
+	} else if args.Shape != nil {
+		// When the feature is off, return an error if the config is not nil.
+		// This prevents unexpected configuration from taking effect when the
+		// feature turns on in the future.
+		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate VolumeCapacityPriority"))
+	}
+	return allErrs.ToAggregate()
 }
 
 func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs) error {
@@ -321,6 +348,13 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 		}
 		if errs := metav1validation.ValidateLabelName(group, path); len(errs) != 0 {
 			allErrs = append(allErrs, errs...)
+		}
+	}
+
+	if args.ScoringStrategy != nil {
+		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, path.Child("resources"))...)
+		if args.ScoringStrategy.RequestedToCapacityRatio != nil && len(args.ScoringStrategy.RequestedToCapacityRatio.Shape) > 0 {
+			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, path.Child("shape"))...)
 		}
 	}
 

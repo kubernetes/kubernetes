@@ -39,15 +39,15 @@ import (
 
 var (
 	pdbLong = templates.LongDesc(i18n.T(`
-		Create a pod disruption budget with the specified name, selector, and desired minimum available pods`))
+		Create a pod disruption budget with the specified name, selector, and desired minimum available pods.`))
 
 	pdbExample = templates.Examples(i18n.T(`
 		# Create a pod disruption budget named my-pdb that will select all pods with the app=rails label
-		# and require at least one of them being available at any point in time.
+		# and require at least one of them being available at any point in time
 		kubectl create poddisruptionbudget my-pdb --selector=app=rails --min-available=1
 
 		# Create a pod disruption budget named my-pdb that will select all pods with the app=nginx label
-		# and require at least half of the pods selected to be available at any point in time.
+		# and require at least half of the pods selected to be available at any point in time
 		kubectl create pdb my-pdb --selector=app=nginx --min-available=50%`))
 )
 
@@ -92,7 +92,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericcliopti
 		Use:                   "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pdb"},
-		Short:                 i18n.T("Create a pod disruption budget with the specified name."),
+		Short:                 i18n.T("Create a pod disruption budget with the specified name"),
 		Long:                  pdbLong,
 		Example:               pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {

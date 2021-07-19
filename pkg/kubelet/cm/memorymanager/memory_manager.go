@@ -193,6 +193,19 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 	defer m.Unlock()
 
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
+
+	// Since we know that each init container always runs to completion before
+	// the next container starts, we can safely remove references to any previously
+	// started init containers. This will free up the memory from these init containers
+	// for use in other pods. If the current container happens to be an init container,
+	// we skip deletion of it until the next container is added, and this is called again.
+	for _, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name == container.Name {
+			break
+		}
+
+		m.policyRemoveContainerByRef(string(pod.UID), initContainer.Name)
+	}
 }
 
 // GetMemoryNUMANodes provides NUMA nodes that used to allocate the container memory
@@ -243,11 +256,7 @@ func (m *manager) RemoveContainer(containerID string) error {
 		return nil
 	}
 
-	err = m.policyRemoveContainerByRef(podUID, containerName)
-	if err != nil {
-		klog.ErrorS(err, "RemoveContainer error")
-		return err
-	}
+	m.policyRemoveContainerByRef(podUID, containerName)
 
 	return nil
 }
@@ -308,22 +317,15 @@ func (m *manager) removeStaleState() {
 		for containerName := range assignments[podUID] {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
 				klog.InfoS("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
-				err := m.policyRemoveContainerByRef(podUID, containerName)
-				if err != nil {
-					klog.ErrorS(err, "RemoveStaleState: failed to remove state", "podUID", podUID, "containerName", containerName)
-				}
+				m.policyRemoveContainerByRef(podUID, containerName)
 			}
 		}
 	}
 }
 
-func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) error {
-	err := m.policy.RemoveContainer(m.state, podUID, containerName)
-	if err == nil {
-		m.containerMap.RemoveByContainerRef(podUID, containerName)
-	}
-
-	return err
+func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) {
+	m.policy.RemoveContainer(m.state, podUID, containerName)
+	m.containerMap.RemoveByContainerRef(podUID, containerName)
 }
 
 func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory []kubeletconfig.MemoryReservation) (map[v1.ResourceName]resource.Quantity, error) {

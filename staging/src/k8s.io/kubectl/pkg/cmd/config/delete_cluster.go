@@ -40,7 +40,7 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Use:                   "delete-cluster NAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete the specified cluster from the kubeconfig"),
-		Long:                  i18n.T("Delete the specified cluster from the kubeconfig"),
+		Long:                  i18n.T("Delete the specified cluster from the kubeconfig."),
 		Example:               deleteClusterExample,
 		ValidArgsFunction:     util.ClusterCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {

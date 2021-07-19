@@ -425,6 +425,26 @@ func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeNam
 	return podObj.volumeMountStateForPod
 }
 
+func (asw *actualStateOfWorld) IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return false
+	}
+
+	for _, podObj := range volumeObj.mountedPods {
+		if podName != podObj.podName {
+			// Treat uncertain mount state as mounted until certain.
+			if podObj.volumeMountStateForPod != operationexecutor.VolumeNotMounted {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // addVolume adds the given volume to the cache indicating the specified
 // volume is attached to this node. If no volume name is supplied, a unique
 // volume name is generated from the volumeSpec and returned on success. If a

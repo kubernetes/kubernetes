@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -58,7 +59,10 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
 	// we may want to set memory capacity.
-	machineInfo := &cadvisorapi.MachineInfo{}
+	memoryCapacityQuantity := resource.MustParse(fakeNodeAllocatableMemory)
+	machineInfo := &cadvisorapi.MachineInfo{
+		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
+	}
 	osInterface := &containertest.FakeOS{}
 	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
 	return fakeRuntimeService, fakeImageService, manager, err
@@ -66,10 +70,12 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 
 // sandboxTemplate is a sandbox template to create fake sandbox.
 type sandboxTemplate struct {
-	pod       *v1.Pod
-	attempt   uint32
-	createdAt int64
-	state     runtimeapi.PodSandboxState
+	pod         *v1.Pod
+	attempt     uint32
+	createdAt   int64
+	state       runtimeapi.PodSandboxState
+	running     bool
+	terminating bool
 }
 
 // containerTemplate is a container template to create fake container.
@@ -1397,6 +1403,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	m.podStateProvider.(*fakePodStateProvider).removed = map[types.UID]struct{}{pod.UID: {}}
 
 	// GetPodStatus and the following SyncPod will not return errors in the
 	// case where the pod has been deleted. We are not adding any pods into

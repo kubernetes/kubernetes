@@ -362,6 +362,14 @@ func addAllEventHandlers(
 			informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 				buildEvtResHandler(at, framework.CSINode, "CSINode"),
 			)
+		case framework.CSIDriver:
+			informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver"),
+			)
+		case framework.CSIStorageCapacity:
+			informerFactory.Storage().V1beta1().CSIStorageCapacities().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity"),
+			)
 		case framework.PersistentVolume:
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			//
@@ -389,6 +397,15 @@ func addAllEventHandlers(
 				informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 					cache.ResourceEventHandlerFuncs{
 						AddFunc: sched.onStorageClassAdd,
+					},
+				)
+			}
+			if at&framework.Update != 0 {
+				informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
+					cache.ResourceEventHandlerFuncs{
+						UpdateFunc: func(_, _ interface{}) {
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.StorageClassUpdate, nil)
+						},
 					},
 				)
 			}

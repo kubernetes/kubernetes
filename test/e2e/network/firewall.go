@@ -45,7 +45,7 @@ import (
 
 const (
 	firewallTestTCPTimeout = time.Duration(1 * time.Second)
-	// Set ports outside of 30000-32767, 80 and 8080 to avoid being whitelisted by the e2e cluster
+	// Set ports outside of 30000-32767, 80 and 8080 to avoid being allowlisted by the e2e cluster
 	firewallTestHTTPPort = int32(29999)
 	firewallTestUDPPort  = int32(29998)
 )
@@ -168,7 +168,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			}()
 		}
 
-		// Send requests from outside of the cluster because internal traffic is whitelisted
+		// Send requests from outside of the cluster because internal traffic is allowlisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
 		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
 		framework.ExpectNoError(err)

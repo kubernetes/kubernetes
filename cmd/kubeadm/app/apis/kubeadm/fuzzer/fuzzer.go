@@ -17,11 +17,15 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -49,7 +53,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{}
 
 	// Adds the default bootstrap token to get the round trip working
-	obj.BootstrapTokens = []kubeadm.BootstrapToken{
+	obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{
 		{
 			Groups: []string{"foo"},
 			Usages: []string{"foo"},
@@ -57,7 +61,8 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 		},
 	}
 	obj.SkipPhases = nil
-	obj.NodeRegistration.ImagePullPolicy = ""
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -119,7 +124,8 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
 	obj.SkipPhases = nil
-	obj.NodeRegistration.ImagePullPolicy = ""
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

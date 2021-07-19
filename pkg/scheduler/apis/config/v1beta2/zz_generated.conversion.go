@@ -90,6 +90,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1beta2.NodeResourcesBalancedAllocationArgs)(nil), (*config.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*v1beta2.NodeResourcesBalancedAllocationArgs), b.(*config.NodeResourcesBalancedAllocationArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesBalancedAllocationArgs)(nil), (*v1beta2.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta2_NodeResourcesBalancedAllocationArgs(a.(*config.NodeResourcesBalancedAllocationArgs), b.(*v1beta2.NodeResourcesBalancedAllocationArgs), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1beta2.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta2_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*v1beta2.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
 	}); err != nil {
@@ -97,26 +107,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesFitArgs)(nil), (*v1beta2.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_NodeResourcesFitArgs_To_v1beta2_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*v1beta2.NodeResourcesFitArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.NodeResourcesLeastAllocatedArgs)(nil), (*config.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(a.(*v1beta2.NodeResourcesLeastAllocatedArgs), b.(*config.NodeResourcesLeastAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesLeastAllocatedArgs)(nil), (*v1beta2.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta2_NodeResourcesLeastAllocatedArgs(a.(*config.NodeResourcesLeastAllocatedArgs), b.(*v1beta2.NodeResourcesLeastAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.NodeResourcesMostAllocatedArgs)(nil), (*config.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(a.(*v1beta2.NodeResourcesMostAllocatedArgs), b.(*config.NodeResourcesMostAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesMostAllocatedArgs)(nil), (*v1beta2.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta2_NodeResourcesMostAllocatedArgs(a.(*config.NodeResourcesMostAllocatedArgs), b.(*v1beta2.NodeResourcesMostAllocatedArgs), scope)
 	}); err != nil {
 		return err
 	}
@@ -170,13 +160,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.RequestedToCapacityRatioArgs)(nil), (*config.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(a.(*v1beta2.RequestedToCapacityRatioArgs), b.(*config.RequestedToCapacityRatioArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*v1beta2.RequestedToCapacityRatioParam)(nil), (*config.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(a.(*v1beta2.RequestedToCapacityRatioParam), b.(*config.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioArgs)(nil), (*v1beta2.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_RequestedToCapacityRatioArgs_To_v1beta2_RequestedToCapacityRatioArgs(a.(*config.RequestedToCapacityRatioArgs), b.(*v1beta2.RequestedToCapacityRatioArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioParam)(nil), (*v1beta2.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_RequestedToCapacityRatioParam_To_v1beta2_RequestedToCapacityRatioParam(a.(*config.RequestedToCapacityRatioParam), b.(*v1beta2.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
@@ -187,6 +177,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.ResourceSpec)(nil), (*v1beta2.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_ResourceSpec_To_v1beta2_ResourceSpec(a.(*config.ResourceSpec), b.(*v1beta2.ResourceSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta2.ScoringStrategy)(nil), (*config.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ScoringStrategy_To_config_ScoringStrategy(a.(*v1beta2.ScoringStrategy), b.(*config.ScoringStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.ScoringStrategy)(nil), (*v1beta2.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ScoringStrategy_To_v1beta2_ScoringStrategy(a.(*config.ScoringStrategy), b.(*v1beta2.ScoringStrategy), scope)
 	}); err != nil {
 		return err
 	}
@@ -489,9 +489,30 @@ func Convert_config_NodeAffinityArgs_To_v1beta2_NodeAffinityArgs(in *config.Node
 	return autoConvert_config_NodeAffinityArgs_To_v1beta2_NodeAffinityArgs(in, out, s)
 }
 
+func autoConvert_v1beta2_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1beta2.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	return nil
+}
+
+// Convert_v1beta2_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
+func Convert_v1beta2_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1beta2.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	return autoConvert_v1beta2_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in, out, s)
+}
+
+func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta2_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1beta2.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	out.Resources = *(*[]v1beta2.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	return nil
+}
+
+// Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta2_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
+func Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta2_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1beta2.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	return autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta2_NodeResourcesBalancedAllocationArgs(in, out, s)
+}
+
 func autoConvert_v1beta2_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta2.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
+	out.ScoringStrategy = (*config.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
 	return nil
 }
 
@@ -503,52 +524,13 @@ func Convert_v1beta2_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1b
 func autoConvert_config_NodeResourcesFitArgs_To_v1beta2_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta2.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
+	out.ScoringStrategy = (*v1beta2.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
 	return nil
 }
 
 // Convert_config_NodeResourcesFitArgs_To_v1beta2_NodeResourcesFitArgs is an autogenerated conversion function.
 func Convert_config_NodeResourcesFitArgs_To_v1beta2_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta2.NodeResourcesFitArgs, s conversion.Scope) error {
 	return autoConvert_config_NodeResourcesFitArgs_To_v1beta2_NodeResourcesFitArgs(in, out, s)
-}
-
-func autoConvert_v1beta2_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in *v1beta2.NodeResourcesLeastAllocatedArgs, out *config.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	return nil
-}
-
-// Convert_v1beta2_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs is an autogenerated conversion function.
-func Convert_v1beta2_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in *v1beta2.NodeResourcesLeastAllocatedArgs, out *config.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_v1beta2_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in, out, s)
-}
-
-func autoConvert_config_NodeResourcesLeastAllocatedArgs_To_v1beta2_NodeResourcesLeastAllocatedArgs(in *config.NodeResourcesLeastAllocatedArgs, out *v1beta2.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	out.Resources = *(*[]v1beta2.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	return nil
-}
-
-// Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta2_NodeResourcesLeastAllocatedArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta2_NodeResourcesLeastAllocatedArgs(in *config.NodeResourcesLeastAllocatedArgs, out *v1beta2.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_config_NodeResourcesLeastAllocatedArgs_To_v1beta2_NodeResourcesLeastAllocatedArgs(in, out, s)
-}
-
-func autoConvert_v1beta2_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in *v1beta2.NodeResourcesMostAllocatedArgs, out *config.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	return nil
-}
-
-// Convert_v1beta2_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs is an autogenerated conversion function.
-func Convert_v1beta2_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in *v1beta2.NodeResourcesMostAllocatedArgs, out *config.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_v1beta2_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in, out, s)
-}
-
-func autoConvert_config_NodeResourcesMostAllocatedArgs_To_v1beta2_NodeResourcesMostAllocatedArgs(in *config.NodeResourcesMostAllocatedArgs, out *v1beta2.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	out.Resources = *(*[]v1beta2.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	return nil
-}
-
-// Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta2_NodeResourcesMostAllocatedArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta2_NodeResourcesMostAllocatedArgs(in *config.NodeResourcesMostAllocatedArgs, out *v1beta2.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_config_NodeResourcesMostAllocatedArgs_To_v1beta2_NodeResourcesMostAllocatedArgs(in, out, s)
 }
 
 func autoConvert_v1beta2_Plugin_To_config_Plugin(in *v1beta2.Plugin, out *config.Plugin, s conversion.Scope) error {
@@ -771,26 +753,24 @@ func Convert_config_PodTopologySpreadArgs_To_v1beta2_PodTopologySpreadArgs(in *c
 	return autoConvert_config_PodTopologySpreadArgs_To_v1beta2_PodTopologySpreadArgs(in, out, s)
 }
 
-func autoConvert_v1beta2_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(in *v1beta2.RequestedToCapacityRatioArgs, out *config.RequestedToCapacityRatioArgs, s conversion.Scope) error {
+func autoConvert_v1beta2_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1beta2.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
 	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
-// Convert_v1beta2_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs is an autogenerated conversion function.
-func Convert_v1beta2_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(in *v1beta2.RequestedToCapacityRatioArgs, out *config.RequestedToCapacityRatioArgs, s conversion.Scope) error {
-	return autoConvert_v1beta2_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(in, out, s)
+// Convert_v1beta2_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam is an autogenerated conversion function.
+func Convert_v1beta2_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1beta2.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
+	return autoConvert_v1beta2_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in, out, s)
 }
 
-func autoConvert_config_RequestedToCapacityRatioArgs_To_v1beta2_RequestedToCapacityRatioArgs(in *config.RequestedToCapacityRatioArgs, out *v1beta2.RequestedToCapacityRatioArgs, s conversion.Scope) error {
+func autoConvert_config_RequestedToCapacityRatioParam_To_v1beta2_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1beta2.RequestedToCapacityRatioParam, s conversion.Scope) error {
 	out.Shape = *(*[]v1beta2.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
-	out.Resources = *(*[]v1beta2.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
-// Convert_config_RequestedToCapacityRatioArgs_To_v1beta2_RequestedToCapacityRatioArgs is an autogenerated conversion function.
-func Convert_config_RequestedToCapacityRatioArgs_To_v1beta2_RequestedToCapacityRatioArgs(in *config.RequestedToCapacityRatioArgs, out *v1beta2.RequestedToCapacityRatioArgs, s conversion.Scope) error {
-	return autoConvert_config_RequestedToCapacityRatioArgs_To_v1beta2_RequestedToCapacityRatioArgs(in, out, s)
+// Convert_config_RequestedToCapacityRatioParam_To_v1beta2_RequestedToCapacityRatioParam is an autogenerated conversion function.
+func Convert_config_RequestedToCapacityRatioParam_To_v1beta2_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1beta2.RequestedToCapacityRatioParam, s conversion.Scope) error {
+	return autoConvert_config_RequestedToCapacityRatioParam_To_v1beta2_RequestedToCapacityRatioParam(in, out, s)
 }
 
 func autoConvert_v1beta2_ResourceSpec_To_config_ResourceSpec(in *v1beta2.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
@@ -813,6 +793,30 @@ func autoConvert_config_ResourceSpec_To_v1beta2_ResourceSpec(in *config.Resource
 // Convert_config_ResourceSpec_To_v1beta2_ResourceSpec is an autogenerated conversion function.
 func Convert_config_ResourceSpec_To_v1beta2_ResourceSpec(in *config.ResourceSpec, out *v1beta2.ResourceSpec, s conversion.Scope) error {
 	return autoConvert_config_ResourceSpec_To_v1beta2_ResourceSpec(in, out, s)
+}
+
+func autoConvert_v1beta2_ScoringStrategy_To_config_ScoringStrategy(in *v1beta2.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
+	out.Type = config.ScoringStrategyType(in.Type)
+	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	out.RequestedToCapacityRatio = (*config.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+	return nil
+}
+
+// Convert_v1beta2_ScoringStrategy_To_config_ScoringStrategy is an autogenerated conversion function.
+func Convert_v1beta2_ScoringStrategy_To_config_ScoringStrategy(in *v1beta2.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
+	return autoConvert_v1beta2_ScoringStrategy_To_config_ScoringStrategy(in, out, s)
+}
+
+func autoConvert_config_ScoringStrategy_To_v1beta2_ScoringStrategy(in *config.ScoringStrategy, out *v1beta2.ScoringStrategy, s conversion.Scope) error {
+	out.Type = v1beta2.ScoringStrategyType(in.Type)
+	out.Resources = *(*[]v1beta2.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	out.RequestedToCapacityRatio = (*v1beta2.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+	return nil
+}
+
+// Convert_config_ScoringStrategy_To_v1beta2_ScoringStrategy is an autogenerated conversion function.
+func Convert_config_ScoringStrategy_To_v1beta2_ScoringStrategy(in *config.ScoringStrategy, out *v1beta2.ScoringStrategy, s conversion.Scope) error {
+	return autoConvert_config_ScoringStrategy_To_v1beta2_ScoringStrategy(in, out, s)
 }
 
 func autoConvert_v1beta2_UtilizationShapePoint_To_config_UtilizationShapePoint(in *v1beta2.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
@@ -841,6 +845,7 @@ func autoConvert_v1beta2_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1bet
 	if err := v1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
+	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
@@ -853,6 +858,7 @@ func autoConvert_config_VolumeBindingArgs_To_v1beta2_VolumeBindingArgs(in *confi
 	if err := v1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
+	out.Shape = *(*[]v1beta2.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 

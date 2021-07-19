@@ -185,6 +185,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.StatefulSetApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1.StatefulSetConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1.StatefulSetSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -215,6 +217,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1beta1.StatefulSetConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1beta1.StatefulSetSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -265,6 +269,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.StatefulSetApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &appsv1beta2.StatefulSetConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &appsv1beta2.StatefulSetSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -389,6 +395,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobStatusApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobTemplateSpec"):
 		return &applyconfigurationsbatchv1.JobTemplateSpecApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("UncountedTerminatedPods"):
+		return &applyconfigurationsbatchv1.UncountedTerminatedPodsApplyConfiguration{}
 
 		// Group=batch, Version=v1beta1
 	case batchv1beta1.SchemeGroupVersion.WithKind("CronJob"):

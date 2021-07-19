@@ -289,10 +289,6 @@ github.com/form3tech-oss/jwt-go
 github.com/fsnotify/fsnotify
 # github.com/fvbommel/sortorder v1.0.1 => github.com/fvbommel/sortorder v1.0.1
 github.com/fvbommel/sortorder
-# github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
-## explicit
-github.com/go-bindata/go-bindata
-github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-errors/errors v1.0.1 => github.com/go-errors/errors v1.0.1
 github.com/go-errors/errors
 # github.com/go-logr/logr v0.4.0 => github.com/go-logr/logr v0.4.0
@@ -475,10 +471,6 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/internal
 github.com/grpc-ecosystem/grpc-gateway/runtime
 github.com/grpc-ecosystem/grpc-gateway/utilities
-# github.com/hashicorp/golang-lru v0.5.1 => github.com/hashicorp/golang-lru v0.5.1
-## explicit
-github.com/hashicorp/golang-lru
-github.com/hashicorp/golang-lru/simplelru
 # github.com/heketi/heketi v10.3.0+incompatible => github.com/heketi/heketi v10.3.0+incompatible
 ## explicit
 github.com/heketi/heketi/client/api/go-client
@@ -917,6 +909,7 @@ go.opentelemetry.io/otel/metric/global
 go.opentelemetry.io/otel/metric/number
 go.opentelemetry.io/otel/metric/registry
 # go.opentelemetry.io/otel/sdk v0.20.0 => go.opentelemetry.io/otel/sdk v0.20.0
+## explicit
 go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal
 go.opentelemetry.io/otel/sdk/resource
@@ -937,8 +930,10 @@ go.opentelemetry.io/otel/sdk/metric/controller/time
 go.opentelemetry.io/otel/sdk/metric/processor/basic
 go.opentelemetry.io/otel/sdk/metric/selector/simple
 # go.opentelemetry.io/otel/trace v0.20.0 => go.opentelemetry.io/otel/trace v0.20.0
+## explicit
 go.opentelemetry.io/otel/trace
 # go.opentelemetry.io/proto/otlp v0.7.0 => go.opentelemetry.io/proto/otlp v0.7.0
+## explicit
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
 go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
@@ -990,7 +985,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 # golang.org/x/mod v0.4.2 => golang.org/x/mod v0.4.2
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 => golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+# golang.org/x/net v0.0.0-20210520170846-37e1c6afe023 => golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 ## explicit
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1015,6 +1010,7 @@ golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+## explicit
 golang.org/x/sync/singleflight
 # golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 => golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 ## explicit
@@ -1826,6 +1822,8 @@ k8s.io/client-go/metadata/fake
 k8s.io/client-go/metadata/metadatainformer
 k8s.io/client-go/metadata/metadatalister
 k8s.io/client-go/pkg/apis/clientauthentication
+k8s.io/client-go/pkg/apis/clientauthentication/install
+k8s.io/client-go/pkg/apis/clientauthentication/v1
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/pkg/version
@@ -1966,6 +1964,7 @@ k8s.io/component-helpers/storage/volume
 k8s.io/controller-manager/app
 k8s.io/controller-manager/config
 k8s.io/controller-manager/config/v1alpha1
+k8s.io/controller-manager/config/v1beta1
 k8s.io/controller-manager/options
 k8s.io/controller-manager/pkg/clientbuilder
 k8s.io/controller-manager/pkg/features
@@ -2115,7 +2114,6 @@ k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/explain
 k8s.io/kubectl/pkg/generate
 k8s.io/kubectl/pkg/generate/versioned
-k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/metricsutil
 k8s.io/kubectl/pkg/polymorphichelpers
 k8s.io/kubectl/pkg/proxy
@@ -2226,6 +2224,20 @@ k8s.io/metrics/pkg/client/external_metrics/fake
 # k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
 ## explicit
 k8s.io/mount-utils
+# k8s.io/pod-security-admission v0.0.0 => ./staging/src/k8s.io/pod-security-admission
+## explicit
+k8s.io/pod-security-admission/admission
+k8s.io/pod-security-admission/admission/api
+k8s.io/pod-security-admission/admission/api/load
+k8s.io/pod-security-admission/admission/api/scheme
+k8s.io/pod-security-admission/admission/api/v1alpha1
+k8s.io/pod-security-admission/admission/api/validation
+k8s.io/pod-security-admission/api
+k8s.io/pod-security-admission/cmd/webhook/server
+k8s.io/pod-security-admission/cmd/webhook/server/options
+k8s.io/pod-security-admission/metrics
+k8s.io/pod-security-admission/policy
+k8s.io/pod-security-admission/test
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit
 k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
@@ -2252,10 +2264,10 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/system-validators v1.4.0 => k8s.io/system-validators v1.4.0
+# k8s.io/system-validators v1.5.0 => k8s.io/system-validators v1.5.0
 ## explicit
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20210521133846-da695404a2bc => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9 => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -2263,8 +2275,11 @@ k8s.io/utils/exec
 k8s.io/utils/exec/testing
 k8s.io/utils/inotify
 k8s.io/utils/integer
+k8s.io/utils/internal/third_party/forked/golang/golang-lru
+k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/io
 k8s.io/utils/keymutex
+k8s.io/utils/lru
 k8s.io/utils/net
 k8s.io/utils/net/ebtables
 k8s.io/utils/nsenter
@@ -2275,13 +2290,13 @@ k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/kustomize/api v0.8.10 => sigs.k8s.io/kustomize/api v0.8.10
+# sigs.k8s.io/kustomize/api v0.8.11 => sigs.k8s.io/kustomize/api v0.8.11
 sigs.k8s.io/kustomize/api/builtins
-sigs.k8s.io/kustomize/api/filesys
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
 sigs.k8s.io/kustomize/api/filters/filtersutil
 sigs.k8s.io/kustomize/api/filters/fsslice
+sigs.k8s.io/kustomize/api/filters/iampolicygenerator
 sigs.k8s.io/kustomize/api/filters/imagetag
 sigs.k8s.io/kustomize/api/filters/labels
 sigs.k8s.io/kustomize/api/filters/nameref
@@ -2319,17 +2334,19 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kustomize/v4 v4.1.3 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.3
+# sigs.k8s.io/kustomize/kustomize/v4 v4.2.0 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
 sigs.k8s.io/kustomize/kustomize/v4/commands/build
-# sigs.k8s.io/kustomize/kyaml v0.10.20 => sigs.k8s.io/kustomize/kyaml v0.10.20
+# sigs.k8s.io/kustomize/kyaml v0.11.0 => sigs.k8s.io/kustomize/kyaml v0.11.0
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
 sigs.k8s.io/kustomize/kyaml/fieldmeta
+sigs.k8s.io/kustomize/kyaml/filesys
 sigs.k8s.io/kustomize/kyaml/fn/runtime/container
 sigs.k8s.io/kustomize/kyaml/fn/runtime/exec
 sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil
 sigs.k8s.io/kustomize/kyaml/fn/runtime/starlark
+sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml
 sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/qri-io/starlib/util
 sigs.k8s.io/kustomize/kyaml/kio
 sigs.k8s.io/kustomize/kyaml/kio/filters
@@ -2352,7 +2369,7 @@ sigs.k8s.io/kustomize/kyaml/yaml/merge2
 sigs.k8s.io/kustomize/kyaml/yaml/merge3
 sigs.k8s.io/kustomize/kyaml/yaml/schema
 sigs.k8s.io/kustomize/kyaml/yaml/walk
-# sigs.k8s.io/structured-merge-diff/v4 v4.1.1 => sigs.k8s.io/structured-merge-diff/v4 v4.1.1
+# sigs.k8s.io/structured-merge-diff/v4 v4.1.2 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 ## explicit
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
@@ -2470,7 +2487,6 @@ sigs.k8s.io/yaml
 # github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
 # github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0
 # github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
-# github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 # github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
@@ -2677,7 +2693,7 @@ sigs.k8s.io/yaml
 # golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 # golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
 # golang.org/x/mod => golang.org/x/mod v0.4.2
-# golang.org/x/net => golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+# golang.org/x/net => golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 # golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
@@ -2739,8 +2755,8 @@ sigs.k8s.io/yaml
 # k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-# k8s.io/system-validators => k8s.io/system-validators v1.4.0
-# k8s.io/utils => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/system-validators => k8s.io/system-validators v1.5.0
+# k8s.io/utils => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
 # modernc.org/mathutil => modernc.org/mathutil v1.0.0
@@ -2748,9 +2764,9 @@ sigs.k8s.io/yaml
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
-# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.10
-# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.12
-# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.3
-# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.10.20
-# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.1
+# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.11
+# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.13
+# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
+# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.11.0
+# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 # sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0

@@ -1884,9 +1884,11 @@ func TestValidateIngressClassUpdate(t *testing.T) {
 				Spec: networking.IngressClassSpec{
 					Controller: "foo.co/bar",
 					Parameters: &networking.IngressClassParametersReference{
-						APIGroup: utilpointer.StringPtr("v1"),
-						Kind:     "ConfigMap",
-						Name:     "foo",
+						APIGroup:  utilpointer.StringPtr("v1"),
+						Scope:     utilpointer.StringPtr("Namespace"),
+						Kind:      "ConfigMap",
+						Name:      "foo",
+						Namespace: utilpointer.StringPtr("bar"),
 					},
 				},
 			},

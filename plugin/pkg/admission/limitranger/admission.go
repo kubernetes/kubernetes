@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/lru"
 )
 
 const (
@@ -191,10 +190,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
 func NewLimitRanger(actions LimitRangerActions) (*LimitRanger, error) {
-	liveLookupCache, err := lru.New(10000)
-	if err != nil {
-		return nil, err
-	}
+	liveLookupCache := lru.New(10000)
 
 	if actions == nil {
 		actions = &DefaultLimitRangerActions{}
