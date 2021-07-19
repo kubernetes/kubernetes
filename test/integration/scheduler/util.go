@@ -498,10 +498,7 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		if pod.Spec.NodeName == "" {
-			return false, nil
-		}
-		return true, nil
+		return pod.Spec.NodeName != "", nil
 	}
 }
 

@@ -584,7 +584,8 @@ type Handle interface {
 	GetWaitingPod(uid types.UID) WaitingPod
 
 	// RejectWaitingPod rejects a waiting pod given its UID.
-	RejectWaitingPod(uid types.UID)
+	// The return value indicates if the pod is waiting or not.
+	RejectWaitingPod(uid types.UID) bool
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface

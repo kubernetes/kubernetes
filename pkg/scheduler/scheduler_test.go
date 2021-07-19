@@ -456,6 +456,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				Profiles: profile.Map{
 					testSchedulerName: fwk,
 				},
+				SchedulingQueue: internalqueue.NewTestQueue(context.Background(), nil),
 			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -946,7 +947,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Profiles: profile.Map{
 			testSchedulerName: fwk,
 		},
-		client: client,
+		client:          client,
+		SchedulingQueue: internalqueue.NewTestQueue(context.Background(), nil),
 	}
 
 	return sched, bindingChan, errChan

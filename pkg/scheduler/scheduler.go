@@ -639,6 +639,16 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				// Avoid moving the assumed Pod itself as it's always Unschedulable.
+				// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
+				// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
+				defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
+					return assumedPod.UID != pod.UID
+				})
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, "")
 			return
@@ -652,6 +662,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, "")
 			return
@@ -664,6 +679,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if err := sched.SchedulerCache.ForgetPod(assumedPod); err != nil {
 				klog.ErrorS(err, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, "")
 		} else {
