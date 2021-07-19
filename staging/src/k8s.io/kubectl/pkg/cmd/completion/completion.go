@@ -103,10 +103,10 @@ var (
 
 var (
 	completionShells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
-		"bash": runCompletionBash,
-		"zsh":  runCompletionZsh,
-		"fish": runCompletionFish,
-		"powershell":  runCompletionPwsh,
+		"bash":       runCompletionBash,
+		"zsh":        runCompletionZsh,
+		"fish":       runCompletionFish,
+		"powershell": runCompletionPwsh,
 	}
 )
 
