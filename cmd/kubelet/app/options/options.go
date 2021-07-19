@@ -20,8 +20,6 @@ package options
 import (
 	"fmt"
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -169,32 +167,6 @@ type KubeletFlags struct {
 	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads on the node.
 	// To use this flag, the corresponding SeccompDefault feature gate must be enabled.
 	SeccompDefault bool
-}
-
-// NewKubeletFlags will create a new KubeletFlags with default values
-func NewKubeletFlags() *KubeletFlags {
-	remoteRuntimeEndpoint := ""
-	if runtime.GOOS == "linux" {
-		remoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
-	} else if runtime.GOOS == "windows" {
-		remoteRuntimeEndpoint = "npipe:////./pipe/dockershim"
-	}
-
-	return &KubeletFlags{
-		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/lib/kubelet/pki",
-		RootDirectory:           defaultRootDir,
-		MasterServiceNamespace:  metav1.NamespaceDefault,
-		MaxContainerCount:       -1,
-		MaxPerPodContainerCount: 1,
-		MinimumGCAge:            metav1.Duration{Duration: 0},
-		NonMasqueradeCIDR:       "10.0.0.0/8",
-		RegisterSchedulable:     true,
-		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
-		NodeLabels:              make(map[string]string),
-		RegisterNode:            true,
-		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
-	}
 }
 
 // ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
