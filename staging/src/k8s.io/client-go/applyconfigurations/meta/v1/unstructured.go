@@ -1,7 +1,8 @@
 package v1
 
 import (
-	"fmt"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,56 +20,80 @@ type UnstructuredExtractor interface {
 	ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 }
 
-// objectTypeCache caches the GVKParser in order to prevent from having to repeatedly
+// gvkParserCache caches the GVKParser in order to prevent from having to repeatedly
 // parse the models from the open API schema when the schema itself changes infrequently.
-type objectTypeCache struct {
-	// TODO: lock this?
+type gvkParserCache struct {
+	// discoveryClient is the client for retrieving the openAPI document and checking
+	// whether the document has changed recently
 	discoveryClient discovery.DiscoveryInterface
-	gvkParser       *fieldmanager.GvkParser
+	// ttl is how long the openAPI schema should be considered valid
+	ttl time.Duration
+	// mu protects the gvkParser
+	mu sync.Mutex
+	// gvkParser retrieves the objectType for a given gvk
+	gvkParser *fieldmanager.GvkParser
+	// lastChecked is the last time we checked if the openAPI doc has changed.
+	lastChecked time.Time
+}
+
+// regenerateGVKParser builds the parser from the raw OpenAPI schema.
+func (c *gvkParserCache) regenerateGVKParser() error {
+	doc, err := c.discoveryClient.OpenAPISchema()
+	if err != nil {
+		return err
+	}
+	c.lastChecked = time.Now()
+	models, err := proto.NewOpenAPIData(doc)
+	if err != nil {
+		return err
+	}
+
+	gvkParser, err := fieldmanager.NewGVKParser(models, false)
+	if err != nil {
+		return err
+	}
+
+	c.gvkParser = gvkParser
+	return nil
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
-func (c *objectTypeCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
-	if !c.discoveryClient.HasOpenAPISchemaChanged() && c.gvkParser != nil {
-		// cache hit
-		fmt.Println("cache hit")
-		fmt.Printf("gvk = %+v\n", gvk)
-		return c.gvkParser.Type(gvk), nil
+func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gvkParser != nil {
+		// if the ttl on the parser cache has expired,
+		// recheck the discovery client to see if the Open API schema has changed
+		if time.Now().After(c.lastChecked.Add(c.ttl)) {
+			c.lastChecked = time.Now()
+			if c.discoveryClient.HasOpenAPISchemaChanged() {
+				// the schema has changed, regenerate the parser
+				if err := c.regenerateGVKParser(); err != nil {
+					return nil, err
+				}
+			}
+		}
 	} else {
-		// cache miss
-		fmt.Println("cache miss")
-		fmt.Printf("gvk = %+v\n", gvk)
-		doc, err := c.discoveryClient.OpenAPISchema()
-		if err != nil {
+		if err := c.regenerateGVKParser(); err != nil {
 			return nil, err
 		}
-		models, err := proto.NewOpenAPIData(doc)
-		if err != nil {
-			return nil, err
-		}
-
-		gvkParser, err := fieldmanager.NewGVKParser(models, false)
-		if err != nil {
-			return nil, err
-		}
-
-		objType := gvkParser.Type(gvk)
-		c.gvkParser = gvkParser
-
-		return objType, nil
 	}
+	return c.gvkParser.Type(gvk), nil
 }
 
 type extractor struct {
-	cache *objectTypeCache
+	cache *gvkParserCache
 }
 
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) UnstructuredExtractor {
+	// TODO: expose ttl as an argument if we want to.
+	defaultTTL := time.Minute
 	return &extractor{
-		cache: &objectTypeCache{
+		cache: &gvkParserCache{
 			discoveryClient: dc,
+			ttl:             defaultTTL,
 		},
 	}
 }
