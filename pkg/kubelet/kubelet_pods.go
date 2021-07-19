@@ -1378,24 +1378,40 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 	klog.V(3).InfoS("Generating pod status", "pod", klog.KObj(pod))
 
-	s := kl.convertStatusToAPIStatus(pod, podStatus)
+	// use the previous pod status, or the api status, as the basis for this pod
+	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	if !found {
+		oldPodStatus = pod.Status
+	}
+	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
 
-	// check if an internal module has requested the pod is evicted.
+	// calculate the next phase and preserve reason
+	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
+	s.Phase = getPhase(&pod.Spec, allStatus)
+	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
+	if s.Phase == oldPodStatus.Phase {
+		// preserve the reason and message which is associated with the phase
+		s.Reason = oldPodStatus.Reason
+		s.Message = oldPodStatus.Message
+		if len(s.Reason) == 0 {
+			s.Reason = pod.Status.Reason
+		}
+		if len(s.Message) == 0 {
+			s.Message = pod.Status.Message
+		}
+	}
+
+	// check if an internal module has requested the pod is evicted and override the reason and message
 	for _, podSyncHandler := range kl.PodSyncHandlers {
 		if result := podSyncHandler.ShouldEvict(pod); result.Evict {
 			s.Phase = v1.PodFailed
 			s.Reason = result.Reason
 			s.Message = result.Message
-			return *s
+			break
 		}
 	}
 
-	// Assume info is ready to process
-	spec := &pod.Spec
-	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(spec, allStatus)
-	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "phase", s.Phase)
-	// Check for illegal phase transition
+	// pods are not allowed to transition out of terminal phases
 	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
 		// API server shows terminal phase; transitions are not allowed
 		if s.Phase != pod.Status.Phase {
@@ -1404,6 +1420,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Phase = pod.Status.Phase
 		}
 	}
+
+	spec := &pod.Spec
+
+	// ensure the probe managers have up to date status for containers
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.Conditions, s.ContainerStatuses, s.Phase))
@@ -1466,10 +1486,10 @@ func (kl *Kubelet) sortPodIPs(podIPs []string) []string {
 	return ips
 }
 
-// convertStatusToAPIStatus creates an api PodStatus for the given pod from
-// the given internal pod status.  It is purely transformative and does not
-// alter the kubelet state at all.
-func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
+// convertStatusToAPIStatus initialize an api PodStatus for the given pod from
+// the given internal pod status and the previous state of the pod from the API.
+// It is purely transformative and does not alter the kubelet state at all.
+func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus, oldPodStatus v1.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
 
 	// copy pod status IPs to avoid race conditions with PodStatus #102806
@@ -1489,11 +1509,6 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
-
-	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
-	if !found {
-		oldPodStatus = pod.Status
-	}
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
