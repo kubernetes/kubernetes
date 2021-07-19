@@ -98,6 +98,7 @@ func TestGetDiskName(t *testing.T) {
 }
 
 func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
+	sharedBlobDiskKind := v1.AzureDedicatedBlobDisk
 	translator := NewAzureDiskCSITranslator()
 
 	cases := []struct {
@@ -141,6 +142,19 @@ func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "azure disk volume with non-managed kind",
+			volume: &corev1.Volume{
+				VolumeSource: corev1.VolumeSource{
+					AzureDisk: &corev1.AzureDiskVolumeSource{
+						DiskName:    "diskname",
+						DataDiskURI: "datadiskuri",
+						Kind:        &sharedBlobDiskKind,
+					},
+				},
+			},
+			expErr: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -163,6 +177,7 @@ func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
 func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 	translator := NewAzureDiskCSITranslator()
 
+	sharedBlobDiskKind := v1.AzureDedicatedBlobDisk
 	cachingMode := corev1.AzureDataDiskCachingMode("cachingmode")
 	fsType := "fstype"
 	readOnly := true
@@ -214,6 +229,23 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "azure disk volume with non-managed kind",
+			volume: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureDisk: &corev1.AzureDiskVolumeSource{
+							CachingMode: &cachingMode,
+							DataDiskURI: diskURI,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+							Kind:        &sharedBlobDiskKind,
+						},
+					},
+				},
+			},
+			expErr: true,
 		},
 	}
 

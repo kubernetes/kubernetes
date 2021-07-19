@@ -100,6 +100,9 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	}
 
 	azureSource := volume.AzureDisk
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// Must be unique per disk as it is used as the unique part of the
@@ -150,6 +153,10 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			VolumeHandle:     azureSource.DataDiskURI,
 		}
 	)
+
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 
 	if azureSource.CachingMode != nil {
 		csiSource.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
