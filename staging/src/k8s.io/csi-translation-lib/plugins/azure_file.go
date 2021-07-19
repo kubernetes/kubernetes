@@ -60,6 +60,9 @@ func NewAzureFileCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Azure File storage class parameters to CSI storage class
 func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	if sc != nil && sc.Parameters != nil {
+		sc.Parameters[csiMigration] = trueValue
+	}
 	return sc, nil
 }
 
@@ -95,7 +98,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 						Driver:           AzureFileDriverName,
 						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
 						ReadOnly:         azureSource.ReadOnly,
-						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
+						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName, csiMigration: trueValue},
 						NodeStageSecretRef: &v1.SecretReference{
 							Name:      azureSource.SecretName,
 							Namespace: secretNamespace,
@@ -140,7 +143,7 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 				Namespace: defaultSecretNamespace,
 			},
 			ReadOnly:         azureSource.ReadOnly,
-			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
+			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName, csiMigration: trueValue},
 			VolumeHandle:     volumeID,
 		}
 	)

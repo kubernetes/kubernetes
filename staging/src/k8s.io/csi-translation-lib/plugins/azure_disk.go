@@ -39,6 +39,9 @@ const (
 	azureDiskKind        = "kind"
 	azureDiskCachingMode = "cachingMode"
 	azureDiskFSType      = "fsType"
+
+	csiMigration = "csi-migration"
+	trueValue    = "true"
 )
 
 var (
@@ -86,8 +89,8 @@ func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 		sc.AllowedTopologies = newTopologies
 	}
 
+	params[csiMigration] = trueValue
 	sc.Parameters = params
-
 	return sc, nil
 }
 
@@ -110,7 +113,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
 					VolumeHandle:     azureSource.DataDiskURI,
-					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+					VolumeAttributes: map[string]string{azureDiskKind: "Managed", csiMigration: trueValue},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -147,7 +150,7 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		// refer to https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
 		csiSource = &v1.CSIPersistentVolumeSource{
 			Driver:           AzureDiskDriverName,
-			VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+			VolumeAttributes: map[string]string{azureDiskKind: "Managed", csiMigration: trueValue},
 			VolumeHandle:     azureSource.DataDiskURI,
 		}
 	)
