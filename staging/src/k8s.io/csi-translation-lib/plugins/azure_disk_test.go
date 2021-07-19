@@ -135,7 +135,7 @@ func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
 						CSI: &corev1.CSIPersistentVolumeSource{
 							Driver:           "disk.csi.azure.com",
 							VolumeHandle:     "datadiskuri",
-							VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+							VolumeAttributes: map[string]string{azureDiskKind: "Managed", csiMigration: trueValue},
 						},
 					},
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -223,6 +223,7 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 								"cachingmode":   "cachingmode",
 								azureDiskFSType: fsType,
 								azureDiskKind:   "Managed",
+								csiMigration:    trueValue,
 							},
 							VolumeHandle: diskURI,
 						},
@@ -458,41 +459,41 @@ func TestTranslateInTreeStorageClassToCSI(t *testing.T) {
 		{
 			name:       "nothing special",
 			options:    NewStorageClass(map[string]string{"foo": "bar"}, nil),
-			expOptions: NewStorageClass(map[string]string{"foo": "bar"}, nil),
+			expOptions: NewStorageClass(map[string]string{"foo": "bar", csiMigration: trueValue}, nil),
 		},
 		{
 			name:       "empty params",
 			options:    NewStorageClass(map[string]string{}, nil),
-			expOptions: NewStorageClass(map[string]string{}, nil),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, nil),
 		},
 		{
 			name:       "zone",
 			options:    NewStorageClass(map[string]string{"zone": "foo"}, nil),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 		},
 		{
 			name:       "zones",
 			options:    NewStorageClass(map[string]string{"zones": "foo,bar,baz"}, nil),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo", "bar", "baz"})),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo", "bar", "baz"})),
 		},
 		{
 			name:       "some normal topology",
 			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 		},
 		{
 			name:       "some translated topology",
 			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelTopologyZone, []string{"foo"})),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 		},
 		{
 			name:       "some translated topology with beta labels",
 			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelFailureDomainBetaZone, []string{"foo"})),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 		},
 		{
 			name:    "zone and topology",
-			options: NewStorageClass(map[string]string{"zone": "foo"}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
+			options: NewStorageClass(map[string]string{"zone": "foo", csiMigration: trueValue}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 			expErr:  true,
 		},
 	}
