@@ -640,8 +640,8 @@ type DaemonSetStatus struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled" protobuf:"varint,3,opt,name=desiredNumberScheduled"`
 
-	// The number of nodes that should be running the daemon pod and have one
-	// or more of the daemon pod running and ready.
+	// Total number of nodes that should be running the daemon pod and have one
+	// or more of the daemon pod running with a Ready Condition by passing the readinessProbe.
 	NumberReady int32 `json:"numberReady" protobuf:"varint,4,opt,name=numberReady"`
 
 	// The most recent generation observed by the daemon set controller.
