@@ -86,7 +86,6 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
-		legacyregistry.MustRegister(etcdObjectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
