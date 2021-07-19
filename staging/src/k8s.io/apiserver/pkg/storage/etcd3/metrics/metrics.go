@@ -92,12 +92,12 @@ func Register() {
 	})
 }
 
-// UpdateObjectCount sets the apiserver_storage_object_counts and etcd_object_counts (deprecated) metric.
+// UpdateObjectCount sets the apiserver_storage_object_counts metric.
 func UpdateObjectCount(resourcePrefix string, count int64) {
 	objectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
 }
 
-// RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
+// RecordEtcdRequestLatency sets the etcd_request_duration_seconds metric.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 }
