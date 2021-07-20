@@ -13,11 +13,15 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
+// openAPISchemaTTL is how frequently we need to check
+// whether the open API schema has changed or not.
+const openAPISchemaTTL = time.Minute
+
 // UnstructuredExtractor enables extracting the applied configuration state from object for fieldManager into an
 // unstructured object type.
 type UnstructuredExtractor interface {
-	ExtractUnstructured(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
-	ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
+	Extract(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
+	ExtractStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error)
 }
 
 // gvkParserCache caches the GVKParser in order to prevent from having to repeatedly
@@ -37,45 +41,42 @@ type gvkParserCache struct {
 }
 
 // regenerateGVKParser builds the parser from the raw OpenAPI schema.
-func (c *gvkParserCache) regenerateGVKParser() error {
-	doc, err := c.discoveryClient.OpenAPISchema()
+func regenerateGVKParser(dc discovery.DiscoveryInterface) (*fieldmanager.GvkParser, error) {
+	doc, err := dc.OpenAPISchema()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.lastChecked = time.Now()
+	//c.lastChecked = time.Now()
 	models, err := proto.NewOpenAPIData(doc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	gvkParser, err := fieldmanager.NewGVKParser(models, false)
-	if err != nil {
-		return err
-	}
+	return fieldmanager.NewGVKParser(models, false)
+	//gvkParser, err := fieldmanager.NewGVKParser(models, false)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	c.gvkParser = gvkParser
-	return nil
+	//return gvkParser, nil
+	//return nil
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
 func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.ParseableType, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.gvkParser != nil {
-		// if the ttl on the parser cache has expired,
-		// recheck the discovery client to see if the Open API schema has changed
-		if time.Now().After(c.lastChecked.Add(c.ttl)) {
-			c.lastChecked = time.Now()
-			if c.discoveryClient.HasOpenAPISchemaChanged() {
-				// the schema has changed, regenerate the parser
-				if err := c.regenerateGVKParser(); err != nil {
-					return nil, err
-				}
+	// if the ttl on the openAPISchema has expired,
+	// recheck the discovery client to see if the Open API schema has changed
+	if time.Now().After(c.lastChecked.Add(openAPISchemaTTL)) {
+		c.lastChecked = time.Now()
+		if c.discoveryClient.HasOpenAPISchemaChanged() {
+			// the schema has changed, regenerate the parser
+			parser, err := regenerateGVKParser(c.discoveryClient)
+			if err != nil {
+				return nil, err
 			}
-		}
-	} else {
-		if err := c.regenerateGVKParser(); err != nil {
-			return nil, err
+			c.gvkParser = parser
 		}
 	}
 	return c.gvkParser.Type(gvk), nil
@@ -87,27 +88,31 @@ type extractor struct {
 
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
-func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) UnstructuredExtractor {
+func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) (UnstructuredExtractor, error) {
 	// TODO: expose ttl as an argument if we want to.
-	defaultTTL := time.Minute
+
+	parser, err := regenerateGVKParser(dc)
+	if err != nil {
+		return nil, err
+	}
 	return &extractor{
 		cache: &gvkParserCache{
+			gvkParser:       parser,
 			discoveryClient: dc,
-			ttl:             defaultTTL,
 		},
-	}
+	}, nil
 }
 
-// ExtractUnstructured extracts the applied configuration owned by fiieldManager from an unstructured object.
+// Extract extracts the applied configuration owned by fiieldManager from an unstructured object.
 // Note that the apply configuration itself is also an unstructured object.
-func (e *extractor) ExtractUnstructured(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
+func (e *extractor) Extract(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
 	return e.extractUnstructured(object, fieldManager, "")
 }
 
-// ExtractUnstructuredStatus is the same as ExtractUnstructured except
+// ExtractStatus is the same as ExtractUnstructured except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func (e *extractor) ExtractUnstructuredStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
+func (e *extractor) ExtractStatus(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
 	return e.extractUnstructured(object, fieldManager, "status")
 }
 

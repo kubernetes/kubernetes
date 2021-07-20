@@ -1140,12 +1140,12 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		}
 	}
 
-	// store the etag header so that we can check whether the document
-	// has changed or not.
-	var etag string
-	etagHeader, ok := resp.Header["Etag"]
-	if ok && len(etagHeader) == 1 {
-		etag = etagHeader[0]
+	// store the X-From-Cache header so that we can
+	// return it as part of the result
+	var fromCache bool
+	xFromCacheHeader, ok := resp.Header["X-From-Cache"]
+	if ok {
+		fromCache = len(xFromCacheHeader) == 1 && xFromCacheHeader[0] == "1"
 	}
 
 	return Result{
@@ -1154,7 +1154,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
 		warnings:    handleWarnings(resp.Header, r.warningHandler),
-		etag:        etag,
+		fromCache:   fromCache,
 	}
 }
 
@@ -1281,7 +1281,7 @@ type Result struct {
 	contentType string
 	err         error
 	statusCode  int
-	etag        string
+	fromCache   bool
 
 	decoder runtime.Decoder
 }
@@ -1318,8 +1318,9 @@ func (r Result) Get() (runtime.Object, error) {
 	return out, nil
 }
 
-func (r Result) Etag() string {
-	return r.etag
+// FromCache returns whether the response was returned from the cache.
+func (r Result) FromCache() bool {
+	return r.fromCache
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no

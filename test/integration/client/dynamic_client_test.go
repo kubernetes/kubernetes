@@ -265,12 +265,15 @@ func TestUnstructuredExtract(t *testing.T) {
 		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actual, got)
 	}
 
-	// extract the object using ExtractUnstructured
+	// extract the object
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(result.ClientConfig)
-	extractor := metav1ac.NewUnstructuredExtractor(discoveryClient)
-	extracted, err := extractor.ExtractUnstructured(got, mgr)
+	extractor, err := metav1ac.NewUnstructuredExtractor(discoveryClient)
 	if err != nil {
-		t.Fatalf("unexpected error when extracting")
+		t.Fatalf("unexpected error when constructing extrator: %v", err)
+	}
+	extracted, err := extractor.Extract(got, mgr)
+	if err != nil {
+		t.Fatalf("unexpected error when extracting: %v", err)
 	}
 
 	// modify the object and apply the modified object
@@ -300,10 +303,9 @@ func TestUnstructuredExtract(t *testing.T) {
 	if !reflect.DeepEqual(actualModified, gotModified) {
 		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actualModified, gotModified)
 	}
-	fmt.Printf("gotModified = %+v\n", gotModified)
 
 	// extract again to test hitting the object type cache
-	extracted2, err := extractor.ExtractUnstructured(gotModified, mgr)
+	extracted2, err := extractor.Extract(gotModified, mgr)
 	if err != nil {
 		t.Fatalf("unexpected error when extracting for the second time")
 	}

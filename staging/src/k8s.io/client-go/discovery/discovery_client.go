@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -139,7 +138,6 @@ type DiscoveryClient struct {
 	restClient restclient.Interface
 
 	LegacyPrefix string
-	etag         string
 }
 
 // Convert metav1.APIVersions to metav1.APIGroup. APIVersions is used by legacy v1, so
@@ -429,20 +427,12 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 // HasOpenAPISchemaChanged checks whether a HEAD request to openapi endpoint returns
 // a 304 StatusNotModified meaning it has not changed.
 func (d *DiscoveryClient) HasOpenAPISchemaChanged() bool {
-	result := d.restClient.Verb("HEAD").AbsPath("/openapi/v2").SetHeader("If-None-Match", d.etag).SetHeader("Accept", mimePb).Do(context.TODO())
-	var status int
-	result.StatusCode(&status)
-	if status == http.StatusNotModified {
-		return false
-	}
-	return true
+	return !d.restClient.Verb("HEAD").AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do(context.TODO()).FromCache()
 }
 
 // OpenAPISchema fetches the open api schema using a rest client and parses the proto.
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	result := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do(context.TODO())
-	d.etag = result.Etag()
-	data, err := result.Raw()
+	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do(context.TODO()).Raw()
 	if err != nil {
 		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
 			// single endpoint not found/registered in old server, try to fetch old endpoint
