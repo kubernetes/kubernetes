@@ -45,24 +45,6 @@ func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsD
 	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP}, dnsDomain)
 }
 
-// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
-func (m *Model) GetProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
-	}
-	return timeoutSeconds
-}
-
-// GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
-func (m *Model) GetWorkers() int {
-	numberOfWorkers := 3
-	if framework.NodeOSDistroIs("windows") {
-		numberOfWorkers = 1 // See https://github.com/kubernetes/kubernetes/pull/97690
-	}
-	return numberOfWorkers
-}
-
 // NewModel instantiates a model based on:
 // - namespaces
 // - pods
@@ -104,6 +86,24 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 		model.Namespaces = append(model.Namespaces, &Namespace{Name: ns, Pods: pods})
 	}
 	return model
+}
+
+// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
+func (m *Model) GetProbeTimeoutSeconds() int {
+	timeoutSeconds := 1
+	if framework.NodeOSDistroIs("windows") {
+		timeoutSeconds = 3
+	}
+	return timeoutSeconds
+}
+
+// GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
+func (m *Model) GetWorkers() int {
+	numberOfWorkers := 3
+	if framework.NodeOSDistroIs("windows") {
+		numberOfWorkers = 1 // See https://github.com/kubernetes/kubernetes/pull/97690
+	}
+	return numberOfWorkers
 }
 
 // NewReachability instantiates a default-true reachability from the model's pods
@@ -180,6 +180,7 @@ type Pod struct {
 	Namespace  string
 	Name       string
 	Containers []*Container
+	ServiceIP  string
 }
 
 // PodString returns a corresponding pod string

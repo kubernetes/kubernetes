@@ -22,7 +22,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -70,10 +69,14 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 			}
 
 			createdPods = append(createdPods, kubePod)
-			_, err = k.createService(pod.Service())
+			svc, err := k.createService(pod.Service())
 			if err != nil {
 				return err
 			}
+			if net.ParseIP(svc.Spec.ClusterIP) == nil {
+				return fmt.Errorf("empty IP address found for service %s/%s", svc.Namespace, svc.Name)
+			}
+			pod.ServiceIP = svc.Spec.ClusterIP
 		}
 	}
 
@@ -110,9 +113,14 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 	return kubePod, nil
 }
 
-// probeConnectivity execs into a pod and checks its connectivity to another pod..
+// probeConnectivity execs into a pod and checks its connectivity to another pod.
+// Implements the Prober interface.
 func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error) {
 	port := strconv.Itoa(toPort)
+	if addrTo == "" {
+		return false, "no IP provided", fmt.Errorf("empty addrTo field")
+	}
+	framework.Logf("Starting probe from pod %v to %v", podFrom, addrTo)
 	var cmd []string
 	timeout := fmt.Sprintf("--timeout=%vs", timeoutSeconds)
 
@@ -259,46 +267,4 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 		}
 	}
 	return nil
-}
-
-// waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
-func (k *kubeManager) waitForHTTPServers(model *Model) error {
-	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
-
-	testCases := map[string]*TestCase{}
-	for _, port := range model.Ports {
-		// Protocols is provided as input so that we can skip udp polling for windows
-		for _, protocol := range model.Protocols {
-			fromPort := 81
-			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
-			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}
-		}
-	}
-	notReady := map[string]bool{}
-	for caseName := range testCases {
-		notReady[caseName] = true
-	}
-
-	for i := 0; i < maxTries; i++ {
-		for caseName, testCase := range testCases {
-			if notReady[caseName] {
-				reachability := NewReachability(model.AllPods(), true)
-				testCase.Reachability = reachability
-				ProbePodToPodConnectivity(k, model, testCase)
-				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
-				if wrong == 0 {
-					framework.Logf("server %s is ready", caseName)
-					delete(notReady, caseName)
-				} else {
-					framework.Logf("server %s is not ready", caseName)
-				}
-			}
-		}
-		if len(notReady) == 0 {
-			return nil
-		}
-		time.Sleep(waitInterval)
-	}
-	return fmt.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }
