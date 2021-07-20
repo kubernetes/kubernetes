@@ -30,8 +30,6 @@ type gvkParserCache struct {
 	// discoveryClient is the client for retrieving the openAPI document and checking
 	// whether the document has changed recently
 	discoveryClient discovery.DiscoveryInterface
-	// ttl is how long the openAPI schema should be considered valid
-	ttl time.Duration
 	// mu protects the gvkParser
 	mu sync.Mutex
 	// gvkParser retrieves the objectType for a given gvk
@@ -46,20 +44,13 @@ func regenerateGVKParser(dc discovery.DiscoveryInterface) (*fieldmanager.GvkPars
 	if err != nil {
 		return nil, err
 	}
-	//c.lastChecked = time.Now()
+
 	models, err := proto.NewOpenAPIData(doc)
 	if err != nil {
 		return nil, err
 	}
 
 	return fieldmanager.NewGVKParser(models, false)
-	//gvkParser, err := fieldmanager.NewGVKParser(models, false)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//return gvkParser, nil
-	//return nil
 }
 
 // objectTypeForGVK retrieves the typed.ParseableType for a given gvk from the cache
