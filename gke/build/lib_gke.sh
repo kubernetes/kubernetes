@@ -1200,8 +1200,17 @@ tar_inject_tars()
 validate()
 {
   validate_licenses
+  validate_gke_cluster_config_files
   validate_bc_sources
   validate_bc_bins
+}
+
+# Validate that the correct GKE internal cluster config files/scripts are
+# copied into the kubernetes-manifests.tar.gz tarball.
+validate_gke_cluster_config_files() {
+  local artifacts_root="${__for_gcs}/${KUBE_GIT_VERSION}"
+  local artifact="${artifacts_root}/kubernetes-manifests.tar.gz"
+  assert_pathregex_exists_in_tar "${artifact}" "^kubernetes/gci-trusty/gke-internal-configure-helper.sh"
 }
 
 # Validate that the binaries were compiled with Go-BoringCrypto, as implied
