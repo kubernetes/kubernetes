@@ -51,7 +51,6 @@ import (
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
 
-	"github.com/PuerkitoBio/purell"
 	"github.com/pkg/errors"
 )
 
@@ -714,7 +713,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 		resp := etcdVersionResponse{}
 		var err error
 		versionURL := fmt.Sprintf("%s/%s", endpoint, "version")
-		if tmpVersionURL, err := purell.NormalizeURLString(versionURL, purell.FlagRemoveDuplicateSlashes); err != nil {
+		if tmpVersionURL, err := normalizeURLString(versionURL); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to normalize external etcd version url %s", versionURL))
 			continue
 		} else {
@@ -1118,4 +1117,17 @@ func setHasItemOrAll(s sets.String, item string) bool {
 		return true
 	}
 	return false
+}
+
+// normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.
+// It takes an URL string as input.
+func normalizeURLString(s string) (string, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+	if len(u.Path) > 0 {
+		u.Path = strings.ReplaceAll(u.Path, "//", "/")
+	}
+	return u.String(), nil
 }
