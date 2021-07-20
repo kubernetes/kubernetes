@@ -631,12 +631,14 @@ func isOrderSame(original, modified []interface{}, mergeKey string) (bool, error
 // diffListsOfScalars returns 2 lists, the first one is addList and the second one is deletionList.
 // Argument diffOptions.IgnoreChangesAndAdditions controls if calculate addList. true means not calculate.
 // Argument diffOptions.IgnoreDeletions controls if calculate deletionList. true means not calculate.
-// original may be changed, but modified is guaranteed to not be changed
+// both original, modified is guaranteed to not be changed
 func diffListsOfScalars(original, modified []interface{}, diffOptions DiffOptions) ([]interface{}, []interface{}, error) {
+	originalCopy := make([]interface{}, len(original))
+	copy(originalCopy, original)
 	modifiedCopy := make([]interface{}, len(modified))
 	copy(modifiedCopy, modified)
 	// Sort the scalars for easier calculating the diff
-	originalScalars := sortScalars(original)
+	originalScalars := sortScalars(originalCopy)
 	modifiedScalars := sortScalars(modifiedCopy)
 
 	originalIndex, modifiedIndex := 0, 0
