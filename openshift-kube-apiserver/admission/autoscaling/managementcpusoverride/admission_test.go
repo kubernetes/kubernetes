@@ -561,7 +561,7 @@ func testPodWithManagedResource(cpuLimit, cpuRequest, memoryLimit, memoryRequest
 }
 
 func testManagedPodWithAnnotations(cpuLimit, cpuRequest, memoryLimit, memoryRequest string, annotations map[string]string) *kapi.Pod {
-	pod := testPod(cpuLimit, cpuRequest, memoryLimit, memoryRequest)
+	pod := testManagedPod(cpuLimit, cpuRequest, memoryLimit, memoryRequest)
 	pod.Annotations = annotations
 	return pod
 }

@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -50,6 +51,8 @@ const (
 	workloadAdmissionWarning = "workload.openshift.io/warning"
 	// infraClusterName contains the name of the cluster infrastructure resource
 	infraClusterName = "cluster"
+	// debugSourceResourceAnnotation contains the debug annotation that refers to the pod resource
+	debugSourceResourceAnnotation = "debug.openshift.io/source-resource"
 )
 
 var _ = initializer.WantsExternalKubeInformerFactory(&managementCPUsOverride{})
@@ -588,6 +591,10 @@ func (a *managementCPUsOverride) Validate(ctx context.Context, attr admission.At
 		}
 
 		for resourceName, c := range containersWorkloadResources {
+			if isDebugPod(pod.Annotations) {
+				warning.AddWarning(ctx, "", "You must pass --keep-annotations parameter to the debug command or upgrade the oc tool to the latest version when trying to debug a pod with workload partitioning resources.")
+			}
+
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.containers.resources.requests"), c.Resources.Requests, fmt.Sprintf("the pod without workload annotations can not have containers with workload resources %q", resourceName)))
 		}
 	} else {
@@ -622,4 +629,9 @@ func getPodInvalidWorkloadAnnotationError(annotations map[string]string, message
 func isStaticPod(annotations map[string]string) bool {
 	source, ok := annotations[kubetypes.ConfigSourceAnnotationKey]
 	return ok && source != kubetypes.ApiserverSource
+}
+
+func isDebugPod(annotations map[string]string) bool {
+	_, ok := annotations[debugSourceResourceAnnotation]
+	return ok
 }
