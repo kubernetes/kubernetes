@@ -82,9 +82,10 @@ var (
 	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_longrunning_gauge",
-			Help:           "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_longrunning_gauge",
+			Help:              "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.23.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -131,9 +132,10 @@ var (
 	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
 	RegisteredWatchers = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_registered_watchers",
-			Help:           "Number of currently registered watchers for a given resources",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_registered_watchers",
+			Help:              "Number of currently registered watchers for a given resources",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.23.0",
 		},
 		[]string{"group", "version", "kind"},
 	)
