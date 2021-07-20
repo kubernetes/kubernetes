@@ -119,6 +119,11 @@ var _ = NewCounter(
 }
 
 func TestStableMetric(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("unable to fetch path to testing package - needed for simulating import path tests")
+	}
+
 	for _, test := range []struct {
 		testName string
 		src      string
@@ -466,7 +471,7 @@ var _ = metrics.NewCounter(
 				Subsystem:      "kubelet",
 				Type:           counterMetricType,
 			},
-			kubeRoot: "/home/pchristopher/go/src/k8s.io/kubernetes",
+			kubeRoot: strings.Join([]string{wd, "testdata"}, string(os.PathSeparator)),
 			src: `
 package test
 import compbasemetrics "k8s.io/component-base/metrics"
@@ -476,6 +481,27 @@ var _ = compbasemetrics.NewCounter(
 			Name: "importedCounter",
 			StabilityLevel: compbasemetrics.STABLE,
 			Subsystem: metrics.KubeletSubsystem,
+	},
+	)
+`},
+		{
+			testName: "Imported k8s.io/staging constant",
+			metric: metric{
+				Name:           "importedCounter",
+				StabilityLevel: "STABLE",
+				Subsystem:      "ThisIsNotTheSoundOfTheTrain",
+				Type:           counterMetricType,
+			},
+			kubeRoot: strings.Join([]string{wd, "testdata"}, string(os.PathSeparator)),
+			src: `
+package test
+import compbasemetrics "k8s.io/component-base/metrics"
+import "k8s.io/metrics"
+var _ = compbasemetrics.NewCounter(
+	&compbasemetrics.CounterOpts{
+		Name: "importedCounter",
+		StabilityLevel: compbasemetrics.STABLE,
+		Subsystem: metrics.OKGO,
 	},
 	)
 `},
@@ -762,9 +788,9 @@ func Test_localImportPath(t *testing.T) {
 			errorExp:     false,
 		},
 		{
-			name:         "public package",
-			importExpr:   "github.com/thisisnot/thesoundofthetrain",
-			errorExp:     true,
+			name:       "public package",
+			importExpr: "github.com/thisisnot/thesoundofthetrain",
+			errorExp:   true,
 		},
 		{
 			name:         "stl package",
