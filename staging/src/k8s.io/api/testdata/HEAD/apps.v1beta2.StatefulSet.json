@@ -1649,30 +1649,26 @@
       }
     },
     "revisionHistoryLimit": -827620894,
-    "minReadySeconds": -619299042,
-    "persistentVolumeClaimRetentionPolicy": {
-      "whenDeleted": "弞þƔ剛Ʃ°qgWǰ绿络a",
-      "whenScaled": "7ɞŶJŖ)j{驟ʦcȃ/I"
-    }
+    "minReadySeconds": -619299042
   },
   "status": {
-    "observedGeneration": -3509397394862257066,
-    "replicas": -1343766220,
-    "readyReplicas": -346713296,
-    "currentReplicas": 282379690,
-    "updatedReplicas": -554064621,
+    "observedGeneration": 5447372700200122498,
+    "replicas": -2070785865,
+    "readyReplicas": 1702437783,
+    "currentReplicas": -1694062357,
+    "updatedReplicas": -296989682,
     "currentRevision": "526",
     "updateRevision": "527",
-    "collisionCount": 974374726,
+    "collisionCount": 1261428189,
     "conditions": [
       {
-        "type": "劾ůk`磾ƃ妹浓ª",
-        "status": "痞濥鐳VDɝÔȗ$",
-        "lastTransitionTime": "2141-07-05T00:48:21Z",
+        "type": "鮩澊聝楧p问Ð7ɞŶJŖ)j{驟ʦ",
+        "status": "N崑-ņȎ",
+        "lastTransitionTime": "2128-12-14T15:28:07Z",
         "reason": "528",
         "message": "529"
       }
     ],
-    "availableReplicas": -1350782402
+    "availableReplicas": -346713296
   }
 }
