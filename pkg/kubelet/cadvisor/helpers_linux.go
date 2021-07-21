@@ -38,13 +38,6 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	switch i.runtime {
 	case types.DockerContainerRuntime:
 		return cadvisorfs.LabelDockerImages, nil
-	case types.RemoteContainerRuntime:
-		// This is a temporary workaround to get stats for cri-o from cadvisor
-		// and should be removed.
-		// Related to https://github.com/kubernetes/kubernetes/issues/51798
-		if i.runtimeEndpoint == CrioSocket || i.runtimeEndpoint == "unix://"+CrioSocket {
-			return cadvisorfs.LabelCrioImages, nil
-		}
 	}
 	return "", fmt.Errorf("no imagefs label for configured runtime")
 }
