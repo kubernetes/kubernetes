@@ -35,7 +35,6 @@ import (
 	"k8s.io/component-base/version"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
@@ -61,20 +60,12 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/windows"
 )
 
-// handleFlags sets up all flags and parses the command line.
-func handleFlags() {
-	config.CopyFlags(config.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
-	flag.Parse()
-}
-
 func TestMain(m *testing.M) {
 	var versionFlag bool
 	flag.CommandLine.BoolVar(&versionFlag, "version", false, "Displays version information.")
 
 	// Register test flags, then parse flags.
-	handleFlags()
+	HandleFlags()
 
 	if framework.TestContext.ListImages {
 		for _, v := range image.GetImageConfigs() {
