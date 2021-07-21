@@ -38,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
@@ -75,21 +74,13 @@ import (
 	_ "k8s.io/kubernetes/test/utils/format"
 )
 
-// handleFlags sets up all flags and parses the command line.
-func handleFlags() {
-	config.CopyFlags(config.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
-	flag.Parse()
-}
-
 func TestMain(m *testing.M) {
 	var versionFlag bool
 	flag.CommandLine.BoolVar(&versionFlag, "version", false, "Displays version information.")
 	listConformanceTests := flag.CommandLine.Bool("list-conformance-tests", false, "If true, will show list of conformance tests.")
 
 	// Register test flags, then parse flags.
-	handleFlags()
+	HandleFlags()
 
 	if versionFlag {
 		fmt.Printf("%s\n", version.Get())
