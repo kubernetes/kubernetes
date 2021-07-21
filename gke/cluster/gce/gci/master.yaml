@@ -1,0 +1,178 @@
+#cloud-config
+
+users:
+- name: etcd
+  homedir: /var/etcd
+  lock_passwd: true
+  ssh_redirect_user: true
+
+- name: kube-bootstrap-logs-forwarder
+  gecos: User the kube-bootstrap-logs-forwarder.service runs as.
+  system: true
+
+write_files:
+  - path: /etc/systemd/system/kube-bootstrap-logs-forwarder.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Forwards Kubernetes bootstrap logs to serial port.
+      Before=kube-master-installation.service
+
+      [Service]
+      User=kube-bootstrap-logs-forwarder
+      Group=systemd-journal
+      SupplementaryGroups=serial
+      ExecStart=journalctl --no-tail --no-pager --follow --utc --output short-iso --unit kube-master-installation --unit kube-master-configuration --unit kubelet
+      StandardOutput=tty
+      TTYPath=/dev/ttyS2
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-master-installation.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Download and install k8s binaries and configurations
+      Requires=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
+      ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
+      ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
+      ExecStartPre=/usr/bin/curl --fail --retry 600 --retry-delay 3 --retry-connrefused --connect-timeout 10 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
+      ExecStart=/home/kubernetes/bin/configure.sh
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-master-internal-route.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Configure kube internal route
+      Requires=kube-master-installation.service
+      After=kube-master-installation.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --retry-connrefused --connect-timeout 10 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/kube-master-internal-route.sh
+      ExecStart=/home/kubernetes/bin/kube-master-internal-route.sh
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-master-configuration.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Configure kubernetes master
+      Requires=kube-master-installation.service
+      After=kube-master-installation.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
+      ExecStart=/home/kubernetes/bin/configure-helper.sh
+      ExecStartPost=systemctl stop kube-bootstrap-logs-forwarder.service
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-container-runtime-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for container runtime
+      After=kube-master-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh container-runtime
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubelet-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for kubelet
+      After=kube-master-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.timer
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=kube-logrotate invocation
+
+      [Timer]
+      OnCalendar=*-*-* *:00/5:00
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes log rotation
+      After=kube-master-configuration.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=-/usr/sbin/logrotate /etc/logrotate.conf
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubernetes.target
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+ - systemctl daemon-reload
+ - systemctl enable kube-bootstrap-logs-forwarder.service
+ - systemctl enable kube-master-installation.service
+ - systemctl enable kube-master-internal-route.service
+ - systemctl enable kube-master-configuration.service
+ - systemctl enable kube-container-runtime-monitor.service
+ - systemctl enable kubelet-monitor.service
+ - systemctl enable kube-logrotate.timer
+ - systemctl enable kube-logrotate.service
+ - systemctl enable kubernetes.target
+ - systemctl start kubernetes.target

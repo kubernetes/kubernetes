@@ -1,0 +1,99 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: ippools.crd.projectcalico.org
+spec:
+  group: crd.projectcalico.org
+  names:
+    kind: IPPool
+    listKind: IPPoolList
+    plural: ippools
+    singular: ippool
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: IPPoolSpec contains the specification for an IPPool resource.
+            properties:
+              blockSize:
+                description: The block size to use for IP address assignments from
+                  this pool. Defaults to 26 for IPv4 and 112 for IPv6.
+                type: integer
+              cidr:
+                description: The pool CIDR.
+                type: string
+              disabled:
+                description: When disabled is true, Calico IPAM will not assign addresses
+                  from this pool.
+                type: boolean
+              ipip:
+                description: 'Deprecated: this field is only used for APIv1 backwards
+                  compatibility. Setting this field is not allowed, this field is
+                  for internal use only.'
+                properties:
+                  enabled:
+                    description: When enabled is true, ipip tunneling will be used
+                      to deliver packets to destinations within this pool.
+                    type: boolean
+                  mode:
+                    description: The IPIP mode.  This can be one of "always" or "cross-subnet".  A
+                      mode of "always" will also use IPIP tunneling for routing to
+                      destination IP addresses within this pool.  A mode of "cross-subnet"
+                      will only use IPIP tunneling when the destination node is on
+                      a different subnet to the originating node.  The default value
+                      (if not specified) is "always".
+                    type: string
+                type: object
+              ipipMode:
+                description: Contains configuration for IPIP tunneling for this pool.
+                  If not specified, then this is defaulted to "Never" (i.e. IPIP tunneling
+                  is disabled).
+                type: string
+              nat-outgoing:
+                description: 'Deprecated: this field is only used for APIv1 backwards
+                  compatibility. Setting this field is not allowed, this field is
+                  for internal use only.'
+                type: boolean
+              natOutgoing:
+                description: When nat-outgoing is true, packets sent from Calico networked
+                  containers in this pool to destinations outside of this pool will
+                  be masqueraded.
+                type: boolean
+              nodeSelector:
+                description: Allows IPPool to allocate for a specific node by label
+                  selector.
+                type: string
+              vxlanMode:
+                description: Contains configuration for VXLAN tunneling for this pool.
+                  If not specified, then this is defaulted to "Never" (i.e. VXLAN
+                  tunneling is disabled).
+                type: string
+            required:
+            - cidr
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

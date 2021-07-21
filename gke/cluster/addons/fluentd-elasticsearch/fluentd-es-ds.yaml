@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd-es
+  namespace: logging
+  labels:
+    k8s-app: fluentd-es
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd-es
+  labels:
+    k8s-app: fluentd-es
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "namespaces"
+  - "pods"
+  verbs:
+  - "get"
+  - "watch"
+  - "list"
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd-es
+  labels:
+    k8s-app: fluentd-es
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+- kind: ServiceAccount
+  name: fluentd-es
+  namespace: logging
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: fluentd-es
+  apiGroup: ""
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-es-v3.1.1
+  namespace: logging
+  labels:
+    k8s-app: fluentd-es
+    version: v3.1.1
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-es
+      version: v3.1.1
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-es
+        version: v3.1.1
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      priorityClassName: system-node-critical
+      serviceAccountName: fluentd-es
+      containers:
+      - name: fluentd-es
+        image: quay.io/fluentd_elasticsearch/fluentd:v3.1.0
+        env:
+        - name: FLUENTD_ARGS
+          value: --no-supervisor -q
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: config-volume
+          mountPath: /etc/fluent/config.d
+        ports:
+        - containerPort: 24231
+          name: prometheus
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: config-volume
+        configMap:
+          name: fluentd-es-config-v0.2.1

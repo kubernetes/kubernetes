@@ -1,0 +1,16 @@
+{{ template "base" .KubeHome }}
+readonly ETCD_APISERVER_CA_KEY={{.CAKey}}
+readonly ETCD_APISERVER_CA_CERT={{.CACert}}
+readonly ETCD_APISERVER_SERVER_KEY={{.APIServerKey}}
+readonly ETCD_APISERVER_SERVER_CERT={{.APIServerCert}}
+readonly ETCD_APISERVER_CLIENT_KEY={{.ETCDKey}}
+readonly ETCD_APISERVER_CLIENT_CERT={{.ETCDCert}}
+readonly ETCD_SERVERS={{.ETCDServers}}
+readonly ETCD_APISERVER_CA_CERT_PATH={{.CACertPath}}
+readonly ETCD_APISERVER_CLIENT_CERT_PATH={{.APIServerCertPath}}
+readonly ETCD_APISERVER_CLIENT_KEY_PATH={{.APIServerKeyPath}}
+readonly ETCD_SERVERS_OVERRIDES={{.ETCDServersOverride}}
+readonly STORAGE_BACKEND={{.StorageBackend}}
+readonly STORAGE_MEDIA_TYPE={{.StorageMediaType}}
+readonly ETCD_COMPACTION_INTERVAL_SEC={{.CompactionInterval}}
+readonly KUBE_API_SERVER_RUNASUSER={{.KubeAPIServerRunAsUser}}

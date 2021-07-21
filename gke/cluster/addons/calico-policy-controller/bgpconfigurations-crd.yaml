@@ -1,0 +1,131 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: bgpconfigurations.crd.projectcalico.org
+spec:
+  group: crd.projectcalico.org
+  names:
+    kind: BGPConfiguration
+    listKind: BGPConfigurationList
+    plural: bgpconfigurations
+    singular: bgpconfiguration
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: BGPConfiguration contains the configuration for any BGP routing.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BGPConfigurationSpec contains the values of the BGP configuration.
+            properties:
+              asNumber:
+                description: 'ASNumber is the default AS number used by a node. [Default:
+                  64512]'
+                format: int32
+                type: integer
+              communities:
+                description: Communities is a list of BGP community values and their
+                  arbitrary names for tagging routes.
+                items:
+                  description: Community contains standard or large community value
+                    and its name.
+                  properties:
+                    name:
+                      description: Name given to community value.
+                      type: string
+                    value:
+                      description: Value must be of format `aa:nn` or `aa:nn:mm`.
+                        For standard community use `aa:nn` format, where `aa` and
+                        `nn` are 16 bit number. For large community use `aa:nn:mm`
+                        format, where `aa`, `nn` and `mm` are 32 bit number. Where,
+                        `aa` is an AS Number, `nn` and `mm` are per-AS identifier.
+                      pattern: ^(\d+):(\d+)$|^(\d+):(\d+):(\d+)$
+                      type: string
+                  type: object
+                type: array
+              listenPort:
+                description: ListenPort is the port where BGP protocol should listen.
+                  Defaults to 179
+                maximum: 65535
+                minimum: 1
+                type: integer
+              logSeverityScreen:
+                description: 'LogSeverityScreen is the log severity above which logs
+                  are sent to the stdout. [Default: INFO]'
+                type: string
+              nodeToNodeMeshEnabled:
+                description: 'NodeToNodeMeshEnabled sets whether full node to node
+                  BGP mesh is enabled. [Default: true]'
+                type: boolean
+              prefixAdvertisements:
+                description: PrefixAdvertisements contains per-prefix advertisement
+                  configuration.
+                items:
+                  description: PrefixAdvertisement configures advertisement properties
+                    for the specified CIDR.
+                  properties:
+                    cidr:
+                      description: CIDR for which properties should be advertised.
+                      type: string
+                    communities:
+                      description: Communities can be list of either community names
+                        already defined in `Specs.Communities` or community value
+                        of format `aa:nn` or `aa:nn:mm`. For standard community use
+                        `aa:nn` format, where `aa` and `nn` are 16 bit number. For
+                        large community use `aa:nn:mm` format, where `aa`, `nn` and
+                        `mm` are 32 bit number. Where,`aa` is an AS Number, `nn` and
+                        `mm` are per-AS identifier.
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                type: array
+              serviceClusterIPs:
+                description: ServiceClusterIPs are the CIDR blocks from which service
+                  cluster IPs are allocated. If specified, Calico will advertise these
+                  blocks, as well as any cluster IPs within them.
+                items:
+                  description: ServiceClusterIPBlock represents a single allowed ClusterIP
+                    CIDR block.
+                  properties:
+                    cidr:
+                      type: string
+                  type: object
+                type: array
+              serviceExternalIPs:
+                description: ServiceExternalIPs are the CIDR blocks for Kubernetes
+                  Service External IPs. Kubernetes Service ExternalIPs will only be
+                  advertised if they are within one of these blocks.
+                items:
+                  description: ServiceExternalIPBlock represents a single allowed
+                    External IP CIDR block.
+                  properties:
+                    cidr:
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
