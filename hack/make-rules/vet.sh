@@ -44,8 +44,11 @@ done
 if [[ ${#targets[@]} -eq 0 ]]; then
   # Do not run on third_party directories or generated client code or build tools.
   while IFS='' read -r line; do
-    targets+=("${line}")
-  done < <(go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
+    # Strips the prefix
+    package="."${line#"${KUBE_GO_PACKAGE}"}
+    targets+=("${package}")
+  done < <(GO111MODULE=on go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
 fi
 
+kube::golang::setup_env
 go vet "${goflags[@]:+${goflags[@]}}" "${targets[@]}"
