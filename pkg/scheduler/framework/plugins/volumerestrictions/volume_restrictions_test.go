@@ -18,7 +18,9 @@ package volumerestrictions
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -74,7 +76,12 @@ func TestGCEDiskConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := newPlugin(t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			state := framework.NewCycleState()
+			preFilterState := &preFilterState{
+				pvck: sets.NewString(),
+			}
+			state.Write(preFilterStateKey, preFilterState)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -122,7 +129,12 @@ func TestAWSDiskConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := newPlugin(t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			state := framework.NewCycleState()
+			preFilterState := &preFilterState{
+				pvck: sets.NewString(),
+			}
+			state.Write(preFilterStateKey, preFilterState)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -176,7 +188,12 @@ func TestRBDDiskConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := newPlugin(t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			state := framework.NewCycleState()
+			preFilterState := &preFilterState{
+				pvck: sets.NewString(),
+			}
+			state.Write(preFilterStateKey, preFilterState)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -230,7 +247,12 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := newPlugin(t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			state := framework.NewCycleState()
+			preFilterState := &preFilterState{
+				pvck: sets.NewString(),
+			}
+			state.Write(preFilterStateKey, preFilterState)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -410,9 +432,19 @@ func TestAccessModeConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := newPluginWithListers(t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
-			gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %+v, want: %+v", gotStatus, test.wantStatus)
+			state := framework.NewCycleState()
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				if !strings.Contains(preFilterStatus.Message(), test.wantStatus.Message()) {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				}
+			} else {
+				nodeInfo := framework.NewNodeInfo(test.existingPods...)
+				nodeInfo.SetNode(node)
+				filterStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfo)
+				if !reflect.DeepEqual(filterStatus, test.wantStatus) {
+					t.Errorf("status does not match: %+v, want: %+v", filterStatus, test.wantStatus)
+				}
 			}
 		})
 	}
