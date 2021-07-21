@@ -44,8 +44,7 @@ type Config struct {
 	InformerFactory    informers.SharedInformerFactory
 	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 
-	//lint:ignore SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
-	//nolint:staticcheck
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
 	EventBroadcaster events.EventBroadcasterAdapter
 
 	// LeaderElection is optional.
