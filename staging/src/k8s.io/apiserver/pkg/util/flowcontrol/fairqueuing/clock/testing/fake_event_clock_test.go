@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package testing
 
 import (
 	"math/rand"
@@ -22,23 +22,17 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 )
 
 type TestableEventClock interface {
-	EventClock
+	clock.EventClock
 	SetTime(time.Time)
 	Run(*time.Time)
 }
 
-// settablePassiveClock allows setting current time of a passive clock
-type settablePassiveClock interface {
-	clock.PassiveClock
-	SetTime(time.Time)
-}
-
 func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.Duration) {
-	exercisePassiveClock(t, ec)
+	exerciseSettablePassiveClock(t, ec)
 	var numDone int32
 	now := ec.Now()
 	strictable := true
@@ -104,7 +98,8 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 	}
 }
 
-func exercisePassiveClock(t *testing.T, pc settablePassiveClock) {
+// copied from baseclocktest, because it is not public
+func exerciseSettablePassiveClock(t *testing.T, pc TestableEventClock) {
 	t1 := time.Now()
 	t2 := t1.Add(time.Hour)
 	pc.SetTime(t1)
@@ -133,51 +128,4 @@ func TestFakeEventClock(t *testing.T) {
 	exerciseTestableEventClock(t, fec, 0)
 	fec, _ = NewFakeEventClock(startTime, time.Second, nil)
 	exerciseTestableEventClock(t, fec, time.Second)
-}
-
-func exerciseEventClock(t *testing.T, ec EventClock, relax func(time.Duration)) {
-	var numDone int32
-	now := ec.Now()
-	const batchSize = 100
-	times := make(chan time.Time, batchSize+1)
-	try := func(abs bool, d time.Duration) {
-		f := func(u time.Time) {
-			realD := ec.Since(now)
-			atomic.AddInt32(&numDone, 1)
-			times <- u
-			if realD < d {
-				t.Errorf("Asked for %v, got %v", d, realD)
-			}
-		}
-		if abs {
-			ec.EventAfterTime(f, now.Add(d))
-		} else {
-			ec.EventAfterDuration(f, d)
-		}
-	}
-	try(true, time.Millisecond*3300)
-	for i := 0; i < batchSize; i++ {
-		d := time.Duration(rand.Intn(30)-3) * time.Millisecond * 100
-		try(i%2 == 0, d)
-	}
-	relax(time.Second * 4)
-	if atomic.LoadInt32(&numDone) != batchSize+1 {
-		t.Errorf("Got only %v events", numDone)
-	}
-	lastTime := now
-	for i := 0; i <= batchSize; i++ {
-		nextTime := <-times
-		if nextTime.Before(now) {
-			continue
-		}
-		dt := nextTime.Sub(lastTime) / (50 * time.Millisecond)
-		if dt < 0 {
-			t.Errorf("Got %s after %s", nextTime, lastTime)
-		}
-		lastTime = nextTime
-	}
-}
-
-func TestRealEventClock(t *testing.T) {
-	exerciseEventClock(t, RealEventClock{}, func(d time.Duration) { time.Sleep(d) })
 }
