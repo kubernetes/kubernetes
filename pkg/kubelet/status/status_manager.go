@@ -157,9 +157,10 @@ func (m *manager) Start() {
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
-	syncTicker := time.NewTicker(syncPeriod).C
+	syncTicker := time.NewTicker(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
+		defer syncTicker.Stop()
 		for {
 			select {
 			case syncRequest := <-m.podStatusChannel:
@@ -168,7 +169,7 @@ func (m *manager) Start() {
 					"statusVersion", syncRequest.status.version,
 					"status", syncRequest.status.status)
 				m.syncPod(syncRequest.podUID, syncRequest.status)
-			case <-syncTicker:
+			case <-syncTicker.C:
 				klog.V(5).InfoS("Status Manager: syncing batch")
 				// remove any entries in the status channel since the batch will handle them
 				for i := len(m.podStatusChannel); i > 0; i-- {
