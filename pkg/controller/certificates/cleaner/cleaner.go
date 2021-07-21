@@ -104,11 +104,7 @@ func (ccc *CSRCleanerController) worker() {
 }
 
 func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) error {
-	isIssuedExpired, err := isIssuedExpired(csr)
-	if err != nil {
-		return err
-	}
-	if isIssuedPastDeadline(csr) || isDeniedPastDeadline(csr) || isFailedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired {
+	if isIssuedPastDeadline(csr) || isDeniedPastDeadline(csr) || isFailedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired(csr) {
 		if err := ccc.csrClient.Delete(context.TODO(), csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
@@ -118,18 +114,14 @@ func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) err
 
 // isIssuedExpired checks if the CSR has been issued a certificate and if the
 // expiration of the certificate (the NotAfter value) has passed.
-func isIssuedExpired(csr *capi.CertificateSigningRequest) (bool, error) {
-	isExpired, err := isExpired(csr)
-	if err != nil {
-		return false, err
-	}
+func isIssuedExpired(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired {
+		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired(csr) {
 			klog.Infof("Cleaning CSR %q as the associated certificate is expired.", csr.Name)
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 // isPendingPastDeadline checks if the certificate has a Pending status and the
@@ -198,20 +190,20 @@ func isIssued(csr *capi.CertificateSigningRequest) bool {
 
 // isExpired checks if the CSR has a certificate and the date in the `NotAfter`
 // field has gone by.
-func isExpired(csr *capi.CertificateSigningRequest) (bool, error) {
+func isExpired(csr *capi.CertificateSigningRequest) bool {
 	if len(csr.Status.Certificate) == 0 {
-		return false, nil
+		return false
 	}
 	block, _ := pem.Decode(csr.Status.Certificate)
 	if block == nil {
-		return false, fmt.Errorf("expected the certificate associated with the CSR to be PEM encoded")
+		return false
 	}
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
-		return false, fmt.Errorf("unable to parse certificate data: %v", err)
+		return false
 	}
 	if len(certs) == 0 {
-		return false, fmt.Errorf("no certificates found")
+		return false
 	}
-	return time.Now().After(certs[0].NotAfter), nil
+	return time.Now().After(certs[0].NotAfter)
 }
