@@ -40,8 +40,7 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + l.Addr().String() + "/metrics"
 	mux := http.NewServeMux()
-	//lint:ignore SA1019 ignore deprecated warning until we move off of global registries
-	//nolint:staticcheck
+	//nolint:staticcheck // SA1019 ignore deprecated warning until we move off of global registries
 	mux.Handle("/metrics", legacyregistry.Handler())
 	server := &http.Server{
 		Addr:    l.Addr().String(),
