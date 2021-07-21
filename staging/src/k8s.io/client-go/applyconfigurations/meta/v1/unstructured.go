@@ -58,17 +58,14 @@ func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.P
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// if the ttl on the openAPISchema has expired,
-	// recheck the discovery client to see if the Open API schema has changed
+	// regenerate the gvk parser
 	if time.Now().After(c.lastChecked.Add(openAPISchemaTTL)) {
 		c.lastChecked = time.Now()
-		if c.discoveryClient.HasOpenAPISchemaChanged() {
-			// the schema has changed, regenerate the parser
-			parser, err := regenerateGVKParser(c.discoveryClient)
-			if err != nil {
-				return nil, err
-			}
-			c.gvkParser = parser
+		parser, err := regenerateGVKParser(c.discoveryClient)
+		if err != nil {
+			return nil, err
 		}
+		c.gvkParser = parser
 	}
 	return c.gvkParser.Type(gvk), nil
 }

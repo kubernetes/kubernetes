@@ -149,10 +149,6 @@ func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
-func (d *memCacheClient) HasOpenAPISchemaChanged() bool {
-	return d.delegate.HasOpenAPISchemaChanged()
-}
-
 func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()

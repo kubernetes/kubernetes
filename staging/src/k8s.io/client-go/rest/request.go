@@ -1140,21 +1140,12 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		}
 	}
 
-	// store the X-From-Cache header so that we can
-	// return it as part of the result
-	var fromCache bool
-	xFromCacheHeader, ok := resp.Header["X-From-Cache"]
-	if ok {
-		fromCache = len(xFromCacheHeader) == 1 && xFromCacheHeader[0] == "1"
-	}
-
 	return Result{
 		body:        body,
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
 		warnings:    handleWarnings(resp.Header, r.warningHandler),
-		fromCache:   fromCache,
 	}
 }
 
@@ -1281,7 +1272,6 @@ type Result struct {
 	contentType string
 	err         error
 	statusCode  int
-	fromCache   bool
 
 	decoder runtime.Decoder
 }
@@ -1316,11 +1306,6 @@ func (r Result) Get() (runtime.Object, error) {
 		}
 	}
 	return out, nil
-}
-
-// FromCache returns whether the response was returned from the cache.
-func (r Result) FromCache() bool {
-	return r.fromCache
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no
