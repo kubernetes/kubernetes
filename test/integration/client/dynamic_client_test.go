@@ -211,7 +211,6 @@ func TestUnstructuredExtract(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
 	dynamicClient, err := dynamic.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
@@ -227,6 +226,10 @@ func TestUnstructuredExtract(t *testing.T) {
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
 				"name": name,
+				// namespace will always get set by extract,
+				// so we add it here (even though it's optional)
+				// to ensure what we apply equals what we extract.
+				"namespace": "default",
 			},
 			"spec": map[string]interface{}{
 				"containers": []interface{}{
@@ -255,102 +258,22 @@ func TestUnstructuredExtract(t *testing.T) {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
 
-	// check that the object applied is what we get back from the server
-	got, err := dynamicClient.Resource(resource).Namespace("default").Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error when getting pod %q: %v", name, err)
-	}
-
-	if !reflect.DeepEqual(actual, got) {
-		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actual, got)
-	}
-
 	// extract the object
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(result.ClientConfig)
 	extractor, err := metav1ac.NewUnstructuredExtractor(discoveryClient)
 	if err != nil {
 		t.Fatalf("unexpected error when constructing extrator: %v", err)
 	}
-	extracted, err := extractor.Extract(got, mgr)
+	extracted, err := extractor.Extract(actual, mgr)
 	if err != nil {
 		t.Fatalf("unexpected error when extracting: %v", err)
 	}
 
-	// modify the object and apply the modified object
-	modified := extracted
-	modified.SetLabels(map[string]string{"label1": "value1"})
-	modifiedData, err := json.Marshal(modified)
-	if err != nil {
-		t.Fatalf("failed to marshal modified pod into bytes: %v", err)
+	// confirm that the extracted object equals the applied object
+	if !reflect.DeepEqual(pod, extracted) {
+		t.Fatalf("extracted pod doesn't equal applied pod. wanted:\n %v\n, got:\n %v\n", pod, extracted)
 	}
 
-	actualModified, err := dynamicClient.Resource(resource).Namespace("default").Patch(
-		context.TODO(),
-		name,
-		types.ApplyPatchType,
-		modifiedData,
-		metav1.PatchOptions{FieldManager: mgr})
-	if err != nil {
-		t.Fatalf("unexpected error when applying modified pod: %v", err)
-	}
-
-	// check that the extracted and modified object is what we expect
-	gotModified, err := dynamicClient.Resource(resource).Namespace("default").Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error when getting pod %q: %v", name, err)
-	}
-
-	if !reflect.DeepEqual(actualModified, gotModified) {
-		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actualModified, gotModified)
-	}
-
-	// extract again to test hitting the object type cache
-	extracted2, err := extractor.Extract(gotModified, mgr)
-	if err != nil {
-		t.Fatalf("unexpected error when extracting for the second time")
-	}
-
-	// modify the object and apply the modified object again
-	modified2 := extracted2
-	modified2.SetLabels(map[string]string{"label2": "value2"})
-	modifiedData2, err := json.Marshal(modified2)
-	if err != nil {
-		t.Fatalf("failed to marshal modified pod into bytes: %v", err)
-	}
-
-	actualModified2, err := dynamicClient.Resource(resource).Namespace("default").Patch(
-		context.TODO(),
-		name,
-		types.ApplyPatchType,
-		modifiedData2,
-		metav1.PatchOptions{FieldManager: mgr})
-	if err != nil {
-		t.Fatalf("unexpected error when applying modified pod: %v", err)
-	}
-
-	gotModified2, err := dynamicClient.Resource(resource).Namespace("default").Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error when getting pod %q: %v", name, err)
-	}
-
-	if !reflect.DeepEqual(actualModified2, gotModified2) {
-		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actualModified, gotModified)
-	}
-
-	// delete the object dynamically
-	err = dynamicClient.Resource(resource).Namespace("default").Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error when deleting pod: %v", err)
-	}
-
-	list, err := client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error when listing pods: %v", err)
-	}
-
-	if len(list.Items) != 0 {
-		t.Fatalf("expected zero pods, got %d", len(list.Items))
-	}
 }
 
 func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
