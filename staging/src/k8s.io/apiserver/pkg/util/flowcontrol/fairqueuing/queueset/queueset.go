@@ -23,23 +23,16 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/utils/clock"
-
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	fqclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fqrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog/v2"
-
-	// The following hack is needed to work around a tooling deficiency.
-	// Packages imported only for test code are not included in vendor.
-	// See https://kubernetes.slack.com/archives/C0EG7JC6T/p1626985671458800?thread_ts=1626983387.450800&cid=C0EG7JC6T
-	// The need for this hack will be removed when we make queueset use an EventClock rather than a PassiveClock.
-	_ "k8s.io/utils/clock/testing"
 )
 
 const nsTimeFmt = "2006-01-02 15:04:05.000000000"
@@ -48,7 +41,7 @@ const nsTimeFmt = "2006-01-02 15:04:05.000000000"
 // queueSetFactory makes QueueSet objects.
 type queueSetFactory struct {
 	counter counter.GoRoutineCounter
-	clock   clock.PassiveClock
+	clock   fqclock.EventClock
 }
 
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
@@ -71,7 +64,7 @@ type queueSetCompleter struct {
 // not end in "Locked" either acquires the lock or does not care about
 // locking.
 type queueSet struct {
-	clock                clock.PassiveClock
+	clock                fqclock.EventClock
 	counter              counter.GoRoutineCounter
 	estimatedServiceTime float64
 	obsPair              metrics.TimedObserverPair
@@ -121,7 +114,7 @@ type queueSet struct {
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
-func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) fq.QueueSetFactory {
+func NewQueueSetFactory(c fqclock.EventClock, counter counter.GoRoutineCounter) fq.QueueSetFactory {
 	return &queueSetFactory{
 		counter: counter,
 		clock:   c,
@@ -811,7 +804,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	// TODO: for now we keep the logic localized so it is easier to see
 	//  how the counters are released for queueset and queue, in future we
 	//  can refactor to move this function.
-	releaseSeatsFn := func() {
+	releaseSeatsFn := func(_ time.Time) {
 		defer qs.removeQueueIfEmptyLocked(r)
 
 		qs.totSeatsInUse -= r.Seats()
@@ -824,18 +817,12 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	defer func() {
 		if r.width.AdditionalLatency <= 0 {
 			// release the seats allocated to this request immediately
-			releaseSeatsFn()
+			releaseSeatsFn(time.Time{})
 			return
 		}
 
-		// spin up a goroutine that sleeps for AdditionalLatency and then release
-		// the seats allocated to this request, this ensures that the additional
-		// latency has no impact on the user experience.
-		go func() {
-			// TODO: use queueset clock so this is testable
-			<-time.After(r.width.AdditionalLatency)
-			releaseSeatsFn()
-		}()
+		// Schedule release of the seats after the duration padding has passed
+		qs.clock.EventAfterDuration(releaseSeatsFn, r.width.AdditionalLatency)
 	}()
 
 	if r.queue == nil {
