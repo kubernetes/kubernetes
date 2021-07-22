@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	dockerref "github.com/docker/distribution/reference"
+	dockerref "github.com/distribution/distribution/v3/reference"
 	dockertypes "github.com/docker/docker/api/types"
 	godigest "github.com/opencontainers/go-digest"
 	"k8s.io/klog/v2"
@@ -41,7 +41,7 @@ func ParseDockerTimestamp(s string) (time.Time, error) {
 // (`foo@sha256:xyz`).
 func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	// The image string follows the grammar specified here
-	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
+	// https://github.com/distribution/distribution/v3/blob/master/reference/reference.go#L4
 	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
 		klog.V(4).InfoS("Couldn't parse image reference", "image", image, "err", err)
