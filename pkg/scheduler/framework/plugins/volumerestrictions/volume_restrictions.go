@@ -254,15 +254,11 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 			}
 		}
 	}
-	// Can be Scheduled in one node
-	f := false
+	// Can be Scheduled in one node, for failed faster
 	for i := 0; i < len(state.nodes); i++ {
 		if nodeInfo.Node().Name == state.nodes[i].Name {
-			f = true
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodSame)
 		}
-	}
-	if f {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodSame)
 	}
 	return nil
 }
