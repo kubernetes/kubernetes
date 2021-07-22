@@ -57,17 +57,24 @@ def print_sysctls(sysctls):
   print(','.join(result))
 
 
-def main(sysctl_defaults, sysctl_overrides, namespaced_sysctl_names):
+def main(sysctl_defaults, sysctl_overrides, pod_sysctl_overrides, namespaced_sysctl_names):
   # Load the sysctl defaults.
   defaults = util.get_sysctls_from_file(sysctl_defaults)
   if not defaults:
     defaults = {}
 
-  # Parse the sysctl overrides.
-  overrides = util.parse_sysctl_overrides(sysctl_overrides)
+  # Parse the pod sysctl overrides.
+  pod_overrides = util.parse_sysctl_overrides(pod_sysctl_overrides)
 
-  # Apply the overrides on top of the defaults.
-  for k, v in overrides.items():
+  # Apply the pod default overrides on top of the defaults.
+  for k, v in pod_overrides.items():
+    defaults[k] = v
+
+  # Parse the sysctl overrides.
+  user_overrides = util.parse_sysctl_overrides(sysctl_overrides)
+
+  # Apply the user overrides on top of the defaults and pod overrides.
+  for k, v in user_overrides.items():
     defaults[k] = v
 
   # Load the namespaced sysctl names.
@@ -85,8 +92,8 @@ if __name__ == '__main__':
   PARSER = argparse.ArgumentParser(
       description='Extract the namespaced kernel parameters from the values '
       'specified in the YAML file --sysctl-defaults and the '
-      'content specified via --sysctl-overrides, according to '
-      'the list in the YAML file --namespaced-sysctl-names.')
+      'content specified via --sysctl-overrides and --pod-sysctl-overrides, '
+      'according to the list in the YAML file --namespaced-sysctl-names.')
   PARSER.add_argument(
       '--sysctl-defaults',
       type=str,
@@ -98,8 +105,16 @@ if __name__ == '__main__':
       type=str,
       required=True,
       help='List of kernel parameter overrides that will be layered on top '
-      'of the default values. Must be specified as key=value pairs '
-      'separated by ","')
+      'of the default values and pod-sysctl-overrides. Must be specified as '
+      'key=value pairs separated by ","')
+  PARSER.add_argument(
+      '--pod-sysctl-overrides',
+      type=str,
+      required=False,
+      help='List of kernel parameter overrides that will be layered on top '
+      'of the default values. This may be overridden by what is given in '
+      '--sysctl-overrides. Must be specified as key=value pairs separated '
+      'by ","')
   PARSER.add_argument(
       '--namespaced-sysctl-names',
       type=str,
@@ -108,5 +123,5 @@ if __name__ == '__main__':
       'parameter names.')
   ARGS = PARSER.parse_args()
 
-  main(ARGS.sysctl_defaults, ARGS.sysctl_overrides,
+  main(ARGS.sysctl_defaults, ARGS.sysctl_overrides, ARGS.pod_sysctl_overrides,
        ARGS.namespaced_sysctl_names)

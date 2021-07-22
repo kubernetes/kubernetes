@@ -172,7 +172,13 @@ function gke-internal-master-start {
 #     by the start-kubelet function.
 function configure-node-sysctls {
   local -r dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/sysctl"
+  # sysctl_overrides - list of sysctls supplied from GKE control plane to
+  # override default sysctls for host namespace (supplied by user).
   local -r sysctl_overrides="${SYSCTL_OVERRIDES:-}"
+  # pod_sysctl_overrides - list of sysctls supplied from GKE control plane to
+  # override default sysctls in pod namespaces. Note that sysctl_overrides
+  # will take precedence over this.
+  local -r pod_sysctl_overrides="${EXTRA_POD_SYSCTLS:-}"
   local -r namespaced_sysctl_names="${dir}/namespaced-sysctl-names.yaml"
   # Use the GKE fleetwide default values if ENABLE_SYSCTL_TUNING is "true".
   if [[ "${ENABLE_SYSCTL_TUNING:-}" == "true" ]]; then
@@ -210,11 +216,14 @@ function configure-node-sysctls {
     --output-defaults=${output_defaults} \
     --output-overrides=${output_overrides}
 
+  echo "Pod sysctl overrides: ${pod_sysctl_overrides}"
+
   # Extract the namespaced kernel parameter defaults and overrides that should
   # be passed to kubelet and set inside pod namespaces.
   POD_SYSCTLS=$(python3 "${dir}/extract-namespaced.py" \
     --sysctl-defaults="${sysctl_defaults}" \
     --sysctl-overrides="${sysctl_overrides}" \
+    --pod-sysctl-overrides="${pod_sysctl_overrides}" \
     --namespaced-sysctl-names="${namespaced_sysctl_names}")
 
   echo "Sysctls to be set in pod namespaces: ${POD_SYSCTLS}"
