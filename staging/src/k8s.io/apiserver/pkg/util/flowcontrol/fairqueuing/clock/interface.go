@@ -31,6 +31,7 @@ type EventFunc func(time.Time)
 // EventClock fires event on time
 type EventClock interface {
 	baseclock.PassiveClock
+	Sleep(d time.Duration)
 	EventAfterDuration(f EventFunc, d time.Duration)
 	EventAfterTime(f EventFunc, t time.Time)
 }

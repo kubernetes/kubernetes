@@ -173,6 +173,19 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 	}
 }
 
+// Sleep returns after the given duration has passed.
+// Unlike the base FakeClock's Sleep, this method does not itself advance the clock
+// but rather leaves that up to other actors (e.g., Run).
+func (fec *FakeEventClock) Sleep(duration time.Duration) {
+	doneCh := make(chan struct{})
+	fec.EventAfterDuration(func(time.Time) {
+		fec.clientWG.Add(1)
+		close(doneCh)
+	}, duration)
+	fec.clientWG.Add(-1)
+	<-doneCh
+}
+
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
 func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {

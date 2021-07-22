@@ -246,7 +246,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 		atomic.AddInt32(&ust.uss.executions[ust.i], 1)
 		ust.igr.Add(1)
 		ust.uss.clk.EventAfterDuration(ust.genCallK(k+1), ust.uc.execDuration+ust.uc.thinkDuration)
-		ClockWait(ust.uss.clk, ust.uss.counter, ust.uc.execDuration)
+		ust.uss.clk.Sleep(ust.uc.execDuration)
 		ust.igr.Add(-1)
 	})
 	ust.uss.t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, executed, idle2)
@@ -357,16 +357,6 @@ func (uss *uniformScenarioState) finalReview() {
 			uss.t.Log("Success with" + e)
 		}
 	}
-}
-
-func ClockWait(clk *fqclock.FakeEventClock, counter counter.GoRoutineCounter, duration time.Duration) {
-	dunch := make(chan struct{})
-	clk.EventAfterDuration(func(time.Time) {
-		counter.Add(1)
-		close(dunch)
-	}, duration)
-	counter.Add(-1)
-	<-dunch
 }
 
 func init() {
