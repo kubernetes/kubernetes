@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
+var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
@@ -118,7 +118,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 	  Description: Pod is created with kernel.shm_rmid_forced. Should allow unsafe sysctls that are specified.
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	*/
-	framework.ConformanceIt("should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21]", func() {
+	ginkgo.It("should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21]", func() {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
