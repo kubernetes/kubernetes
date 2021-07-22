@@ -35,8 +35,7 @@ type imageFsInfoProvider struct {
 // ImageFsInfoLabel returns the image fs label for the configured runtime.
 // For remote runtimes, it handles additional runtimes natively understood by cAdvisor.
 func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
-	switch i.runtime {
-	case types.DockerContainerRuntime:
+	if i.runtime == types.DockerContainerRuntime {
 		return cadvisorfs.LabelDockerImages, nil
 	}
 	return "", fmt.Errorf("no imagefs label for configured runtime")
