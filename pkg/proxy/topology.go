@@ -27,19 +27,26 @@ import (
 // labels, and enabled feature gates. This is primarily used to enable topology
 // aware routing.
 func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) []Endpoint {
+	filteredEndpoints := make([]Endpoint, len(endpoints))
+	copy(filteredEndpoints, endpoints)
+
+	dualTrafficPolicyLocalFlag := false
 	if svcInfo.NodeLocalExternal() {
-		return endpoints
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
+			filteredEndpoints = FilterLocalEndpoint(filteredEndpoints)
+			dualTrafficPolicyLocalFlag = true
+		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
-		return FilterLocalEndpoint(endpoints)
+	if dualTrafficPolicyLocalFlag {
+		return filteredEndpoints
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-		return filterEndpointsWithHints(endpoints, svcInfo.HintsAnnotation(), nodeLabels)
+		return filterEndpointsWithHints(filteredEndpoints, svcInfo.HintsAnnotation(), nodeLabels)
 	}
 
-	return endpoints
+	return filteredEndpoints
 }
 
 // filterEndpointsWithHints provides filtering based on the hints included in

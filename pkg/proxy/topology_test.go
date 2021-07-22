@@ -31,6 +31,7 @@ func TestFilterEndpoints(t *testing.T) {
 	type endpoint struct {
 		ip        string
 		zoneHints sets.String
+		isLocal   bool
 	}
 	testCases := []struct {
 		name              string
@@ -122,6 +123,69 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
+	}, {
+		name:         "only one of externalTrafficPolicy or internalTrafficPolicy are set to local, hints enabled, hints annotation == auto",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, nodeLocalInternal: false, hintsAnnotation: "auto"},
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:         "only externalTrafficPolicy is set to local, hints are ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, nodeLocalInternal: false},
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:         "only internalTrafficPolicy is set to local, hints are ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, nodeLocalInternal: false},
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:         "both externalTrafficPolicy and internalTrafficPolicy are set to local, hints are ignored",
+		hintsEnabled: true,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, nodeLocalInternal: true},
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), isLocal: true},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), isLocal: true},
+		},
 	}}
 
 	endpointsToStringArray := func(endpoints []Endpoint) []string {
@@ -138,12 +202,12 @@ func TestFilterEndpoints(t *testing.T) {
 
 			endpoints := []Endpoint{}
 			for _, ep := range tc.endpoints {
-				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, IsLocal: ep.isLocal})
 			}
 
 			expectedEndpoints := []Endpoint{}
 			for _, ep := range tc.expectedEndpoints {
-				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, IsLocal: ep.isLocal})
 			}
 
 			filteredEndpoints := FilterEndpoints(endpoints, tc.serviceInfo, tc.nodeLabels)
