@@ -410,13 +410,13 @@ func TestAccessModeConflicts(t *testing.T) {
 			wantStatus:             nil,
 		},
 		{
-			name:                   "access mode conflict ,can be scheduled to the same node",
+			name:                   "access mode conflict ,can be scheduled to the same node, for fast failed",
 			pod:                    podWithReadWriteOncePodPVC2,
 			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC, podWithReadWriteManyPVC},
 			existingNodes:          []*v1.Node{node},
 			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.Success,InfoReasonReadWriteOncePodSame),
+			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodSame),
 		},
 		{
 			name:                   "access mode conflict ,can't be scheduled to the same node",

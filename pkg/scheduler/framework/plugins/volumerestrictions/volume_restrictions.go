@@ -52,9 +52,10 @@ const (
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
 	ErrReasonDiskConflict = "node(s) had no available disk"
 	// ErrReasonReadWriteOncePodConflict is used when a pod is found using the same PVC with the ReadWriteOncePod access mode.
-	ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
-	// InfoReasonReadWriteOncePodSame is used when a pod can be scheduled pods that use the same pvc on the same node
-	InfoReasonReadWriteOncePodSame = "Can be scheduled to the same node"
+	// ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
+
+	// ErrReasonReadWriteOncePodSame means the pod to be scheduled matches the pvcs of the pod on the node, which is unreasonable scheduling and is used for fast failure
+	ErrReasonReadWriteOncePodSame = "Schedule to this node for fast failure"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -254,10 +255,14 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 		}
 	}
 	// Can be Scheduled in one node
+	f := false
 	for i := 0; i < len(state.nodes); i++ {
-		if nodeInfo.Node().Name == state.nodes[i].Name{
-			return framework.NewStatus(framework.Success,InfoReasonReadWriteOncePodSame)
+		if nodeInfo.Node().Name == state.nodes[i].Name {
+			f = true
 		}
+	}
+	if f {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodSame)
 	}
 	return nil
 }
