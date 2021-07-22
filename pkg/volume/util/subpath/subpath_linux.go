@@ -114,7 +114,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		if err != nil {
 			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
 		}
-		if mntInfo.Root != subpath.Path {
+		if !checkMountInfoRootEqualSubpath(mntInfo.Root, subpath.Path) {
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
 				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
@@ -153,6 +153,25 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		}
 	}
 	return false, bindPathTarget, nil
+}
+
+func checkMountInfoRootEqualSubpath(mntInfoRoot string, subpath string) bool {
+	if mntInfoRoot == subpath {
+		return true
+	}
+	mountPointPath := strings.TrimSuffix(subpath, mntInfoRoot)
+	if mountPointPath == subpath {
+		return false
+	}
+	// check if kubelet root dir mount in an extra data disk
+	linuxHostUtil := hostutil.NewHostUtil()
+	mntInfo, err := linuxHostUtil.FindMountInfo(mountPointPath)
+	if err != nil {
+		klog.Errorf("findMountInfoRoot error, err=%v", err)
+		return false
+	}
+	klog.Infof("%s is mount point, mntInfo is %v", mountPointPath, mntInfo)
+	return true
 }
 
 func getSubpathBindTarget(subpath Subpath) string {
