@@ -9,11 +9,16 @@ import (
 // depending on the host's endianness.
 var NativeEndian binary.ByteOrder
 
+// Clang is set to either "el" or "eb" depending on the host's endianness.
+var ClangEndian string
+
 func init() {
 	if isBigEndian() {
 		NativeEndian = binary.BigEndian
+		ClangEndian = "eb"
 	} else {
 		NativeEndian = binary.LittleEndian
+		ClangEndian = "el"
 	}
 }
 
