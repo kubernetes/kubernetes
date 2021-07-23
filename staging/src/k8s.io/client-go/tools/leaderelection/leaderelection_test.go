@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -87,12 +88,33 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		observedTime   time.Time
 		reactors       []Reactor
 
-		expectSuccess    bool
-		transitionLeader bool
-		outHolder        string
+		expectSuccess            bool
+		transitionLeader         bool
+		tolerateNetworkPartition bool
+		outHolder                string
 	}{
 		{
 			name: "acquire from no object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+				{
+					verb: "create",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			expectSuccess: true,
+			outHolder:     "baz",
+		},
+		{
+			name:                     "acquire from no object, tolerate network enabled",
+			tolerateNetworkPartition: true,
 			reactors: []Reactor{
 				{
 					verb: "get",
@@ -233,6 +255,23 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			expectSuccess: true,
 			outHolder:     "baz",
 		},
+		{
+			name:                     "leader tolerate network partition",
+			tolerateNetworkPartition: true,
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, syscall.ECONNRESET
+					},
+				},
+			},
+			observedTime:   future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
+
+			expectSuccess: true,
+			outHolder:     "baz",
+		},
 	}
 
 	for i := range tests {
@@ -288,6 +327,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 						reportedLeader = l
 					},
 				},
+				TolerateNetworkPartition: test.tolerateNetworkPartition,
 			}
 			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
 			le := &LeaderElector{
@@ -925,9 +965,10 @@ func testReleaseLease(t *testing.T, objectType string) {
 		observedTime   time.Time
 		reactors       []Reactor
 
-		expectSuccess    bool
-		transitionLeader bool
-		outHolder        string
+		tolerateNetworkPartition bool
+		expectSuccess            bool
+		transitionLeader         bool
+		outHolder                string
 	}{
 		{
 			name: "release acquired lock from no object",
@@ -1012,6 +1053,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 						reportedLeader = l
 					},
 				},
+				TolerateNetworkPartition: test.tolerateNetworkPartition,
 			}
 			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
 			le := &LeaderElector{

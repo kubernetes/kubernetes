@@ -153,6 +153,15 @@ type LeaderElectionConfig struct {
 	// simultaneously acting on the critical path.
 	ReleaseOnCancel bool
 
+	// TolerateNetworkPartition the leader doesn't stop leading if is not able
+	// to renew the lock because of network problems. Most likely, the consumer
+	// of the library should not be able to reach the apiserver too, so it should
+	// handle the network problems, but in this case, it will not be affected by
+	// the OnStoppedLeadingcallback.
+	// On the connection is restored, it can happen that there are multiple leaders
+	// until the new election happens again.
+	TolerateNetworkPartition bool
+
 	// Name is the name of the resource lock for debugging
 	Name string
 }
@@ -326,6 +335,11 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	// 1. obtain or create the ElectionRecord
 	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
 	if err != nil {
+		// if TolerateNetworkPartition the Leader keeps the lease until the network is ready
+		if le.IsLeader() && le.config.TolerateNetworkPartition && errors.IsNetworkError(err) {
+			klog.Warningf("network error: %v , toleration to network errors enabled, retrying in %d seconds", err, le.config.RetryPeriod)
+			return true
+		}
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
 			return false
