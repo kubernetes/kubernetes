@@ -3,8 +3,10 @@ package link
 import (
 	"fmt"
 	"io"
+	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/internal"
 )
 
 type IterOptions struct {
@@ -15,19 +17,45 @@ type IterOptions struct {
 	// AttachTo requires the kernel to include BTF of itself,
 	// and it to be compiled with a recent pahole (>= 1.16).
 	Program *ebpf.Program
+
+	// Map specifies the target map for bpf_map_elem and sockmap iterators.
+	// It may be nil.
+	Map *ebpf.Map
 }
 
 // AttachIter attaches a BPF seq_file iterator.
 func AttachIter(opts IterOptions) (*Iter, error) {
-	link, err := AttachRawLink(RawLinkOptions{
-		Program: opts.Program,
-		Attach:  ebpf.AttachTraceIter,
-	})
+	if err := haveBPFLink(); err != nil {
+		return nil, err
+	}
+
+	progFd := opts.Program.FD()
+	if progFd < 0 {
+		return nil, fmt.Errorf("invalid program: %s", internal.ErrClosedFd)
+	}
+
+	var info bpfIterLinkInfoMap
+	if opts.Map != nil {
+		mapFd := opts.Map.FD()
+		if mapFd < 0 {
+			return nil, fmt.Errorf("invalid map: %w", internal.ErrClosedFd)
+		}
+		info.map_fd = uint32(mapFd)
+	}
+
+	attr := bpfLinkCreateIterAttr{
+		prog_fd:       uint32(progFd),
+		attach_type:   ebpf.AttachTraceIter,
+		iter_info:     internal.NewPointer(unsafe.Pointer(&info)),
+		iter_info_len: uint32(unsafe.Sizeof(info)),
+	}
+
+	fd, err := bpfLinkCreateIter(&attr)
 	if err != nil {
 		return nil, fmt.Errorf("can't link iterator: %w", err)
 	}
 
-	return &Iter{*link}, err
+	return &Iter{RawLink{fd, ""}}, err
 }
 
 // LoadPinnedIter loads a pinned iterator from a bpffs.
@@ -64,4 +92,9 @@ func (it *Iter) Open() (io.ReadCloser, error) {
 	}
 
 	return fd.File("bpf_iter"), nil
+}
+
+// union bpf_iter_link_info.map
+type bpfIterLinkInfoMap struct {
+	map_fd uint32
 }
