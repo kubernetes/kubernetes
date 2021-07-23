@@ -350,6 +350,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					continue
 				}
 
+				if zone, ok := test.Parameters["zone"]; ok {
+					framework.ExpectNotEqual(len(zone), 0, "expect at least one zone")
+				}
+
 				ginkgo.By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
 				test.Client = c
@@ -1000,9 +1004,11 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 
 func getRandomClusterZone(c clientset.Interface) string {
 	zones, err := e2enode.GetClusterZones(c)
+	zone := ""
 	framework.ExpectNoError(err)
-	framework.ExpectNotEqual(len(zones), 0)
-
-	zonesList := zones.UnsortedList()
-	return zonesList[rand.Intn(zones.Len())]
+	if len(zones) != 0 {
+		zonesList := zones.UnsortedList()
+		zone = zonesList[rand.Intn(zones.Len())]
+	}
+	return zone
 }

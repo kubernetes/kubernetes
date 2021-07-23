@@ -105,14 +105,13 @@ var _ = common.SIGDescribe("Conntrack", func() {
 				len(nodes.Items))
 		}
 
-		var family v1.IPFamily
+		family := v1.IPv4Protocol
 		if framework.TestContext.ClusterIsIPv6() {
 			family = v1.IPv6Protocol
-		} else {
-			family = v1.IPv4Protocol
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
@@ -120,6 +119,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,

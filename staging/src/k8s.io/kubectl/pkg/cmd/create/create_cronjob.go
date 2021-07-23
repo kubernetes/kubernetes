@@ -38,13 +38,13 @@ import (
 
 var (
 	cronjobLong = templates.LongDesc(i18n.T(`
-		Create a cronjob with the specified name.`))
+		Create a cron job with the specified name.`))
 
 	cronjobExample = templates.Examples(`
-		# Create a cronjob
+		# Create a cron job
 		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *"
 
-		# Create a cronjob with command
+		# Create a cron job with a command
 		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *" -- date`)
 )
 
@@ -87,7 +87,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: false,
 		Aliases:               []string{"cj"},
-		Short:                 cronjobLong,
+		Short:                 i18n.T("Create a cron job with the specified name"),
 		Long:                  cronjobLong,
 		Example:               cronjobExample,
 		Run: func(cmd *cobra.Command, args []string) {

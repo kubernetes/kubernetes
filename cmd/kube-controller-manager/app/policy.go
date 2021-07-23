@@ -34,7 +34,7 @@ import (
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		klog.Infof("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
+		klog.InfoS("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
 		return nil, false, nil
 	}
 

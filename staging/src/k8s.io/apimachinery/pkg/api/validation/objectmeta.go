@@ -143,7 +143,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	metadata, err := meta.Accessor(objMeta)
 	if err != nil {
-		allErrs := field.ErrorList{}
+		var allErrs field.ErrorList
 		allErrs = append(allErrs, field.Invalid(fldPath, objMeta, err.Error()))
 		return allErrs
 	}
@@ -154,7 +154,7 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	var allErrs field.ErrorList
 
 	if len(meta.GetGenerateName()) != 0 {
 		for _, msg := range nameFn(meta.GetGenerateName(), true) {

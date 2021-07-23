@@ -38,6 +38,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 			Enabled: []v1beta2.Plugin{
 				{Name: names.NodeResourcesFit},
 				{Name: names.NodePorts},
+				{Name: names.VolumeRestrictions},
 				{Name: names.PodTopologySpread},
 				{Name: names.InterPodAffinity},
 				{Name: names.VolumeBinding},
@@ -81,11 +82,11 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
 				{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
 				{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-				{Name: names.NodeResourcesLeastAllocated, Weight: pointer.Int32Ptr(1)},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
 				{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
 				// Weight is doubled because:
 				// - This is a score coming from user preference.
-				// - It makes its signal comparable to NodeResourcesLeastAllocated.
+				// - It makes its signal comparable to NodeResourcesFit.LeastAllocated.
 				{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
 				{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
 			},
@@ -147,23 +148,46 @@ func mergePlugins(defaultPlugins, customPlugins *v1beta2.Plugins) *v1beta2.Plugi
 	return defaultPlugins
 }
 
+type pluginIndex struct {
+	index  int
+	plugin v1beta2.Plugin
+}
+
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta2.PluginSet) v1beta2.PluginSet {
 	disabledPlugins := sets.NewString()
+	enabledCustomPlugins := make(map[string]pluginIndex)
+	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
+	replacedPluginIndex := sets.NewInt()
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
-
+	for index, enabledPlugin := range customPluginSet.Enabled {
+		enabledCustomPlugins[enabledPlugin.Name] = pluginIndex{index, enabledPlugin}
+	}
 	var enabledPlugins []v1beta2.Plugin
 	if !disabledPlugins.Has("*") {
 		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
 			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
 				continue
 			}
-
+			// The default plugin is explicitly re-configured, update the default plugin accordingly.
+			if customPlugin, ok := enabledCustomPlugins[defaultEnabledPlugin.Name]; ok {
+				klog.InfoS("Default plugin is explicitly re-configured; overriding", "plugin", defaultEnabledPlugin.Name)
+				// Update the default plugin in place to preserve order.
+				defaultEnabledPlugin = customPlugin.plugin
+				replacedPluginIndex.Insert(customPlugin.index)
+			}
 			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
 		}
 	}
 
-	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
+	// Append all the custom plugins which haven't replaced any default plugins.
+	// Note: duplicated custom plugins will still be appended here.
+	// If so, the instantiation of scheduler framework will detect it and abort.
+	for index, plugin := range customPluginSet.Enabled {
+		if !replacedPluginIndex.Has(index) {
+			enabledPlugins = append(enabledPlugins, plugin)
+		}
+	}
 	return v1beta2.PluginSet{Enabled: enabledPlugins}
 }

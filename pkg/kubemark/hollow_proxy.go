@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -69,8 +69,8 @@ func NewHollowProxyOrDie(
 	iptInterface utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	execer utilexec.Interface,
-	broadcaster record.EventBroadcaster,
-	recorder record.EventRecorder,
+	broadcaster events.EventBroadcaster,
+	recorder events.EventRecorder,
 	useRealProxier bool,
 	proxierSyncPeriod time.Duration,
 	proxierMinSyncPeriod time.Duration,

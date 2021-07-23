@@ -44,6 +44,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -69,12 +70,14 @@ const (
 	decisionSkipFilter
 )
 
-var defaultRequestWidthEstimator = func(*http.Request) uint { return 1 }
+var defaultRequestWidthEstimator = func(*http.Request) fcrequest.Width { return fcrequest.Width{Seats: 1} }
 
 type fakeApfFilter struct {
 	mockDecision mockDecision
 	postEnqueue  func()
 	postDequeue  func()
+
+	utilflowcontrol.WatchTracker
 }
 
 func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
@@ -146,6 +149,7 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 		mockDecision: decision,
 		postEnqueue:  postEnqueue,
 		postDequeue:  postDequeue,
+		WatchTracker: utilflowcontrol.NewWatchTracker(),
 	}
 	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
 }
@@ -347,10 +351,39 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	})
 }
 
+func TestApfCancelWaitRequest(t *testing.T) {
+	epmetrics.Register()
+
+	server := newApfServerWithSingleRequest(t, decisionCancelWait)
+	defer server.Close()
+
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
+		t.Error(err)
+	}
+
+	checkForExpectedMetrics(t, []string{
+		"apiserver_current_inflight_requests",
+		"apiserver_request_terminations_total",
+		"apiserver_dropped_requests_total",
+	})
+}
+
 type fakeWatchApfFilter struct {
 	lock     sync.Mutex
 	inflight int
 	capacity int
+
+	postExecutePanic bool
+	preExecutePanic  bool
+
+	utilflowcontrol.WatchTracker
+}
+
+func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
+	return &fakeWatchApfFilter{
+		capacity:     capacity,
+		WatchTracker: utilflowcontrol.NewWatchTracker(),
+	}
 }
 
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
@@ -372,7 +405,13 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 		return
 	}
 
+	if f.preExecutePanic {
+		panic("pre-exec-panic")
+	}
 	execFn()
+	if f.postExecutePanic {
+		panic("post-exec-panic")
+	}
 
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -431,9 +470,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	allRunning := sync.WaitGroup{}
 	allRunning.Add(2 * concurrentRequests)
 
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: concurrentRequests,
-	}
+	fakeFilter := newFakeWatchApfFilter(concurrentRequests)
 
 	onExecuteFunc := func() {
 		firstRunning.Done()
@@ -478,9 +515,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: 0,
-	}
+	fakeFilter := newFakeWatchApfFilter(0)
 
 	onExecuteFunc := func() {
 		t.Errorf("Request unexepectedly executing")
@@ -496,9 +531,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfWatchPanic(t *testing.T) {
-	fakeFilter := &fakeWatchApfFilter{
-		capacity: 1,
-	}
+	fakeFilter := newFakeWatchApfFilter(1)
 
 	onExecuteFunc := func() {
 		panic("test panic")
@@ -519,6 +552,53 @@ func TestApfWatchPanic(t *testing.T) {
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestApfWatchHandlePanic(t *testing.T) {
+	preExecutePanicingFilter := newFakeWatchApfFilter(1)
+	preExecutePanicingFilter.preExecutePanic = true
+
+	postExecutePanicingFilter := newFakeWatchApfFilter(1)
+	postExecutePanicingFilter.postExecutePanic = true
+
+	testCases := []struct {
+		name   string
+		filter *fakeWatchApfFilter
+	}{
+		{
+			name:   "pre-execute panic",
+			filter: preExecutePanicingFilter,
+		},
+		{
+			name:   "post-execute panic",
+			filter: postExecutePanicingFilter,
+		},
+	}
+
+	onExecuteFunc := func() {
+		time.Sleep(5 * time.Second)
+	}
+	postExecuteFunc := func() {}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc)
+			handler := func(w http.ResponseWriter, r *http.Request) {
+				defer func() {
+					if err := recover(); err == nil {
+						t.Errorf("expected panic, got %v", err)
+					}
+				}()
+				apfHandler.ServeHTTP(w, r)
+			}
+			server := httptest.NewServer(http.HandlerFunc(handler))
+			defer server.Close()
+
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
@@ -549,23 +629,6 @@ func TestContextClosesOnRequestProcessed(t *testing.T) {
 	wg.Wait()
 }
 
-func TestApfCancelWaitRequest(t *testing.T) {
-	epmetrics.Register()
-
-	server := newApfServerWithSingleRequest(t, decisionCancelWait)
-	defer server.Close()
-
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
-		t.Error(err)
-	}
-
-	checkForExpectedMetrics(t, []string{
-		"apiserver_current_inflight_requests",
-		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
-	})
-}
-
 type fakeFilterRequestDigest struct {
 	*fakeApfFilter
 	requestDigestGot *utilflowcontrol.RequestDigest
@@ -586,13 +649,15 @@ func TestApfWithRequestDigest(t *testing.T) {
 	reqDigestExpected := &utilflowcontrol.RequestDigest{
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
-		Width:       5,
+		Width: fcrequest.Width{
+			Seats: 5,
+		},
 	}
 
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request) uint { return reqDigestExpected.Width },
+		func(_ *http.Request) fcrequest.Width { return reqDigestExpected.Width },
 	)
 
 	w := httptest.NewRecorder()

@@ -134,7 +134,7 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
 				if err != nil {
-					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
 					return
 				}
 			}

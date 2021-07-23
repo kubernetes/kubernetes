@@ -26,14 +26,17 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/util/certificate/csr"
 	capi "k8s.io/kubernetes/pkg/apis/certificates"
 	capiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -190,7 +193,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: "example.com/some-signer-name",
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"signerName with a total length greater than 571 characters should be rejected": {
 			csr: capi.CertificateSigningRequest{
@@ -229,7 +231,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: fmt.Sprintf("abc.io/%s.%s", repeatString("a", 253), repeatString("a", 253)),
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"signerName with a domain label greater than 63 characters will fail": {
 			csr: capi.CertificateSigningRequest{
@@ -260,7 +261,73 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: maxLengthSignerName,
 				},
 			},
-			errs: field.ErrorList{},
+		},
+		"negative duration": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:            validUsages,
+					Request:           newCSRPEM(t),
+					SignerName:        validSignerName,
+					ExpirationSeconds: pointer.Int32(-1),
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("expirationSeconds"), int32(-1), "may not specify a duration less than 600 seconds (10 minutes)"),
+			},
+		},
+		"zero duration": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:            validUsages,
+					Request:           newCSRPEM(t),
+					SignerName:        validSignerName,
+					ExpirationSeconds: pointer.Int32(0),
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("expirationSeconds"), int32(0), "may not specify a duration less than 600 seconds (10 minutes)"),
+			},
+		},
+		"one duration": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:            validUsages,
+					Request:           newCSRPEM(t),
+					SignerName:        validSignerName,
+					ExpirationSeconds: pointer.Int32(1),
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("expirationSeconds"), int32(1), "may not specify a duration less than 600 seconds (10 minutes)"),
+			},
+		},
+		"too short duration": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:            validUsages,
+					Request:           newCSRPEM(t),
+					SignerName:        validSignerName,
+					ExpirationSeconds: csr.DurationToExpirationSeconds(time.Minute),
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(specPath.Child("expirationSeconds"), *csr.DurationToExpirationSeconds(time.Minute), "may not specify a duration less than 600 seconds (10 minutes)"),
+			},
+		},
+		"valid duration": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:            validUsages,
+					Request:           newCSRPEM(t),
+					SignerName:        validSignerName,
+					ExpirationSeconds: csr.DurationToExpirationSeconds(10 * time.Minute),
+				},
+			},
 		},
 		"missing usages": {
 			csr: capi.CertificateSigningRequest{
@@ -285,7 +352,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					SignerName: validSignerName,
 				},
 			},
-			errs: field.ErrorList{},
 		},
 		"unknown and duplicate usages - v1": {
 			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1"},

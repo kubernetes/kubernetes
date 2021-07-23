@@ -31,7 +31,7 @@ import (
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -55,7 +55,7 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	cmd.PersistentFlags().StringVar(&pathOptions.LoadingRules.ExplicitPath, pathOptions.ExplicitFileFlag, pathOptions.LoadingRules.ExplicitPath, "use a particular kubeconfig file")
 
 	// TODO(juanvallejo): update all subcommands to work with genericclioptions.IOStreams
-	cmd.AddCommand(NewCmdConfigView(f, streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigView(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetAuthInfo(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, pathOptions))

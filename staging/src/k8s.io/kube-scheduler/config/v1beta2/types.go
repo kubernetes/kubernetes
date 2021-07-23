@@ -197,6 +197,8 @@ type Plugins struct {
 // If an array is empty, missing, or nil, default plugins at that extension point will be used.
 type PluginSet struct {
 	// Enabled specifies plugins that should be enabled in addition to default plugins.
+	// If the default plugin is also configured in the scheduler config file, the weight of plugin will
+	// be overridden accordingly.
 	// These are called after default plugins and in the same order specified here.
 	// +listType=atomic
 	Enabled []Plugin `json:"enabled,omitempty"`

@@ -67,12 +67,23 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj r
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
 
-	pvcutil.DropDisabledFields(&pvc.Spec, nil)
+	pvcutil.DropDisabledFields(&pvc.Spec)
+
+	// For data sources, we need to do 2 things to implement KEP 1495
+
+	// First drop invalid values from spec.dataSource (anything other than PVC or
+	// VolumeSnapshot) if certain conditions are met.
+	pvcutil.EnforceDataSourceBackwardsCompatibility(&pvc.Spec, nil)
+
+	// Second copy dataSource -> dataSourceRef or dataSourceRef -> dataSource if one of them
+	// is nil and the other is non-nil
+	pvcutil.NormalizeDataSources(&pvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
-	return validation.ValidatePersistentVolumeClaim(pvc)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(pvc, nil)
+	return validation.ValidatePersistentVolumeClaim(pvc, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -94,12 +105,23 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 
-	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
+	pvcutil.DropDisabledFields(&newPvc.Spec)
+
+	// We need to use similar logic to PrepareForCreate here both to preserve backwards
+	// compatibility with the old behavior (ignoring of garbage dataSources at both create
+	// and update time) and also for compatibility with older clients, that might omit
+	// the dataSourceRef field which we filled in automatically, so we have to fill it
+	// in again here.
+	pvcutil.EnforceDataSourceBackwardsCompatibility(&newPvc.Spec, &oldPvc.Spec)
+	pvcutil.NormalizeDataSources(&newPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
-	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
+	newPvc := obj.(*api.PersistentVolumeClaim)
+	oldPvc := old.(*api.PersistentVolumeClaim)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
+	errorList := validation.ValidatePersistentVolumeClaim(newPvc, opts)
+	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

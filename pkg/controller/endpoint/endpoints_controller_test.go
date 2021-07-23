@@ -2008,41 +2008,85 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 
 func TestSyncServiceOverCapacity(t *testing.T) {
 	testCases := []struct {
-		name               string
-		startingAnnotation *string
-		numExisting        int
-		numDesired         int
-		expectedAnnotation bool
+		name                string
+		startingAnnotation  *string
+		numExisting         int
+		numDesired          int
+		numDesiredNotReady  int
+		numExpectedReady    int
+		numExpectedNotReady int
+		expectedAnnotation  bool
 	}{{
-		name:               "empty",
-		startingAnnotation: nil,
-		numExisting:        0,
-		numDesired:         0,
-		expectedAnnotation: false,
+		name:                "empty",
+		startingAnnotation:  nil,
+		numExisting:         0,
+		numDesired:          0,
+		numExpectedReady:    0,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
 	}, {
-		name:               "annotation added past capacity",
-		startingAnnotation: nil,
-		numExisting:        maxCapacity - 1,
-		numDesired:         maxCapacity + 1,
-		expectedAnnotation: true,
+		name:                "annotation added past capacity, < than maxCapacity of Ready Addresses",
+		startingAnnotation:  nil,
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity - 3,
+		numDesiredNotReady:  4,
+		numExpectedReady:    maxCapacity - 3,
+		numExpectedNotReady: 3,
+		expectedAnnotation:  true,
 	}, {
-		name:               "annotation removed below capacity",
-		startingAnnotation: utilpointer.StringPtr("warning"),
-		numExisting:        maxCapacity - 1,
-		numDesired:         maxCapacity - 1,
-		expectedAnnotation: false,
+		name:                "annotation added past capacity, maxCapacity of Ready Addresses ",
+		startingAnnotation:  nil,
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  10,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
 	}, {
-		name:               "annotation removed at capacity",
-		startingAnnotation: utilpointer.StringPtr("warning"),
-		numExisting:        maxCapacity,
-		numDesired:         maxCapacity,
-		expectedAnnotation: false,
+		name:                "annotation removed below capacity",
+		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity - 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity - 1,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
 	}, {
-		name:               "no endpoints change, annotation value corrected",
-		startingAnnotation: utilpointer.StringPtr("invalid"),
-		numExisting:        maxCapacity + 1,
-		numDesired:         maxCapacity + 1,
-		expectedAnnotation: true,
+		name:                "annotation was set to warning previously, annotation removed at capacity",
+		startingAnnotation:  utilpointer.StringPtr("warning"),
+		numExisting:         maxCapacity,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "annotation was set to warning previously but still over capacity",
+		startingAnnotation:  utilpointer.StringPtr("warning"),
+		numExisting:         maxCapacity + 1,
+		numDesired:          maxCapacity + 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
+	}, {
+		name:                "annotation removed at capacity",
+		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		numExisting:         maxCapacity,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "no endpoints change, annotation value corrected",
+		startingAnnotation:  utilpointer.StringPtr("invalid"),
+		numExisting:         maxCapacity + 1,
+		numDesired:          maxCapacity + 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
 	}}
 
 	for _, tc := range testCases {
@@ -2050,7 +2094,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 			ns := "test"
 			client, c := newFakeController(0 * time.Second)
 
-			addPods(c.podStore, ns, tc.numDesired, 1, 0, ipv4only)
+			addPods(c.podStore, ns, tc.numDesired, 1, tc.numDesiredNotReady, ipv4only)
 			pods := c.podStore.List()
 
 			svc := &v1.Service{
@@ -2094,12 +2138,96 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 			if tc.expectedAnnotation {
 				if !ok {
 					t.Errorf("Expected EndpointsOverCapacity annotation to be set")
-				} else if actualAnnotation != "warning" {
-					t.Errorf("Expected EndpointsOverCapacity annotation to be 'warning', got %s", actualAnnotation)
+				} else if actualAnnotation != "truncated" {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be 'truncated', got %s", actualAnnotation)
 				}
 			} else {
 				if ok {
 					t.Errorf("Expected EndpointsOverCapacity annotation not to be set, got %s", actualAnnotation)
+				}
+			}
+			numActualReady := 0
+			numActualNotReady := 0
+			for _, subset := range actualEndpoints.Subsets {
+				numActualReady += len(subset.Addresses)
+				numActualNotReady += len(subset.NotReadyAddresses)
+			}
+			if numActualReady != tc.numExpectedReady {
+				t.Errorf("Unexpected number of actual ready Endpoints: got %d endpoints, want %d endpoints", numActualReady, tc.numExpectedReady)
+			}
+			if numActualNotReady != tc.numExpectedNotReady {
+				t.Errorf("Unexpected number of actual not ready Endpoints: got %d endpoints, want %d endpoints", numActualNotReady, tc.numExpectedNotReady)
+			}
+		})
+	}
+}
+
+func TestTruncateEndpoints(t *testing.T) {
+	testCases := []struct {
+		desc string
+		// subsetsReady, subsetsNotReady, expectedReady, expectedNotReady
+		// must all be the same length
+		subsetsReady     []int
+		subsetsNotReady  []int
+		expectedReady    []int
+		expectedNotReady []int
+	}{{
+		desc:             "empty",
+		subsetsReady:     []int{},
+		subsetsNotReady:  []int{},
+		expectedReady:    []int{},
+		expectedNotReady: []int{},
+	}, {
+		desc:             "total endpoints < max capacity",
+		subsetsReady:     []int{50, 100, 100, 100, 100},
+		subsetsNotReady:  []int{50, 100, 100, 100, 100},
+		expectedReady:    []int{50, 100, 100, 100, 100},
+		expectedNotReady: []int{50, 100, 100, 100, 100},
+	}, {
+		desc:             "total endpoints = max capacity",
+		subsetsReady:     []int{100, 100, 100, 100, 100},
+		subsetsNotReady:  []int{100, 100, 100, 100, 100},
+		expectedReady:    []int{100, 100, 100, 100, 100},
+		expectedNotReady: []int{100, 100, 100, 100, 100},
+	}, {
+		desc:             "total ready endpoints < max capacity, but total endpoints > max capacity",
+		subsetsReady:     []int{90, 110, 50, 10, 20},
+		subsetsNotReady:  []int{101, 200, 200, 201, 298},
+		expectedReady:    []int{90, 110, 50, 10, 20},
+		expectedNotReady: []int{73, 144, 144, 145, 214},
+	}, {
+		desc:             "total ready endpoints > max capacity",
+		subsetsReady:     []int{205, 400, 402, 400, 693},
+		subsetsNotReady:  []int{100, 200, 200, 200, 300},
+		expectedReady:    []int{98, 191, 192, 191, 328},
+		expectedNotReady: []int{0, 0, 0, 0, 0},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			var subsets []v1.EndpointSubset
+			for subsetIndex, numReady := range tc.subsetsReady {
+				subset := v1.EndpointSubset{}
+				for i := 0; i < numReady; i++ {
+					subset.Addresses = append(subset.Addresses, v1.EndpointAddress{})
+				}
+
+				numNotReady := tc.subsetsNotReady[subsetIndex]
+				for i := 0; i < numNotReady; i++ {
+					subset.NotReadyAddresses = append(subset.NotReadyAddresses, v1.EndpointAddress{})
+				}
+				subsets = append(subsets, subset)
+			}
+
+			endpoints := &v1.Endpoints{Subsets: subsets}
+			truncateEndpoints(endpoints)
+
+			for i, subset := range endpoints.Subsets {
+				if len(subset.Addresses) != tc.expectedReady[i] {
+					t.Errorf("Unexpected number of actual ready Endpoints for subset %d: got %d endpoints, want %d endpoints", i, len(subset.Addresses), tc.expectedReady[i])
+				}
+				if len(subset.NotReadyAddresses) != tc.expectedNotReady[i] {
+					t.Errorf("Unexpected number of actual not ready Endpoints for subset %d: got %d endpoints, want %d endpoints", i, len(subset.NotReadyAddresses), tc.expectedNotReady[i])
 				}
 			}
 		})

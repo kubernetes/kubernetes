@@ -48,6 +48,11 @@ func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
 	return args.Get(0).([]int64)
 }
 
+func (m *mockProvider) GetMemory(podUID, containerName string) []*podresourcesv1.ContainerMemory {
+	args := m.Called(podUID, containerName)
+	return args.Get(0).([]*podresourcesv1.ContainerMemory)
+}
+
 func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
 }
@@ -60,6 +65,11 @@ func (m *mockProvider) GetAllocatableDevices() []*podresourcesv1.ContainerDevice
 func (m *mockProvider) GetAllocatableCPUs() []int64 {
 	args := m.Called()
 	return args.Get(0).([]int64)
+}
+
+func (m *mockProvider) GetAllocatableMemory() []*podresourcesv1.ContainerMemory {
+	args := m.Called()
+	return args.Get(0).([]*podresourcesv1.ContainerMemory)
 }
 
 func TestListPodResourcesV1alpha1(t *testing.T) {

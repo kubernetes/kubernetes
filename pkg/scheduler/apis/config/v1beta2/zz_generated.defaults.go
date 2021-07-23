@@ -34,16 +34,11 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta2.KubeSchedulerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta2.KubeSchedulerConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesLeastAllocatedArgs{}, func(obj interface{}) {
-		SetObjectDefaults_NodeResourcesLeastAllocatedArgs(obj.(*v1beta2.NodeResourcesLeastAllocatedArgs))
+	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesBalancedAllocationArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*v1beta2.NodeResourcesBalancedAllocationArgs))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesMostAllocatedArgs{}, func(obj interface{}) {
-		SetObjectDefaults_NodeResourcesMostAllocatedArgs(obj.(*v1beta2.NodeResourcesMostAllocatedArgs))
-	})
+	scheme.AddTypeDefaultingFunc(&v1beta2.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*v1beta2.NodeResourcesFitArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta2.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta2.PodTopologySpreadArgs)) })
-	scheme.AddTypeDefaultingFunc(&v1beta2.RequestedToCapacityRatioArgs{}, func(obj interface{}) {
-		SetObjectDefaults_RequestedToCapacityRatioArgs(obj.(*v1beta2.RequestedToCapacityRatioArgs))
-	})
 	scheme.AddTypeDefaultingFunc(&v1beta2.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1beta2.VolumeBindingArgs)) })
 	return nil
 }
@@ -60,20 +55,16 @@ func SetObjectDefaults_KubeSchedulerConfiguration(in *v1beta2.KubeSchedulerConfi
 	SetDefaults_KubeSchedulerConfiguration(in)
 }
 
-func SetObjectDefaults_NodeResourcesLeastAllocatedArgs(in *v1beta2.NodeResourcesLeastAllocatedArgs) {
-	SetDefaults_NodeResourcesLeastAllocatedArgs(in)
+func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *v1beta2.NodeResourcesBalancedAllocationArgs) {
+	SetDefaults_NodeResourcesBalancedAllocationArgs(in)
 }
 
-func SetObjectDefaults_NodeResourcesMostAllocatedArgs(in *v1beta2.NodeResourcesMostAllocatedArgs) {
-	SetDefaults_NodeResourcesMostAllocatedArgs(in)
+func SetObjectDefaults_NodeResourcesFitArgs(in *v1beta2.NodeResourcesFitArgs) {
+	SetDefaults_NodeResourcesFitArgs(in)
 }
 
 func SetObjectDefaults_PodTopologySpreadArgs(in *v1beta2.PodTopologySpreadArgs) {
 	SetDefaults_PodTopologySpreadArgs(in)
-}
-
-func SetObjectDefaults_RequestedToCapacityRatioArgs(in *v1beta2.RequestedToCapacityRatioArgs) {
-	SetDefaults_RequestedToCapacityRatioArgs(in)
 }
 
 func SetObjectDefaults_VolumeBindingArgs(in *v1beta2.VolumeBindingArgs) {

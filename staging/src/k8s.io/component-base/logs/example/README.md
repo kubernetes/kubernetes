@@ -29,11 +29,11 @@ go run ./staging/src/k8s.io/component-base/logs/example/cmd/logger.go --logging-
 
 Expected output:
 ```
-{"ts":1622923409719.5137,"msg":"Log using Infof, key: value\n","v":0}
-{"ts":1622923409719.5403,"msg":"Log using InfoS","v":0,"key":"value"}
-{"ts":1622923409719.6025,"msg":"Log using Errorf, err: fail\n","v":0}
-{"ts":1622923409719.6077,"msg":"Log using ErrorS","err":"fail","v":0}
-{"ts":1622923409719.6467,"msg":"Log with sensitive key, data: {\"secret\"}\n","v":0}
+{"ts":1624215726270.3562,"caller":"cmd/logger.go:58","msg":"Log using Infof, key: value\n","v":0}
+{"ts":1624215726270.4377,"caller":"cmd/logger.go:59","msg":"Log using InfoS","v":0,"key":"value"}
+{"ts":1624215726270.6724,"caller":"cmd/logger.go:61","msg":"Log using Errorf, err: fail\n","v":0}
+{"ts":1624215726270.7566,"caller":"cmd/logger.go:62","msg":"Log using ErrorS","err":"fail","v":0}
+{"ts":1624215726270.8428,"caller":"cmd/logger.go:64","msg":"Log with sensitive key, data: {\"secret\"}\n","v":0}
 ```
 
 ## Logging sanitization

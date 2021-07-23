@@ -2934,6 +2934,11 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 		*out = new(TypedLocalObjectReference)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.DataSourceRef != nil {
+		in, out := &in.DataSourceRef, &out.DataSourceRef
+		*out = new(TypedLocalObjectReference)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

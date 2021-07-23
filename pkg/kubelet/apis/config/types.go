@@ -221,6 +221,10 @@ type KubeletConfiguration struct {
 	// CPUManagerPolicy is the name of the policy to use.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
+	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
+	// to fine tune the behaviour of the cpu manager policies.
+	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
+	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
@@ -326,6 +330,10 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// memorySwap configures swap memory available to container workloads.
+	// +featureGate=NodeSwap
+	// +optional
+	MemorySwap MemorySwapConfiguration
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
@@ -407,6 +415,17 @@ type KubeletConfiguration struct {
 	EnableProfilingHandler bool
 	// EnableDebugFlagsHandler enables/debug/flags/v handler.
 	EnableDebugFlagsHandler bool
+	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
+	SeccompDefault bool
+	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
+	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
+	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
+	// while increasing will put less reclaim pressure.
+	// See http://kep.k8s.io/2570 for more details.
+	// Default: 0.8
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryThrottlingFactor *float64
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -565,4 +584,13 @@ type ExecEnvVar struct {
 type MemoryReservation struct {
 	NumaNode int32
 	Limits   v1.ResourceList
+}
+
+type MemorySwapConfiguration struct {
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwap
+	// +optional
+	SwapBehavior string
 }

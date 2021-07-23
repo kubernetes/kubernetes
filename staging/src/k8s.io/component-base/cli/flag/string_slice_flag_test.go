@@ -83,8 +83,8 @@ func TestStringSlice(t *testing.T) {
 		} else if err != nil {
 			t.Errorf("%d: expected nil error, got %v", i, err)
 		}
-		if !reflect.DeepEqual(*v.value, test.expected) {
-			t.Errorf("%d: expected %+v, got %+v", i, test.expected, *v.value)
+		if !reflect.DeepEqual(s, test.expected) {
+			t.Errorf("%d: expected %+v, got %+v", i, test.expected, s)
 		}
 		if v.changed != test.changed {
 			t.Errorf("%d: expected %t got %t", i, test.changed, v.changed)

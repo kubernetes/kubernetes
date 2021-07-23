@@ -19,6 +19,7 @@ package framework
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -29,7 +30,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/config"
-	"github.com/pkg/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -229,6 +229,8 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+	// RestartKubelet restarts Kubelet unit when the process is killed.
+	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
 }
@@ -482,7 +484,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
 	if err != nil {
-		if os.IsNotExist(errors.Cause(err)) {
+		if os.IsNotExist(errors.Unwrap(err)) {
 			// Provide a more helpful error message when the provider is unknown.
 			var providers []string
 			for _, name := range GetProviders() {

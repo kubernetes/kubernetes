@@ -27,12 +27,12 @@ import (
 // labels, and enabled feature gates. This is primarily used to enable topology
 // aware routing.
 func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) []Endpoint {
-	if svcInfo.NodeLocalExternal() || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if svcInfo.NodeLocalExternal() {
 		return endpoints
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
-		return filterEndpointsInternalTrafficPolicy(svcInfo.InternalTrafficPolicy(), endpoints)
+		return FilterLocalEndpoint(endpoints)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
@@ -85,20 +85,8 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 	return filteredEndpoints
 }
 
-// filterEndpointsInternalTrafficPolicy returns the node local endpoints based
-// on configured InternalTrafficPolicy.
-//
-// If ServiceInternalTrafficPolicy feature gate is off, returns the original
-// EndpointSlice.
-// Otherwise, if InternalTrafficPolicy is Local, only return the node local endpoints.
-func filterEndpointsInternalTrafficPolicy(internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType, endpoints []Endpoint) []Endpoint {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		return endpoints
-	}
-	if internalTrafficPolicy == nil || *internalTrafficPolicy == v1.ServiceInternalTrafficPolicyCluster {
-		return endpoints
-	}
-
+// FilterLocalEndpoint returns the node local endpoints
+func FilterLocalEndpoint(endpoints []Endpoint) []Endpoint {
 	var filteredEndpoints []Endpoint
 
 	// Get all the local endpoints
@@ -108,7 +96,5 @@ func filterEndpointsInternalTrafficPolicy(internalTrafficPolicy *v1.ServiceInter
 		}
 	}
 
-	// When internalTrafficPolicy is Local, only return the node local
-	// endpoints
 	return filteredEndpoints
 }

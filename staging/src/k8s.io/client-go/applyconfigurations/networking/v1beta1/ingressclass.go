@@ -48,7 +48,7 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // ExtractIngressClass extracts the applied configuration owned by fieldManager from
 // ingressClass. If no managedFields are found in ingressClass for fieldManager, a
 // IngressClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // ingressClass must be a unmodified IngressClass API object that was retrieved from the Kubernetes API.

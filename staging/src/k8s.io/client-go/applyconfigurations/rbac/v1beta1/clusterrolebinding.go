@@ -49,7 +49,7 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // ExtractClusterRoleBinding extracts the applied configuration owned by fieldManager from
 // clusterRoleBinding. If no managedFields are found in clusterRoleBinding for fieldManager, a
 // ClusterRoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // clusterRoleBinding must be a unmodified ClusterRoleBinding API object that was retrieved from the Kubernetes API.

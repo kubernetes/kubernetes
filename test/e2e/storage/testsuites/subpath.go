@@ -122,7 +122,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
@@ -323,11 +323,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Create the directory
 		var command string
-		if framework.NodeOSDistroIs("windows") {
-			command = fmt.Sprintf("mkdir -p %v; New-Item -itemtype File -path %v", l.subPathDir, probeFilePath)
-		} else {
-			command = fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
-		}
+		command = fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
 		setInitCommand(l.pod, command)
 		testPodContainerRestart(f, l.pod)
 	})

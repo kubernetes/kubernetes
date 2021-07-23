@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -48,6 +49,9 @@ const (
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
 	singleCallTimeout = 5 * time.Minute
+
+	// sshBastionEnvKey is the environment variable key for running SSH commands via bastion.
+	sshBastionEnvKey = "KUBE_SSH_BASTION"
 )
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -133,11 +137,43 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 			len(hosts), len(nodelist.Items), nodelist)
 	}
 
-	sshHosts := make([]string, 0, len(hosts))
-	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, SSHPort))
+	lenHosts := len(hosts)
+	wg := &sync.WaitGroup{}
+	wg.Add(lenHosts)
+	sshHosts := make([]string, 0, lenHosts)
+	var sshHostsLock sync.Mutex
+
+	for _, host := range hosts {
+		go func(host string) {
+			defer wg.Done()
+			if canConnect(host) {
+				e2elog.Logf("Assuming SSH on host %s", host)
+				sshHostsLock.Lock()
+				sshHosts = append(sshHosts, net.JoinHostPort(host, SSHPort))
+				sshHostsLock.Unlock()
+			} else {
+				e2elog.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
+			}
+		}(host)
 	}
+	wg.Wait()
+
 	return sshHosts, nil
+}
+
+// canConnect returns true if a network connection is possible to the SSHPort.
+func canConnect(host string) bool {
+	if _, ok := os.LookupEnv(sshBastionEnvKey); ok {
+		return true
+	}
+	hostPort := net.JoinHostPort(host, SSHPort)
+	conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
+	if err != nil {
+		e2elog.Logf("cannot dial %s: %v", hostPort, err)
+		return false
+	}
+	conn.Close()
+	return true
 }
 
 // Result holds the execution result of SSH command
@@ -176,7 +212,7 @@ func SSH(cmd, host, provider string) (Result, error) {
 		result.User = os.Getenv("USER")
 	}
 
-	if bastion := os.Getenv("KUBE_SSH_BASTION"); len(bastion) > 0 {
+	if bastion := os.Getenv(sshBastionEnvKey); len(bastion) > 0 {
 		stdout, stderr, code, err := runSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
 		result.Stdout = stdout
 		result.Stderr = stderr

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -383,16 +384,31 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
 		})
 	registry.registerPriorityConfigProducer(MostRequestedPriority,
-		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
+		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.MostAllocatedName, &args.Weight)
+			*pluginConfig = append(*pluginConfig,
+				config.PluginConfig{Name: noderesources.MostAllocatedName, Args: &config.NodeResourcesMostAllocatedArgs{
+					Resources: []config.ResourceSpec{
+						{Name: string(v1.ResourceCPU), Weight: 1},
+						{Name: string(v1.ResourceMemory), Weight: 1},
+					},
+				}})
+
 		})
 	registry.registerPriorityConfigProducer(BalancedResourceAllocation,
 		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.BalancedAllocationName, &args.Weight)
 		})
 	registry.registerPriorityConfigProducer(LeastRequestedPriority,
-		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
+		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.LeastAllocatedName, &args.Weight)
+			*pluginConfig = append(*pluginConfig,
+				config.PluginConfig{Name: noderesources.LeastAllocatedName, Args: &config.NodeResourcesLeastAllocatedArgs{
+					Resources: []config.ResourceSpec{
+						{Name: string(v1.ResourceCPU), Weight: 1},
+						{Name: string(v1.ResourceMemory), Weight: 1},
+					},
+				}})
 		})
 	registry.registerPriorityConfigProducer(noderesources.RequestedToCapacityRatioName,
 		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {

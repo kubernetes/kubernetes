@@ -2674,6 +2674,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: succeeded
       type:
         scalar: numeric
+    - name: uncountedTerminatedPods
+      type:
+        namedType: io.k8s.api.batch.v1.UncountedTerminatedPods
 - name: io.k8s.api.batch.v1.JobTemplateSpec
   map:
     fields:
@@ -2685,6 +2688,21 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.batch.v1.JobSpec
       default: {}
+- name: io.k8s.api.batch.v1.UncountedTerminatedPods
+  map:
+    fields:
+    - name: failed
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: succeeded
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: io.k8s.api.batch.v1beta1.CronJob
   map:
     fields:
@@ -2807,6 +2825,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.certificates.v1.CertificateSigningRequestSpec
   map:
     fields:
+    - name: expirationSeconds
+      type:
+        scalar: numeric
     - name: extra
       type:
         map:
@@ -2903,6 +2924,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.certificates.v1beta1.CertificateSigningRequestSpec
   map:
     fields:
+    - name: expirationSeconds
+      type:
+        scalar: numeric
     - name: extra
       type:
         map:
@@ -4872,6 +4896,9 @@ var schemaYAML = typed.YAMLObject(`types:
             scalar: string
           elementRelationship: atomic
     - name: dataSource
+      type:
+        namedType: io.k8s.api.core.v1.TypedLocalObjectReference
+    - name: dataSourceRef
       type:
         namedType: io.k8s.api.core.v1.TypedLocalObjectReference
     - name: resources

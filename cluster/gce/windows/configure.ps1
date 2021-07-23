@@ -129,6 +129,9 @@ try {
   $kube_env = Fetch-KubeEnv
   Set-EnvironmentVars
 
+  # Set the TCP/IP Parameters to keep idle connections alive.
+  Set-WindowsTCPParameters
+
   # Install Docker if the select CRI is not containerd and docker is not already
   # installed.
   if (${env:CONTAINER_RUNTIME} -ne "containerd") {

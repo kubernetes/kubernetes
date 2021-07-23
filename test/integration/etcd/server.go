@@ -61,8 +61,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 /IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END EC PRIVATE KEY-----`
 
-// StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
-func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *Master {
+// StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource
+func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
 	certDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +125,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}
 
 	// then build and use an etcd lock
-	// this prevents more than one of these masters from running at the same time
+	// this prevents more than one of these api servers from running at the same time
 	lock := concurrency.NewLocker(session, "kube_integration_etcd_raw")
 	lock.Lock()
 
@@ -156,7 +156,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		// Catch panics that occur in this go routine so we get a comprehensible failure
 		defer func() {
 			if err := recover(); err != nil {
-				t.Errorf("Unexpected panic trying to start API master: %#v", err)
+				t.Errorf("Unexpected panic trying to start API server: %#v", err)
 			}
 		}()
 
@@ -217,7 +217,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		}
 	}
 
-	return &Master{
+	return &APIServer{
 		Client:    kubeClient,
 		Dynamic:   dynamic.NewForConfigOrDie(kubeClientConfig),
 		Config:    kubeClientConfig,
@@ -228,9 +228,9 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}
 }
 
-// Master represents a running API server that is ready for use
+// APIServer represents a running API server that is ready for use
 // The Cleanup func must be deferred to prevent resource leaks
-type Master struct {
+type APIServer struct {
 	Client    clientset.Interface
 	Dynamic   dynamic.Interface
 	Config    *restclient.Config

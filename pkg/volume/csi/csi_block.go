@@ -193,7 +193,8 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		accessMode,
 		nodeStageSecrets,
 		csiSource.VolumeAttributes,
-		nil /* MountOptions */)
+		nil, /* MountOptions */
+		nil /* fsGroup */)
 
 	if err != nil {
 		return "", err
@@ -265,7 +266,8 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
-		[]string{},
+		[]string{}, /* mountOptions */
+		nil,        /* fsGroup */
 	)
 
 	if err != nil {

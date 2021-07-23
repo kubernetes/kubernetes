@@ -17,6 +17,7 @@ limitations under the License.
 package logs
 
 import (
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -35,38 +36,25 @@ var (
 )
 
 func init() {
-	JSONLogger = NewJSONLogger(nil)
+	JSONLogger = NewJSONLogger(zapcore.Lock(os.Stdout))
 }
 
 // NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
 func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
-	l, _ := zapConfig.Build()
-	l = l.WithOptions(zap.AddCallerSkip(1))
-	if w != nil {
-		l = l.WithOptions(zap.WrapCore(
-			func(zapcore.Core) zapcore.Core {
-				return zapcore.NewCore(zapcore.NewJSONEncoder(zapConfig.EncoderConfig), zapcore.AddSync(w), zapcore.DebugLevel)
-			}))
-	}
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(w), zapcore.DebugLevel)
+	l := zap.New(core, zap.WithCaller(true), zap.AddCallerSkip(1))
 	return &zapLogger{l: l}
 }
 
-var zapConfig = zap.Config{
-	Level:       zap.NewAtomicLevelAt(zap.DebugLevel),
-	Development: false,
-	Sampling:    nil,
-	Encoding:    "json",
-	EncoderConfig: zapcore.EncoderConfig{
-		MessageKey: "msg",
+var encoderConfig = zapcore.EncoderConfig{
+	MessageKey: "msg",
 
-		CallerKey:      "caller",
-		TimeKey:        "ts",
-		EncodeTime:     epochMillisTimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	},
-	OutputPaths:      []string{"stdout"},
-	ErrorOutputPaths: []string{"stderr"},
+	CallerKey:      "caller",
+	TimeKey:        "ts",
+	EncodeTime:     epochMillisTimeEncoder,
+	EncodeDuration: zapcore.StringDurationEncoder,
+	EncodeCaller:   zapcore.ShortCallerEncoder,
 }
 
 // this has the same implementation as zapcore.EpochMillisTimeEncoder but
@@ -97,6 +85,13 @@ func (l *zapLogger) Enabled() bool {
 func (l *zapLogger) Info(msg string, keysAndVals ...interface{}) {
 	if checkedEntry := l.l.Check(zapcore.InfoLevel, msg); checkedEntry != nil {
 		checkedEntry.Write(l.handleFields(keysAndVals)...)
+	}
+}
+
+// Error write log message to error level
+func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
+	if checkedEntry := l.l.Check(zap.ErrorLevel, msg); checkedEntry != nil {
+		checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
 	}
 }
 
@@ -145,13 +140,6 @@ func (l *zapLogger) handleFields(args []interface{}, additional ...zap.Field) []
 	}
 
 	return append(fields, additional...)
-}
-
-// Error write log message to error level
-func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
-	if checkedEntry := l.l.Check(zap.ErrorLevel, msg); checkedEntry != nil {
-		checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
-	}
 }
 
 func handleError(err error) zap.Field {

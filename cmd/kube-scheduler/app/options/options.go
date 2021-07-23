@@ -38,14 +38,12 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	configv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 )
 
@@ -73,28 +71,14 @@ type Options struct {
 
 // NewOptions returns default scheduler app options.
 func NewOptions() (*Options, error) {
-	cfg, err := newDefaultComponentConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	hhost, hport, err := splitHostIntPort(cfg.HealthzBindAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	o := &Options{
-		ComponentConfig: *cfg,
-		SecureServing:   apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
 			Healthz: (&apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			}).WithLoopback(),
 			Metrics: (&apiserveroptions.DeprecatedInsecureServingOptions{
-				BindNetwork: "tcp",
-			}).WithLoopback(),
-			BindPort:    hport,
-			BindAddress: hhost,
+				BindNetwork: "tcp"}).WithLoopback(),
 		},
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
@@ -118,6 +102,81 @@ func NewOptions() (*Options, error) {
 	return o, nil
 }
 
+// Complete completes the remaining instantiation of the options obj.
+// In particular, it injects the latest internal versioned ComponentConfig.
+func (o *Options) Complete(nfs *cliflag.NamedFlagSets) error {
+	cfg, err := latest.Default()
+	if err != nil {
+		return err
+	}
+
+	hhost, hport, err := splitHostIntPort(cfg.HealthzBindAddress)
+	if err != nil {
+		return err
+	}
+	// Obtain CLI args related with insecure serving.
+	// If not specified in command line, derive the default settings from cfg.
+	insecureServing := nfs.FlagSet("insecure serving")
+	if !insecureServing.Changed("address") {
+		o.CombinedInsecureServing.BindAddress = hhost
+	}
+	if !insecureServing.Changed("port") {
+		o.CombinedInsecureServing.BindPort = hport
+	}
+	// Obtain deprecated CLI args. Set them to cfg if specified in command line.
+	deprecated := nfs.FlagSet("deprecated")
+	if deprecated.Changed("profiling") {
+		cfg.EnableProfiling = o.ComponentConfig.EnableProfiling
+	}
+	if deprecated.Changed("contention-profiling") {
+		cfg.EnableContentionProfiling = o.ComponentConfig.EnableContentionProfiling
+	}
+	if deprecated.Changed("kubeconfig") {
+		cfg.ClientConnection.Kubeconfig = o.ComponentConfig.ClientConnection.Kubeconfig
+	}
+	if deprecated.Changed("kube-api-content-type") {
+		cfg.ClientConnection.ContentType = o.ComponentConfig.ClientConnection.ContentType
+	}
+	if deprecated.Changed("kube-api-qps") {
+		cfg.ClientConnection.QPS = o.ComponentConfig.ClientConnection.QPS
+	}
+	if deprecated.Changed("kube-api-burst") {
+		cfg.ClientConnection.Burst = o.ComponentConfig.ClientConnection.Burst
+	}
+	if deprecated.Changed("lock-object-namespace") {
+		cfg.LeaderElection.ResourceNamespace = o.ComponentConfig.LeaderElection.ResourceNamespace
+	}
+	if deprecated.Changed("lock-object-name") {
+		cfg.LeaderElection.ResourceName = o.ComponentConfig.LeaderElection.ResourceName
+	}
+	// Obtain CLI args related with leaderelection. Set them to cfg if specified in command line.
+	leaderelection := nfs.FlagSet("leader election")
+	if leaderelection.Changed("leader-elect") {
+		cfg.LeaderElection.LeaderElect = o.ComponentConfig.LeaderElection.LeaderElect
+	}
+	if leaderelection.Changed("leader-elect-lease-duration") {
+		cfg.LeaderElection.LeaseDuration = o.ComponentConfig.LeaderElection.LeaseDuration
+	}
+	if leaderelection.Changed("leader-elect-renew-deadline") {
+		cfg.LeaderElection.RenewDeadline = o.ComponentConfig.LeaderElection.RenewDeadline
+	}
+	if leaderelection.Changed("leader-elect-retry-period") {
+		cfg.LeaderElection.RetryPeriod = o.ComponentConfig.LeaderElection.RetryPeriod
+	}
+	if leaderelection.Changed("leader-elect-resource-lock") {
+		cfg.LeaderElection.ResourceLock = o.ComponentConfig.LeaderElection.ResourceLock
+	}
+	if leaderelection.Changed("leader-elect-resource-name") {
+		cfg.LeaderElection.ResourceName = o.ComponentConfig.LeaderElection.ResourceName
+	}
+	if leaderelection.Changed("leader-elect-resource-namespace") {
+		cfg.LeaderElection.ResourceNamespace = o.ComponentConfig.LeaderElection.ResourceNamespace
+	}
+
+	o.ComponentConfig = *cfg
+	return nil
+}
+
 func splitHostIntPort(s string) (string, int, error) {
 	host, port, err := net.SplitHostPort(s)
 	if err != nil {
@@ -128,23 +187,6 @@ func splitHostIntPort(s string) (string, int, error) {
 		return "", 0, err
 	}
 	return host, portInt, err
-}
-
-func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := configv1beta2.KubeSchedulerConfiguration{}
-	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
-
-	kubeschedulerscheme.Scheme.Default(&versionedCfg)
-	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
-	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
-		return nil, err
-	}
-	// We don't set this field in pkg/scheduler/apis/config/{version}/conversion.go
-	// because the field will be cleared later by API machinery during
-	// conversion. See KubeSchedulerConfiguration internal type definition for
-	// more details.
-	cfg.TypeMeta.APIVersion = configv1beta2.SchemeGroupVersion.String()
-	return &cfg, nil
 }
 
 // Flags returns flags for a specific scheduler by section name

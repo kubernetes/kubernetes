@@ -38,6 +38,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -341,7 +342,7 @@ profiles:
 			options: &Options{
 				ConfigFile: configFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, err := newDefaultComponentConfig()
+					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -407,7 +408,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -480,7 +481,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta1,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta1,
 					},
 				},
 			},
@@ -490,7 +491,7 @@ profiles:
 			options: &Options{
 				ConfigFile: oldConfigFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, err := newDefaultComponentConfig()
+					cfg, err := latest.Default()
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -520,7 +521,7 @@ profiles:
 			name: "kubeconfig flag",
 			options: &Options{
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
@@ -584,7 +585,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -593,7 +594,7 @@ profiles:
 			name: "overridden master",
 			options: &Options{
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+					cfg, _ := latest.Default()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
@@ -656,7 +657,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins:       defaults.PluginsV1beta2,
-						PluginConfig:  defaults.PluginConfigs,
+						PluginConfig:  defaults.PluginConfigsV1beta2,
 					},
 				},
 			},
@@ -747,13 +748,18 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
-								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
 							},
 							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
-									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -865,8 +871,19 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
+								},
 							},
 							{
 								Name: "NodeResourcesLeastAllocated",
@@ -946,7 +963,7 @@ profiles:
 								},
 							},
 						},
-						PluginConfig: defaults.PluginConfigs,
+						PluginConfig: defaults.PluginConfigsV1beta2,
 					},
 					{
 						SchedulerName: "bar-profile",
@@ -982,13 +999,18 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
-								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
 							},
 							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: &kubeschedulerconfig.NodeResourcesLeastAllocatedArgs{
-									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Name: "NodeResourcesFit",
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -1063,7 +1085,7 @@ profiles:
 								},
 							},
 						},
-						PluginConfig: defaults.PluginConfigs,
+						PluginConfig: defaults.PluginConfigsV1beta1,
 					},
 					{
 						SchedulerName: "bar-profile",
@@ -1099,8 +1121,19 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
 								Name: "NodeResourcesFit",
-								Args: &kubeschedulerconfig.NodeResourcesFitArgs{},
+								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
+									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
+										Type:      kubeschedulerconfig.LeastAllocated,
+										Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+									},
+								},
 							},
 							{
 								Name: "NodeResourcesLeastAllocated",

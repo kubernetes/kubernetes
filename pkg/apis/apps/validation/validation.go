@@ -162,7 +162,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'minReadySeconds' and 'updateStrategy' are forbidden"))
 		} else {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template' and 'updateStrategy' are forbidden"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'minReadySeconds' are forbidden"))
 		}
 	}
 

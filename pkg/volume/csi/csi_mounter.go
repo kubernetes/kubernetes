@@ -229,12 +229,24 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// Inject pod service account token into volume attributes
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+	serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
+	}
+	volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+
+	driverSupportsCSIVolumeMountGroup := false
+	var nodePublishFSGroupArg *int64
+	if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
+		driverSupportsCSIVolumeMountGroup, err = csi.NodeSupportsVolumeMountGroup(ctx)
 		if err != nil {
-			return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
+			return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
 		}
-		volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+
+		if driverSupportsCSIVolumeMountGroup {
+			klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodePublishVolume.", c.driverName)
+			nodePublishFSGroupArg = mounterArgs.FsGroup
+		}
 	}
 
 	err = csi.NodePublishVolume(
@@ -249,6 +261,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		nodePublishSecrets,
 		fsType,
 		mountOptions,
+		nodePublishFSGroupArg,
 	)
 
 	if err != nil {
@@ -266,7 +279,9 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
-	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
+
 		// fullPluginName helps to distinguish different driver from csi plugin
 		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		if err != nil {

@@ -120,7 +120,7 @@ func checkDockerConfig() error {
 			"/usr/share/docker.io/contrib/check-config.sh",
 			"/usr/share/docker/contrib/check-config.sh",
 		}
-		whitelist = map[string]bool{
+		allowlist = map[string]bool{
 			"CONFIG_MEMCG_SWAP_ENABLED": true,
 			"CONFIG_RT_GROUP_SCHED":     true,
 			"CONFIG_EXT3_FS":            true,
@@ -134,7 +134,7 @@ func checkDockerConfig() error {
 		missing = map[string]bool{}
 	)
 
-	// Whitelists CONFIG_DEVPTS_MULTIPLE_INSTANCES (meaning allowing it to be
+	// Allowlists CONFIG_DEVPTS_MULTIPLE_INSTANCES (meaning allowing it to be
 	// absent) if the kernel version is >= 4.8, because this option has been
 	// removed from the 4.8 kernel.
 	kernelVersion, err := getKernelVersion()
@@ -142,7 +142,7 @@ func checkDockerConfig() error {
 		return err
 	}
 	if kernelVersion.GTE(semver.MustParse("4.8.0")) {
-		whitelist["CONFIG_DEVPTS_MULTIPLE_INSTANCES"] = true
+		allowlist["CONFIG_DEVPTS_MULTIPLE_INSTANCES"] = true
 	}
 
 	for _, bin := range bins {
@@ -150,7 +150,7 @@ func checkDockerConfig() error {
 			continue
 		}
 		// We don't check the return code because it's OK if the script returns
-		// a non-zero exit code just because the configs in the whitelist are
+		// a non-zero exit code just because the configs in the allowlist are
 		// missing.
 		output, _ := runCommand(bin)
 		for _, line := range strings.Split(output, "\n") {
@@ -165,7 +165,7 @@ func checkDockerConfig() error {
 			key := strings.TrimFunc(fields[0], func(c rune) bool {
 				return c == ' ' || c == '-'
 			})
-			if _, found := whitelist[key]; !found {
+			if _, found := allowlist[key]; !found {
 				missing[key] = true
 			}
 		}
@@ -279,19 +279,19 @@ func checkDockerSeccomp() error {
 		return err
 	}
 	// Starts a container with the default seccomp profile and ensures that
-	// unshare (a blacklisted system call in the default profile) fails.
+	// unshare (a denylisted system call in the default profile) fails.
 	cmd := []string{"docker", "run", "--rm", "-i", image, "unshare", "-r", "whoami"}
 	_, err = runCommand(cmd...)
 	if err == nil {
 		return fmt.Errorf("%q did not fail as expected", strings.Join(cmd, " "))
 	}
-	// Starts a container with a custom seccomp profile that blacklists mkdir
+	// Starts a container with a custom seccomp profile that denylists mkdir
 	// and ensures that unshare succeeds.
 	_, err = runCommand("docker", "run", "--rm", "-i", "--security-opt", fmt.Sprintf("seccomp=%s", seccompProfileFileName), image, "unshare", "-r", "whoami")
 	if err != nil {
 		return err
 	}
-	// Starts a container with a custom seccomp profile that blacklists mkdir
+	// Starts a container with a custom seccomp profile that denylists mkdir
 	// and ensures that mkdir fails.
 	cmd = []string{"docker", "run", "--rm", "-i", "--security-opt", fmt.Sprintf("seccomp=%s", seccompProfileFileName), image, "mkdir", "-p", "/tmp/foo"}
 	_, err = runCommand(cmd...)

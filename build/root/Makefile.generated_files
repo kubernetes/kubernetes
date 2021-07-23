@@ -39,7 +39,7 @@ UPDATE_API_KNOWN_VIOLATIONS ?=
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_prerelease_lifecycle gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_bindata
+generated_files: gen_prerelease_lifecycle gen_deepcopy gen_defaulter gen_conversion gen_openapi
 
 #
 # Helper logic to calculate Go's dependency DAG ourselves.
@@ -73,7 +73,6 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    --prune  k8s.io/kubernetes/staging              \
 	    --prune  k8s.io/kubernetes/vendor               \
 	    k8s.io/kubernetes/vendor/k8s.io/...             \
-	    github.com/go-bindata/go-bindata/go-bindata/... \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                         \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
@@ -638,33 +637,4 @@ gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE
 # it, and make is happy.
 $(OPENAPI_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
-	touch $@
-
-
-# bindata generation
-#
-
-# The tool used to generate bindata files.
-BINDATA_GEN := $(BIN_DIR)/go-bindata
-
-# A wrapper script that generates all bindata files.  It is fast enough that we
-# don't care.
-BINDATA_SCRIPT := hack/generate-bindata.sh
-
-# This rule is the user-friendly entrypoint for bindata generation.
-.PHONY: gen_bindata
-gen_bindata: $(BINDATA_GEN) FORCE
-	./hack/run-in-gopath.sh $(BINDATA_SCRIPT)
-
-# How to build the generator tool.  The deps for this are defined in
-# the $(BINDATA_GEN).mk, above.
-#
-# A word on the need to touch: This rule might trigger if, for example, a
-# non-Go file was added or deleted from a directory on which this depends.
-# This target needs to be reconsidered, but Go realizes it doesn't actually
-# have to be rebuilt.  In that case, make will forever see the dependency as
-# newer than the binary, and try to rebuild it over and over.  So we touch it,
-# and make is happy.
-$(BINDATA_GEN): $(GODEPS_k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/go-bindata/go-bindata/go-bindata
 	touch $@

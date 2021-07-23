@@ -84,7 +84,16 @@ func (c *azureTokenCache) setToken(tokenKey string, token *azureToken) {
 	c.cache[tokenKey] = token
 }
 
+var warnOnce sync.Once
+
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	// deprecated in v1.22, remove in v1.25
+	// this should be updated to use klog.Warningf in v1.24 to more actively warn consumers
+	warnOnce.Do(func() {
+		klog.V(1).Infof(`WARNING: the azure auth plugin is deprecated in v1.22+, unavailable in v1.25+; use https://github.com/Azure/kubelogin instead.
+To learn more, consult https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`)
+	})
+
 	var (
 		ts          tokenSource
 		environment azure.Environment

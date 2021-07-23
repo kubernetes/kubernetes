@@ -81,6 +81,7 @@ var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
 var _ framework.ScorePlugin = &VolumeBinding{}
+var _ framework.EnqueueExtensions = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = names.VolumeBinding
@@ -88,6 +89,35 @@ const Name = names.VolumeBinding
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
 	return Name
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
+	events := []framework.ClusterEvent{
+		// Pods may fail because of missing or mis-configured storage class
+		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
+		// schedulable upon StorageClass Add or Update events.
+		{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update},
+		// We bind PVCs with PVs, so any changes may make the pods schedulable.
+		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update},
+		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
+		// Pods may fail to find available PVs because the node labels do not
+		// match the storage class's allowed topologies or PV's node affinity.
+		// A new or updated node may make pods schedulable.
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+		// We rely on CSI node to translate in-tree PV to CSI.
+		{Resource: framework.CSINode, ActionType: framework.Add | framework.Update},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		// When CSIStorageCapacity is enabled, pods may become schedulable
+		// on CSI driver & storage capacity changes.
+		events = append(events, []framework.ClusterEvent{
+			{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
+			{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
+		}...)
+	}
+	return events
 }
 
 // podHasPVCs returns 2 values:
@@ -221,20 +251,6 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	return nil
 }
 
-var (
-	// TODO (for alpha) make it configurable in config.VolumeBindingArgs
-	defaultShapePoint = []config.UtilizationShapePoint{
-		{
-			Utilization: 0,
-			Score:       0,
-		},
-		{
-			Utilization: 100,
-			Score:       int32(config.MaxCustomPriorityScore),
-		},
-	}
-)
-
 // Score invoked at the score extension point.
 func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	if pl.scorer == nil {
@@ -363,8 +379,8 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	// build score function
 	var scorer volumeCapacityScorer
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		shape := make(helper.FunctionShape, 0, len(defaultShapePoint))
-		for _, point := range defaultShapePoint {
+		shape := make(helper.FunctionShape, 0, len(args.Shape))
+		for _, point := range args.Shape {
 			shape = append(shape, helper.FunctionShapePoint{
 				Utilization: int64(point.Utilization),
 				Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),

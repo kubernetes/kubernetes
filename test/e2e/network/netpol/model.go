@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,24 +43,6 @@ type Model struct {
 // NewWindowsModel returns a model specific to windows testing.
 func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsDomain string) *Model {
 	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP}, dnsDomain)
-}
-
-// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
-func (m *Model) GetProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
-	}
-	return timeoutSeconds
-}
-
-// GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
-func (m *Model) GetWorkers() int {
-	numberOfWorkers := 3
-	if framework.NodeOSDistroIs("windows") {
-		numberOfWorkers = 1 // See https://github.com/kubernetes/kubernetes/pull/97690
-	}
-	return numberOfWorkers
 }
 
 // NewModel instantiates a model based on:
@@ -107,6 +88,24 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 	return model
 }
 
+// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
+func (m *Model) GetProbeTimeoutSeconds() int {
+	timeoutSeconds := 1
+	if framework.NodeOSDistroIs("windows") {
+		timeoutSeconds = 3
+	}
+	return timeoutSeconds
+}
+
+// GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
+func (m *Model) GetWorkers() int {
+	numberOfWorkers := 3
+	if framework.NodeOSDistroIs("windows") {
+		numberOfWorkers = 1 // See https://github.com/kubernetes/kubernetes/pull/97690
+	}
+	return numberOfWorkers
+}
+
 // NewReachability instantiates a default-true reachability from the model's pods
 func (m *Model) NewReachability() *Reachability {
 	return NewReachability(m.AllPods(), true)
@@ -149,7 +148,7 @@ func (m *Model) FindPod(ns string, name string) (*Pod, error) {
 			}
 		}
 	}
-	return nil, errors.Errorf("unable to find pod %s/%s", ns, name)
+	return nil, fmt.Errorf("unable to find pod %s/%s", ns, name)
 }
 
 // Namespace is the abstract representation of what matters to network policy
@@ -181,6 +180,7 @@ type Pod struct {
 	Namespace  string
 	Name       string
 	Containers []*Container
+	ServiceIP  string
 }
 
 // PodString returns a corresponding pod string

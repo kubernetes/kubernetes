@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/lithammer/dedent"
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"

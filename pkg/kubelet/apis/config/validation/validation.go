@@ -155,6 +155,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
+	if localFeatureGate.Enabled(features.NodeSwap) {
+		if kc.MemorySwap.SwapBehavior != "" && kc.MemorySwap.SwapBehavior != kubetypes.LimitedSwap && kc.MemorySwap.SwapBehavior != kubetypes.UnlimitedSwap {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior %v must be one of: LimitedSwap, UnlimitedSwap", kc.MemorySwap.SwapBehavior))
+		}
+	}
+	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MemorySwap.SwapBehavior cannot be set when NodeSwap feature flag is disabled"))
+	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
@@ -204,5 +212,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if errs := logs.ValidateLoggingConfiguration(&kc.Logging, field.NewPath("logging")); len(errs) > 0 {
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
+
+	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor is required when MemoryQoS feature flag is enabled"))
+	}
+	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", kc.MemoryThrottlingFactor))
+	}
+
 	return utilerrors.NewAggregate(allErrors)
 }

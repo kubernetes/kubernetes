@@ -1096,5 +1096,6 @@ func getNodeHostIP(f *framework.Framework, nodeName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
+	framework.ExpectNotEqual(len(ips), 0)
 	return ips[0]
 }

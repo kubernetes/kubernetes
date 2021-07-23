@@ -23,14 +23,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	netutil "k8s.io/apimachinery/pkg/util/net"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -40,12 +33,21 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	netutil "k8s.io/apimachinery/pkg/util/net"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 var (
 	// PlaceholderToken is only set statically to make kubeadm not randomize the token on every run
-	PlaceholderToken = kubeadmapiv1.BootstrapToken{
-		Token: &kubeadmapiv1.BootstrapTokenString{
+	PlaceholderToken = bootstraptokenv1.BootstrapToken{
+		Token: &bootstraptokenv1.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -67,7 +69,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
-func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
+func SetBootstrapTokensDynamicDefaults(cfg *[]bootstraptokenv1.BootstrapToken) error {
 	// Populate the .Token field with a random value if unset
 	// We do this at this layer, and not the API defaulting layer
 	// because of possible security concerns, and more practically
@@ -82,7 +84,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't generate random token")
 		}
-		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+		token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 		if err != nil {
 			return err
 		}
@@ -183,7 +185,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, localAPIEnd
 func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 	versionedInitCfg := &kubeadmapiv1.InitConfiguration{
 		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		BootstrapTokens:  []kubeadmapiv1.BootstrapToken{PlaceholderToken},
+		BootstrapTokens:  []bootstraptokenv1.BootstrapToken{PlaceholderToken},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			CRISocket: kubeadmconstants.DefaultDockerCRISocket, // avoid CRI detection
 			Name:      "node",

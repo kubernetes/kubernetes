@@ -61,7 +61,7 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
@@ -180,7 +180,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 // TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
 func TestTerminalPodEviction(t *testing.T) {
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)

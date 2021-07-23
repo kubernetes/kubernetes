@@ -62,7 +62,7 @@ type Manager struct {
 	shutdownGracePeriodCriticalPods time.Duration
 
 	getPods        eviction.ActivePodsFunc
-	killPod        eviction.KillPodFunc
+	killPodFunc    eviction.KillPodFunc
 	syncNodeStatus func()
 
 	dbusCon     dbusInhibiter
@@ -78,7 +78,7 @@ type Manager struct {
 func NewManager(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
 	manager := &Manager{
 		getPods:                         getPodsFunc,
-		killPod:                         killPodFunc,
+		killPodFunc:                     killPodFunc,
 		syncNodeStatus:                  syncNodeStatus,
 		shutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		shutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
@@ -268,15 +268,10 @@ func (m *Manager) processShutdownEvent() error {
 			}
 
 			klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
-
-			status := v1.PodStatus{
-				Phase:   v1.PodFailed,
-				Reason:  nodeShutdownReason,
-				Message: nodeShutdownMessage,
-			}
-
-			err := m.killPod(pod, status, &gracePeriodOverride)
-			if err != nil {
+			if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
+				status.Message = nodeShutdownMessage
+				status.Reason = nodeShutdownReason
+			}); err != nil {
 				klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 			} else {
 				klog.V(1).InfoS("Shutdown manager finished killing pod", "pod", klog.KObj(pod))

@@ -112,9 +112,13 @@ type ContainerManager interface {
 	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
 	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
 
-	// Implements the podresources Provider API for CPUs and Devices
+	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+	GetNodeAllocatableAbsolute() v1.ResourceList
+
+	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider
+	podresources.MemoryProvider
 }
 
 type NodeConfig struct {
@@ -130,6 +134,7 @@ type NodeConfig struct {
 	NodeAllocatableConfig
 	QOSReserved                             map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy            string
+	ExperimentalCPUManagerPolicyOptions     map[string]string
 	ExperimentalTopologyManagerScope        string
 	ExperimentalCPUManagerReconcilePeriod   time.Duration
 	ExperimentalMemoryManagerPolicy         string

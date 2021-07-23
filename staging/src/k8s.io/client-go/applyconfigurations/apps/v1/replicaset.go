@@ -50,7 +50,7 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // ExtractReplicaSet extracts the applied configuration owned by fieldManager from
 // replicaSet. If no managedFields are found in replicaSet for fieldManager, a
 // ReplicaSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // replicaSet must be a unmodified ReplicaSet API object that was retrieved from the Kubernetes API.

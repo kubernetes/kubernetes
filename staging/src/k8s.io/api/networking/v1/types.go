@@ -426,7 +426,7 @@ type HTTPIngressPath struct {
 	//   the IngressClass. Implementations can treat this as a separate PathType
 	//   or treat it identically to Prefix or Exact path types.
 	// Implementations are required to support all path types.
-	PathType *PathType `json:"pathType,omitempty" protobuf:"bytes,3,opt,name=pathType"`
+	PathType *PathType `json:"pathType" protobuf:"bytes,3,opt,name=pathType"`
 
 	// Backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.

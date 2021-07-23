@@ -19,9 +19,6 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -29,6 +26,9 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 var controlPlaneJoinExample = cmdutil.Examples(`
@@ -44,6 +44,8 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	}
 	if name == "etcd" || name == "all" {
 		flags = append(flags, options.Patches)
+		// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
+		flags = append(flags, options.ExperimentalPatches)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)

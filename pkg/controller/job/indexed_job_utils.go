@@ -18,7 +18,6 @@ package job
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -39,85 +39,184 @@ func isIndexedJob(job *batch.Job) bool {
 	return job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion
 }
 
-// calculateSucceededIndexes returns a string representation of the list of
-// succeeded indexes in compressed format and the number of succeeded indexes.
-func calculateSucceededIndexes(pods []*v1.Pod, completions int32) (string, int32) {
-	sort.Sort(byCompletionIndex(pods))
-	var result strings.Builder
-	var lastSucceeded int
-	var count int32
-	firstSucceeded := math.MinInt32
-	for _, p := range pods {
-		ix := getCompletionIndex(p.Annotations)
-		if ix == unknownCompletionIndex {
-			continue
-		}
-		if ix >= int(completions) {
-			break
-		}
-		if p.Status.Phase == v1.PodSucceeded {
-			if firstSucceeded == math.MinInt32 {
-				firstSucceeded = ix
-			} else if ix > lastSucceeded+1 {
-				addSingleOrRangeStr(&result, firstSucceeded, lastSucceeded)
-				count += int32(lastSucceeded - firstSucceeded + 1)
-				firstSucceeded = ix
-			}
-			lastSucceeded = ix
-		}
-	}
-	if firstSucceeded != math.MinInt32 {
-		addSingleOrRangeStr(&result, firstSucceeded, lastSucceeded)
-		count += int32(lastSucceeded - firstSucceeded + 1)
-	}
-	return result.String(), count
+type interval struct {
+	First int
+	Last  int
 }
 
-func addSingleOrRangeStr(builder *strings.Builder, first, last int) {
-	if builder.Len() > 0 {
-		builder.WriteRune(',')
+type orderedIntervals []interval
+
+// calculateSucceededIndexes returns the old and new list of succeeded indexes
+// in compressed format (intervals).
+// The old list is solely based off .status.completedIndexes, but returns an
+// empty list if this Job is not tracked with finalizers. The new list includes
+// the indexes that succeeded since the last sync.
+func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
+	var prevIntervals orderedIntervals
+	withFinalizers := trackingUncountedPods(job)
+	if withFinalizers {
+		prevIntervals = succeededIndexesFromJob(job)
 	}
-	builder.WriteString(strconv.Itoa(first))
-	if last > first {
-		if last == first+1 {
-			builder.WriteRune(',')
-		} else {
-			builder.WriteRune('-')
+	newSucceeded := sets.NewInt()
+	for _, p := range pods {
+		ix := getCompletionIndex(p.Annotations)
+		// Succeeded Pod with valid index and, if tracking with finalizers,
+		// has a finalizer (meaning that it is not counted yet).
+		if p.Status.Phase == v1.PodSucceeded && ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && (!withFinalizers || hasJobTrackingFinalizer(p)) {
+			newSucceeded.Insert(ix)
 		}
-		builder.WriteString(strconv.Itoa(last))
 	}
+	// List returns the items of the set in order.
+	result := prevIntervals.withOrderedIndexes(newSucceeded.List())
+	return prevIntervals, result
+}
+
+// withOrderedIndexes returns a new list of ordered intervals that contains
+// the newIndexes, provided in increasing order.
+func (oi orderedIntervals) withOrderedIndexes(newIndexes []int) orderedIntervals {
+	var result orderedIntervals
+	i := 0
+	j := 0
+	var lastInterval *interval
+	appendOrMergeWithLastInterval := func(thisInterval interval) {
+		if lastInterval == nil || thisInterval.First > lastInterval.Last+1 {
+			result = append(result, thisInterval)
+			lastInterval = &result[len(result)-1]
+		} else if lastInterval.Last < thisInterval.Last {
+			lastInterval.Last = thisInterval.Last
+		}
+	}
+	for i < len(oi) && j < len(newIndexes) {
+		if oi[i].First < newIndexes[j] {
+			appendOrMergeWithLastInterval(oi[i])
+			i++
+		} else {
+			appendOrMergeWithLastInterval(interval{newIndexes[j], newIndexes[j]})
+			j++
+		}
+	}
+	for i < len(oi) {
+		appendOrMergeWithLastInterval(oi[i])
+		i++
+	}
+	for j < len(newIndexes) {
+		appendOrMergeWithLastInterval(interval{newIndexes[j], newIndexes[j]})
+		j++
+	}
+	return result
+}
+
+// total returns number of indexes contained in the intervals.
+func (oi orderedIntervals) total() int {
+	var count int
+	for _, iv := range oi {
+		count += iv.Last - iv.First + 1
+	}
+	return count
+}
+
+func (oi orderedIntervals) String() string {
+	var builder strings.Builder
+	for _, v := range oi {
+		if builder.Len() > 0 {
+			builder.WriteRune(',')
+		}
+		builder.WriteString(strconv.Itoa(v.First))
+		if v.Last > v.First {
+			if v.Last == v.First+1 {
+				builder.WriteRune(',')
+			} else {
+				builder.WriteRune('-')
+			}
+			builder.WriteString(strconv.Itoa(v.Last))
+		}
+	}
+	return builder.String()
+}
+
+func (oi orderedIntervals) has(ix int) bool {
+	lo := 0
+	hi := len(oi)
+	// Invariant: oi[hi].Last >= ix
+	for hi > lo {
+		mid := lo + (hi-lo)/2
+		if oi[mid].Last >= ix {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	if hi == len(oi) {
+		return false
+	}
+	return oi[hi].First <= ix
+}
+
+func succeededIndexesFromJob(job *batch.Job) orderedIntervals {
+	if job.Status.CompletedIndexes == "" {
+		return nil
+	}
+	var result orderedIntervals
+	var lastInterval *interval
+	completions := int(*job.Spec.Completions)
+	for _, intervalStr := range strings.Split(job.Status.CompletedIndexes, ",") {
+		limitsStr := strings.Split(intervalStr, "-")
+		var inter interval
+		var err error
+		inter.First, err = strconv.Atoi(limitsStr[0])
+		if err != nil {
+			klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+			continue
+		}
+		if inter.First >= completions {
+			break
+		}
+		if len(limitsStr) > 1 {
+			inter.Last, err = strconv.Atoi(limitsStr[1])
+			if err != nil {
+				klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+				continue
+			}
+			if inter.Last >= completions {
+				inter.Last = completions - 1
+			}
+		} else {
+			inter.Last = inter.First
+		}
+		if lastInterval != nil && lastInterval.Last == inter.First-1 {
+			lastInterval.Last = inter.Last
+		} else {
+			result = append(result, inter)
+			lastInterval = &result[len(result)-1]
+		}
+	}
+	return result
 }
 
 // firstPendingIndexes returns `count` indexes less than `completions` that are
-// not covered by running or succeeded pods.
-func firstPendingIndexes(pods []*v1.Pod, count, completions int) []int {
+// not covered by `activePods` or `succeededIndexes`.
+func firstPendingIndexes(activePods []*v1.Pod, succeededIndexes orderedIntervals, count, completions int) []int {
 	if count == 0 {
 		return nil
 	}
-	nonPending := sets.NewInt()
-	for _, p := range pods {
-		if p.Status.Phase == v1.PodSucceeded || controller.IsPodActive(p) {
-			ix := getCompletionIndex(p.Annotations)
-			if ix != unknownCompletionIndex {
-				nonPending.Insert(ix)
-			}
+	active := sets.NewInt()
+	for _, p := range activePods {
+		ix := getCompletionIndex(p.Annotations)
+		if ix != unknownCompletionIndex {
+			active.Insert(ix)
 		}
 	}
 	result := make([]int, 0, count)
-	// The following algorithm is bounded by the number of non pending pods and
-	// parallelism.
-	// TODO(#99368): Convert the list of non-pending pods into a set of
-	// non-pending intervals from the job's .status.completedIndexes and active
-	// pods.
+	nonPending := succeededIndexes.withOrderedIndexes(active.List())
+	// The following algorithm is bounded by len(nonPending) and count.
 	candidate := 0
-	for _, np := range nonPending.List() {
-		for ; candidate < np && candidate < completions; candidate++ {
+	for _, sInterval := range nonPending {
+		for ; candidate < completions && len(result) < count && candidate < sInterval.First; candidate++ {
 			result = append(result, candidate)
-			if len(result) == count {
-				return result
-			}
 		}
-		candidate = np + 1
+		if candidate < sInterval.Last+1 {
+			candidate = sInterval.Last + 1
+		}
 	}
 	for ; candidate < completions && len(result) < count; candidate++ {
 		result = append(result, candidate)

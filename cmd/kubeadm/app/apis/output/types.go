@@ -17,8 +17,9 @@ limitations under the License.
 package output
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
