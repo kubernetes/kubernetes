@@ -199,6 +199,7 @@ type pausePodConfig struct {
 	Priority                          *int32
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
+	Volumes                           []v1.Volume
 }
 
 // initPausePod initializes a pod API object from the given config. It is used
@@ -226,6 +227,7 @@ func initPausePod(conf *pausePodConfig) *v1.Pod {
 			Priority:          conf.Priority,
 			PreemptionPolicy:  conf.PreemptionPolicy,
 			PriorityClassName: conf.PriorityClassName,
+			Volumes:           conf.Volumes,
 		},
 	}
 	if conf.Resources != nil {

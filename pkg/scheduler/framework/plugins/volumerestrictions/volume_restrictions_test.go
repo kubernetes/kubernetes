@@ -78,7 +78,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			p := newPlugin(t)
 			state := framework.NewCycleState()
 			preFilterState := &preFilterState{
-				pvck: sets.NewString(),
+				keysWithRWOP: sets.NewString(),
 			}
 			state.Write(preFilterStateKey, preFilterState)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
@@ -131,7 +131,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			p := newPlugin(t)
 			state := framework.NewCycleState()
 			preFilterState := &preFilterState{
-				pvck: sets.NewString(),
+				keysWithRWOP: sets.NewString(),
 			}
 			state.Write(preFilterStateKey, preFilterState)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
@@ -190,7 +190,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 			p := newPlugin(t)
 			state := framework.NewCycleState()
 			preFilterState := &preFilterState{
-				pvck: sets.NewString(),
+				keysWithRWOP: sets.NewString(),
 			}
 			state.Write(preFilterStateKey, preFilterState)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
@@ -249,7 +249,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			p := newPlugin(t)
 			state := framework.NewCycleState()
 			preFilterState := &preFilterState{
-				pvck: sets.NewString(),
+				keysWithRWOP: sets.NewString(),
 			}
 			state.Write(preFilterStateKey, preFilterState)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
@@ -410,16 +410,16 @@ func TestAccessModeConflicts(t *testing.T) {
 			wantStatus:             nil,
 		},
 		{
-			name:                   "access mode conflict ,can be scheduled to the same node, for fast failed",
+			name:                   "can be scheduled to the same node, for fast failed",
 			pod:                    podWithReadWriteOncePodPVC2,
 			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC, podWithReadWriteManyPVC},
 			existingNodes:          []*v1.Node{node},
 			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodSame),
+			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodRepeat),
 		},
 		{
-			name:                   "access mode conflict ,can't be scheduled to the same node",
+			name:                   "can't be scheduled to the same node",
 			pod:                    podWithReadWriteOncePodPVC3,
 			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC},
 			existingNodes:          []*v1.Node{node},
@@ -469,4 +469,8 @@ func newPluginWithListers(t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs [
 	}
 
 	return plugintesting.SetupPluginWithInformers(ctx, t, pluginFactory, &config.InterPodAffinityArgs{}, snapshot, objects)
+}
+
+func addVolumesToPod(volumes []v1.Volume, pod *v1.Pod) {
+	pod.Spec.Volumes = volumes
 }

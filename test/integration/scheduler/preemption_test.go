@@ -1468,3 +1468,116 @@ func TestPreferNominatedNode(t *testing.T) {
 		})
 	}
 }
+
+func TestReadWriteOncePodPreemption(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
+	namespace := "preemption-rwop"
+	testCtx := initTest(t, namespace)
+	defer testutils.CleanupTest(t, testCtx)
+
+	cs := testCtx.ClientSet
+	makePvc := func(pvcName string) *v1.PersistentVolumeClaim {
+		return &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      pvcName,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
+			},
+		}
+	}
+	type volumeConfig struct {
+		name      string
+		claimName string
+	}
+	makeVolume := func(conf volumeConfig) v1.Volume {
+		return v1.Volume{
+			Name: conf.name,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: conf.claimName,
+				},
+			},
+		}
+	}
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
+	}
+	// Create 2 nodes
+	_, err := createNode(cs, st.MakeNode().Name("node0").Capacity(nodeRes).Obj())
+	if err != nil {
+		t.Fatalf("Error creating node1: %v", err)
+	}
+	_, err = createNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+	if err != nil {
+		t.Fatalf("Error creating node2: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		podToScheduled  *v1.Pod
+		existingPods    []*v1.Pod
+		existingNodes   []*v1.Node
+		existingPVCs    []*v1.PersistentVolumeClaim
+		ScheduledToNode string
+	}{
+		{
+			name: "nothing happened",
+			podToScheduled: initPausePod(&pausePodConfig{
+				Name:      "podTOScheduled",
+				Namespace: namespace,
+			}),
+			existingPods: []*v1.Pod{
+				initPausePod(&pausePodConfig{
+					Name:      "pod-0",
+					Namespace: namespace,
+					NodeName:  "node1",
+					Volumes: []v1.Volume{
+						makeVolume(volumeConfig{
+							name:      "data0",
+							claimName: "pvc-0",
+						}),
+						makeVolume(volumeConfig{
+							name:      "data1",
+							claimName: "pvc-1",
+						},
+						),
+					},
+				}),
+			},
+			existingPVCs:    []*v1.PersistentVolumeClaim{makePvc("pvc-0")},
+			ScheduledToNode: "node1",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pods := make([]*v1.Pod, len(test.existingPods))
+			for i, p := range test.existingPods {
+				// Create pausePod
+				pods[i], err = runPausePod(cs, p)
+				if err != nil {
+					t.Fatalf("Error running pause pod: %v", err)
+				}
+			}
+			// Create Pvc
+			createPvcs(cs, namespace, test.existingPVCs)
+			// Create the "pod".
+			pod, err := createPausePod(cs, test.podToScheduled)
+			if err != nil {
+				t.Errorf("Error while creating podToScheduled : %v", err)
+			}
+			if pod.Spec.SchedulerName != test.ScheduledToNode {
+				t.Errorf("Was scheduled to the wrong node : %v", err)
+			}
+		})
+	}
+}
+
+func createPvcs(cs clientset.Interface, namespace string, pvcs []*v1.PersistentVolumeClaim) {
+	for i := range pvcs {
+		cs.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), pvcs[i], metav1.CreateOptions{})
+	}
+}
