@@ -38,11 +38,5 @@ func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 
 // EventAfterTime schedules an EventFunc
 func (r RealEventClock) EventAfterTime(f EventFunc, t time.Time) {
-	now := time.Now()
-	d := t.Sub(now)
-	if d <= 0 {
-		go f(now)
-	} else {
-		r.EventAfterDuration(f, d)
-	}
+	r.EventAfterDuration(f, time.Until(t))
 }
