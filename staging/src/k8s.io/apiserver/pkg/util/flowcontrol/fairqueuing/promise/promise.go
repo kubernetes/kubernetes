@@ -14,23 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lockingpromise
+package promise
 
 import (
 	"sync"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 )
 
-// lockingPromise implementss the promise.LockingWriteOnce interface.
+// promise implements the promise.WriteOnce interface.
 // This implementation is based on a condition variable.
 // This implementation tracks active goroutines:
 // the given counter is decremented for a goroutine waiting for this
 // varible to be set and incremented when such a goroutine is
 // unblocked.
-type lockingPromise struct {
-	lock          sync.Locker
+type promise struct {
 	cond          sync.Cond
 	activeCounter counter.GoRoutineCounter // counter of active goroutines
 	waitingCount  int                      // number of goroutines idle due to this being unset
@@ -38,24 +36,17 @@ type lockingPromise struct {
 	value         interface{}
 }
 
-var _ promise.LockingWriteOnce = &lockingPromise{}
+var _ WriteOnce = &promise{}
 
 // NewWriteOnce makes a new promise.LockingWriteOnce
-func NewWriteOnce(lock sync.Locker, activeCounter counter.GoRoutineCounter) promise.LockingWriteOnce {
-	return &lockingPromise{
-		lock:          lock,
+func NewWriteOnce(lock sync.Locker, activeCounter counter.GoRoutineCounter) WriteOnce {
+	return &promise{
 		cond:          *sync.NewCond(lock),
 		activeCounter: activeCounter,
 	}
 }
 
-func (p *lockingPromise) Get() interface{} {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	return p.GetLocked()
-}
-
-func (p *lockingPromise) GetLocked() interface{} {
+func (p *promise) Get() interface{} {
 	if !p.isSet {
 		p.waitingCount++
 		p.activeCounter.Add(-1)
@@ -64,23 +55,11 @@ func (p *lockingPromise) GetLocked() interface{} {
 	return p.value
 }
 
-func (p *lockingPromise) IsSet() bool {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	return p.IsSetLocked()
-}
-
-func (p *lockingPromise) IsSetLocked() bool {
+func (p *promise) IsSet() bool {
 	return p.isSet
 }
 
-func (p *lockingPromise) Set(value interface{}) bool {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	return p.SetLocked(value)
-}
-
-func (p *lockingPromise) SetLocked(value interface{}) bool {
+func (p *promise) Set(value interface{}) bool {
 	if p.isSet {
 		return false
 	}

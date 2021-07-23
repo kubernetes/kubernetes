@@ -16,14 +16,10 @@ limitations under the License.
 
 package promise
 
-// This file defines interfaces for promises and futures and related
-// things.  These are about coordination among multiple goroutines and
-// so are safe for concurrent calls --- although moderated in some
-// cases by a requirement that the caller hold a certain lock.
-
 // WriteOnce represents a variable that is initially not set and can
 // be set once and is readable.  This is the common meaning for
 // "promise".
+// The implementations of this interface are NOT thread-safe.
 type WriteOnce interface {
 	// Get reads the current value of this variable.  If this variable
 	// is not set yet then this call blocks until this variable gets a
@@ -40,28 +36,4 @@ type WriteOnce interface {
 	// already set, this method returns false without modifying the
 	// variable's value.
 	Set(interface{}) bool
-}
-
-// LockingWriteOnce is a WriteOnce whose implementation is protected
-// by a lock.
-type LockingWriteOnce interface {
-	WriteOnce
-
-	// GetLocked is like Get but the caller must already hold the
-	// lock.  GetLocked may release, and later re-acquire, the lock
-	// any number of times.  Get may acquire, and later release, the
-	// lock any number of times.
-	GetLocked() interface{}
-
-	// IsSetLocked is like IsSet but the caller must already hold the
-	// lock.  IsSetLocked may release, and later re-acquire, the lock
-	// any number of times.  IsSet may acquire, and later release, the
-	// lock any number of times.
-	IsSetLocked() bool
-
-	// SetLocked is like Set but the caller must already hold the
-	// lock.  SetLocked may release, and later re-acquire, the lock
-	// any number of times.  Set may acquire, and later release, the
-	// lock any number of times
-	SetLocked(interface{}) bool
 }

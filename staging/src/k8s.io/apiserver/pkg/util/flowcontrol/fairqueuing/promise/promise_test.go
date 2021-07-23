@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lockingpromise
+package promise
 
 import (
 	"sync"
@@ -34,6 +34,9 @@ func TestLockingWriteOnce(t *testing.T) {
 	var got atomic.Value
 	counter.Add(1)
 	go func() {
+		lock.Lock()
+		defer lock.Unlock()
+
 		got.Store(wr.Get())
 		atomic.AddInt32(&gots, 1)
 		counter.Add(-1)
@@ -43,13 +46,21 @@ func TestLockingWriteOnce(t *testing.T) {
 	if atomic.LoadInt32(&gots) != 0 {
 		t.Error("Get returned before Set")
 	}
-	if wr.IsSet() {
-		t.Error("IsSet before Set")
-	}
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if wr.IsSet() {
+			t.Error("IsSet before Set")
+		}
+	}()
 	aval := &now
-	if !wr.Set(aval) {
-		t.Error("Set() returned false")
-	}
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if !wr.Set(aval) {
+			t.Error("Set() returned false")
+		}
+	}()
 	clock.Run(nil)
 	time.Sleep(time.Second)
 	if atomic.LoadInt32(&gots) != 1 {
@@ -58,11 +69,18 @@ func TestLockingWriteOnce(t *testing.T) {
 	if got.Load() != aval {
 		t.Error("Get did not return what was Set")
 	}
-	if !wr.IsSet() {
-		t.Error("IsSet()==false after Set")
-	}
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if !wr.IsSet() {
+			t.Error("IsSet()==false after Set")
+		}
+	}()
 	counter.Add(1)
 	go func() {
+		lock.Lock()
+		defer lock.Unlock()
+
 		got.Store(wr.Get())
 		atomic.AddInt32(&gots, 1)
 		counter.Add(-1)
@@ -75,17 +93,29 @@ func TestLockingWriteOnce(t *testing.T) {
 	if got.Load() != aval {
 		t.Error("Second Get did not return what was Set")
 	}
-	if !wr.IsSet() {
-		t.Error("IsSet()==false after second Set")
-	}
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if !wr.IsSet() {
+			t.Error("IsSet()==false after second Get")
+		}
+	}()
 	later := time.Now()
 	bval := &later
-	if wr.Set(bval) {
-		t.Error("second Set() returned true")
-	}
-	if !wr.IsSet() {
-		t.Error("IsSet() returned false after second set")
-	} else if wr.Get() != aval {
-		t.Error("Get() after second Set returned wrong value")
-	}
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if wr.Set(bval) {
+			t.Error("second Set() returned true")
+		}
+	}()
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if !wr.IsSet() {
+			t.Error("IsSet() returned false after second set")
+		} else if wr.Get() != aval {
+			t.Error("Get() after second Set returned wrong value")
+		}
+	}()
 }

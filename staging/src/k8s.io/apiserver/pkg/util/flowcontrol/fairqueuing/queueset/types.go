@@ -52,7 +52,10 @@ type request struct {
 	// is removed from its queue.  The value will be decisionReject,
 	// decisionCancel, or decisionExecute; decisionTryAnother never
 	// appears here.
-	decision promise.LockingWriteOnce
+	//
+	// The field is NOT thread-safe and should be protected by the
+	// queueset's lock.
+	decision promise.WriteOnce
 
 	// arrivalTime is the real time when the request entered this system
 	arrivalTime time.Time
