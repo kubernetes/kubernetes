@@ -288,13 +288,18 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 				kubeConfig.CurrentContext = tt.currentContext
 
 				kubeConfigFile, err := newKubeConfigFile(kubeConfig)
-
-				if err == nil {
-					defer os.Remove(kubeConfigFile)
-
-					_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, nil)
+				if err != nil {
+					return err
 				}
 
+				defer os.Remove(kubeConfigFile)
+
+				config, err := LoadKubeconfig(kubeConfigFile, nil)
+				if err != nil {
+					return err
+				}
+
+				_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 				return err
 			}()
 
@@ -316,7 +321,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 // TestMissingKubeConfigFile ensures that a kube config path to a missing file is handled properly
 func TestMissingKubeConfigFile(t *testing.T) {
 	kubeConfigPath := "/some/missing/path"
-	_, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff, nil)
+	_, err := LoadKubeconfig(kubeConfigPath, nil)
 
 	if err == nil {
 		t.Errorf("creating the webhook should had failed")
@@ -445,7 +450,12 @@ func TestTLSConfig(t *testing.T) {
 
 			defer os.Remove(configFile)
 
-			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+			config, err := LoadKubeconfig(configFile, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 			if err == nil {
 				err = wh.RestClient.Get().Do(context.TODO()).Error()
@@ -520,7 +530,14 @@ func TestRequestTimeout(t *testing.T) {
 
 	var requestTimeout = 10 * time.Millisecond
 
-	wh, err := newGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config.Timeout = requestTimeout
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
@@ -606,7 +623,12 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	defer os.Remove(configFile)
 
-	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
