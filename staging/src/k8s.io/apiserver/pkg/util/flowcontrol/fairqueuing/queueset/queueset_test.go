@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
-	fqclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
+	fqclocktest "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock/testing"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
@@ -133,7 +133,7 @@ type uniformScenario struct {
 	expectAllRequests                        bool
 	evalInqueueMetrics, evalExecutingMetrics bool
 	rejectReason                             string
-	clk                                      *fqclock.FakeEventClock
+	clk                                      *fqclocktest.FakeEventClock
 	counter                                  counter.GoRoutineCounter
 }
 
@@ -367,7 +367,7 @@ func init() {
 func TestNoRestraint(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
@@ -393,7 +393,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize1",
@@ -430,7 +430,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize3",
@@ -466,7 +466,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectEqual",
@@ -503,7 +503,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectUnequal",
@@ -540,7 +540,7 @@ func TestWindup(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestWindup",
@@ -576,7 +576,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
@@ -609,7 +609,7 @@ func TestTimeout(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
@@ -645,7 +645,7 @@ func TestContextCancel(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
 	now := time.Now()
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestContextCancel",
@@ -724,7 +724,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
 	now := time.Now()
-	clk, counter := fqclock.NewFakeEventClock(now, 0, nil)
+	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
 	qsf := NewQueueSetFactory(clk, counter)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTotalRequestsExecutingWithPanic",

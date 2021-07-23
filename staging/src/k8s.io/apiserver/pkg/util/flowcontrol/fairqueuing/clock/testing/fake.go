@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package testing
 
 import (
 	"container/heap"
@@ -24,9 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
-	"k8s.io/klog/v2"
 	baseclocktest "k8s.io/utils/clock/testing"
+
+	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
+	"k8s.io/klog/v2"
 )
 
 // waitGroupCounter is a wait group used for a GoRoutine Counter.  This private
@@ -93,7 +95,7 @@ var _ heap.Interface = (*eventWaiterHeap)(nil)
 
 type eventWaiter struct {
 	targetTime time.Time
-	f          EventFunc
+	f          clock.EventFunc
 }
 
 // NewFakeEventClock constructor.  The given `r *rand.Rand` must
@@ -162,7 +164,7 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 			for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
 				ew := heap.Pop(&fec.waiters).(eventWaiter)
 				wg.Add(1)
-				go func(f EventFunc) { f(now); wg.Done() }(ew.f)
+				go func(f clock.EventFunc) { f(now); wg.Done() }(ew.f)
 				foundSome = true
 			}
 			wg.Wait()
@@ -188,7 +190,7 @@ func (fec *FakeEventClock) Sleep(duration time.Duration) {
 
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
-func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
+func (fec *FakeEventClock) EventAfterDuration(f clock.EventFunc, d time.Duration) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	now := fec.Now()
@@ -198,7 +200,7 @@ func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 
 // EventAfterTime schedules the given function to be invoked once
 // the given time has arrived.
-func (fec *FakeEventClock) EventAfterTime(f EventFunc, t time.Time) {
+func (fec *FakeEventClock) EventAfterTime(f clock.EventFunc, t time.Time) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())
