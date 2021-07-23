@@ -274,7 +274,9 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && !hasFinalizer(svc, ILBFinalizerV1) {
+		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingUpdateInternalLoadBalancer",
+			"Skipped updateInternalLoadBalancer as service does not contain '%s' finalizer.", ILBFinalizerV1)
 		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
