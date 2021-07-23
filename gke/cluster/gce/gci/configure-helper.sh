@@ -2884,11 +2884,12 @@ EOF
     copy-manifests "${src_dir}/gce-extras/in-place" "${dst_dir}/gce-extras/in-place"
   fi
 
+  create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
+
   if [[ "${KUBE_ADDON_MANAGER_CRP:-false}" == "true" ]]; then
     echo "kube-addon-manager is configured to not be deployed through kube-up."
     return
   fi
-  create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
   # User and group should never contain characters that need to be quoted
   # shellcheck disable=SC2086
   prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002}
