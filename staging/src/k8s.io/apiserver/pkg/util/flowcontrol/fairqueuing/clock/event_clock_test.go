@@ -21,8 +21,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"k8s.io/utils/clock"
 )
 
 type TestableEventClock interface {
@@ -32,7 +30,7 @@ type TestableEventClock interface {
 }
 
 func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.Duration) {
-	exercisePassiveClock(t, ec)
+	exerciseSettablePassiveClock(t, ec)
 	var numDone int32
 	now := ec.Now()
 	strictable := true
@@ -98,15 +96,8 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 	}
 }
 
-// copied from baseclocktest, because apparently
-// test files can not define public symbols.
-type SettablePassiveClock interface {
-	clock.PassiveClock
-	SetTime(time.Time)
-}
-
 // copied from baseclocktest, because it is not public
-func exercisePassiveClock(t *testing.T, pc SettablePassiveClock) {
+func exerciseSettablePassiveClock(t *testing.T, pc TestableEventClock) {
 	t1 := time.Now()
 	t2 := t1.Add(time.Hour)
 	pc.SetTime(t1)

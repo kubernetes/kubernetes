@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 )
 
 func TestLockingWriteMultiple(t *testing.T) {
