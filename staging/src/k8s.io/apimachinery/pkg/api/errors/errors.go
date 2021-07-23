@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -622,6 +623,15 @@ func IsUnexpectedServerError(err error) bool {
 func IsUnexpectedObjectError(err error) bool {
 	uoe := &UnexpectedObjectError{}
 	return err != nil && errors.As(err, &uoe)
+}
+
+// IsNetworkError determines if err is due to a network connectivity problem.
+func IsNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(net.Error)
+	return ok
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
