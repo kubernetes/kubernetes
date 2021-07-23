@@ -127,6 +127,7 @@ func newPluginProvider(pluginBinDir string, provider kubeletconfig.CredentialPro
 			pluginBinDir: pluginBinDir,
 			args:         provider.Args,
 			envVars:      provider.Env,
+			environ:      os.Environ,
 		},
 	}, nil
 }
@@ -316,6 +317,7 @@ type execPlugin struct {
 	args         []string
 	envVars      []kubeletconfig.ExecEnvVar
 	pluginBinDir string
+	environ      func() []string
 }
 
 // ExecPlugin executes the plugin binary with arguments and environment variables specified in CredentialProviderConfig:
@@ -345,10 +347,16 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	cmd := exec.CommandContext(ctx, filepath.Join(e.pluginBinDir, e.name), e.args...)
 	cmd.Stdout, cmd.Stderr, cmd.Stdin = stdout, stderr, stdin
 
-	cmd.Env = []string{}
-	for _, envVar := range e.envVars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", envVar.Name, envVar.Value))
+	var configEnvVars []string
+	for _, v := range e.envVars {
+		configEnvVars = append(configEnvVars, fmt.Sprintf("%s=%s", v.Name, v.Value))
 	}
+
+	// Append current system environment variables, to the ones configured in the
+	// credential provider file. Failing to do so may result in unsuccessful execution
+	// of the provider binary, see https://github.com/kubernetes/kubernetes/issues/102750
+	// also, this behaviour is inline with Credential Provider Config spec
+	cmd.Env = mergeEnvVars(e.environ(), configEnvVars)
 
 	err = cmd.Run()
 	if ctx.Err() != nil {
@@ -417,4 +425,15 @@ func (e *execPlugin) decodeResponse(data []byte) (*credentialproviderapi.Credent
 func parseRegistry(image string) string {
 	imageParts := strings.Split(image, "/")
 	return imageParts[0]
+}
+
+// mergedEnvVars overlays system defined env vars with credential provider env vars,
+// it gives priority to the credential provider vars allowing user to override system
+// env vars
+func mergeEnvVars(sysEnvVars, credProviderVars []string) []string {
+	mergedEnvVars := sysEnvVars
+	for _, credProviderVar := range credProviderVars {
+		mergedEnvVars = append(mergedEnvVars, credProviderVar)
+	}
+	return mergedEnvVars
 }
