@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
