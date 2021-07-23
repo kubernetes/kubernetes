@@ -126,6 +126,8 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 	if pl.enableReadWriteOncePod {
 		return pl.isReadWriteOncePodAccessModeConflict(cycleState, pod)
 	}
+	p := &preFilterState{}
+	cycleState.Write(preFilterStateKey, p)
 	return framework.NewStatus(framework.Success)
 }
 
@@ -345,7 +347,22 @@ type preFilterState struct {
 }
 
 func (s *preFilterState) Clone() framework.StateData {
-	return s
+	if s == nil {
+		return nil
+	}
+	copynodesMatchPVC := make([]*v1.Node,len(s.nodesMatchPVC))
+	for i := 0; i < len(s.nodesMatchPVC); i++ {
+		copynodesMatchPVC[i]= s.nodesMatchPVC[i].DeepCopy()
+	}
+	copykeysWithRWOP:=  sets.NewString()
+	for key := range s.keysWithRWOP {
+		copykeysWithRWOP.Insert(key)
+	}
+	copy := preFilterState{
+		nodesMatchPVC: copynodesMatchPVC,
+		keysWithRWOP: copykeysWithRWOP,
+	}
+	return &copy
 }
 
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
