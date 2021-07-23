@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -16,7 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package options contains all of the primary arguments for a kubelet.
 package options
 
-const remoteRuntimeEndpoint = ""
+const dockerEndpoint = "unix:///var/run/docker.sock"

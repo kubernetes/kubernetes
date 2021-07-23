@@ -39,11 +39,6 @@ var (
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
-	dockerEndpoint := ""
-	if runtime.GOOS != "windows" {
-		dockerEndpoint = "unix:///var/run/docker.sock"
-	}
-
 	return &config.ContainerRuntimeOptions{
 		ContainerRuntime:          kubetypes.DockerContainerRuntime,
 		DockerEndpoint:            dockerEndpoint,

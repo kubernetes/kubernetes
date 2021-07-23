@@ -19,29 +19,4 @@ limitations under the License.
 // Package options contains all of the primary arguments for a kubelet.
 package options
 
-import (
-	"path/filepath"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-// NewKubeletFlags will create a new KubeletFlags with default values
-func NewKubeletFlags() *KubeletFlags {
-	remoteRuntimeEndpoint := "unix:///var/run/dockershim.sock"
-
-	return &KubeletFlags{
-		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/lib/kubelet/pki",
-		RootDirectory:           defaultRootDir,
-		MasterServiceNamespace:  metav1.NamespaceDefault,
-		MaxContainerCount:       -1,
-		MaxPerPodContainerCount: 1,
-		MinimumGCAge:            metav1.Duration{Duration: 0},
-		NonMasqueradeCIDR:       "10.0.0.0/8",
-		RegisterSchedulable:     true,
-		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
-		NodeLabels:              make(map[string]string),
-		RegisterNode:            true,
-		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
-	}
-}
+const remoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
