@@ -310,7 +310,7 @@ function kube::release::build_conformance_image() {
   local -r save_dir="${4-}"
   kube::log::status "Building conformance image for arch: ${arch}"
   ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
-    make -C cluster/images/conformance/ build >/dev/null
+    make -C test/conformance/image/ build >/dev/null
 
   local conformance_tag
   conformance_tag="${registry}/conformance-${arch}:${version}"
