@@ -57,6 +57,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
@@ -109,7 +110,13 @@ func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (aut
 		Jitter:   0.2,
 		Steps:    5,
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil, retryBackoff, customDial)
+
+	clientConfig, err := webhookutil.LoadKubeconfig(kubecfgFile.Name(), customDial)
+	if err != nil {
+		return nil, err
+	}
+
+	webhookTokenAuth, err := webhook.New(clientConfig, "v1beta1", nil, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
