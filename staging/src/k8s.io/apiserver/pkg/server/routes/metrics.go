@@ -17,6 +17,8 @@ limitations under the License.
 package routes
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
 	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
@@ -30,7 +32,7 @@ type DefaultMetrics struct{}
 // Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
 	register()
-	c.Handle("/metrics", legacyregistry.Handler())
+	c.Handle("/metrics", promhttp.Handler())
 }
 
 // MetricsWithReset install the prometheus metrics handler extended with support for the DELETE method
