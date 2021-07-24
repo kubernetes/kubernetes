@@ -67,6 +67,7 @@ func InitMultiVolumeTestSuite() storageframework.TestSuite {
 		storageframework.BlockVolModeDynamicPV,
 		storageframework.Ext4DynamicPV,
 		storageframework.XfsDynamicPV,
+		storageframework.NtfsDynamicPV,
 	}
 	return InitCustomMultiVolumeTestSuite(patterns)
 }

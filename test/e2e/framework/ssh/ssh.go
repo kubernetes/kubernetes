@@ -49,6 +49,9 @@ const (
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
 	singleCallTimeout = 5 * time.Minute
+
+	// sshBastionEnvKey is the environment variable key for running SSH commands via bastion.
+	sshBastionEnvKey = "KUBE_SSH_BASTION"
 )
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -160,9 +163,13 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 // canConnect returns true if a network connection is possible to the SSHPort.
 func canConnect(host string) bool {
+	if _, ok := os.LookupEnv(sshBastionEnvKey); ok {
+		return true
+	}
 	hostPort := net.JoinHostPort(host, SSHPort)
 	conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
 	if err != nil {
+		e2elog.Logf("cannot dial %s: %v", hostPort, err)
 		return false
 	}
 	conn.Close()
@@ -205,7 +212,7 @@ func SSH(cmd, host, provider string) (Result, error) {
 		result.User = os.Getenv("USER")
 	}
 
-	if bastion := os.Getenv("KUBE_SSH_BASTION"); len(bastion) > 0 {
+	if bastion := os.Getenv(sshBastionEnvKey); len(bastion) > 0 {
 		stdout, stderr, code, err := runSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
 		result.Stdout = stdout
 		result.Stderr = stderr

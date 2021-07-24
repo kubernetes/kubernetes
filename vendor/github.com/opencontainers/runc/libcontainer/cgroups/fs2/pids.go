@@ -23,7 +23,7 @@ func setPids(dirPath string, r *configs.Resources) error {
 		return nil
 	}
 	if val := numToStr(r.PidsLimit); val != "" {
-		if err := fscommon.WriteFile(dirPath, "pids.max", val); err != nil {
+		if err := cgroups.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
 	}
@@ -34,9 +34,9 @@ func setPids(dirPath string, r *configs.Resources) error {
 func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
-	contents, err := fscommon.ReadFile(dirPath, "cgroup.procs")
+	contents, err := cgroups.ReadFile(dirPath, "cgroup.procs")
 	if errors.Is(err, unix.ENOTSUP) {
-		contents, err = fscommon.ReadFile(dirPath, "cgroup.threads")
+		contents, err = cgroups.ReadFile(dirPath, "cgroup.threads")
 	}
 	if err != nil {
 		return err

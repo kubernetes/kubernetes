@@ -275,6 +275,7 @@ aliases:
     - dcbw
     - freehan
     - johnbelamaric
+    - khenidak
     - mrhohn
     - thockin
   sig-network-reviewers:
@@ -287,6 +288,7 @@ aliases:
     - dcbw
     - freehan
     - johnbelamaric
+    - khenidak
     - m1093782566
     - mrhohn
     - rramkumar1
