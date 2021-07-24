@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
+// Rule is a tuple of APIGroups, APIVersion, and Resources. It is recommended
 // to make sure that all the tuple expansions are valid.
 type Rule struct {
 	// APIGroups is the API groups the resources belong to. '*' is all groups.
