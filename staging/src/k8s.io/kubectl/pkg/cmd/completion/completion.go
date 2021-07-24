@@ -193,5 +193,5 @@ func runCompletionPwsh(out io.Writer, boilerPlate string, kubectl *cobra.Command
 		return err
 	}
 
-	return kubectl.GenPowerShellCompletion(out)
+	return kubectl.GenPowerShellCompletionWithDesc(out)
 }
