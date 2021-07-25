@@ -1008,7 +1008,6 @@ func (proxier *Proxier) OnNodeSynced() {
 }
 
 // This is where all of the ipvs calls happen.
-// assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
