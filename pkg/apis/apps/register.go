@@ -25,7 +25,7 @@ import (
 var (
 	// SchemeBuilder stores functions to add things to a scheme.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme applies all stored functions t oa scheme.
+	// AddToScheme applies all stored functions to a scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
