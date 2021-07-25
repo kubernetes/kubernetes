@@ -24,19 +24,24 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
@@ -252,6 +257,36 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			name: "test 9",
 		},
+		{
+			// Test case where defaultpreemption is registered as PostFilterPlugin
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPostFilterPlugin(defaultpreemption.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return defaultpreemption.New(plArgs, fh, plfeature.Features{EnablePodDisruptionBudget: feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget)})
+				}),
+			},
+			extenders: []st.FakeExtender{
+				{
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
+					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
+					Weight:       5,
+				},
+				{
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
+					Prioritizers: []st.PriorityConfig{{Function: st.Node2PrioritizerExtender, Weight: 10}},
+					Weight:       1,
+				},
+			},
+			nodes: []string{"node1", "node2"},
+			expectedResult: ScheduleResult{
+				SuggestedHost:  "node1",
+				EvaluatedNodes: 2,
+				FeasibleNodes:  2,
+			},
+			name:       "test 10",
+		},
 	}
 
 	for _, test := range tests {
@@ -263,12 +298,14 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
+			
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "",
+				runtime.WithExtenders(extenders),
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),

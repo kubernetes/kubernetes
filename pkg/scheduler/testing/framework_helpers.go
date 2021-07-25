@@ -89,6 +89,11 @@ func RegisterBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) 
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
 }
 
+// RegisterPostFilterPlugin returns a function to register a Post Filter Plugin to a given registry.
+func RegisterPostFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PostFilter")
+}
+
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
 func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
@@ -139,6 +144,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.PreBind
 	case "PostBind":
 		return &plugins.PostBind
+	case "PostFilter":
+		return &plugins.PostFilter
 	default:
 		return nil
 	}
