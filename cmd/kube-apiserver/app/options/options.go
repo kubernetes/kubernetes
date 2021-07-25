@@ -31,6 +31,7 @@ import (
 	"k8s.io/component-base/metrics"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
@@ -270,6 +271,9 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	// allow mutation of persistent volumes sources
+	fs.BoolVar(&validation.MutablePersistentVolumeSource, "mutable-persistent-volume-source", false, "allow mutation of PersistentVolumeSource in PersistentVolume")
 
 	return fss
 }

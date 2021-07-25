@@ -56,6 +56,8 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+var MutablePersistentVolumeSource = false
+
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
@@ -1641,8 +1643,11 @@ var allowedPVCTemplateObjectMetaFields = map[string]bool{
 
 // PersistentVolumeSpecValidationOptions contains the different settings for PeristentVolume validation
 type PersistentVolumeSpecValidationOptions struct {
-	// Allow spec to contain the "ReadWiteOncePod" access mode
+	// Allow spec to contain the "ReadWriteOncePod" access mode
 	AllowReadWriteOncePod bool
+
+	// Allow updates to the PersistenVolumeSource
+	MutablePersistentVolumeSource bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -1657,7 +1662,8 @@ var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), st
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		AllowReadWriteOncePod:         utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		MutablePersistentVolumeSource: MutablePersistentVolumeSource,
 	}
 	if oldPv == nil {
 		// If there's no old PV, use the options based solely on feature enablement
@@ -1980,7 +1986,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	}
 
 	// PersistentVolumeSource should be immutable after creation.
-	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
+	if !opts.MutablePersistentVolumeSource && !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
 		pvcSourceDiff := diff.ObjectDiff(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), fmt.Sprintf("spec.persistentvolumesource is immutable after creation\n%v", pvcSourceDiff)))
 	}
