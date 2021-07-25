@@ -401,8 +401,7 @@ func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, 
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 		}
-		// TODO (before beta at the latest): make this configurable similar to the EndpointController
-		go ephemeralController.Run(1 /* int(ctx.ComponentConfig.EphemeralController.ConcurrentEphemeralVolumeSyncs) */, ctx.Stop)
+		go ephemeralController.Run(int(ctx.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), ctx.Stop)
 		return nil, true, nil
 	}
 	return nil, false, nil
