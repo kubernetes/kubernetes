@@ -1288,7 +1288,7 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 	heartbeatTime := now.Add(bookmarkFrequency)
 	if c.deadline.IsZero() {
 		// Timeout is set by our client libraries (e.g. reflector) as well as defaulted by
-		// apiserver if properly configured. So this shoudln't happen in practice.
+		// apiserver if properly configured. So this shouldn't happen in practice.
 		return heartbeatTime, true
 	}
 	if pretimeoutTime := c.deadline.Add(-2 * time.Second); pretimeoutTime.Before(heartbeatTime) {

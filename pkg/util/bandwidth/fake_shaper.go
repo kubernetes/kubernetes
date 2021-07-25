@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// FakeShaper provides an implementation of the bandwith.Shaper.
+// FakeShaper provides an implementation of the bandwidth.Shaper.
 // Beware this is implementation has no features besides Reset and GetCIDRs.
 type FakeShaper struct {
 	CIDRs      []string
