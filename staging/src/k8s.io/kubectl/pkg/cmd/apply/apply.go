@@ -187,7 +187,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
+	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
@@ -324,8 +324,6 @@ func isIncompatibleServerError(err error) bool {
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	var err error = nil
 	if !o.objectsCached {
-		// include the uninitialized objects by default if --prune is true
-		// unless explicitly set --include-uninitialized=false
 		r := o.Builder.
 			Unstructured().
 			Schema(o.Validator).
