@@ -154,9 +154,9 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 		if err != nil {
 			klog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
 				configFilePath, err)
+		} else {
+			defer config.Close()
 		}
-
-		defer config.Close()
 		cloud, err = GetCloudProvider(name, config)
 	} else {
 		// Pass explicit nil so plugins can actually check for nil. See
