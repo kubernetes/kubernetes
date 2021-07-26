@@ -472,6 +472,13 @@ func NewNode(name string) *v1.Node {
 	}
 }
 
+// NewNodeWithConditions is a helper function for creating Nodes for testing.
+func NewNodeWithConditions(name string, conditions []v1.NodeCondition) *v1.Node {
+	node := NewNode(name)
+	node.Status.Conditions = conditions
+	return node
+}
+
 // NewPod is a helper function for creating Pods for testing.
 func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{

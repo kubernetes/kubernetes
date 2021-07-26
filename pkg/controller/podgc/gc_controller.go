@@ -57,23 +57,25 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
-	deletePod              func(namespace, name string) error
-	terminatedPodThreshold int
+	deletePod                        func(namespace, name string) error
+	terminatedPodThreshold           int
+	deleteUnreachableTerminatingPods bool
 }
 
 func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, deleteUnreachableTerminatingPods bool) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 	gcc := &PodGCController{
-		kubeClient:             kubeClient,
-		terminatedPodThreshold: terminatedPodThreshold,
-		podLister:              podInformer.Lister(),
-		podListerSynced:        podInformer.Informer().HasSynced,
-		nodeLister:             nodeInformer.Lister(),
-		nodeListerSynced:       nodeInformer.Informer().HasSynced,
-		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
+		kubeClient:                       kubeClient,
+		terminatedPodThreshold:           terminatedPodThreshold,
+		deleteUnreachableTerminatingPods: deleteUnreachableTerminatingPods,
+		podLister:                        podInformer.Lister(),
+		podListerSynced:                  podInformer.Informer().HasSynced,
+		nodeLister:                       nodeInformer.Lister(),
+		nodeListerSynced:                 nodeInformer.Informer().HasSynced,
+		nodeQueue:                        workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
 			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
 			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
@@ -115,6 +117,7 @@ func (gcc *PodGCController) gc() {
 	}
 	gcc.gcOrphaned(pods, nodes)
 	gcc.gcUnscheduledTerminating(pods)
+	gcc.gcUnreachableTerminating(pods, nodes)
 }
 
 func isPodTerminated(pod *v1.Pod) bool {
@@ -233,6 +236,61 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
+		}
+	}
+}
+
+// gcUnreachableTerminating deletes pods that are terminating and are assigned to a not-ready node.
+func (gcc *PodGCController) gcUnreachableTerminating(pods []*v1.Pod, nodes []*v1.Node) {
+
+	if !gcc.deleteUnreachableTerminatingPods {
+		return
+	}
+
+	klog.V(4).Infof("GC'ing terminating pods on not ready nodes.")
+
+	// Compute not-ready status for each node
+	notReadyNodes := []string{}
+	for _, node := range nodes {
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == v1.NodeReady && condition.Status != v1.ConditionTrue {
+				notReadyNodes = append(notReadyNodes, node.ObjectMeta.Name)
+			}
+		}
+	}
+	if len(notReadyNodes) == 0 {
+		return
+	}
+
+	// Iterate on each terminating pod
+	for _, pod := range pods {
+
+		// Node shall be marked for deletion and assigned to a node
+		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) == 0 {
+			continue
+		}
+
+		// Make sure we reached scheduled deadline before we force delete the pod
+		if time.Now().Before(pod.DeletionTimestamp.Time) {
+			continue
+		}
+
+		// Pod's assigned node shall be in the list of not-ready nodes
+		deletePod := false
+		for _, nodeName := range notReadyNodes {
+			if nodeName == pod.Spec.NodeName {
+				deletePod = true
+			}
+		}
+
+		// Time to delete this pod
+		if deletePod {
+			klog.V(2).Infof("Found terminating Pod %v/%v assigned to a not-ready Node. Deleting.", pod.Namespace, pod.Name)
+			if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+				utilruntime.HandleError(err)
+			} else {
+				klog.V(0).Infof("Forced deletion of terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			}
 		}
 	}
 }

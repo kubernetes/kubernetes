@@ -22,4 +22,8 @@ type PodGCControllerConfiguration struct {
 	// before the terminated pod garbage collector starts deleting terminated pods.
 	// If <= 0, the terminated pod garbage collector is disabled.
 	TerminatedPodGCThreshold int32
+	// When set to 'true', all terminating pods attached to a node which is not ready
+	// are are garbage collected. With setting this flag, such pods would stay forever
+	// until dead node comes back in the game.
+	DeleteUnreachableTerminatingPods bool
 }

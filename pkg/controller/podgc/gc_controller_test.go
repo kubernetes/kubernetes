@@ -39,11 +39,11 @@ import (
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int, deleteUnreachableTerminatingPods bool) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold, deleteUnreachableTerminatingPods)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -125,7 +125,7 @@ func TestGCTerminated(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			gcc, podInformer, _ := NewFromClient(client, test.threshold, false)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {
@@ -314,7 +314,7 @@ func TestGCOrphaned(t *testing.T) {
 				nodeList.Items = append(nodeList.Items, *node)
 			}
 			client := fake.NewSimpleClientset(nodeList)
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			gcc, podInformer, nodeInformer := NewFromClient(client, -1, false)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
@@ -413,7 +413,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			gcc, podInformer, _ := NewFromClient(client, -1)
+			gcc, podInformer, _ := NewFromClient(client, -1, false)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {
@@ -440,6 +440,109 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				return
 			}
 			gcc.gcUnscheduledTerminating(pods)
+
+			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
+				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v",
+					i, test.deletedPodNames.List(), deletedPodNames, test.name)
+			}
+		})
+	}
+}
+
+func TestGCUnreachableTerminating(t *testing.T) {
+	type nameToPhase struct {
+		name              string
+		deletionTimeStamp *metav1.Time
+		nodeName          string
+	}
+
+	testCases := []struct {
+		name            string
+		optionEnabled   bool
+		pods            []nameToPhase
+		nodes           []*v1.Node
+		deletedPodNames sets.String
+	}{
+		{
+			name:          "Terminating pod on a not-ready node must be deleted",
+			optionEnabled: true,
+			pods: []nameToPhase{
+				{name: "a", deletionTimeStamp: nil, nodeName: ""},
+				{name: "b", deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "c", deletionTimeStamp: nil, nodeName: "readynode"},
+				{name: "d", deletionTimeStamp: &metav1.Time{}, nodeName: "readynode"},
+				{name: "e", deletionTimeStamp: nil, nodeName: "notreadynode"},
+				{name: "f", deletionTimeStamp: &metav1.Time{}, nodeName: "notreadynode"},
+				{name: "g", deletionTimeStamp: &metav1.Time{Time: time.Now().Add(time.Second * 30)}, nodeName: "notreadynode"},
+				{name: "h", deletionTimeStamp: &metav1.Time{Time: time.Now()}, nodeName: "notreadynode"},
+			},
+			nodes: []*v1.Node{
+				testutil.NewNodeWithConditions("readynode", []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				}}),
+				testutil.NewNodeWithConditions("notreadynode", []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionFalse,
+				}}),
+			},
+			deletedPodNames: sets.NewString("f", "h"),
+		},
+		{
+			name:          "Terminating pod on a not-ready node must not be deleted if not per-option enabled",
+			optionEnabled: false,
+			pods: []nameToPhase{
+				{name: "a", deletionTimeStamp: nil, nodeName: ""},
+				{name: "b", deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "c", deletionTimeStamp: nil, nodeName: "readynode"},
+				{name: "d", deletionTimeStamp: &metav1.Time{}, nodeName: "readynode"},
+				{name: "e", deletionTimeStamp: nil, nodeName: "notreadynode"},
+				{name: "f", deletionTimeStamp: &metav1.Time{}, nodeName: "notreadynode"},
+			},
+			nodes: []*v1.Node{
+				testutil.NewNodeWithConditions("readynode", []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				}}),
+				testutil.NewNodeWithConditions("notreadynode", []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionFalse,
+				}}),
+			},
+			deletedPodNames: sets.NewString(),
+		},
+	}
+
+	for i, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			gcc, podInformer, _ := NewFromClient(client, -1, test.optionEnabled)
+			deletedPodNames := make([]string, 0)
+			var lock sync.Mutex
+			gcc.deletePod = func(_, name string) error {
+				lock.Lock()
+				defer lock.Unlock()
+				deletedPodNames = append(deletedPodNames, name)
+				return nil
+			}
+
+			creationTime := time.Unix(0, 0)
+			for _, pod := range test.pods {
+				creationTime = creationTime.Add(1 * time.Hour)
+				podInformer.Informer().GetStore().Add(&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+						DeletionTimestamp: pod.deletionTimeStamp},
+					Spec: v1.PodSpec{NodeName: pod.nodeName},
+				})
+			}
+
+			pods, err := podInformer.Lister().List(labels.Everything())
+			if err != nil {
+				t.Errorf("Error while listing all Pods: %v", err)
+				return
+			}
+
+			gcc.gcUnreachableTerminating(pods, test.nodes)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v",

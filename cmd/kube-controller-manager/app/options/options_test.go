@@ -364,7 +364,8 @@ func TestAddFlags(t *testing.T) {
 		},
 		PodGCController: &PodGCControllerOptions{
 			&podgcconfig.PodGCControllerConfiguration{
-				TerminatedPodGCThreshold: 12000,
+				TerminatedPodGCThreshold:         12000,
+				DeleteUnreachableTerminatingPods: false,
 			},
 		},
 		ReplicaSetController: &ReplicaSetControllerOptions{
@@ -604,7 +605,8 @@ func TestApplyTo(t *testing.T) {
 				VolumeHostAllowLocalLoopback: false,
 			},
 			PodGCController: podgcconfig.PodGCControllerConfiguration{
-				TerminatedPodGCThreshold: 12000,
+				TerminatedPodGCThreshold:         12000,
+				DeleteUnreachableTerminatingPods: false,
 			},
 			ReplicaSetController: replicasetconfig.ReplicaSetControllerConfiguration{
 				ConcurrentRSSyncs: 10,

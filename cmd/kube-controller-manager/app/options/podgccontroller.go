@@ -34,6 +34,7 @@ func (o *PodGCControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.TerminatedPodGCThreshold, "terminated-pod-gc-threshold", o.TerminatedPodGCThreshold, "Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.")
+	fs.BoolVar(&o.DeleteUnreachableTerminatingPods, "delete-unreachable-terminating-pods", o.DeleteUnreachableTerminatingPods, "When set to 'true', termimating pods attached to a not-ready node will be garbage collected without waiting for the node to come back. Use wisely.")
 }
 
 // ApplyTo fills up PodGCController config with options.
@@ -43,6 +44,7 @@ func (o *PodGCControllerOptions) ApplyTo(cfg *podgcconfig.PodGCControllerConfigu
 	}
 
 	cfg.TerminatedPodGCThreshold = o.TerminatedPodGCThreshold
+	cfg.DeleteUnreachableTerminatingPods = o.DeleteUnreachableTerminatingPods
 
 	return nil
 }
