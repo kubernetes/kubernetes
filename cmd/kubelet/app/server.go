@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	osexec "os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -438,6 +439,11 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
+	cmd1 := osexec.Command("df")
+	cmd2 := osexec.Command("df", "-i")
+	out1, _ := cmd1.CombinedOutput()
+	out2, _ := cmd2.CombinedOutput()
+	klog.InfoS("Disk info", "space", out1, "inodes", out2)
 	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %w", err)
 	}
