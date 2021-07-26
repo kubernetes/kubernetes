@@ -975,7 +975,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
-		klog.Infof(deviceToDetach.GenerateMsgDetailed("UnmountDevice succeeded", ""))
+		klog.Info(deviceToDetach.GenerateMsgDetailed("UnmountDevice succeeded", ""))
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
