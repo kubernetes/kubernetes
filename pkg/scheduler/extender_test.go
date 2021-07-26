@@ -24,11 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/features"
@@ -36,12 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
@@ -258,7 +258,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 9",
 		},
 		{
-			// Test case where defaultpreemption is registered as PostFilterPlugin
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -285,7 +284,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				EvaluatedNodes: 2,
 				FeasibleNodes:  2,
 			},
-			name:       "test 10",
+			name: "test 10",
 		},
 	}
 
@@ -298,7 +297,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			
+
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
