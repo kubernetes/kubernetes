@@ -19,6 +19,11 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2"
+	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"testing"
 	"time"
 
@@ -78,6 +83,56 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
 	go dc.Run(testCtx.Scheduler.StopEverything)
 	return dc
+}
+
+// initPersistentVolumeController initializes and runs a PersistentVolume Controller to properly
+// update PersistentVolume objects.
+func initPersistentVolumeController(namespace string, t *testing.T, testCtx *testutils.TestContext, syncPeriod time.Duration) (*persistentvolumecontroller.PersistentVolumeController, informers.SharedInformerFactory, watch.Interface) {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
+	plugin := &volumetest.FakeVolumePlugin{
+		PluginName: "kubernetes.io/mock-provisioner",
+		Host:       host,
+	}
+	plugins := []volume.VolumePlugin{plugin}
+	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, syncPeriod)
+	ctrl, err := persistentvolumecontroller.NewController(
+		persistentvolumecontroller.ControllerParameters{
+			KubeClient:     testCtx.ClientSet,
+			SyncPeriod:     syncPeriod,
+			VolumePlugins:  plugins,
+			VolumeInformer: informers.Core().V1().PersistentVolumes(),
+			ClaimInformer:  informers.Core().V1().PersistentVolumeClaims(),
+			ClassInformer:  informers.Storage().V1().StorageClasses(),
+			PodInformer:    informers.Core().V1().Pods(),
+			NodeInformer:   informers.Core().V1().Nodes(),
+		})
+	if err != nil {
+		t.Fatalf("Failed to construct PersistentVolumes: %v", err)
+	}
+	informers.Start(testCtx.Scheduler.StopEverything)
+	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
+	go ctrl.Run(testCtx.Scheduler.StopEverything)
+
+	watchPVC, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(namespace).Watch(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to watch PersistentVolumeClaims: %v", err)
+	}
+
+	return ctrl, informers, watchPVC
+}
+
+func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
+	for {
+		event := <-w.ResultChan()
+		claim, ok := event.Object.(*v1.PersistentVolumeClaim)
+		if !ok {
+			continue
+		}
+		if claim.Status.Phase == phase {
+			klog.V(2).Infof("claim %q is %s", claim.Name, phase)
+			break
+		}
+	}
 }
 
 // initTest initializes a test environment and creates API server and scheduler with default

@@ -416,7 +416,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingNodes:          []*v1.Node{node},
 			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodRepeat),
+			wantStatus:             nil,
 		},
 		{
 			name:                   "can't be scheduled to the same node",

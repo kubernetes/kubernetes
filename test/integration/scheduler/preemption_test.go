@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1469,14 +1470,23 @@ func TestPreferNominatedNode(t *testing.T) {
 	}
 }
 
+// TestReadWriteOncePodPreemption is used to verify that when ReadWriteOncePod is turned on,
+// when the PVC of a Pod on a node is ReadWriteOncePod, a
+// nd these PVCs contain podToScheduled PVCs (also ReadWriteOncePod),
+// they are scheduled to the same node for rapid failure.
 func TestReadWriteOncePodPreemption(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
+
 	namespace := "preemption-rwop"
 	testCtx := initTest(t, namespace)
 	defer testutils.CleanupTest(t, testCtx)
-
-	cs := testCtx.ClientSet
-	makePvc := func(pvcName string) *v1.PersistentVolumeClaim {
+	_, _, watchPVC := initPersistentVolumeController(namespace, t, testCtx, 2*time.Second)
+	defer watchPVC.Stop()
+	volumeBindingMode := storagev1.VolumeBindingImmediate
+	pvcRes := make(v1.ResourceList)
+	pvcRes[v1.ResourceStorage] = resource.MustParse("20M")
+	scn := "gold"
+	makePvc := func(pvcName, volName string) *v1.PersistentVolumeClaim {
 		return &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -1484,6 +1494,22 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
+				Resources: v1.ResourceRequirements{
+					Requests: pvcRes,
+				},
+				StorageClassName: &scn,
+				VolumeName:       volName,
+			},
+		}
+	}
+	makePv := func(name, path, cap string) *v1.PersistentVolume {
+		return &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: path}},
+				Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)},
+				AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
+				StorageClassName:       "gold",
 			},
 		}
 	}
@@ -1501,83 +1527,144 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			},
 		}
 	}
+
 	nodeRes := map[v1.ResourceName]string{
-		v1.ResourcePods:   "32",
-		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourcePods:    "32",
+		v1.ResourceCPU:     "500m",
+		v1.ResourceMemory:  "500",
+		v1.ResourceStorage: "1G",
 	}
 	// Create 2 nodes
-	_, err := createNode(cs, st.MakeNode().Name("node0").Capacity(nodeRes).Obj())
+	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node0").Capacity(nodeRes).Obj())
 	if err != nil {
 		t.Fatalf("Error creating node1: %v", err)
 	}
-	_, err = createNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+	_, err = createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
 	if err != nil {
 		t.Fatalf("Error creating node2: %v", err)
 	}
-
+	// Create StorageClass
+	storageClass := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: "gold", Annotations: map[string]string{
+		}},
+		VolumeBindingMode: &volumeBindingMode,
+		Provisioner:       "kubernetes.io/mock-provisioner",
+	}
+	createStorageClass(t, testCtx.ClientSet, storageClass)
 	tests := []struct {
 		name            string
 		podToScheduled  *v1.Pod
 		existingPods    []*v1.Pod
 		existingNodes   []*v1.Node
-		existingPVCs    []*v1.PersistentVolumeClaim
-		ScheduledToNode string
+		existingPvcs    []*v1.PersistentVolumeClaim
+		existingPvs     []*v1.PersistentVolume
+		scheduledToNode string
 	}{
 		{
-			name: "nothing happened",
+			name: "Scheduling to the same node",
 			podToScheduled: initPausePod(&pausePodConfig{
-				Name:      "podTOScheduled",
+				Name:      "pod-test-same",
 				Namespace: namespace,
+				Volumes: []v1.Volume{
+					makeVolume(volumeConfig{
+						name:      "data0",
+						claimName: "pvc-0",
+					}),
+					makeVolume(volumeConfig{
+						name:      "data1",
+						claimName: "pvc-1",
+					},
+					),
+				},
 			}),
 			existingPods: []*v1.Pod{
 				initPausePod(&pausePodConfig{
-					Name:      "pod-0",
+					Name:      "pod-0-same",
 					Namespace: namespace,
-					NodeName:  "node1",
+					NodeName:  "node0",
 					Volumes: []v1.Volume{
 						makeVolume(volumeConfig{
-							name:      "data0",
+							name:      "data",
 							claimName: "pvc-0",
-						}),
-						makeVolume(volumeConfig{
-							name:      "data1",
-							claimName: "pvc-1",
 						},
 						),
 					},
 				}),
+				initPausePod(&pausePodConfig{
+					Name:      "pod-1-same",
+					Namespace: namespace,
+					NodeName:  "node0",
+					Volumes: []v1.Volume{
+						makeVolume(volumeConfig{
+							name:      "data",
+							claimName: "pvc-1",
+						}),
+					},
+				}),
 			},
-			existingPVCs:    []*v1.PersistentVolumeClaim{makePvc("pvc-0")},
-			ScheduledToNode: "node1",
+			existingPvcs:    []*v1.PersistentVolumeClaim{makePvc("pvc-0", "pv0"), makePvc("pvc-1", "pv1")},
+			existingPvs:     []*v1.PersistentVolume{makePv("pv0", "/tmp", "20M"), makePv("pv1", "/tmp", "20M")},
+			scheduledToNode: "node0",
 		},
 	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			pods := make([]*v1.Pod, len(test.existingPods))
-			for i, p := range test.existingPods {
+			// Create Pvc and Pv
+			createPvs(t, testCtx.ClientSet, test.existingPvs)
+			createPvcs(t, testCtx.ClientSet, namespace, test.existingPvcs)
+			// Waiting for binding
+			for i := 0; i < len(test.existingPvcs); i++ {
+				waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
+				t.Logf("%d claims bound", i+1)
+			}
+			for i := range test.existingPods {
 				// Create pausePod
-				pods[i], err = runPausePod(cs, p)
+				runPausePod(testCtx.ClientSet, test.existingPods[i])
 				if err != nil {
 					t.Fatalf("Error running pause pod: %v", err)
 				}
 			}
-			// Create Pvc
-			createPvcs(cs, namespace, test.existingPVCs)
 			// Create the "pod".
-			pod, err := createPausePod(cs, test.podToScheduled)
+			pod, err := createPausePod(testCtx.ClientSet, test.podToScheduled)
+			if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				t.Fatalf("Pod %v/%v didn't get scheduled: %v", pod.Namespace, pod.Name, err)
+			}
 			if err != nil {
 				t.Errorf("Error while creating podToScheduled : %v", err)
 			}
-			if pod.Spec.SchedulerName != test.ScheduledToNode {
-				t.Errorf("Was scheduled to the wrong node : %v", err)
+			pod, _ = testCtx.ClientSet.CoreV1().Pods(namespace).Get(context.Background(), "pod-test-same", metav1.GetOptions{})
+			if pod.Spec.NodeName != test.scheduledToNode {
+				t.Errorf("Was scheduled to the wrong node : %v", pod.Spec.NodeName)
 			}
 		})
 	}
 }
 
-func createPvcs(cs clientset.Interface, namespace string, pvcs []*v1.PersistentVolumeClaim) {
+func createPvcs(t *testing.T, cs clientset.Interface, namespace string, pvcs []*v1.PersistentVolumeClaim) {
 	for i := range pvcs {
-		cs.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), pvcs[i], metav1.CreateOptions{})
+		_, err := cs.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), pvcs[i], metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("Create pvc failed: %v", err)
+		}
+	}
+}
+
+func createPvs(t *testing.T, cs clientset.Interface, pvs []*v1.PersistentVolume) {
+	for i := range pvs {
+		_, err := cs.CoreV1().PersistentVolumes().Create(context.Background(), pvs[i], metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("Create PersistentVolumes failed: %v", err)
+		}
+	}
+}
+
+func createStorageClass(t *testing.T, cs clientset.Interface, sc *storagev1.StorageClass) {
+	_, err := cs.StorageV1().StorageClasses().Create(context.Background(), sc, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Create StorageClass failed: %v", err)
 	}
 }

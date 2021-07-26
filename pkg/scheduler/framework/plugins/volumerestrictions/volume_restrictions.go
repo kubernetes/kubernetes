@@ -52,8 +52,10 @@ const (
 	preFilterStateKey = "PreFilter" + Name
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
 	ErrReasonDiskConflict = "node(s) had no available disk"
-	// ErrReasonReadWriteOncePodRepeat means In ReadWriteOncePod access mode, the current PVC has been bound and cannot be bound repeatedly。
-	ErrReasonReadWriteOncePodRepeat = "In ReadWriteOncePod access mode, one pvc can only be bound to one pod, and the scheduling fails"
+	// ErrReasonReadWriteOncePodRepeat means that after the ReadWriteOncePod is turned on,
+	// the current cluster has nodes that meet the volume restrictions,
+	// so the pod will be scheduled to that node instead of this node.
+	ErrReasonReadWriteOncePodRepeat = "pod will be scheduled to nodes that meet volume restrictions"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -278,9 +280,15 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 			}
 		}
 	}
-	// Can be Scheduled in one node, for failed faster
-	for i := 0; i < len(state.nodesMatchPVC); i++ {
-		if nodeInfo.Node().Name == state.nodesMatchPVC[i].Name {
+	// Only select nodes that meet the conditions
+	if len(state.nodesMatchPVC) > 0 {
+		f := false
+		for i := 0; i < len(state.nodesMatchPVC); i++ {
+			if nodeInfo.Node().Name == state.nodesMatchPVC[i].Name {
+				f = true
+			}
+		}
+		if !f {
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodRepeat)
 		}
 	}
@@ -350,28 +358,28 @@ func (s *preFilterState) Clone() framework.StateData {
 	if s == nil {
 		return nil
 	}
-	copynodesMatchPVC := make([]*v1.Node,len(s.nodesMatchPVC))
+	copynodesMatchPVC := make([]*v1.Node, len(s.nodesMatchPVC))
 	for i := 0; i < len(s.nodesMatchPVC); i++ {
-		copynodesMatchPVC[i]= s.nodesMatchPVC[i].DeepCopy()
+		copynodesMatchPVC[i] = s.nodesMatchPVC[i].DeepCopy()
 	}
-	copykeysWithRWOP:=  sets.NewString()
+	copykeysWithRWOP := sets.NewString()
 	for key := range s.keysWithRWOP {
 		copykeysWithRWOP.Insert(key)
 	}
 	copy := preFilterState{
 		nodesMatchPVC: copynodesMatchPVC,
-		keysWithRWOP: copykeysWithRWOP,
+		keysWithRWOP:  copykeysWithRWOP,
 	}
 	return &copy
 }
 
+// getPreFilterState is used to get the state in cyclestate
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
 		return nil, fmt.Errorf("error reading %q from cycleState: %w", Name, err)
 	}
-
 	s, ok := c.(*preFilterState)
 	if !ok {
 		return nil, fmt.Errorf("%+v  convert to volumerestrictions.state error", c)
