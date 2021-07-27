@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -59,7 +60,7 @@ func (c *gvkParserCache) objectTypeForGVK(gvk schema.GroupVersionKind) (*typed.P
 	defer c.mu.Unlock()
 	// if the ttl on the openAPISchema has expired,
 	// regenerate the gvk parser
-	if time.Now().After(c.lastChecked.Add(openAPISchemaTTL)) {
+	if time.Since(c.lastChecked) > openAPISchemaTTL {
 		c.lastChecked = time.Now()
 		parser, err := regenerateGVKParser(c.discoveryClient)
 		if err != nil {
@@ -77,11 +78,9 @@ type extractor struct {
 // NewUnstructuredExtractor creates the extractor with which you can extract the applied configuration
 // for a given manager from an unstructured object.
 func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) (UnstructuredExtractor, error) {
-	// TODO: expose ttl as an argument if we want to.
-
 	parser, err := regenerateGVKParser(dc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed generating initial GVK Parser: %v", err)
 	}
 	return &extractor{
 		cache: &gvkParserCache{
@@ -108,12 +107,12 @@ func (e *extractor) extractUnstructured(object *unstructured.Unstructured, field
 	gvk := object.GetObjectKind().GroupVersionKind()
 	objectType, err := e.cache.objectTypeForGVK(gvk)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch the objectType: %v", err)
 	}
 	result := &unstructured.Unstructured{}
 	err = managedfields.ExtractInto(object, *objectType, fieldManager, result, subresource)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed calling ExtractInto for unstructured: %v", err)
 	}
 	result.SetName(object.GetName())
 	result.SetNamespace(object.GetNamespace())
