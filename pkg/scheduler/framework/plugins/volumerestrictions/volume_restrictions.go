@@ -19,6 +19,8 @@ package volumerestrictions
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	"strings"
-	"sync/atomic"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
@@ -52,10 +52,8 @@ const (
 	preFilterStateKey = "PreFilter" + Name
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
 	ErrReasonDiskConflict = "node(s) had no available disk"
-	// ErrReasonReadWriteOncePodRepeat means that after the ReadWriteOncePod is turned on,
-	// the current cluster has nodes that meet the volume restrictions,
-	// so the pod will be scheduled to that node instead of this node.
-	ErrReasonReadWriteOncePodRepeat = "pod will be scheduled to nodes that meet volume restrictions"
+	// ErrReasonReadWriteOncePodConflict is used when a pod is found using the same PVC with the ReadWriteOncePod access mode.
+	ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -133,7 +131,8 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 	return framework.NewStatus(framework.Success)
 }
 
-// isReadWriteOncePodAccessModeConflict checks if a pod uses a PVC with the ReadWriteOncePod access mode.
+// isReadWriteOncePodAccessModeConflict Checks whether the Pod uses a PVC with ReadWriteOncePod access mode
+// and collects the nodes that contain all PVCs of the Pod
 // This access mode restricts volume access to a single pod on a single node. Since only a single pod can
 // use a ReadWriteOncePod PVC, mark any other pods attempting to use this PVC as UnschedulableAndUnresolvable.
 func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
@@ -142,10 +141,12 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(cycleState *f
 		return framework.NewStatus(framework.Error, "error while getting node info")
 	}
 	pvcKeys, status := pl.keysForPVCWithRWOP(pod)
+
 	if status != nil {
 		return status
 	}
-	var nodesMatchPVCWithRWOP []*v1.Node
+	nodesMatchPVC := make([]*v1.Node, len(nodeInfos))
+	index := int32(-1)
 	ctx, cancel := context.WithCancel(context.Background())
 	processNode := func(i int) {
 		nodeInfo := nodeInfos[i]
@@ -153,9 +154,9 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(cycleState *f
 		for key := range pvcKeys {
 			refCount := nodeInfo.PVCRefCounts[key]
 			if refCount != 0 {
-				atomic.AddUint32(&pvcKeysNumber, ^uint32(0))
+				pvcKeysNumber--
 				if pvcKeysNumber == 0 {
-					nodesMatchPVCWithRWOP = append(nodesMatchPVCWithRWOP, nodeInfo.Node())
+					nodesMatchPVC[atomic.AddInt32(&index, 1)] = nodeInfo.Node()
 					cancel()
 				}
 			}
@@ -163,6 +164,11 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(cycleState *f
 	}
 	pl.parallelizer.Until(ctx, len(nodeInfos), processNode)
 	// update cyclestate
+	var nodesMatchPVCWithRWOP []*v1.Node
+	for i := 0; i <= int(index); i++ {
+		nodesMatchPVCWithRWOP = append(nodesMatchPVCWithRWOP, nodesMatchPVC[i])
+	}
+	//
 	p := &preFilterState{
 		nodesMatchPVC: nodesMatchPVCWithRWOP,
 		keysWithRWOP:  pvcKeys,
@@ -227,7 +233,7 @@ func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framewo
 	return nil
 }
 
-// Collect a pod in the form of namespace+pvcName with pvc whose accessmode is ReadWriteOncePod.
+// keysForPVCWithRWOP collecting the names of the PVCs and namespaces on the pod with ReadWriteOncePod access mode
 // Be used to quickly determine the PVCRefCounts in nodeInfo.
 func (pl *VolumeRestrictions) keysForPVCWithRWOP(pod *v1.Pod) (sets.String, *framework.Status) {
 	var pvcKeys []string
@@ -289,7 +295,7 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 			}
 		}
 		if !f {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodRepeat)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
 		}
 	}
 	return nil
@@ -324,32 +330,14 @@ func New(_ runtime.Object, handle framework.Handle, fts feature.Features) (frame
 	}, nil
 }
 
-// canBePreempt only verifies the volume, not the resource/affinity..
-func canBePreempt(nodeInfo *framework.NodeInfo, key string) bool {
-	namespace, pvcName := strings.Split(key, "/")[0], strings.Split(key, "/")[1]
-	anotherNodeInfo := nodeInfo.Clone()
-	for _, podInfo := range anotherNodeInfo.Pods {
-		pod := podInfo.Pod
-		if pod.Namespace != namespace {
-			continue
-		}
-		for _, vol := range pod.Spec.Volumes {
-			if vol.PersistentVolumeClaim.ClaimName == pvcName {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // preFilterState computed at PreFilter and used at Filter.
 // PreFilter traverses and compares whether the pvc referenced by each pod on each node
 // and the pvc of podToScheduled are the same pvc
 type preFilterState struct {
-	// All nodes that can match podToScheduled's all pvcs
+	// If the pod of a node references the pvc (rwop) of all pods to be scheduled, this node will be added.
 	// Used for fast-failure scheduling
 	nodesMatchPVC []*v1.Node
-	// If the AccessModes of the pvc used by a pod is ReadWriteOncePod,
+	// If the AccessModes of the pvc used by the incoming pod is ReadWriteOncePod,
 	// pod's namespace and pvcName are added to keysWithRWOP
 	keysWithRWOP sets.String
 }

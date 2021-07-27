@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -1548,8 +1548,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: "gold", Annotations: map[string]string{
-		}},
+		ObjectMeta:        metav1.ObjectMeta{Name: "gold"},
 		VolumeBindingMode: &volumeBindingMode,
 		Provisioner:       "kubernetes.io/mock-provisioner",
 	}
