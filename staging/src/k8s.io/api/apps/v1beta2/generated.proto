@@ -327,7 +327,7 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of Pods targeted by this Deployment with a Ready Condition by passing the readinessProbe.
+  // readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
@@ -463,7 +463,7 @@ message ReplicaSetStatus {
   // +optional
   optional int32 fullyLabeledReplicas = 2;
 
-  // Total number of pods targeted by this ReplicaSet with a Ready Condition by passing the readinessProbe.
+  // readyReplicas is the number of pods targeted by this ReplicaSet controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 4;
 
@@ -757,7 +757,7 @@ message StatefulSetStatus {
   // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
 
-  // Total number of pods created by this StatefulSet controller with a Ready Condition by passing the readinessProbe.
+  // readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.
   optional int32 readyReplicas = 3;
 
   // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
