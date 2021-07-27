@@ -170,6 +170,10 @@ func setup() (chan interface{}, chan interface{}, OperationExecutor) {
 // This function starts by writing to ch and blocks on the quit channel
 // until it is closed by the currently running test
 func startOperationAndBlock(ch chan<- interface{}, quit <-chan interface{}) {
-	ch <- nil
-	<-quit
+	select {
+	case ch <- nil:
+		<-quit
+	case <-quit:
+		return
+	}
 }
