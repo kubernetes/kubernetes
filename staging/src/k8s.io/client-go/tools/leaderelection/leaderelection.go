@@ -101,9 +101,10 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
 	le := LeaderElector{
-		config:  lec,
-		clock:   clock.RealClock{},
-		metrics: globalMetricsFactory.newLeaderMetrics(),
+		config:      lec,
+		clock:       clock.RealClock{},
+		metrics:     globalMetricsFactory.newLeaderMetrics(),
+		initialized: false,
 	}
 	le.metrics.leaderOff(le.config.Name)
 	return &le, nil
@@ -192,6 +193,8 @@ type LeaderElector struct {
 	observedRecordLock sync.Mutex
 
 	metrics leaderMetricsAdapter
+
+	initialized bool
 }
 
 // Run starts the leader election loop. Run will not return
@@ -328,14 +331,17 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
+			le.initialized = false
 			return false
 		}
 		if err = le.config.Lock.Create(ctx, leaderElectionRecord); err != nil {
 			klog.Errorf("error initially creating leader election record: %v", err)
+			le.initialized = false
 			return false
 		}
 
 		le.setObservedRecord(&leaderElectionRecord)
+		le.initialized = true
 
 		return true
 	}
@@ -346,6 +352,9 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
+
+	le.initialized = true
+
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
 		le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		!le.IsLeader() {
@@ -384,6 +393,11 @@ func (le *LeaderElector) maybeReportTransition() {
 
 // Check will determine if the current lease is expired by more than timeout.
 func (le *LeaderElector) Check(maxTolerableExpiredLease time.Duration) error {
+	if !le.initialized {
+		// if the leader election has not been setup yet, the check should return false
+		return fmt.Errorf("election of %s not initialized", le.config.Name)
+	}
+
 	if !le.IsLeader() {
 		// Currently not concerned with the case that we are hot standby
 		return nil
