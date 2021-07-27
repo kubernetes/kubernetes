@@ -383,7 +383,7 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	}
 
 	ginkgo.By("running a Gu pod requesting multiple CPUs")
-	runMultipleCPUGuPod(f)
+	runGuPodTest(f, 2)
 
 	ginkgo.By("running a Gu pod with multiple containers requesting integer CPUs")
 	runMultipleCPUContainersGuPod(f)
