@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"time"
 
@@ -177,7 +178,7 @@ func NewKubeGenericRuntimeManager(
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
-	seccompProfileRoot string,
+	rootDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
 	podStateProvider podStateProvider,
 	osInterface kubecontainer.OSInterface,
@@ -206,7 +207,7 @@ func NewKubeGenericRuntimeManager(
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
 		cpuCFSQuotaPeriod:      cpuCFSQuotaPeriod,
-		seccompProfileRoot:     seccompProfileRoot,
+		seccompProfileRoot:     filepath.Join(rootDirectory, "seccomp"),
 		livenessManager:        livenessManager,
 		readinessManager:       readinessManager,
 		startupManager:         startupManager,
