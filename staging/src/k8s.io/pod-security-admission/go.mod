@@ -15,7 +15,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.9.0
-	k8s.io/utils v0.0.0-20210709001253-0e1f9d693477
+	k8s.io/utils v0.0.0-20210722164352-7f3ee0f31471
 	sigs.k8s.io/yaml v1.2.0
 )
 

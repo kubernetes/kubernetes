@@ -26,7 +26,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
-	k8s.io/utils v0.0.0-20210709001253-0e1f9d693477
+	k8s.io/utils v0.0.0-20210722164352-7f3ee0f31471
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 	sigs.k8s.io/yaml v1.2.0
 )
