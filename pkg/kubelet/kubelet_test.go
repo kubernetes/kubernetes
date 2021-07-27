@@ -1445,6 +1445,11 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 		pods[4].UID: true,
 	}
 
+	kubelet.podWorkers.(*fakePodWorkers).terminationRequested = map[types.UID]bool{
+		pods[0].UID: true,
+		pods[1].UID: true,
+	}
+
 	expected := []*v1.Pod{pods[2], pods[3], pods[4]}
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutTerminatedPods(pods)

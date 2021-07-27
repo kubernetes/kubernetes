@@ -969,7 +969,7 @@ func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
 func (kl *Kubelet) filterOutTerminatedPods(pods []*v1.Pod) []*v1.Pod {
 	var filteredPods []*v1.Pod
 	for _, p := range pods {
-		if !kl.podWorkers.CouldHaveRunningContainers(p.UID) {
+		if kl.podWorkers.IsPodTerminationRequested(p.UID) {
 			continue
 		}
 		filteredPods = append(filteredPods, p)
