@@ -1660,7 +1660,8 @@ rules:
       branch: release-1.22
     - repository: controller-manager
       branch: release-1.22
-
+    - repository: mount-utils
+      branch: release-1.22
 
 - destination: cri-api
   library: true
