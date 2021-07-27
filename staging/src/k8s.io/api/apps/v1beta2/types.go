@@ -287,7 +287,7 @@ type StatefulSetStatus struct {
 	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32 `json:"replicas" protobuf:"varint,2,opt,name=replicas"`
 
-	// Total number of pods created by this StatefulSet controller with a Ready Condition by passing the readinessProbe.
+	// readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,3,opt,name=readyReplicas"`
 
 	// currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
@@ -503,7 +503,7 @@ type DeploymentStatus struct {
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty" protobuf:"varint,3,opt,name=updatedReplicas"`
 
-	// Total number of Pods targeted by this Deployment with a Ready Condition by passing the readinessProbe.
+	// readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,7,opt,name=readyReplicas"`
 
@@ -900,7 +900,7 @@ type ReplicaSetStatus struct {
 	// +optional
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty" protobuf:"varint,2,opt,name=fullyLabeledReplicas"`
 
-	// Total number of pods targeted by this ReplicaSet with a Ready Condition by passing the readinessProbe.
+	// readyReplicas is the number of pods targeted by this ReplicaSet controller with a Ready Condition.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,4,opt,name=readyReplicas"`
 
