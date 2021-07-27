@@ -69,8 +69,7 @@ func TestLocalPersistentVolume(t *testing.T) {
 
 	for i := 0; i < 50; i++ {
 		podName := "pod-" + string(uuid.NewUUID())
-		volumename := fmt.Sprintf("volume%v", i+1)
-		pod := makePod(namespace, podName, "local-pvc", volumename)
+		pod := makePod(namespace, podName, "local-pvc")
 		_, err = testClient.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Failed to create pod: %v", err)
@@ -125,7 +124,7 @@ func createLocalPVC(name, namespace string) *v1.PersistentVolumeClaim {
 	}
 }
 
-func makePod(ns, name, localPvcName, mountSubPath string) *v1.Pod {
+func makePod(ns, name, localPvcName string) *v1.Pod {
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +139,7 @@ func makePod(ns, name, localPvcName, mountSubPath string) *v1.Pod {
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "local-pv",
-							MountPath: fmt.Sprintf("/mnt/%s", mountSubPath),
+							MountPath: fmt.Sprintf("/mnt/volume"),
 						},
 					},
 				},

@@ -622,6 +622,78 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
+	ginkgo.Context("Pods sharing a single local PV [Serial]", func() {
+		var (
+			pv *v1.PersistentVolume
+		)
+
+		ginkgo.BeforeEach(func() {
+			localVolume := &localTestVolume{
+				ltr: &utils.LocalTestResource{
+					Node: config.randomNode,
+					Path: "/tmp",
+				},
+				localVolumeType: DirectoryLocalVolumeType,
+			}
+			pvConfig := makeLocalPVConfig(config, localVolume)
+			var err error
+			pv, err = e2epv.CreatePV(config.client, e2epv.MakePersistentVolume(pvConfig))
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func() {
+			if pv == nil {
+				return
+			}
+			ginkgo.By(fmt.Sprintf("Clean PV %s", pv.Name))
+			err := config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("all pods should be running", func() {
+			var (
+				pvc   *v1.PersistentVolumeClaim
+				pods  = map[string]*v1.Pod{}
+				count = 2
+				err   error
+			)
+			pvc = e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
+			ginkgo.By(fmt.Sprintf("Create a PVC %s", pvc.Name))
+			pvc, err = e2epv.CreatePVC(config.client, config.ns, pvc)
+			framework.ExpectNoError(err)
+			ginkgo.By(fmt.Sprintf("Create %d pods to use this PVC", count))
+			podConfig := e2epod.Config{
+				NS:           config.ns,
+				PVCs:         []*v1.PersistentVolumeClaim{pvc},
+				SeLinuxLabel: selinuxLabel,
+			}
+			for i := 0; i < count; i++ {
+
+				pod, err := e2epod.MakeSecPod(&podConfig)
+				framework.ExpectNoError(err)
+				pod, err = config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				pods[pod.Name] = pod
+			}
+			ginkgo.By("Wait for all pods are running")
+			const runningTimeout = 5 * time.Minute
+			waitErr := wait.PollImmediate(time.Second, runningTimeout, func() (done bool, err error) {
+				podsList, err := config.client.CoreV1().Pods(config.ns).List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				runningPods := 0
+				for _, pod := range podsList.Items {
+					switch pod.Status.Phase {
+					case v1.PodRunning:
+						runningPods++
+					}
+				}
+				return runningPods == count, nil
+			})
+			framework.ExpectNoError(waitErr, "Some pods are not running within %v", runningTimeout)
+		})
+	})
 })
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
