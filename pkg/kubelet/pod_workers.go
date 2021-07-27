@@ -540,7 +540,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		// A terminated pod may still be waiting for cleanup - if we receive a runtime pod kill request
 		// due to housekeeping seeing an older cached version of the runtime pod simply ignore it until
 		// after the pod worker completes.
-		if isRuntimePod {
+		if isRuntimePod && !status.IsFinished() {
 			klog.V(3).InfoS("Pod is waiting for termination, ignoring runtime-only kill until after pod worker is fully terminated", "pod", klog.KObj(pod), "podUID", pod.UID)
 			return
 		}
