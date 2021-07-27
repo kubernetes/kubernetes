@@ -18,7 +18,6 @@ package cpumanager
 
 import (
 	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -96,6 +95,8 @@ type staticPolicy struct {
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
 	reserved cpuset.CPUSet
+	// flag of strict removable reserved cpu from list of available cpus
+	strictReserved bool
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
@@ -110,7 +111,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, strictReserved bool, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -141,6 +142,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	return &staticPolicy{
 		topology:    topology,
 		reserved:    reserved,
+		strictReserved: strictReserved,
 		affinity:    affinity,
 		cpusToReuse: make(map[string]cpuset.CPUSet),
 		options:     opts,
@@ -170,6 +172,9 @@ func (p *staticPolicy) validateState(s state.State) error {
 		}
 		// state is empty initialize
 		allCPUs := p.topology.CPUDetails.CPUs()
+		if p.strictReserved {
+			allCPUs = allCPUs.Difference(p.reserved)
+		}
 		s.SetDefaultCPUSet(allCPUs)
 		return nil
 	}
@@ -178,9 +183,16 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// 1. Check if the reserved cpuset is not part of default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
-	if !p.reserved.Intersection(tmpDefaultCPUset).Equals(p.reserved) {
-		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
-			p.reserved.String(), tmpDefaultCPUset.String())
+	if p.strictReserved {
+		if !p.reserved.Intersection(tmpDefaultCPUset).IsEmpty() {
+			return fmt.Errorf("some of strictly reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reserved.Intersection(tmpDefaultCPUset).String(), tmpDefaultCPUset.String())
+		}
+	} else {
+		if !p.reserved.Intersection(tmpDefaultCPUset).Equals(p.reserved) {
+			return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reserved.String(), tmpDefaultCPUset.String())
+		}
 	}
 
 	// 2. Check if state for static policy is consistent
@@ -203,15 +215,19 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
 	tmpCPUSets := []cpuset.CPUSet{}
+	tmpAllCPUs := p.topology.CPUDetails.CPUs()
 	for pod := range tmpAssignments {
 		for _, cset := range tmpAssignments[pod] {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
-	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+	if p.strictReserved {
+		tmpAllCPUs = tmpAllCPUs.Difference(p.reserved)
+	}
+	if !totalKnownCPUs.Equals(tmpAllCPUs) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+			tmpAllCPUs.String(), totalKnownCPUs.String())
 	}
 
 	return nil

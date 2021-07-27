@@ -229,6 +229,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.NewCPUSet(),
+		false,
 		topologymanager.NewFakeManager(),
 		nil)
 	testCases := []struct {
@@ -300,9 +301,10 @@ func TestCPUManagerAdd(t *testing.T) {
 
 func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	testCases := []struct {
-		description      string
-		topo             *topology.CPUTopology
-		numReservedCPUs  int
+		description       string
+		topo              *topology.CPUTopology
+		numReservedCPUs   int
+		strictReserved    bool
 		initContainerIDs []string
 		containerIDs     []string
 		stAssignments    state.ContainerCPUAssignments
@@ -480,7 +482,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), testCase.strictReserved, topologymanager.NewFakeManager(), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -553,6 +555,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 	testCases := []struct {
 		description                string
 		cpuPolicyName              string
+		strictCPUReserved		   bool
 		nodeAllocatableReservation v1.ResourceList
 		isTopologyBroken           bool
 		expectedPolicy             string
@@ -595,6 +598,13 @@ func TestCPUManagerGenerate(t *testing.T) {
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
 			expectedError:              fmt.Errorf("the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero"),
 		},
+		{
+			description:                "static policy - strict flag without specificCPUs",
+			cpuPolicyName:              "static",
+			strictCPUReserved:			true,
+			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
+			expectedError:              fmt.Errorf("[cpumanager] strict reservation avaliable only with explicit config of reserved CPUs"),
+		},
 	}
 
 	mockedMachineInfo := cadvisorapi.MachineInfo{
@@ -635,7 +645,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(), testCase.strictCPUReserved)
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -1005,6 +1015,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.NewCPUSet(0),
+		false,
 		topologymanager.NewFakeManager(),
 		nil)
 	testCases := []struct {
@@ -1118,7 +1129,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.NewCPUSet(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.NewCPUSet(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(), false)
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}

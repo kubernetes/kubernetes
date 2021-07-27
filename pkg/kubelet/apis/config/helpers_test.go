@@ -234,6 +234,7 @@ var (
 		"ReservedMemory[*].Limits[*].s",
 		"ReservedMemory[*].NumaNode",
 		"ReservedSystemCPUs",
+		"StrictCPUReservation",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
 		"SeccompDefault",

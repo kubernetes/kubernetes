@@ -886,6 +886,11 @@ type KubeletConfiguration struct {
 	// CPU list rather than the "dynamic" list by systemReserved and kubeReserved.
 	// This option does not support systemReservedCgroup or kubeReservedCgroup.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// This flag enabled option of strict cpu reservation of pods. When enabled
+	// cpuset list removes ReservedSystemCPUs cpus from topology for non-guaranteed pods.
+	// Default: false
+	// +optional
+	StrictCPUReservation bool `json:"strictCPUReservation,omitempty"`
 	// showHiddenMetricsForVersion is the previous version for which you want to show
 	// hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.

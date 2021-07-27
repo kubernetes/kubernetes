@@ -762,6 +762,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
 					ReservedSystemCPUs:       reservedSystemCPUs,
+					StrictCPUReservation:	  s.StrictCPUReservation,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				QOSReserved:                             *experimentalQOSReserved,

@@ -133,6 +133,9 @@ type manager struct {
 
 	// allocatableCPUs is the set of online CPUs as reported by the system
 	allocatableCPUs cpuset.CPUSet
+
+	// flag of strict removable reserved cpu from list of available cpus
+	strictCPUReserved bool
 }
 
 var _ Manager = &manager{}
@@ -143,7 +146,7 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store, strictCPUReserved bool) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 	var err error
@@ -177,11 +180,16 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 			return nil, fmt.Errorf("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
 		}
 
+		if strictCPUReserved && specificCPUs.IsEmpty()  {
+			// strictCPUReserved used only with list of specific cpus which need to be reserved to system purposes
+			return nil, fmt.Errorf("[cpumanager] strict reservation avaliable only with explicit config of reserved CPUs")
+		}
+
 		// Take the ceiling of the reservation, since fractional CPUs cannot be
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
+		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, strictCPUReserved, affinity, cpuPolicyOptions)
 		if err != nil {
 			return nil, fmt.Errorf("new static policy error: %w", err)
 		}

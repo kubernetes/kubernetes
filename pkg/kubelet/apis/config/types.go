@@ -375,6 +375,9 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+	// This flag enabled option of strict cpu reservation of pods.
+	// When enabled cpuset list removes ReservedSystemCPUs cpus from topology for non-guaranteed pods.
+	StrictCPUReservation bool
 	// The previous version for which you want to show hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.
 	// The format is <major>.<minor>, e.g.: '1.16'.

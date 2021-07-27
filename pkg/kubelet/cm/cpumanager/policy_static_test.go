@@ -33,6 +33,7 @@ type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
 	numReservedCPUs int
+	strictReserved  bool
 	podUID          string
 	options         map[string]string
 	containerName   string
@@ -51,6 +52,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 		description:     spt.description,
 		topo:            spt.topo, // accessed in read-only
 		numReservedCPUs: spt.numReservedCPUs,
+		strictReserved:  spt.strictReserved,
 		podUID:          spt.podUID,
 		options:         spt.options, // accessed in read-only
 		containerName:   spt.containerName,
@@ -64,7 +66,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.NewCPUSet(), false, topologymanager.NewFakeManager(), nil)
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -140,7 +142,7 @@ func TestStaticPolicyStart(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), testCase.strictReserved, topologymanager.NewFakeManager(), nil)
 			policy := p.(*staticPolicy)
 			st := &mockState{
 				assignments:   testCase.stAssignments,
@@ -517,7 +519,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 }
 
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), testCase.options)
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), testCase.strictReserved, topologymanager.NewFakeManager(), testCase.options)
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -617,7 +619,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), testCase.strictReserved, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -707,7 +709,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), false, topologymanager.NewFakeManager(), nil)
 		policy := p.(*staticPolicy)
 		st := &mockState{
 			assignments:   tc.stAssignments,
@@ -740,6 +742,7 @@ type staticPolicyTestWithResvList struct {
 	topo            *topology.CPUTopology
 	numReservedCPUs int
 	reserved        cpuset.CPUSet
+	strictReserved  bool
 	stAssignments   state.ContainerCPUAssignments
 	stDefaultCPUSet cpuset.CPUSet
 	pod             *v1.Pod
@@ -759,6 +762,16 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.NewCPUSet(),
 			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description:     "empty cpuset with strict reservation",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			reserved:        cpuset.NewCPUSet(0, 1),
+			strictReserved:  true,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(),
+			expCSet:         cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
 			description:     "reserved cores 0 & 1 are not present in available cpuset",
@@ -781,7 +794,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, testCase.strictReserved, topologymanager.NewFakeManager(), nil)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -858,7 +871,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, testCase.strictReserved, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,

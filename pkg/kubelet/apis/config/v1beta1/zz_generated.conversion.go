@@ -362,6 +362,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
+	out.StrictCPUReservation = in.StrictCPUReservation
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
@@ -538,6 +539,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
+	out.StrictCPUReservation = in.StrictCPUReservation
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	if err := v1alpha1.Convert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(&in.Logging, &out.Logging, s); err != nil {
 		return err
