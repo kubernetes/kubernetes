@@ -46,6 +46,7 @@ func TestComputeReconciledRoleRules(t *testing.T) {
 	tests := map[string]struct {
 		expectedRole           *rbacv1.ClusterRole
 		actualRole             *rbacv1.ClusterRole
+		aggrLabelPrefixes      []string
 		removeExtraPermissions bool
 
 		expectedReconciledRole       *rbacv1.ClusterRole
@@ -257,12 +258,48 @@ func TestComputeReconciledRoleRules(t *testing.T) {
 				ss{"description": "fancy", "system": "false", "owner": "admin", "vip": "yes", "rate": "down", "up": "true"}),
 			expectedReconciliationNeeded: true,
 		},
+		"aggregation labels reconciliation without removal": {
+			expectedRole:           role(rules(), ss{"env": "prod", "aggregation-a": "a"}, nil),
+			actualRole:             role(rules(), ss{"color": "red", "team": "pm"}, nil),
+			aggrLabelPrefixes:      []string{"aggregation"},
+			removeExtraPermissions: false,
+
+			expectedReconciledRole: role(
+				rules(),
+				ss{"env": "prod", "aggregation-a": "a", "color": "red", "team": "pm"},
+				nil),
+			expectedReconciliationNeeded: true,
+		},
+		"aggregation labels reconciliation with removal": {
+			expectedRole:           role(rules(), ss{"env": "prod", "aggregation-a": "a"}, nil),
+			actualRole:             role(rules(), ss{"color": "red", "aggregation-a": "b", "aggregation-x": "y", "team": "pm"}, nil),
+			aggrLabelPrefixes:      []string{"aggregation"},
+			removeExtraPermissions: false,
+
+			expectedReconciledRole: role(
+				rules(),
+				ss{"env": "prod", "aggregation-a": "a", "color": "red", "team": "pm"},
+				nil),
+			expectedReconciliationNeeded: true,
+		},
+		"aggregation labels reconciliation with all labels removal": {
+			expectedRole:           role(rules(), ss{"env": "prod", "aggregation-a": "a"}, nil),
+			actualRole:             role(rules(), ss{"color": "red", "aggregation-a": "b", "aggregation-x": "y", "team": "pm"}, nil),
+			aggrLabelPrefixes:      []string{""},
+			removeExtraPermissions: false,
+
+			expectedReconciledRole: role(
+				rules(),
+				ss{"env": "prod", "aggregation-a": "a"},
+				nil),
+			expectedReconciliationNeeded: true,
+		},
 	}
 
 	for k, tc := range tests {
 		actualRole := ClusterRoleRuleOwner{ClusterRole: tc.actualRole}
 		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
-		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions)
+		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions, tc.aggrLabelPrefixes)
 		if err != nil {
 			t.Errorf("%s: %v", k, err)
 			continue
@@ -381,7 +418,7 @@ func TestComputeReconciledRoleAggregationRules(t *testing.T) {
 	for k, tc := range tests {
 		actualRole := ClusterRoleRuleOwner{ClusterRole: tc.actualRole}
 		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
-		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions)
+		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions, nil)
 		if err != nil {
 			t.Errorf("%s: %v", k, err)
 			continue

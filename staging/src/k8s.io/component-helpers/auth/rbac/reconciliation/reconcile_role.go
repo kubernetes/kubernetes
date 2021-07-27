@@ -19,6 +19,7 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -65,6 +66,11 @@ type ReconcileRoleOptions struct {
 	Confirm bool
 	// RemoveExtraPermissions indicates reconciliation should remove extra permissions from an existing role
 	RemoveExtraPermissions bool
+	// AggrLabelPrefixes specifies aggregate labels prefixes that should be reconciled.
+	// For example, 'rbac.authorization.k8s.io/aggregate-to-'.
+	// If not specified, labels are not reconciled.
+	// If empty string specified, all labels are reconciled.
+	AggrLabelPrefixes []string
 	// Client is used to look up existing roles, and create/update the role when Confirm=true
 	Client RuleOwnerModifier
 }
@@ -125,7 +131,7 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 		return nil, err
 
 	default:
-		result, err = computeReconciledRole(existing, o.Role, o.RemoveExtraPermissions)
+		result, err = computeReconciledRole(existing, o.Role, o.RemoveExtraPermissions, o.AggrLabelPrefixes)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +181,7 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 
 // computeReconciledRole returns the role that must be created and/or updated to make the
 // existing role's permissions match the expected role's permissions
-func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions bool) (*ReconcileClusterRoleResult, error) {
+func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions bool, aggrLabelPrefixes []string) (*ReconcileClusterRoleResult, error) {
 	result := &ReconcileClusterRoleResult{Operation: ReconcileNone}
 
 	result.Protected = (existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false")
@@ -188,7 +194,7 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 	if !reflect.DeepEqual(result.Role.GetAnnotations(), existing.GetAnnotations()) {
 		result.Operation = ReconcileUpdate
 	}
-	result.Role.SetLabels(merge(expected.GetLabels(), result.Role.GetLabels()))
+	result.Role.SetLabels(merge(expected.GetLabels(), removeAggrLabels(result.Role.GetLabels(), aggrLabelPrefixes)))
 	if !reflect.DeepEqual(result.Role.GetLabels(), existing.GetLabels()) {
 		result.Operation = ReconcileUpdate
 	}
@@ -252,6 +258,28 @@ func merge(maps ...map[string]string) map[string]string {
 		}
 	}
 	return output
+}
+
+// removeAggrLabels removes aggregation labels by prefixes
+func removeAggrLabels(labels map[string]string, prefixes []string) map[string]string {
+	if labels == nil {
+		return nil
+	}
+	res := map[string]string{}
+	for key, value := range labels {
+		found := false
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(key, prefix) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			res[key] = value
+		}
+
+	}
+	return res
 }
 
 // aggregationRuleCovers determines whether or not the ownerSelectors cover the servantSelectors in terms of semantically
