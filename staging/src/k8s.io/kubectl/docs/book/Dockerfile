@@ -12,16 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.7
+###############################################################
+#
+# Security vulnerability: curl piped to shell
+#
+# This code is currently not being run, and it is temporarily
+# commented out until we can decide on a future for the
+# "kubectl book". Sean Sullivan (seans3), 2021-07-27
+#
+###############################################################
 
-EXPOSE 4000
-RUN curl -sL https://deb.nodesource.com/setup_11.x | bash
+# FROM python:3.7
 
-RUN apt-get update && apt-get install -y nodejs npm && apt-get clean;
-RUN npm install gitbook-cli -g
+# EXPOSE 4000
+# RUN curl -sL https://deb.nodesource.com/setup_11.x | bash
 
-WORKDIR /opt/book/
-COPY . /opt/book/
-RUN npm install
+# RUN apt-get update && apt-get install -y nodejs npm && apt-get clean;
+# RUN npm install gitbook-cli -g
 
-CMD ["gitbook", "serve"]
+# WORKDIR /opt/book/
+# COPY . /opt/book/
+# RUN npm install
+
+# CMD ["gitbook", "serve"]
