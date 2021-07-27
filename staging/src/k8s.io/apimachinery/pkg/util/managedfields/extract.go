@@ -78,7 +78,7 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 
 	// set the type meta manually if it doesn't exist to avoid missing kind errors
 	// when decoding from unstructured JSON
-	if _, ok := m["kind"]; !ok {
+	if _, ok := m["kind"]; !ok && object.GetObjectKind().GroupVersionKind().Kind != "" {
 		m["kind"] = object.GetObjectKind().GroupVersionKind().Kind
 		m["apiVersion"] = object.GetObjectKind().GroupVersionKind().GroupVersion().String()
 	}
