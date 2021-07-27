@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/structured-merge-diff/v4/value"
@@ -64,7 +65,7 @@ func (DeducedTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Obje
 }
 
 type typeConverter struct {
-	parser *GvkParser
+	parser *managedfields.GvkParser
 }
 
 var _ TypeConverter = &typeConverter{}
@@ -73,7 +74,7 @@ var _ TypeConverter = &typeConverter{}
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
 func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
-	parser, err := NewGVKParser(models, preserveUnknownFields)
+	parser, err := managedfields.NewGVKParser(models, preserveUnknownFields)
 	if err != nil {
 		return nil, err
 	}
