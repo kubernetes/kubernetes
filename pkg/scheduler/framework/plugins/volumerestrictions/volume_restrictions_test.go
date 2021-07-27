@@ -470,4 +470,3 @@ func newPluginWithListers(t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs [
 
 	return plugintesting.SetupPluginWithInformers(ctx, t, pluginFactory, &config.InterPodAffinityArgs{}, snapshot, objects)
 }
-
