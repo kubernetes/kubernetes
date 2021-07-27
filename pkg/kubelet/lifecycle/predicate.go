@@ -21,15 +21,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/util/feature"
-	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -95,17 +91,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
-	fit := len(reasons) == 0 && err == nil
-	if err != nil {
-		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-		klog.InfoS("Failed to admit pod, GeneralPredicates failed", "pod", klog.KObj(admitPod), "err", err)
-		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  "UnexpectedAdmissionError",
-			Message: message,
-		}
-	}
+	reasons := generalPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
 		fit = len(reasons) == 0 && err == nil
@@ -222,13 +209,10 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
-	if nodeInfo.Node() == nil {
-		return nil, fmt.Errorf("node not found")
-	}
-
+func generalPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+	nonResources, insufficientResources := scheduler.GeneralFilter(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead))
 	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead)) {
+	for _, r := range insufficientResources {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,
 			Requested:    r.Requested,
@@ -236,18 +220,8 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 			Capacity:     r.Capacity,
 		})
 	}
-
-	// Ignore parsing errors for backwards compatibility.
-	match, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
-	if !match {
-		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
+	for _, nr := range nonResources {
+		reasons = append(reasons, &PredicateFailureError{nr.Name, nr.Reason})
 	}
-	if !nodename.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
-	}
-	if !nodeports.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
-	}
-
-	return reasons, nil
+	return reasons
 }

@@ -174,7 +174,6 @@ func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterSt
 	if pod.Spec.Overhead != nil && enablePodOverhead {
 		result.Add(pod.Spec.Overhead)
 	}
-
 	return result
 }
 
@@ -237,33 +236,22 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	return nil
 }
 
-// InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
-type InsufficientResource struct {
-	ResourceName v1.ResourceName
-	// We explicitly have a parameter for reason to avoid formatting a message on the fly
-	// for common resources, which is expensive for cluster autoscaler simulations.
-	Reason    string
-	Requested int64
-	Used      int64
-	Capacity  int64
-}
-
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []InsufficientResource {
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []framework.InsufficientResource {
 	return fitsRequest(computePodResourceRequest(pod, enablePodOverhead), nodeInfo, nil, nil)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {
-	insufficientResources := make([]InsufficientResource, 0, 4)
+func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []framework.InsufficientResource {
+	insufficientResources := make([]framework.InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
 	if len(nodeInfo.Pods)+1 > allowedPodNumber {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourcePods,
-			"Too many pods",
-			1,
-			int64(len(nodeInfo.Pods)),
-			int64(allowedPodNumber),
+		insufficientResources = append(insufficientResources, framework.InsufficientResource{
+			ResourceName: v1.ResourcePods,
+			Reason:       "Too many pods",
+			Requested:    1,
+			Used:         int64(len(nodeInfo.Pods)),
+			Capacity:     int64(allowedPodNumber),
 		})
 	}
 
@@ -275,30 +263,30 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	if podRequest.MilliCPU > (nodeInfo.Allocatable.MilliCPU - nodeInfo.Requested.MilliCPU) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceCPU,
-			"Insufficient cpu",
-			podRequest.MilliCPU,
-			nodeInfo.Requested.MilliCPU,
-			nodeInfo.Allocatable.MilliCPU,
+		insufficientResources = append(insufficientResources, framework.InsufficientResource{
+			ResourceName: v1.ResourceCPU,
+			Reason:       "Insufficient cpu",
+			Requested:    podRequest.MilliCPU,
+			Used:         nodeInfo.Requested.MilliCPU,
+			Capacity:     nodeInfo.Allocatable.MilliCPU,
 		})
 	}
 	if podRequest.Memory > (nodeInfo.Allocatable.Memory - nodeInfo.Requested.Memory) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceMemory,
-			"Insufficient memory",
-			podRequest.Memory,
-			nodeInfo.Requested.Memory,
-			nodeInfo.Allocatable.Memory,
+		insufficientResources = append(insufficientResources, framework.InsufficientResource{
+			ResourceName: v1.ResourceMemory,
+			Reason:       "Insufficient memory",
+			Requested:    podRequest.Memory,
+			Used:         nodeInfo.Requested.Memory,
+			Capacity:     nodeInfo.Allocatable.Memory,
 		})
 	}
 	if podRequest.EphemeralStorage > (nodeInfo.Allocatable.EphemeralStorage - nodeInfo.Requested.EphemeralStorage) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceEphemeralStorage,
-			"Insufficient ephemeral-storage",
-			podRequest.EphemeralStorage,
-			nodeInfo.Requested.EphemeralStorage,
-			nodeInfo.Allocatable.EphemeralStorage,
+		insufficientResources = append(insufficientResources, framework.InsufficientResource{
+			ResourceName: v1.ResourceEphemeralStorage,
+			Reason:       "Insufficient ephemeral-storage",
+			Requested:    podRequest.EphemeralStorage,
+			Used:         nodeInfo.Requested.EphemeralStorage,
+			Capacity:     nodeInfo.Allocatable.EphemeralStorage,
 		})
 	}
 
@@ -315,12 +303,12 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			}
 		}
 		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
-			insufficientResources = append(insufficientResources, InsufficientResource{
-				rName,
-				fmt.Sprintf("Insufficient %v", rName),
-				podRequest.ScalarResources[rName],
-				nodeInfo.Requested.ScalarResources[rName],
-				nodeInfo.Allocatable.ScalarResources[rName],
+			insufficientResources = append(insufficientResources, framework.InsufficientResource{
+				ResourceName: rName,
+				Reason:       fmt.Sprintf("Insufficient %v", rName),
+				Requested:    podRequest.ScalarResources[rName],
+				Used:         nodeInfo.Requested.ScalarResources[rName],
+				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
 			})
 		}
 	}

@@ -26,7 +26,14 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -330,6 +337,96 @@ func TestPreCheckForNode(t *testing.T) {
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGeneralFilter(t *testing.T) {
+	nodeaffinityError := framework.NonResource{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod}
+	nodenameError := framework.NonResource{Name: nodename.Name, Reason: nodename.ErrReason}
+	nodeportsError := framework.NonResource{Name: nodeports.Name, Reason: nodeports.ErrReason}
+	tainttolerationError := framework.NonResource{Name: tainttoleration.Name, Reason: tainttoleration.ErrReasonNotMatch}
+	podOverheadError := framework.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}
+	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	taints := []v1.Taint{{Key: "foo", Value: "bar", Effect: v1.TaintEffectNoSchedule}}
+	tests := []struct {
+		name                     string
+		nodeFunc                 func() *v1.Node
+		existingPods             []*v1.Pod
+		pod                      *v1.Pod
+		flags                    []bool
+		wantNonResource          [][]framework.NonResource
+		wantInsufficientResource [][]framework.InsufficientResource
+	}{
+		{
+			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
+			nodeFunc: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("foo", "bar").Obj()
+			},
+			pod: st.MakePod().Name("pod2").HostPort(80).NodeSelector(map[string]string{"foo": "bar1"}).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").HostPort(80).Obj(),
+			},
+			flags:                    []bool{true, false},
+			wantNonResource:          [][]framework.NonResource{{nodeaffinityError, nodeportsError}, {nodeaffinityError}},
+			wantInsufficientResource: [][]framework.InsufficientResource{{}, {}},
+		},
+		{
+			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
+			nodeFunc: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(cpu).Obj()
+			},
+			pod: st.MakePod().Name("pod2").Container("c").Overhead(v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).NodeSelector(map[string]string{"foo": "bar1"}).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "7"}).Node("fake-node").Obj(),
+			},
+			flags:                    []bool{true, false},
+			wantNonResource:          [][]framework.NonResource{{nodeaffinityError}, nil},
+			wantInsufficientResource: [][]framework.InsufficientResource{{podOverheadError}, {podOverheadError}},
+		},
+		{
+			name: "check nodename and nodeports, nodename need fail quickly if includeAllFailures is false",
+			nodeFunc: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Obj()
+			},
+			pod: st.MakePod().Name("pod2").HostPort(80).Node("fake-node1").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
+			},
+			flags:                    []bool{true, false},
+			wantNonResource:          [][]framework.NonResource{{nodenameError, nodeportsError}, {nodenameError}},
+			wantInsufficientResource: [][]framework.InsufficientResource{{}, {}},
+		},
+		{
+			name: "check nodeports and tainttoleration, nodeports need fail quickly if includeAllFailures is false",
+			nodeFunc: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Taints(taints).Obj()
+			},
+			pod: st.MakePod().Name("pod2").HostPort(80).Label("foo", "bar").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
+			},
+			flags:                    []bool{true, false},
+			wantNonResource:          [][]framework.NonResource{{nodeportsError, tainttolerationError}, {nodeportsError}},
+			wantInsufficientResource: [][]framework.InsufficientResource{{}, {}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodOverhead, true)()
+			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
+			nodeInfo.SetNode(tt.nodeFunc())
+
+			for i := range tt.flags {
+				nonResources, insufficientResources := GeneralFilter(tt.pod, nodeInfo, tt.flags[i])
+
+				if diff := cmp.Diff(tt.wantNonResource[i], nonResources); diff != "" {
+					t.Errorf("Unexpected diff in nonResources (-want, +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(tt.wantInsufficientResource[i], insufficientResources); diff != "" {
+					t.Errorf("Unexpected diff in insufficientResources (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}

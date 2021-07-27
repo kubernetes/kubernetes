@@ -21,23 +21,24 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
@@ -492,37 +493,54 @@ func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
-	// In addition to the checks in kubelet (pkg/kubelet/lifecycle/predicate.go#GeneralPredicates),
-	// the following logic appends a taint/toleration check.
-	// TODO: verify if kubelet should also apply the taint/toleration check, and then unify the
-	// logic with kubelet and move to a shared place.
-	//
 	// Note: the following checks doesn't take preemption into considerations, in very rare
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
 	return func(pod *v1.Pod) bool {
-		if len(noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead))) != 0 {
-			return false
-		}
-
-		// Ignore parsing errors for backwards compatibility.
-		matches, _ := nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
-		if !matches {
-			return false
-		}
-
-		if !nodename.Fits(pod, nodeInfo) {
-			return false
-		}
-
-		if !nodeports.Fits(pod, nodeInfo) {
-			return false
-		}
-
-		_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
-			// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-			return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
-		})
-		return !isUntolerated
+		nonResources, insufficientResources := GeneralFilter(pod, nodeInfo, false)
+		return len(nonResources) == 0 && len(insufficientResources) == 0
 	}
+}
+
+// GeneralFilter calls the filtering logic of noderesources/nodeport/nodeAffinity/tainttoleration/nodename
+// and returns the failure reasons. It's used in kubelet(pkg/kubelet/lifecycle/predicate.go) and scheduler.
+// It returns the first failure if `includeAllFailures` is set to false; otherwise
+// returns all failures.
+func GeneralFilter(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) ([]framework.NonResource, []framework.InsufficientResource) {
+	var nonResources []framework.NonResource
+	insufficientResources := noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead))
+	if len(insufficientResources) != 0 && !includeAllFailures {
+		return nonResources, insufficientResources
+	}
+
+	if matches, _ := corev1nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node()); !matches {
+		nonResources = append(nonResources, framework.NonResource{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod})
+		if !includeAllFailures {
+			return nonResources, insufficientResources
+		}
+	}
+	if !nodename.Fits(pod, nodeInfo) {
+		nonResources = append(nonResources, framework.NonResource{Name: nodename.Name, Reason: nodename.ErrReason})
+		if !includeAllFailures {
+			return nonResources, insufficientResources
+		}
+	}
+
+	if !nodeports.Fits(pod, nodeInfo) {
+		nonResources = append(nonResources, framework.NonResource{Name: nodeports.Name, Reason: nodeports.ErrReason})
+		if !includeAllFailures {
+			return nonResources, insufficientResources
+		}
+	}
+	_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+	})
+	if isUntolerated {
+		nonResources = append(nonResources, framework.NonResource{Name: tainttoleration.Name, Reason: tainttoleration.ErrReasonNotMatch})
+		if !includeAllFailures {
+			return nonResources, insufficientResources
+		}
+	}
+	return nonResources, insufficientResources
 }

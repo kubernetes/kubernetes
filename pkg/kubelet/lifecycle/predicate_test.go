@@ -253,11 +253,8 @@ func TestGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			reasons, err := GeneralPredicates(test.pod, test.nodeInfo)
-			fits := len(reasons) == 0 && err == nil
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			reasons := generalPredicates(test.pod, test.nodeInfo)
+			fits := len(reasons) == 0
 			if !fits && !reflect.DeepEqual(reasons, test.reasons) {
 				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.reasons)
 			}

@@ -947,3 +947,20 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 		*protocol = string(v1.ProtocolTCP)
 	}
 }
+
+// InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
+type InsufficientResource struct {
+	ResourceName v1.ResourceName
+	// We explicitly have a parameter for reason to avoid formatting a message on the fly
+	// for common resources, which is expensive for cluster autoscaler simulations.
+	Reason    string
+	Requested int64
+	Used      int64
+	Capacity  int64
+}
+
+// NonResource describes a kind of non-resource reason that causes the pod to not fit the node.
+type NonResource struct {
+	Name   string
+	Reason string
+}
