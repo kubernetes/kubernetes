@@ -471,6 +471,3 @@ func newPluginWithListers(t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs [
 	return plugintesting.SetupPluginWithInformers(ctx, t, pluginFactory, &config.InterPodAffinityArgs{}, snapshot, objects)
 }
 
-func addVolumesToPod(volumes []v1.Volume, pod *v1.Pod) {
-	pod.Spec.Volumes = volumes
-}
