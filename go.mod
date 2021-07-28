@@ -83,6 +83,7 @@ require (
 	github.com/vmware/govmomi v0.20.3
 	go.etcd.io/etcd/client/pkg/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
+	go.etcd.io/etcd/server/v3 v3.5.0
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp v0.7.0

@@ -255,6 +255,7 @@ github.com/docker/docker/api/types/volume
 github.com/docker/docker/client
 github.com/docker/docker/errdefs
 github.com/docker/docker/pkg/jsonmessage
+github.com/docker/docker/pkg/reexec
 github.com/docker/docker/pkg/stdcopy
 # github.com/docker/go-connections v0.4.0 => github.com/docker/go-connections v0.4.0
 ## explicit
@@ -822,6 +823,7 @@ go.etcd.io/etcd/raft/v3/quorum
 go.etcd.io/etcd/raft/v3/raftpb
 go.etcd.io/etcd/raft/v3/tracker
 # go.etcd.io/etcd/server/v3 v3.5.0 => go.etcd.io/etcd/server/v3 v3.5.0
+## explicit
 go.etcd.io/etcd/server/v3/auth
 go.etcd.io/etcd/server/v3/config
 go.etcd.io/etcd/server/v3/datadir
