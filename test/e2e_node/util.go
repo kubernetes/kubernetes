@@ -97,6 +97,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
 	}
+	framework.Logf("DEBUG stats summary: %s", string(contentsBytes))
 
 	decoder := json.NewDecoder(strings.NewReader(string(contentsBytes)))
 	summary := stats.Summary{}
@@ -104,6 +105,8 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
+	framework.Logf("DEBUG stats summary json: %+v", summary)
+
 	return &summary, nil
 }
 
