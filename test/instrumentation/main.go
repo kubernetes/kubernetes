@@ -196,6 +196,8 @@ func localImportPath(importExpr string) (string, error) {
 		// search k/k local checkout
 		pathPrefix = KUBE_ROOT
 		importExpr = strings.Replace(importExpr, kubeURLRoot, "", 1)
+	} else if strings.Contains(importExpr, "k8s.io/klog/v2") || strings.Contains(importExpr, "k8s.io/util") {
+		pathPrefix = strings.Join([]string{KUBE_ROOT, "vendor"}, string(os.PathSeparator))
 	} else if strings.Contains(importExpr, "k8s.io/") {
 		// search k/k/staging local checkout
 		pathPrefix = strings.Join([]string{KUBE_ROOT, "staging", "src"}, string(os.PathSeparator))
@@ -204,7 +206,7 @@ func localImportPath(importExpr string) (string, error) {
 		// pathPrefix = strings.Join([]string{KUBE_ROOT, "vendor"}, string(os.PathSeparator))
 
 		//  this requires implementing SIV, skip for now
-		return "", fmt.Errorf("unable to handle general, non STL imports for metric analysis")
+		return "", fmt.Errorf("unable to handle general, non STL imports for metric analysis.  import path:  %s", importExpr)
 	} else {
 		// stdlib -> prefix with GOROOT
 		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
@@ -230,13 +232,14 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 		// find local path on disk for listed import
 		importDirectory, err := localImportPath(im.Path.Value)
 		if err != nil {
-			fmt.Fprint(os.Stderr, err.Error())
+			// uncomment the below log line if you want to start using non k8s/non stl libs for resolving const/var in metric definitions
+			// fmt.Fprint(os.Stderr, err.Error() + "\n")
 			continue
 		}
 
 		files, err := ioutil.ReadDir(importDirectory)
 		if err != nil {
-			//fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %w, skipping\n", importDirectory, err)
+			fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %s, skipping\n", importDirectory, err)
 			continue
 		}
 
