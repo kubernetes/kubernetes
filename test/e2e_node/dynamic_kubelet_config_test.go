@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -1168,7 +1169,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		configErrorKey:         errorSamples,
 	})
 	// wait for expected metrics to appear
-	gomega.Eventually(func() error {
+	err := func() error {
 		actual, err := getKubeletMetrics(sets.NewString(
 			assignedConfigKey,
 			activeConfigKey,
@@ -1186,8 +1187,20 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		}
 		// compare to expected
 		if !reflect.DeepEqual(expect, actual) {
-			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
+			return fmt.Errorf("checkConfigMetrics: case: %s\nexpect:%s\n\ngot:\n%s", tc.desc, samplesString(expect), samplesString(actual))
 		}
 		return nil
-	}, timeout, interval).Should(gomega.BeNil())
+	}()
+	framework.Logf("got error: %v", err)
+}
+
+func samplesString(metrics map[string]model.Samples) string {
+	var out []string
+	for key, samples := range metrics {
+		for _, s := range samples {
+			out = append(out, fmt.Sprintf("%s: %s %s @ %d", key, s.Metric.String(), s.Value.String(), s.Timestamp.Unix()))
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, "\n")
 }
