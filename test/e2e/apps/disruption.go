@@ -19,13 +19,12 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
-
+	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -407,6 +406,58 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
+	ginkgo.It("should allow evicting unready pods when PodDisruptionBudget allows 0 disruptions", func() {
+		ctx, ctxCancel := context.WithCancel(context.TODO())
+		defer ctxCancel()
+
+		ginkgo.By("creating the pods")
+		createPodsOrDie(cs, ns, 2)
+		waitForPodsOrDie(cs, ns, 2)
+
+		unreadyPod, err := cs.CoreV1().Pods(ns).Create(
+			ctx,
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   fmt.Sprintf("pod-3"),
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "donothing",
+							Image: imageutils.GetPauseImageName(),
+							ReadinessProbe: &v1.Probe{
+								Handler: v1.Handler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/false"},
+									},
+								},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+			metav1.CreateOptions{},
+		)
+		framework.ExpectNoError(err, "Creating pod pod-3 in namespace %q", ns)
+
+		ginkgo.By("creating the pdb")
+		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1"), defaultLabels)
+		pdb := waitForPdbToBeProcessed(cs, ns, defaultName)
+		gomega.Expect(pdb.Status.ExpectedPods).To(gomega.Equal(3))
+		gomega.Expect(pdb.Status.DesiredHealthy).To(gomega.Equal(2))
+		gomega.Expect(pdb.Status.CurrentHealthy).To(gomega.Equal(2))
+		gomega.Expect(pdb.Status.DisruptionsAllowed).To(gomega.Equal(0))
+
+		err = cs.CoreV1().Pods(unreadyPod.Namespace).EvictV1(ctx, &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: unreadyPod.Name,
+			},
+			DeleteOptions: &metav1.DeleteOptions{},
+		})
+		framework.ExpectNoError(err, "Evicting pod %q in namespace %q", unreadyPod.Name, unreadyPod.Namespace)
+	})
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, name string, minAvailable intstr.IntOrString, labels map[string]string) {
@@ -633,10 +684,12 @@ func locateRunningPod(cs kubernetes.Interface, ns string) (pod *v1.Pod, err erro
 	return pod, err
 }
 
-func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string, name string) {
+func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string, name string) *policyv1.PodDisruptionBudget {
 	ginkgo.By("Waiting for the pdb to be processed")
+	var pdb *policyv1.PodDisruptionBudget
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		var err error
+		pdb, err = cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -646,6 +699,7 @@ func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string, name string) {
 		return true, nil
 	})
 	framework.ExpectNoError(err, "Waiting for the pdb to be processed in namespace %s", ns)
+	return pdb
 }
 
 func waitForPdbToBeDeleted(cs kubernetes.Interface, ns string, name string) {

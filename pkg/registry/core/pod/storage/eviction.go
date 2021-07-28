@@ -297,7 +297,9 @@ func setPreconditionsResourceVersion(deleteOptions *metav1.DeleteOptions, resour
 // without checking PDBs.
 func canIgnorePDB(pod *api.Pod) bool {
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed ||
-		pod.Status.Phase == api.PodPending || !pod.ObjectMeta.DeletionTimestamp.IsZero() {
+		pod.Status.Phase == api.PodPending || !pod.ObjectMeta.DeletionTimestamp.IsZero() ||
+		// Unready pods are not accounted in the PDB, so they have to be freely evictable.
+		!podutil.IsPodReady(pod) {
 		return true
 	}
 	return false
