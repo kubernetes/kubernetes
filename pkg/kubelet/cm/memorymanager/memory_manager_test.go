@@ -68,7 +68,7 @@ type testMemoryManager struct {
 	reserved                   systemReservedMemory
 	podAllocate                *v1.Pod
 	firstPod                   *v1.Pod
-	activePods                 []*v1.Pod
+	terminatingPods            []*v1.Pod
 }
 
 func returnPolicyByName(testCase testMemoryManager) Policy {
@@ -901,7 +901,11 @@ func TestRemoveStaleState(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: nil,
 				},
-				activePods:        func() []*v1.Pod { return nil },
+				terminatingPods: func() []*v1.Pod {
+					return []*v1.Pod{
+						getFakeTerminatingPod(),
+					}
+				},
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
@@ -1028,7 +1032,6 @@ func TestAddContainer(t *testing.T) {
 			updateError:               nil,
 			podAllocate:               pod,
 			assignments:               state.ContainerMemoryAssignments{},
-			activePods:                nil,
 		},
 		{
 			description:               "Shouldn't return any error when policy is set as None",
@@ -1042,7 +1045,6 @@ func TestAddContainer(t *testing.T) {
 			expectedAddContainerError: nil,
 			podAllocate:               pod,
 			assignments:               state.ContainerMemoryAssignments{},
-			activePods:                nil,
 		},
 		{
 			description: "Allocation should fail if policy returns an error",
@@ -1138,7 +1140,6 @@ func TestAddContainer(t *testing.T) {
 			expectedAddContainerError: nil,
 			podAllocate:               pod,
 			assignments:               state.ContainerMemoryAssignments{},
-			activePods:                nil,
 		},
 		{
 			description: "Correct allocation of container requiring amount of memory higher than capacity of one NUMA node",
@@ -1244,7 +1245,6 @@ func TestAddContainer(t *testing.T) {
 				},
 			}),
 			assignments: state.ContainerMemoryAssignments{},
-			activePods:  nil,
 		},
 		{
 			description: "Should fail if try to allocate container requiring amount of memory higher than capacity of one NUMA node but a small pod is already allocated",
@@ -1366,21 +1366,6 @@ func TestAddContainer(t *testing.T) {
 					hugepages1Gi:      resource.MustParse("4Gi"),
 				},
 			}),
-			activePods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						UID: types.UID("fakePod1"),
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{
-							{
-								Name:      "fakeContainer1",
-								Resources: *requirementsGuaranteed,
-							},
-						},
-					},
-				},
-			},
 		},
 	}
 
@@ -1393,7 +1378,7 @@ func TestAddContainer(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: testCase.updateError,
 				},
-				activePods:        func() []*v1.Pod { return testCase.activePods },
+				terminatingPods:   func() []*v1.Pod { return nil },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
@@ -1869,7 +1854,7 @@ func TestRemoveContainer(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: testCase.expectedError,
 				},
-				activePods:        func() []*v1.Pod { return nil },
+				terminatingPods:   func() []*v1.Pod { return nil },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
@@ -2112,10 +2097,6 @@ func TestGetTopologyHints(t *testing.T) {
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
 					},
-					{
-						NUMANodeAffinity: newNUMAAffinity(0, 1),
-						Preferred:        false,
-					},
 				},
 				string(hugepages1Gi): {
 					{
@@ -2125,10 +2106,6 @@ func TestGetTopologyHints(t *testing.T) {
 					{
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: newNUMAAffinity(0, 1),
-						Preferred:        false,
 					},
 				},
 			},
@@ -2144,14 +2121,14 @@ func TestGetTopologyHints(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: nil,
 				},
-				activePods:        func() []*v1.Pod { return nil },
+				terminatingPods:   func() []*v1.Pod { return nil },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
 			mgr.state.SetMachineState(testCase.machineState.Clone())
 			mgr.state.SetMemoryAssignments(testCase.assignments.Clone())
 
-			pod := getPod("fakePod1", "fakeContainer1", requirementsGuaranteed)
+			pod := getPod("fakePod2", "fakeContainer1", requirementsGuaranteed)
 			container := &pod.Spec.Containers[0]
 			hints := mgr.GetTopologyHints(pod, container)
 			if !reflect.DeepEqual(hints, testCase.expectedHints) {
@@ -2321,7 +2298,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: nil,
 				},
-				activePods:        func() []*v1.Pod { return []*v1.Pod{testCase.podAllocate} },
+				terminatingPods:   func() []*v1.Pod { return nil },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
@@ -2388,6 +2365,24 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 						PageSize: pageSize1Gb,
 						NumPages: 5,
 					},
+				},
+			},
+		},
+	}
+}
+
+func getFakeTerminatingPod() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "fakePod1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "fakeContainer1",
+				},
+				{
+					Name: "fakeContainer2",
 				},
 			},
 		},

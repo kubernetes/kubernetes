@@ -31,7 +31,7 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *fakeManager) Start(_ TerminatingPodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ runtimeService, _ containermap.ContainerMap) error {
 	klog.InfoS("Start()")
 	return nil
 }

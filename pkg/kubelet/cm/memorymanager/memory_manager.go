@@ -39,8 +39,8 @@ import (
 // memoryManagerStateFileName is the file name where memory manager stores its state
 const memoryManagerStateFileName = "memory_manager_state"
 
-// ActivePodsFunc is a function that returns a list of active pods
-type ActivePodsFunc func() []*v1.Pod
+// TerminatingPodsFunc is a function that returns a list of terminating pods.
+type TerminatingPodsFunc func() []*v1.Pod
 
 type runtimeService interface {
 	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
@@ -48,13 +48,13 @@ type runtimeService interface {
 
 type sourcesReadyStub struct{}
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(_ string) {}
+func (s *sourcesReadyStub) AllReady() bool     { return true }
 
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(terminatingPods TerminatingPodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the memory allocation during the container removal
@@ -103,9 +103,9 @@ type manager struct {
 	// to make UpdateContainerResources() calls against the containers.
 	containerRuntime runtimeService
 
-	// activePods is a method for listing active pods on the node
-	// so all the containers can be updated during call to the removeStaleState.
-	activePods ActivePodsFunc
+	// terminatingPods is a method for listing terminating pods on the node
+	// so we can remove them from the state file.
+	terminatingPods TerminatingPodsFunc
 
 	// podStatusProvider provides a method for obtaining pod statuses
 	// and the containerID of their containers
@@ -161,10 +161,10 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 }
 
 // Start starts the memory manager under the kubelet and calls policy start
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(terminatingPods TerminatingPodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	klog.InfoS("Starting memorymanager", "policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
-	m.activePods = activePods
+	m.terminatingPods = terminatingPods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
 	m.containerMap = initialContainers
@@ -285,8 +285,8 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers
 func (m *manager) removeStaleState() {
 	// Only once all sources are ready do we attempt to remove any stale state.
-	// This ensures that the call to `m.activePods()` below will succeed with
-	// the actual active pods list.
+	// This ensures that the call to `m.terminatingPods()` below will succeed with
+	// the actual terminating pods list.
 	if !m.sourcesReady.AllReady() {
 		return
 	}
@@ -298,15 +298,15 @@ func (m *manager) removeStaleState() {
 	m.Lock()
 	defer m.Unlock()
 
-	// Get the list of active pods.
-	activePods := m.activePods()
+	// Get the list of terminating pods.
+	terminatingPods := m.terminatingPods()
 
-	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
-	activeContainers := make(map[string]map[string]struct{})
-	for _, pod := range activePods {
-		activeContainers[string(pod.UID)] = make(map[string]struct{})
+	// Build a list of (podUID, containerName) pairs for all containers in all terminating Pods.
+	terminatingContainers := make(map[string]map[string]struct{})
+	for _, pod := range terminatingPods {
+		terminatingContainers[string(pod.UID)] = make(map[string]struct{})
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			activeContainers[string(pod.UID)][container.Name] = struct{}{}
+			terminatingContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}
 
@@ -315,7 +315,7 @@ func (m *manager) removeStaleState() {
 	assignments := m.state.GetMemoryAssignments()
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
-			if _, ok := activeContainers[podUID][containerName]; !ok {
+			if _, ok := terminatingContainers[podUID][containerName]; ok {
 				klog.InfoS("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
 				m.policyRemoveContainerByRef(podUID, containerName)
 			}
