@@ -1451,6 +1451,44 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFilterNonTerminatingPods(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pods := newTestPods(5)
+	now := metav1.NewTime(time.Now())
+	pods[0].Status.Phase = v1.PodFailed
+	pods[1].Status.Phase = v1.PodSucceeded
+	// The pod is terminating, should not filter out.
+	pods[2].Status.Phase = v1.PodRunning
+	pods[2].DeletionTimestamp = &now
+	pods[2].Status.ContainerStatuses = []v1.ContainerStatus{
+		{State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{
+				StartedAt: now,
+			},
+		}},
+	}
+	pods[3].Status.Phase = v1.PodPending
+	pods[4].Status.Phase = v1.PodRunning
+
+	kubelet.podWorkers.(*fakePodWorkers).terminating = map[types.UID]bool{
+		pods[0].UID: true,
+		pods[1].UID: true,
+	}
+
+	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		pods[2].UID: true,
+		pods[3].UID: true,
+		pods[4].UID: true,
+	}
+
+	expected := []*v1.Pod{pods[0], pods[1]}
+	kubelet.podManager.SetPods(pods)
+	actual := kubelet.filterNonTerminatingPods(pods)
+	assert.Equal(t, expected, actual)
+}
+
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

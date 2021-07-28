@@ -101,6 +101,12 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
+// GetTerminatingPods returns terminating pods
+func (kl *Kubelet) GetTerminatingPods() []*v1.Pod {
+	allPods := kl.podManager.GetPods()
+	return kl.filterNonTerminatingPods(allPods)
+}
+
 // makeBlockVolumes maps the raw block devices specified in the path of the container
 // Experimental
 func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumepathhandler.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
@@ -970,6 +976,18 @@ func (kl *Kubelet) filterOutTerminatedPods(pods []*v1.Pod) []*v1.Pod {
 	var filteredPods []*v1.Pod
 	for _, p := range pods {
 		if !kl.podWorkers.CouldHaveRunningContainers(p.UID) {
+			continue
+		}
+		filteredPods = append(filteredPods, p)
+	}
+	return filteredPods
+}
+
+// filterNonTerminatingPods returns the pods that have terminating state
+func (kl *Kubelet) filterNonTerminatingPods(pods []*v1.Pod) []*v1.Pod {
+	var filteredPods []*v1.Pod
+	for _, p := range pods {
+		if !kl.podWorkers.ShouldPodContainersBeTerminating(p.UID) {
 			continue
 		}
 		filteredPods = append(filteredPods, p)
