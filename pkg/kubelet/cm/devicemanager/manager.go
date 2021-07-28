@@ -51,8 +51,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
-// ActivePodsFunc is a function that returns a list of pods to reconcile.
-type ActivePodsFunc func() []*v1.Pod
+// TerminatingPodsFunc is a function that returns a list of terminating pods.
+type TerminatingPodsFunc func() []*v1.Pod
 
 // monitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
@@ -70,10 +70,9 @@ type ManagerImpl struct {
 	server *grpc.Server
 	wg     sync.WaitGroup
 
-	// activePods is a method for listing active pods on the node
-	// so the amount of pluginResources requested by existing pods
-	// could be counted when updating allocated devices
-	activePods ActivePodsFunc
+	// terminatingPods is a method for listing terminating pods on the node
+	// so we can un-allocate devices attached to terminating pods.
+	terminatingPods TerminatingPodsFunc
 
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
@@ -163,7 +162,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 
 	// The following structures are populated with real implementations in manager.Start()
 	// Before that, initializes them to perform no-op operations.
-	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
+	manager.terminatingPods = func() []*v1.Pod { return []*v1.Pod{} }
 	manager.sourcesReady = &sourcesReadyStub{}
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(dir)
 	if err != nil {
@@ -238,10 +237,10 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
+func (m *ManagerImpl) Start(terminatingPods TerminatingPodsFunc, sourcesReady config.SourcesReady) error {
 	klog.V(2).InfoS("Starting Device Plugin manager")
 
-	m.activePods = activePods
+	m.terminatingPods = terminatingPods
 	m.sourcesReady = sourcesReady
 
 	// Loads in allocatedDevices information from disk.
@@ -619,21 +618,25 @@ func (m *ManagerImpl) readCheckpoint() error {
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices() {
-	activePods := m.activePods()
+	terminatingPods := m.terminatingPods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	podsToBeRemoved := m.podDevices.pods()
-	for _, pod := range activePods {
-		podsToBeRemoved.Delete(string(pod.UID))
+	var podsToBeRemoved []string
+	for _, pod := range terminatingPods {
+		podUID := string(pod.UID)
+		if !m.podDevices.hasPod(podUID) {
+			continue
+		}
+		podsToBeRemoved = append(podsToBeRemoved, podUID)
 	}
 	if len(podsToBeRemoved) <= 0 {
 		return
 	}
-	klog.V(3).InfoS("Pods to be removed", "podUIDs", podsToBeRemoved.List())
-	m.podDevices.delete(podsToBeRemoved.List())
+	klog.V(3).InfoS("Pods to be removed", "podUIDs", podsToBeRemoved)
+	m.podDevices.delete(podsToBeRemoved)
 	// Regenerated allocatedDevices after we update pod allocation information.
 	m.allocatedDevices = m.podDevices.devices()
 }

@@ -541,16 +541,16 @@ func TestCheckpoint(t *testing.T) {
 	as.True(reflect.DeepEqual(expectedAllDevices, testManager.healthyDevices))
 }
 
-type activePodsStub struct {
-	activePods []*v1.Pod
+type terminatingPodsStub struct {
+	terminatingPods []*v1.Pod
 }
 
-func (a *activePodsStub) getActivePods() []*v1.Pod {
-	return a.activePods
+func (a *terminatingPodsStub) getTerminatingPods() []*v1.Pod {
+	return a.terminatingPods
 }
 
-func (a *activePodsStub) updateActivePods(newPods []*v1.Pod) {
-	a.activePods = newPods
+func (a *terminatingPodsStub) updateTerminatingPods(newPods []*v1.Pod) {
+	a.terminatingPods = newPods
 }
 
 type MockEndpoint struct {
@@ -604,7 +604,7 @@ func makePod(limits v1.ResourceList) *v1.Pod {
 	}
 }
 
-func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*ManagerImpl, error) {
+func getTestManager(tmpDir string, terminatingPods TerminatingPodsFunc, testRes []TestResource) (*ManagerImpl, error) {
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	if err != nil {
@@ -620,7 +620,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		podDevices:            newPodDevices(),
 		devicesToReuse:        make(PodReusableDevices),
 		topologyAffinityStore: topologymanager.NewFakeManager(),
-		activePods:            activePods,
+		terminatingPods:       terminatingPods,
 		sourcesReady:          &sourcesReadyStub{},
 		checkpointManager:     ckm,
 		allDevices:            NewResourceDeviceInstances(),
@@ -775,13 +775,13 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	testResources = append(testResources, res1)
 	testResources = append(testResources, res2)
 	as := require.New(t)
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
+	podsStub := terminatingPodsStub{
+		terminatingPods: []*v1.Pod{},
 	}
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(tmpDir, podsStub.getTerminatingPods, testResources)
 	as.Nil(err)
 
 	testPods := []*v1.Pod{
@@ -827,11 +827,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			expErr:                    nil,
 		},
 	}
-	activePods := []*v1.Pod{}
+
 	for _, testCase := range testCases {
 		pod := testCase.testPod
-		activePods = append(activePods, pod)
-		podsStub.updateActivePods(activePods)
 		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
@@ -873,14 +871,14 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	testResources = append(testResources, res1)
 	testResources = append(testResources, res2)
 	as := require.New(t)
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
+	podsStub := terminatingPodsStub{
+		terminatingPods: []*v1.Pod{},
 	}
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(tmpDir, podsStub.getTerminatingPods, testResources)
 	as.Nil(err)
 
 	podWithPluginResourcesInInitContainers := &v1.Pod{
@@ -928,7 +926,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 			},
 		},
 	}
-	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
+
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
 		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
 	}
@@ -1019,14 +1017,14 @@ func TestDevicePreStartContainer(t *testing.T) {
 		topology:         false,
 	}
 	as := require.New(t)
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
+	podsStub := terminatingPodsStub{
+		terminatingPods: []*v1.Pod{},
 	}
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, []TestResource{res1})
+	testManager, err := getTestManager(tmpDir, podsStub.getTerminatingPods, []TestResource{res1})
 	as.Nil(err)
 
 	ch := make(chan []string, 1)
@@ -1039,9 +1037,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	}
 	pod := makePod(v1.ResourceList{
 		v1.ResourceName(res1.resourceName): res1.resourceQuantity})
-	activePods := []*v1.Pod{}
-	activePods = append(activePods, pod)
-	podsStub.updateActivePods(activePods)
+
 	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
@@ -1068,8 +1064,6 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 	pod2 := makePod(v1.ResourceList{
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
-	activePods = append(activePods, pod2)
-	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
 	as.Nil(err)
 	_, err = testManager.GetDeviceRunContainerOptions(pod2, &pod2.Spec.Containers[0])

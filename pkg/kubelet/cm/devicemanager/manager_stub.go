@@ -34,7 +34,7 @@ func NewManagerStub() (*ManagerStub, error) {
 }
 
 // Start simply returns nil.
-func (h *ManagerStub) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
+func (h *ManagerStub) Start(_ TerminatingPodsFunc, _ config.SourcesReady) error {
 	return nil
 }
 

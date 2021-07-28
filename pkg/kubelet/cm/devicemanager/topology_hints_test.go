@@ -61,7 +61,7 @@ func TestGetTopologyHints(t *testing.T) {
 			allocatedDevices: make(map[string]sets.String),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
-			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
+			terminatingPods:  func() []*v1.Pod { return nil },
 			numaNodes:        []int{0, 1},
 		}
 
@@ -415,7 +415,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
-			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+			terminatingPods:       func() []*v1.Pod { return nil },
 			topologyAffinityStore: &mockAffinityStore{tc.hint},
 		}
 
@@ -604,7 +604,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
-			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+			terminatingPods:       func() []*v1.Pod { return nil },
 			topologyAffinityStore: &mockAffinityStore{tc.hint},
 		}
 
@@ -925,7 +925,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			allocatedDevices: make(map[string]sets.String),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
-			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}} },
+			terminatingPods:  func() []*v1.Pod { return nil },
 			numaNodes:        []int{0, 1},
 		}
 
