@@ -113,6 +113,9 @@ type ManagerImpl struct {
 
 	// update channel for device health updates
 	update chan resourceupdates.Update
+
+	// pendingAdmissionPod contain the pod during the admission phase
+	pendingAdmissionPod *v1.Pod
 }
 
 type endpointInfo struct {
@@ -367,6 +370,10 @@ func (m *ManagerImpl) Stop() error {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	// The pod is during the admission phase. We need to save the pod to avoid it
+	// being cleaned before the admission ended
+	m.setPodPendingAdmission(pod)
+
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -547,14 +554,20 @@ func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices() {
-	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	activeAndAdmittedPods := m.activePods()
+	if m.pendingAdmissionPod != nil {
+		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
+	}
+
 	podsToBeRemoved := m.podDevices.pods()
-	for _, pod := range activePods {
+	for _, pod := range activeAndAdmittedPods {
 		podsToBeRemoved.Delete(string(pod.UID))
 	}
 	if len(podsToBeRemoved) <= 0 {
@@ -1182,4 +1195,11 @@ func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
 	// Once we make it here we know we have a running container.
 	klog.V(4).InfoS("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 	return true
+}
+
+func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.pendingAdmissionPod = pod
 }
