@@ -606,6 +606,7 @@ func (cm *containerManagerImpl) Status() Status {
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
+	terminatingPods TerminatingPodsFunc,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
@@ -616,7 +617,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
 		}
-		err = cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		err = cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), cpumanager.TerminatingPodsFunc(terminatingPods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
@@ -628,7 +629,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
 		}
-		err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		err = cm.memoryManager.Start(memorymanager.TerminatingPodsFunc(terminatingPods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start memory manager error: %v", err)
 		}
@@ -691,7 +692,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
+	if err := cm.deviceManager.Start(devicemanager.TerminatingPodsFunc(terminatingPods), sourcesReady); err != nil {
 		return err
 	}
 
