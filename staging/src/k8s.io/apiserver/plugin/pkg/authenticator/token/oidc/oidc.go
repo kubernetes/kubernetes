@@ -70,6 +70,10 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 	IssuerURL string
 
+	// IssuerHTTPProxy, if specified, is used to proxy connection when the provider
+	// can not be reached directly (for example, from a private network without access to the Internet).
+	IssuerHTTPProxy string
+
 	// Optional KeySet to allow for synchronous initlization instead of fetching from the remote issuer.
 	KeySet oidc.KeySet
 
@@ -279,6 +283,14 @@ func New(opts Options) (*Authenticator, error) {
 		// TLS uses the host's root CA set.
 		TLSClientConfig: &tls.Config{RootCAs: roots},
 	})
+
+	if opts.IssuerHTTPProxy != "" {
+		proxyUrl, err := url.Parse(opts.IssuerHTTPProxy)
+		if err != nil {
+			return nil, err
+		}
+		tr.Proxy = http.ProxyURL(proxyUrl)
+	}
 
 	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
 

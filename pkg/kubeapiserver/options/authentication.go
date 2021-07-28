@@ -72,15 +72,16 @@ type BootstrapTokenAuthenticationOptions struct {
 
 // OIDCAuthenticationOptions contains OIDC authentication options for API Server
 type OIDCAuthenticationOptions struct {
-	CAFile         string
-	ClientID       string
-	IssuerURL      string
-	UsernameClaim  string
-	UsernamePrefix string
-	GroupsClaim    string
-	GroupsPrefix   string
-	SigningAlgs    []string
-	RequiredClaims map[string]string
+	CAFile          string
+	ClientID        string
+	IssuerURL       string
+	IssuerHTTPProxy string
+	UsernameClaim   string
+	UsernamePrefix  string
+	GroupsClaim     string
+	GroupsPrefix    string
+	SigningAlgs     []string
+	RequiredClaims  map[string]string
 }
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
@@ -271,6 +272,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"The URL of the OpenID issuer, only HTTPS scheme will be accepted. "+
 			"If set, it will be used to verify the OIDC JSON Web Token (JWT).")
 
+		fs.StringVar(&o.OIDC.IssuerHTTPProxy, "oidc-issuer-proxy", o.OIDC.IssuerHTTPProxy, ""+
+			"If provided, the HTTP proxy server to be used to connect to the OpenID issuer URL.")
+
 		fs.StringVar(&o.OIDC.ClientID, "oidc-client-id", o.OIDC.ClientID,
 			"The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set.")
 
@@ -407,6 +411,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.OIDCGroupsClaim = o.OIDC.GroupsClaim
 		ret.OIDCGroupsPrefix = o.OIDC.GroupsPrefix
 		ret.OIDCIssuerURL = o.OIDC.IssuerURL
+		ret.OIDCIssuerHTTPProxy = o.OIDC.IssuerHTTPProxy
 		ret.OIDCUsernameClaim = o.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = o.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = o.OIDC.SigningAlgs

@@ -52,6 +52,7 @@ type Config struct {
 
 	TokenAuthFile               string
 	OIDCIssuerURL               string
+	OIDCIssuerHTTPProxy         string
 	OIDCClientID                string
 	OIDCCAFile                  string
 	OIDCUsernameClaim           string
@@ -162,6 +163,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
 			IssuerURL:            config.OIDCIssuerURL,
+			IssuerHTTPProxy:      config.OIDCIssuerHTTPProxy,
 			ClientID:             config.OIDCClientID,
 			CAContentProvider:    oidcCAContent,
 			UsernameClaim:        config.OIDCUsernameClaim,
