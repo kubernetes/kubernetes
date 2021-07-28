@@ -161,3 +161,7 @@ func EtcdMain(tests func() int) {
 func GetEtcdURL() string {
 	return etcdURL
 }
+
+func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn func(), err error) {
+	return "", nil, fmt.Errorf("not implemented")
+}
