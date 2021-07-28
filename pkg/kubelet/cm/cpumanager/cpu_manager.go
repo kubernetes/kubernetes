@@ -41,6 +41,9 @@ import (
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
+// TerminatingPodsFunc is a function that returns a list of terminating pods.
+type TerminatingPodsFunc func() []*v1.Pod
+
 type runtimeService interface {
 	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
 }
@@ -53,7 +56,7 @@ const cpuManagerStateFileName = "cpu_manager_state"
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(activePods ActivePodsFunc, terminatingPods TerminatingPodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -111,6 +114,10 @@ type manager struct {
 	// activePods is a method for listing active pods on the node
 	// so all the containers can be updated in the reconciliation loop.
 	activePods ActivePodsFunc
+
+	// terminatingPods is a method for listing terminating pods on the node
+	// so we can remove them from the state file.
+	terminatingPods TerminatingPodsFunc
 
 	// podStatusProvider provides a method for obtaining pod statuses
 	// and the containerID of their containers
@@ -202,11 +209,12 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(activePods ActivePodsFunc, terminatingPods TerminatingPodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	klog.InfoS("Starting CPU manager", "policy", m.policy.Name())
 	klog.InfoS("Reconciling", "reconcilePeriod", m.reconcilePeriod)
 	m.sourcesReady = sourcesReady
 	m.activePods = activePods
+	m.terminatingPods = terminatingPods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
 	m.containerMap = initialContainers
@@ -342,15 +350,15 @@ func (m *manager) removeStaleState() {
 	m.Lock()
 	defer m.Unlock()
 
-	// Get the list of active pods.
-	activePods := m.activePods()
+	// Get the list of terminating pods.
+	terminatingPods := m.terminatingPods()
 
-	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
-	activeContainers := make(map[string]map[string]struct{})
-	for _, pod := range activePods {
-		activeContainers[string(pod.UID)] = make(map[string]struct{})
+	// Build a list of (podUID, containerName) pairs for all containers in all terminating Pods.
+	terminatingContainers := make(map[string]map[string]struct{})
+	for _, pod := range terminatingPods {
+		terminatingContainers[string(pod.UID)] = make(map[string]struct{})
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			activeContainers[string(pod.UID)][container.Name] = struct{}{}
+			terminatingContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}
 
@@ -359,7 +367,7 @@ func (m *manager) removeStaleState() {
 	assignments := m.state.GetCPUAssignments()
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
-			if _, ok := activeContainers[podUID][containerName]; !ok {
+			if _, ok := terminatingContainers[podUID][containerName]; ok {
 				klog.ErrorS(nil, "RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
 				err := m.policyRemoveContainerByRef(podUID, containerName)
 				if err != nil {

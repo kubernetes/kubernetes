@@ -273,6 +273,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			containerMap:      containermap.NewContainerMap(),
 			podStatusProvider: mockPodStatusProvider{},
 			sourcesReady:      &sourcesReadyStub{},
+			terminatingPods:   func() []*v1.Pod { return nil },
 		}
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
@@ -498,6 +499,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			activePods: func() []*v1.Pod {
 				return []*v1.Pod{testCase.pod}
 			},
+			terminatingPods: func() []*v1.Pod { return nil },
 		}
 
 		containers := append(
@@ -677,6 +679,7 @@ func TestCPUManagerRemove(t *testing.T) {
 		containerRuntime:  mockRuntimeService{},
 		containerMap:      containerMap,
 		activePods:        func() []*v1.Pod { return nil },
+		terminatingPods:   func() []*v1.Pod { return nil },
 		podStatusProvider: mockPodStatusProvider{},
 	}
 
@@ -948,6 +951,7 @@ func TestReconcileState(t *testing.T) {
 			activePods: func() []*v1.Pod {
 				return testCase.activePods
 			},
+			terminatingPods: func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
@@ -1039,6 +1043,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			containerMap:      containermap.NewContainerMap(),
 			podStatusProvider: mockPodStatusProvider{},
 			sourcesReady:      &sourcesReadyStub{},
+			terminatingPods:   func() []*v1.Pod { return nil },
 		}
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")

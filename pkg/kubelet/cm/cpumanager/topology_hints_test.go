@@ -182,6 +182,7 @@ func TestGetTopologyHints(t *testing.T) {
 			activePods:        func() []*v1.Pod { return activePods },
 			podStatusProvider: mockPodStatusProvider{},
 			sourcesReady:      &sourcesReadyStub{},
+			terminatingPods:   func() []*v1.Pod { return nil },
 		}
 
 		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
@@ -230,6 +231,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			activePods:        func() []*v1.Pod { return activePods },
 			podStatusProvider: mockPodStatusProvider{},
 			sourcesReady:      &sourcesReadyStub{},
+			terminatingPods:   func() []*v1.Pod { return nil },
 		}
 
 		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
