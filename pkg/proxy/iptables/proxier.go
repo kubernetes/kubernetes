@@ -831,6 +831,9 @@ func (proxier *Proxier) syncProxyRules() {
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				conntrackCleanupServiceIPs.Insert(extIP)
 			}
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				conntrackCleanupServiceIPs.Insert(lbIP)
+			}
 			nodePort := svcInfo.NodePort()
 			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
 				klog.V(2).Infof("Stale %s service NodePort %v -> %d", strings.ToLower(string(svcInfo.Protocol())), svcPortName, nodePort)
