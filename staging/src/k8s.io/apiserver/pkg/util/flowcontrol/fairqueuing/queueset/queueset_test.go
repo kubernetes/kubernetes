@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/utils/clock"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqclocktest "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock/testing"
@@ -663,7 +664,7 @@ func TestContextCancel(t *testing.T) {
 	metrics.Reset()
 	now := time.Now()
 	clk, counter := fqclocktest.NewFakeEventClock(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, counter, testableCancelWhenDone)
 	qCfg := fq.QueuingConfig{
 		Name:             "TestContextCancel",
 		DesiredNumQueues: 11,
@@ -759,6 +760,21 @@ func TestContextCancel(t *testing.T) {
 	if !idle1 {
 		t.Error("Not idle at the end")
 	}
+}
+
+// testableCancelWhenDone counts goroutine activity so it can be used with FakeEventClock
+func testableCancelWhenDone(qs *queueSet, configName string, req *request, fsName string, descr1, descr2 interface{}, doneCh <-chan struct{}) {
+	qs.counter.Add(1)
+	go func() {
+		defer runtime.HandleCrash()
+		qs.counter.Add(-1)
+		<-doneCh
+		// Whatever goroutine unblocked the preceding receive MUST
+		// have already accounted for this activation.
+		klog.V(6).Infof("QS(%s): Context of request %q %#+v %#+v is Done", qs.qCfg.Name, fsName, descr1, descr2)
+		qs.cancelWait(req)
+		qs.counter.Add(-1)
+	}()
 }
 
 func TestTotalRequestsExecutingWithPanic(t *testing.T) {

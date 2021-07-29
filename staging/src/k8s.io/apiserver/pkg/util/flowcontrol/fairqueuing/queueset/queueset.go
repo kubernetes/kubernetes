@@ -49,6 +49,9 @@ const nsTimeFmt = "2006-01-02 15:04:05.000000000"
 type queueSetFactory struct {
 	counter counter.GoRoutineCounter
 	clock   clock.PassiveClock
+
+	// cancelWaitWhenDone arranges that `qs.cancelWait(req)` is called after doneCh is closed
+	cancelWaitWhenDone func(qs *queueSet, configName string, req *request, fsName string, descr1, descr2 interface{}, doneCh <-chan struct{})
 }
 
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
@@ -75,6 +78,9 @@ type queueSet struct {
 	counter              counter.GoRoutineCounter
 	estimatedServiceTime float64
 	obsPair              metrics.TimedObserverPair
+
+	// cancelWaitWhenDone arranges that `qs.cancelWait(req)` is called after doneCh is closed
+	cancelWaitWhenDone func(qs *queueSet, configName string, req *request, fsName string, descr1, descr2 interface{}, doneCh <-chan struct{})
 
 	lock sync.Mutex
 
@@ -122,9 +128,15 @@ type queueSet struct {
 
 // NewQueueSetFactory creates a new QueueSetFactory object
 func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) fq.QueueSetFactory {
+	return newTestableQueueSetFactory(c, counter, normalCancelWaitWhenDone)
+}
+
+// newTestableQueueSetFactory creates a new QueueSetFactory object with the given connector between context cancel and wait cancel
+func newTestableQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter, cancelWaitWhenDone func(qs *queueSet, configName string, req *request, fsName string, descr1, descr2 interface{}, doneCh <-chan struct{})) fq.QueueSetFactory {
 	return &queueSetFactory{
-		counter: counter,
-		clock:   c,
+		counter:            counter,
+		clock:              c,
+		cancelWaitWhenDone: cancelWaitWhenDone,
 	}
 }
 
@@ -162,6 +174,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 			counter:              qsc.factory.counter,
 			estimatedServiceTime: 60,
 			obsPair:              qsc.obsPair,
+			cancelWaitWhenDone:   qsc.factory.cancelWaitWhenDone,
 			qCfg:                 qsc.qCfg,
 			virtualTime:          0,
 			lastRealTime:         qsc.factory.clock.Now(),
@@ -302,23 +315,18 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 	configName := qs.qCfg.Name
 
 	if doneCh != nil {
-		qs.preCreateOrUnblockGoroutine()
-		go func() {
-			defer runtime.HandleCrash()
-			qs.goroutineDoneOrBlocked()
-			<-doneCh
-			// Whatever goroutine unblocked the preceding receive MUST
-			// have already either (a) incremented qs.counter or (b)
-			// known that said counter is not actually counting or (c)
-			// known that the count does not need to be accurate.
-			// BTW, the count only needs to be accurate in a test that
-			// uses FakeEventClock::Run().
-			klog.V(6).Infof("QS(%s): Context of request %q %#+v %#+v is Done", configName, fsName, descr1, descr2)
-			qs.cancelWait(req)
-			qs.goroutineDoneOrBlocked()
-		}()
+		qs.cancelWaitWhenDone(qs, configName, req, fsName, descr1, descr2, doneCh)
 	}
 	return req, false
+}
+
+func normalCancelWaitWhenDone(qs *queueSet, configName string, req *request, fsName string, descr1, descr2 interface{}, doneCh <-chan struct{}) {
+	go func() {
+		defer runtime.HandleCrash()
+		<-doneCh
+		klog.V(6).Infof("QS(%s): Context of request %q %#+v %#+v is Done", qs.qCfg.Name, fsName, descr1, descr2)
+		qs.cancelWait(req)
+	}()
 }
 
 // Seats returns the number of seats this request requires.
@@ -856,21 +864,6 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 		keptQueues[i].index--
 	}
 	return keptQueues
-}
-
-// preCreateOrUnblockGoroutine needs to be called before creating a
-// goroutine associated with this queueSet or unblocking a blocked
-// one, to properly update the accounting used in testing.
-func (qs *queueSet) preCreateOrUnblockGoroutine() {
-	qs.counter.Add(1)
-}
-
-// goroutineDoneOrBlocked needs to be called at the end of every
-// goroutine associated with this queueSet or when such a goroutine is
-// about to wait on some other goroutine to do something; this is to
-// properly update the accounting used in testing.
-func (qs *queueSet) goroutineDoneOrBlocked() {
-	qs.counter.Add(-1)
 }
 
 func (qs *queueSet) UpdateObservations() {
