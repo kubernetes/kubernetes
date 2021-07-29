@@ -168,18 +168,6 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
 	targetHost := netutil.CanonicalAddr(req.URL)
 
-	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
-	proxyReq := http.Request{
-		Method: "CONNECT",
-		URL:    &url.URL{},
-		Host:   targetHost,
-	}
-
-	if pa := s.proxyAuth(proxyURL); pa != "" {
-		proxyReq.Header = http.Header{}
-		proxyReq.Header.Set("Proxy-Authorization", pa)
-	}
-
 	var rwc net.Conn
 	if proxyURL.Scheme == "socks5" {
 		dialAddr := netutil.CanonicalAddr(proxyURL)
@@ -192,6 +180,17 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 			return nil, err
 		}
 	} else {
+		// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
+		proxyReq := http.Request{
+			Method: "CONNECT",
+			URL:    &url.URL{},
+			Host:   targetHost,
+		}
+
+		if pa := s.proxyAuth(proxyURL); pa != "" {
+			proxyReq.Header = http.Header{}
+			proxyReq.Header.Set("Proxy-Authorization", pa)
+		}
 		proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
 		if err != nil {
 			return nil, err
