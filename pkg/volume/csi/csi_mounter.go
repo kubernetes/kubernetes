@@ -369,7 +369,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
+		return errors.New(log("mounter.TearDownAt failed to get CSI client: %v", err))
 	}
 
 	// Could not get spec info on whether this is a migrated operation because c.spec is nil
