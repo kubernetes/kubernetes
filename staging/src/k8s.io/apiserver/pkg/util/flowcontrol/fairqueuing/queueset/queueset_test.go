@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"sort"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,8 +34,10 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	testeventclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
+	testpromise "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/promise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
@@ -307,11 +312,11 @@ func (uss *uniformScenarioState) finalReview() {
 	expectedRejects := ""
 	for i := range uss.clients {
 		fsName := fmt.Sprintf("client%d", i)
-		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
+		if atomic.LoadInt32(&uss.executions[i]) > 0 {
 			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 			uss.expectedConcurrencyInUse = uss.expectedConcurrencyInUse + fmt.Sprintf(`				apiserver_flowcontrol_request_concurrency_in_use{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
-		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
+		if atomic.LoadInt32(&uss.rejects[i]) > 0 {
 			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
 		}
 	}
@@ -353,8 +358,9 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 }
 
-func init() {
+func TestMain(m *testing.M) {
 	klog.InitFlags(nil)
+	os.Exit(m.Run())
 }
 
 // TestNoRestraint tests whether the no-restraint factory gives every client what it asks for
@@ -388,7 +394,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize1",
 		DesiredNumQueues: 9,
@@ -425,7 +431,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize3",
 		DesiredNumQueues: 8,
@@ -461,7 +467,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectEqual",
 		DesiredNumQueues: 9,
@@ -498,7 +504,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectUnequal",
 		DesiredNumQueues: 9,
@@ -535,7 +541,7 @@ func TestWindup(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestWindup",
 		DesiredNumQueues: 9,
@@ -571,7 +577,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		DesiredNumQueues: 0,
@@ -604,7 +610,7 @@ func TestTimeout(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
 		DesiredNumQueues: 128,
@@ -635,12 +641,27 @@ func TestTimeout(t *testing.T) {
 	}.exercise(t)
 }
 
+// TestContextCancel tests cancellation of a request's context.
+// The outline is:
+// 1. Use a concurrency limit of 1.
+// 2. Start request 1.
+// 3. Use a fake clock for the following logic, to insulate from scheduler noise.
+// 4. The exec fn of request 1 starts request 2, which should wait
+//    in its queue.
+// 5. The exec fn of request 1 also forks a goroutine that waits 1 second
+//    and then cancels the context of request 2.
+// 6. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
+//    calls `req2.Finish`, which is expected to return after the context cancel.
+// 7. The queueset interface allows StartRequest 2 to return `nil` in this situation,
+//    if the scheduler gets the cancel done before StartRequest finishes;
+//    the test handles this without regard to whether the implementation will ever do that.
+// 8. Check that the above took exactly 1 second.
 func TestContextCancel(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
 	now := time.Now()
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestContextCancel",
 		DesiredNumQueues: 11,
@@ -653,59 +674,80 @@ func TestContextCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
-	counter.Add(1) // account for the goroutine running this test
+	counter.Add(1) // account for main activity of the goroutine running this test
 	ctx1 := context.Background()
-	b2i := map[bool]int{false: 0, true: 1}
-	var qnc [2][2]int32
-	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
+	pZero := func() *int32 { var zero int32; return &zero }
+	// counts of calls to the QueueNoteFns
+	queueNoteCounts := map[int]map[bool]*int32{
+		1: {false: pZero(), true: pZero()},
+		2: {false: pZero(), true: pZero()},
+	}
+	queueNoteFn := func(fn int) func(inQueue bool) {
+		return func(inQueue bool) { atomic.AddInt32(queueNoteCounts[fn][inQueue], 1) }
+	}
+	fatalErrs := []string{}
+	var errsLock sync.Mutex
+	expectQNCount := func(fn int, inQueue bool, expect int32) {
+		if a := atomic.LoadInt32(queueNoteCounts[fn][inQueue]); a != expect {
+			errsLock.Lock()
+			defer errsLock.Unlock()
+			fatalErrs = append(fatalErrs, fmt.Sprintf("Got %d calls to queueNoteFn%d(%v), expected %d", a, fn, inQueue, expect))
+		}
+	}
+	expectQNCounts := func(fn int, expectF, expectT int32) {
+		expectQNCount(fn, false, expectF)
+		expectQNCount(fn, true, expectT)
+	}
+	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs1", "test", "one", queueNoteFn(1))
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
 	}
-	if a := atomic.AddInt32(&qnc[0][0], 0); a != 1 {
-		t.Errorf("Got %d calls to queueNoteFn1(false), expected 1", a)
+	expectQNCounts(1, 1, 1)
+	var executed1, idle1 bool
+	counter.Add(1) // account for the following goroutine
+	go func() {
+		defer counter.Add(-1) // account completion of this goroutine
+		idle1 = req1.Finish(func() {
+			executed1 = true
+			ctx2, cancel2 := context.WithCancel(context.Background())
+			tBefore := clk.Now()
+			counter.Add(1) // account for the following goroutine
+			go func() {
+				defer counter.Add(-1) // account completion of this goroutine
+				clk.Sleep(time.Second)
+				expectQNCounts(2, 0, 1)
+				// account for unblocking the goroutine that waits on cancelation
+				counter.Add(1)
+				cancel2()
+			}()
+			req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", queueNoteFn(2))
+			if idle2a {
+				t.Error("2nd StartRequest returned idle")
+			}
+			if req2 != nil {
+				idle2b := req2.Finish(func() {
+					t.Error("Executing req2")
+				})
+				if idle2b {
+					t.Error("2nd Finish returned idle")
+				}
+				expectQNCounts(2, 1, 1)
+			}
+			tAfter := clk.Now()
+			dt := tAfter.Sub(tBefore)
+			if dt != time.Second {
+				t.Errorf("Unexpected: dt=%d", dt)
+			}
+		})
+	}()
+	counter.Add(-1) // completion of main activity of goroutine running this test
+	clk.Run(nil)
+	errsLock.Lock()
+	defer errsLock.Unlock()
+	if len(fatalErrs) > 0 {
+		t.Error(strings.Join(fatalErrs, "; "))
 	}
-	if a := atomic.AddInt32(&qnc[0][1], 0); a != 1 {
-		t.Errorf("Got %d calls to queueNoteFn1(true), expected 1", a)
-	}
-	var executed1 bool
-	idle1 := req1.Finish(func() {
-		executed1 = true
-		ctx2, cancel2 := context.WithCancel(context.Background())
-		tBefore := time.Now()
-		go func() {
-			time.Sleep(time.Second)
-			if a := atomic.AddInt32(&qnc[1][0], 0); a != 0 {
-				t.Errorf("Got %d calls to queueNoteFn2(false), expected 0", a)
-			}
-			if a := atomic.AddInt32(&qnc[1][1], 0); a != 1 {
-				t.Errorf("Got %d calls to queueNoteFn2(true), expected 1", a)
-			}
-			// account for unblocking the goroutine that waits on cancelation
-			counter.Add(1)
-			cancel2()
-		}()
-		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
-		if idle2a {
-			t.Error("2nd StartRequest returned idle")
-		}
-		if req2 != nil {
-			idle2b := req2.Finish(func() {
-				t.Error("Executing req2")
-			})
-			if idle2b {
-				t.Error("2nd Finish returned idle")
-			}
-			if a := atomic.AddInt32(&qnc[1][0], 0); a != 1 {
-				t.Errorf("Got %d calls to queueNoteFn2(false), expected 1", a)
-			}
-		}
-		tAfter := time.Now()
-		dt := tAfter.Sub(tBefore)
-		if dt < time.Second || dt > 2*time.Second {
-			t.Errorf("Unexpected: dt=%d", dt)
-		}
-	})
 	if !executed1 {
 		t.Errorf("Unexpected: executed1=%v", executed1)
 	}
@@ -714,12 +756,20 @@ func TestContextCancel(t *testing.T) {
 	}
 }
 
+func countingPromiseFactoryFactory(activeCounter counter.GoRoutineCounter) promiseFactoryFactory {
+	return func(qs *queueSet) promiseFactory {
+		return func(initial interface{}, doneCh <-chan struct{}, doneVal interface{}) promise.WriteOnce {
+			return testpromise.NewCountingWriteOnce(activeCounter, &qs.lock, initial, doneCh, doneVal)
+		}
+	}
+}
+
 func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
 	now := time.Now()
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := NewQueueSetFactory(clk, counter)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTotalRequestsExecutingWithPanic",
 		DesiredNumQueues: 0,
