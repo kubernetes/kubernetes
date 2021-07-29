@@ -191,7 +191,7 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 
 func localImportPath(importExpr string) (string, error) {
 	// parse directory path
-	pathPrefix := "unknown"
+	var pathPrefix string
 	if strings.Contains(importExpr, kubeURLRoot) {
 		// search k/k local checkout
 		pathPrefix = KUBE_ROOT
@@ -212,7 +212,7 @@ func localImportPath(importExpr string) (string, error) {
 		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
 	} // ToDo: support non go mod
 
-	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), 0)
+	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), -1)
 	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(crossPlatformImportExpr, "\"")}, string(os.PathSeparator))
 
 	return importDirectory, nil
@@ -221,7 +221,7 @@ func localImportPath(importExpr string) (string, error) {
 func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {
 	for _, im := range imports {
 		// get imported label
-		importAlias := "unknown"
+		var importAlias string
 		if im.Name == nil {
 			pathSegments := strings.Split(im.Path.Value, "/")
 			importAlias = strings.Trim(pathSegments[len(pathSegments)-1], "\"")
