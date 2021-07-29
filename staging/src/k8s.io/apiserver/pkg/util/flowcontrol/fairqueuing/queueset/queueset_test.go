@@ -23,6 +23,8 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -313,11 +315,11 @@ func (uss *uniformScenarioState) finalReview() {
 	expectedRejects := ""
 	for i := range uss.clients {
 		fsName := fmt.Sprintf("client%d", i)
-		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
+		if atomic.LoadInt32(&uss.executions[i]) > 0 {
 			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 			uss.expectedConcurrencyInUse = uss.expectedConcurrencyInUse + fmt.Sprintf(`				apiserver_flowcontrol_request_concurrency_in_use{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
-		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
+		if atomic.LoadInt32(&uss.rejects[i]) > 0 {
 			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
 		}
 	}
@@ -641,6 +643,23 @@ func TestTimeout(t *testing.T) {
 	}.exercise(t)
 }
 
+// TestContextCancel tests that cancellation of a request's context.
+// The outline is:
+// 1. Use a concurrency limit of 1.
+// 2. Start request 1.
+// 3. The exec fn of request 1 starts request 2, which should wait
+//    in its queue.
+// 4. The exec fn of request 1 also forks a goroutine that waits 1 second
+//    and then cancels the context of request 2.
+// 5. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
+//    calls `req2.Finish`, which is expected to return after the context cancel.
+// 6. The queueset interface allows StartRequest 2 to return `nil` in this situation,
+//    if the scheduler gets the cancel done before StartRequest finishes;
+//    the test handles this without regard to whether the implementation will ever do that.
+// 7. The test checks whether at least 1 second has elapsed.
+// 8. The test checks fails if more than 2 seconds have passed, on the grounds that this
+//    probably indicates that something went wrong.  This is a potential source of flakes,
+//    since we have no guarantees from the scheduler.
 func TestContextCancel(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
@@ -662,36 +681,51 @@ func TestContextCancel(t *testing.T) {
 	counter.Add(1) // account for the goroutine running this test
 	ctx1 := context.Background()
 	b2i := map[bool]int{false: 0, true: 1}
-	var qnc [2][2]int32
-	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
+	var qnc [2][2]int32 // counts of calls to the following queueNoteFns
+	queueNoteFn1 := func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) }
+	queueNoteFn2 := func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) }
+	expectQNCounts := func(fn int, expectF, expectT int32) {
+		if a := atomic.LoadInt32(&qnc[fn-1][0]); a != expectF {
+			t.Errorf("Got %d calls to queueNoteFn%d(false), expected %d", a, fn, expectF)
+		}
+		if a := atomic.LoadInt32(&qnc[fn-1][1]); a != expectT {
+			t.Errorf("Got %d calls to queueNoteFn%d(true), expected %d", a, fn, expectT)
+		}
+	}
+	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs1", "test", "one", queueNoteFn1)
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
 	}
-	if a := atomic.AddInt32(&qnc[0][0], 0); a != 1 {
-		t.Errorf("Got %d calls to queueNoteFn1(false), expected 1", a)
+	expectQNCounts(1, 1, 1)
+	fatalErrs := []string{}
+	var errsLock sync.Mutex
+	expectQNCount := func(fn int, inQueue bool, expect int32) {
+		if a := atomic.LoadInt32(&qnc[fn-1][b2i[inQueue]]); a != expect {
+			errsLock.Lock()
+			defer errsLock.Unlock()
+			fatalErrs = append(fatalErrs, fmt.Sprintf("Got %d calls to queueNoteFn%d(%v), expected %d", a, fn, inQueue, expect))
+		}
 	}
-	if a := atomic.AddInt32(&qnc[0][1], 0); a != 1 {
-		t.Errorf("Got %d calls to queueNoteFn1(true), expected 1", a)
+	expectQNCounts = func(fn int, expectF, expectT int32) {
+		expectQNCount(fn, false, expectF)
+		expectQNCount(fn, true, expectT)
 	}
 	var executed1 bool
 	idle1 := req1.Finish(func() {
 		executed1 = true
 		ctx2, cancel2 := context.WithCancel(context.Background())
 		tBefore := time.Now()
+		counter.Add(1) // account for the following goroutine
 		go func() {
 			time.Sleep(time.Second)
-			if a := atomic.AddInt32(&qnc[1][0], 0); a != 0 {
-				t.Errorf("Got %d calls to queueNoteFn2(false), expected 0", a)
-			}
-			if a := atomic.AddInt32(&qnc[1][1], 0); a != 1 {
-				t.Errorf("Got %d calls to queueNoteFn2(true), expected 1", a)
-			}
+			expectQNCounts(2, 0, 1)
 			// account for unblocking the goroutine that waits on cancelation
 			counter.Add(1)
 			cancel2()
+			counter.Add(-1) // account completion of this goroutine
 		}()
-		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
+		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", queueNoteFn2)
 		if idle2a {
 			t.Error("2nd StartRequest returned idle")
 		}
@@ -702,9 +736,7 @@ func TestContextCancel(t *testing.T) {
 			if idle2b {
 				t.Error("2nd Finish returned idle")
 			}
-			if a := atomic.AddInt32(&qnc[1][0], 0); a != 1 {
-				t.Errorf("Got %d calls to queueNoteFn2(false), expected 1", a)
-			}
+			expectQNCounts(2, 1, 1)
 		}
 		tAfter := time.Now()
 		dt := tAfter.Sub(tBefore)
@@ -712,12 +744,19 @@ func TestContextCancel(t *testing.T) {
 			t.Errorf("Unexpected: dt=%d", dt)
 		}
 	})
+	errsLock.Lock()
+	defer errsLock.Unlock()
+	if len(fatalErrs) > 0 {
+		t.Error(strings.Join(fatalErrs, "; "))
+	}
 	if !executed1 {
 		t.Errorf("Unexpected: executed1=%v", executed1)
 	}
 	if !idle1 {
 		t.Error("Not idle at the end")
 	}
+	counter.Add(-1) // account for completion of this test
+	clk.Run(nil)    // test that goroutine counting was right
 }
 
 func TestTotalRequestsExecutingWithPanic(t *testing.T) {
