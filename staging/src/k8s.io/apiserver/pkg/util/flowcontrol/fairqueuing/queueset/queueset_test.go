@@ -647,19 +647,17 @@ func TestTimeout(t *testing.T) {
 // The outline is:
 // 1. Use a concurrency limit of 1.
 // 2. Start request 1.
-// 3. The exec fn of request 1 starts request 2, which should wait
+// 3. Use a fake clock for the following logic, to insulate from scheduler noise.
+// 4. The exec fn of request 1 starts request 2, which should wait
 //    in its queue.
-// 4. The exec fn of request 1 also forks a goroutine that waits 1 second
+// 5. The exec fn of request 1 also forks a goroutine that waits 1 second
 //    and then cancels the context of request 2.
-// 5. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
+// 6. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
 //    calls `req2.Finish`, which is expected to return after the context cancel.
-// 6. The queueset interface allows StartRequest 2 to return `nil` in this situation,
+// 7. The queueset interface allows StartRequest 2 to return `nil` in this situation,
 //    if the scheduler gets the cancel done before StartRequest finishes;
 //    the test handles this without regard to whether the implementation will ever do that.
-// 7. The test checks whether at least 1 second has elapsed.
-// 8. The test checks fails if more than 2 seconds have passed, on the grounds that this
-//    probably indicates that something went wrong.  This is a potential source of flakes,
-//    since we have no guarantees from the scheduler.
+// 8. Check that the above took exactly 1 second.
 func TestContextCancel(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
@@ -678,7 +676,7 @@ func TestContextCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
-	counter.Add(1) // account for the goroutine running this test
+	counter.Add(1) // account for main activity of the goroutine running this test
 	ctx1 := context.Background()
 	b2i := map[bool]int{false: 0, true: 1}
 	var qnc [2][2]int32 // counts of calls to the following queueNoteFns
@@ -711,39 +709,45 @@ func TestContextCancel(t *testing.T) {
 		expectQNCount(fn, false, expectF)
 		expectQNCount(fn, true, expectT)
 	}
-	var executed1 bool
-	idle1 := req1.Finish(func() {
-		executed1 = true
-		ctx2, cancel2 := context.WithCancel(context.Background())
-		tBefore := time.Now()
-		counter.Add(1) // account for the following goroutine
-		go func() {
-			time.Sleep(time.Second)
-			expectQNCounts(2, 0, 1)
-			// account for unblocking the goroutine that waits on cancelation
-			counter.Add(1)
-			cancel2()
-			counter.Add(-1) // account completion of this goroutine
-		}()
-		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", queueNoteFn2)
-		if idle2a {
-			t.Error("2nd StartRequest returned idle")
-		}
-		if req2 != nil {
-			idle2b := req2.Finish(func() {
-				t.Error("Executing req2")
-			})
-			if idle2b {
-				t.Error("2nd Finish returned idle")
+	var executed1, idle1 bool
+	counter.Add(1)
+	go func() {
+		idle1 = req1.Finish(func() {
+			executed1 = true
+			ctx2, cancel2 := context.WithCancel(context.Background())
+			tBefore := clk.Now()
+			counter.Add(1) // account for the following goroutine
+			go func() {
+				ClockWait(clk, counter, time.Second)
+				expectQNCounts(2, 0, 1)
+				// account for unblocking the goroutine that waits on cancelation
+				counter.Add(1)
+				cancel2()
+				counter.Add(-1) // account completion of this goroutine
+			}()
+			req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", queueNoteFn2)
+			if idle2a {
+				t.Error("2nd StartRequest returned idle")
 			}
-			expectQNCounts(2, 1, 1)
-		}
-		tAfter := time.Now()
-		dt := tAfter.Sub(tBefore)
-		if dt < time.Second || dt > 2*time.Second {
-			t.Errorf("Unexpected: dt=%d", dt)
-		}
-	})
+			if req2 != nil {
+				idle2b := req2.Finish(func() {
+					t.Error("Executing req2")
+				})
+				if idle2b {
+					t.Error("2nd Finish returned idle")
+				}
+				expectQNCounts(2, 1, 1)
+			}
+			tAfter := clk.Now()
+			dt := tAfter.Sub(tBefore)
+			if dt != time.Second {
+				t.Errorf("Unexpected: dt=%d", dt)
+			}
+		})
+		counter.Add(-1) // account completion of this goroutine
+	}()
+	counter.Add(-1) // completion of main activity of goroutine running this test
+	clk.Run(nil)
 	errsLock.Lock()
 	defer errsLock.Unlock()
 	if len(fatalErrs) > 0 {
@@ -755,8 +759,6 @@ func TestContextCancel(t *testing.T) {
 	if !idle1 {
 		t.Error("Not idle at the end")
 	}
-	counter.Add(-1) // account for completion of this test
-	clk.Run(nil)    // test that goroutine counting was right
 }
 
 func TestTotalRequestsExecutingWithPanic(t *testing.T) {
