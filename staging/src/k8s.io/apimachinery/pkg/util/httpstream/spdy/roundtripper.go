@@ -32,6 +32,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/proxy"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -178,21 +180,33 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
-	if err != nil {
-		return nil, err
-	}
+	var rwc net.Conn
+	if proxyURL.Scheme == "socks5" {
+		dialAddr := netutil.CanonicalAddr(proxyURL)
+		dialer, err := proxy.SOCKS5("tcp", dialAddr, nil, proxy.Direct)
+		if err != nil {
+			return nil, err
+		}
+		rwc, err = dialer.Dial("tcp", targetHost)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
+		if err != nil {
+			return nil, err
+		}
+		//lint:ignore SA1019 ignore deprecated httputil.NewProxyClientConn
+		proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+		_, err = proxyClientConn.Do(&proxyReq)
+		//lint:ignore SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
+		// returned from the invocation of proxyClientConn.Do
+		if err != nil && err != httputil.ErrPersistEOF {
+			return nil, err
+		}
 
-	//lint:ignore SA1019 ignore deprecated httputil.NewProxyClientConn
-	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
-	_, err = proxyClientConn.Do(&proxyReq)
-	//lint:ignore SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
-	// returned from the invocation of proxyClientConn.Do
-	if err != nil && err != httputil.ErrPersistEOF {
-		return nil, err
+		rwc, _ = proxyClientConn.Hijack()
 	}
-
-	rwc, _ := proxyClientConn.Hijack()
 
 	if req.URL.Scheme != "https" {
 		return rwc, nil
