@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	//"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -288,16 +288,18 @@ func (qs *queueSet) StartRequest(ctx context.Context, width *fqrequest.Width, ha
 	// of well-counted goroutines. We Are Told that every
 	// request's context's Done channel gets closed by the time
 	// the request is done being processed.
-	doneCh := ctx.Done()
+/*	doneCh := ctx.Done()
 
 	// Retrieve the queueset configuration name while we have the lock
 	// and use it in the goroutine below.
 	configName := qs.qCfg.Name
 
 	if doneCh != nil {
+		klog.Errorf("EEEEEEEEEEEEEE")
+		panic("EEEEEE")
 		qs.preCreateOrUnblockGoroutine()
 		go func() {
-			defer runtime.HandleCrash()
+//			defer runtime.HandleCrash()
 			qs.goroutineDoneOrBlocked()
 			_ = <-doneCh
 			// Whatever goroutine unblocked the preceding receive MUST
@@ -310,7 +312,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, width *fqrequest.Width, ha
 			qs.cancelWait(req)
 			qs.goroutineDoneOrBlocked()
 		}()
-	}
+	}*/
 	return req, false
 }
 
@@ -356,8 +358,16 @@ func (req *request) wait() (bool, bool) {
 	// Step 4:
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
-	decisionAny := req.decision.Get()
+	decisionAny, err := req.decision.Get(&qs.lock, req.ctx.Done())
 	qs.syncTimeLocked()
+
+	// FIXME: double-check
+	if err != nil {
+		qs.cancelWaitLocked(req)
+		qs.goroutineDoneOrBlocked()
+		return false, qs.isIdleLocked()
+	}
+
 	decision, isDecision := decisionAny.(requestDecision)
 	if !isDecision {
 		panic(fmt.Sprintf("QS(%s): Impossible decision %#+v (of type %T) for request %#+v %#+v", qs.qCfg.Name, decisionAny, decisionAny, req.descr1, req.descr2))
@@ -453,7 +463,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		fsName:            fsName,
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
-		decision:          promise.NewWriteOnce(&qs.lock, qs.counter),
+		decision:          promise.NewWriteOnce(qs.counter),
 		arrivalTime:       qs.clock.Now(),
 		queue:             queue,
 		descr1:            descr1,
@@ -588,7 +598,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, width *fqreques
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
 		startTime:         now,
-		decision:          promise.NewWriteOnce(&qs.lock, qs.counter),
+		decision:          promise.NewWriteOnce(qs.counter),
 		arrivalTime:       now,
 		descr1:            descr1,
 		descr2:            descr2,
@@ -649,9 +659,7 @@ func (qs *queueSet) dispatchLocked() bool {
 
 // cancelWait ensures the request is not waiting.  This is only
 // applicable to a request that has been assigned to a queue.
-func (qs *queueSet) cancelWait(req *request) {
-	qs.lock.Lock()
-	defer qs.lock.Unlock()
+func (qs *queueSet) cancelWaitLocked(req *request) {
 	if req.decision.IsSet() {
 		// The request has already been removed from the queue
 		// and so we consider its wait to be over.

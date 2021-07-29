@@ -16,6 +16,10 @@ limitations under the License.
 
 package promise
 
+import(
+	"sync"
+)
+
 // WriteOnce represents a variable that is initially not set and can
 // be set once and is readable.  This is the common meaning for
 // "promise".
@@ -24,7 +28,8 @@ type WriteOnce interface {
 	// Get reads the current value of this variable.  If this variable
 	// is not set yet then this call blocks until this variable gets a
 	// value.
-	Get() interface{}
+	// FIXME: Rename to Wait or sth.
+	Get(sync.Locker, <-chan struct{}) (interface{}, error)
 
 	// IsSet returns immediately with an indication of whether this
 	// variable has been set.

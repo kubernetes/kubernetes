@@ -17,6 +17,7 @@ limitations under the License.
 package promise
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
@@ -29,7 +30,7 @@ import (
 // varible to be set and incremented when such a goroutine is
 // unblocked.
 type promise struct {
-	cond          sync.Cond
+	doneCh        chan struct{}
 	activeCounter counter.GoRoutineCounter // counter of active goroutines
 	waitingCount  int                      // number of goroutines idle due to this being unset
 	isSet         bool
@@ -39,20 +40,32 @@ type promise struct {
 var _ WriteOnce = &promise{}
 
 // NewWriteOnce makes a new promise.LockingWriteOnce
-func NewWriteOnce(lock sync.Locker, activeCounter counter.GoRoutineCounter) WriteOnce {
+func NewWriteOnce(activeCounter counter.GoRoutineCounter) WriteOnce {
 	return &promise{
-		cond:          *sync.NewCond(lock),
+		doneCh:       make(chan struct{}),
 		activeCounter: activeCounter,
 	}
 }
 
-func (p *promise) Get() interface{} {
+// FIXME:
+var timeoutErr = fmt.Errorf("timeout")
+
+func (p *promise) Get(lock sync.Locker, stopCh <-chan struct{}) (interface{}, error) {
 	if !p.isSet {
 		p.waitingCount++
 		p.activeCounter.Add(-1)
-		p.cond.Wait()
+
+		lock.Unlock()
+
+		select {
+		case <-p.doneCh:
+			lock.Lock()
+		case <-stopCh:
+			lock.Lock()
+			return nil, timeoutErr
+		}
 	}
-	return p.value
+	return p.value, nil
 }
 
 func (p *promise) IsSet() bool {
@@ -65,10 +78,10 @@ func (p *promise) Set(value interface{}) bool {
 	}
 	p.isSet = true
 	p.value = value
+	close(p.doneCh)
 	if p.waitingCount > 0 {
 		p.activeCounter.Add(p.waitingCount)
 		p.waitingCount = 0
-		p.cond.Broadcast()
 	}
 	return true
 }
