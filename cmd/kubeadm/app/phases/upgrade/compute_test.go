@@ -85,7 +85,8 @@ spec:
     image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
 
 func getEtcdVersion(v *versionutil.Version) string {
-	return constants.SupportedEtcdVersion[uint8(v.Minor())]
+	etcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, v.String())
+	return etcdVer.String()
 }
 
 const fakeCurrentCoreDNSVersion = "1.0.6"

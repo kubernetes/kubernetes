@@ -208,8 +208,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestConfigImagesListOutput(t *testing.T) {
 
-	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
-	if !ok {
+	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
+	if err != nil {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
 	}
 	versionMapping := struct {
@@ -218,7 +218,7 @@ func TestConfigImagesListOutput(t *testing.T) {
 		PauseVersion   string
 		CoreDNSVersion string
 	}{
-		EtcdVersion:    etcdVersion,
+		EtcdVersion:    etcdVersion.String(),
 		KubeVersion:    "v" + dummyKubernetesVersionStr,
 		PauseVersion:   constants.PauseVersion,
 		CoreDNSVersion: constants.CoreDNSVersion,
