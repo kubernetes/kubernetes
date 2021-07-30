@@ -35,6 +35,7 @@ import (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+	// test cla
 
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
