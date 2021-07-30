@@ -81,7 +81,7 @@ func TestInit(t *testing.T) {
 func TestPluginManager(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	fnp := NewMockNetworkPlugin(ctrl)
-	defer fnp.Finish()
+	defer ctrl.Finish()
 	pm := network.NewPluginManager(fnp)
 
 	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
@@ -96,7 +96,7 @@ func TestPluginManager(t *testing.T) {
 		podName := fmt.Sprintf("pod%d", i)
 		containerID := kubecontainer.ContainerID{ID: podName}
 
-		fnp.EXPECT().SetUpPod("", podName, containerID).Return(nil).Times(4)
+		fnp.EXPECT().SetUpPod("", podName, containerID, nil, nil).Return(nil).Times(4)
 		fnp.EXPECT().GetPodNetworkStatus("", podName, containerID).Return(&network.PodNetworkStatus{IP: netutils.ParseIPSloppy("1.2.3.4")}, nil).Times(4)
 		fnp.EXPECT().TearDownPod("", podName, containerID).Return(nil).Times(4)
 

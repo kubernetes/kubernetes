@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockvmssvmclient/interface.go -package=mockvmssvmclient Interface
 package vmssvmclient
 
 import (
@@ -32,8 +33,6 @@ const (
 )
 
 // Interface is the client interface for VirtualMachineScaleSetVM.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/interface.go -package=mockvmssvmclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient/interface.go
 type Interface interface {
 	// Get gets a VirtualMachineScaleSetVM.
 	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (compute.VirtualMachineScaleSetVM, *retry.Error)
