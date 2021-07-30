@@ -353,7 +353,6 @@ func TestSchedulerExtender(t *testing.T) {
 
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, &policy,
 		scheduler.WithProfiles([]schedulerapi.KubeSchedulerProfile(nil)...))
-		
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	defer testutils.CleanupTest(t, testCtx)
