@@ -3492,6 +3492,11 @@ function main() {
   fi
   log-end 'SetupKubePodLogReadersGroupDir'
 
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if [[ -n "${GKE_AUTOPILOT_SSHD_CONFIG:-}" ]]; then
+      log-wrap 'GKEConfigureAutopilotSSHD' gke-configure-autopilot-sshd
+    fi
+  fi
   log-wrap 'StartKubelet' start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then

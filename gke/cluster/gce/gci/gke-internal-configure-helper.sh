@@ -724,6 +724,14 @@ EOF
   systemctl start inplace.service
 }
 
+# Configure sshd as required for Autopilot nodes
+function gke-configure-autopilot-sshd {
+  echo "Reconfiguring sshd for Autopilot"
+  echo "${GKE_AUTOPILOT_SSHD_CONFIG}" >> "/etc/ssh/sshd_config"
+  systemctl restart sshd
+  echo "Restarted sshd"
+}
+
 function deploy-etcd-via-kube-up {
   [[ "${ETCD_CRP:-}" != "true" ]]
 }
