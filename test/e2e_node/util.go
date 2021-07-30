@@ -396,17 +396,15 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	return r, i, nil
 }
 
-func DumpKubeletLogs() {
-	kubeletServiceName := findKubletServiceName(false)
-	framework.Logf("===================== BEGIN journalctl for kubelet =====================")
-	stdout, err := exec.Command("sudo", "journalctl", "--no-pager", "-xeu", kubeletServiceName).CombinedOutput()
-	framework.Logf("[%s] %s", err, stdout)
-	framework.Logf("===================== END journalctl for kubelet =====================")
-}
-
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findRunningKubletServiceName() string {
-	stdout, err := exec.Command("sudo", "systemctl", "list-units", "*kubelet*", "--state=running").CombinedOutput()
+func findKubletServiceName(running bool) string {
+	cmdLine := []string{
+		"systemctl", "list-units", "*kubelet*",
+	}
+	if running {
+		cmdLine = append(cmdLine, "--state=running")
+	}
+	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
@@ -417,7 +415,7 @@ func findRunningKubletServiceName() string {
 }
 
 func restartKubelet() {
-	kubeletServiceName := findRunningKubletServiceName()
+	kubeletServiceName := findKubletServiceName(false)
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
@@ -428,7 +426,7 @@ func restartKubelet() {
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findRunningKubletServiceName()
+	kubeletServiceName := findKubletServiceName(true)
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
