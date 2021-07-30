@@ -1090,7 +1090,7 @@ func (tc *nodeConfigTestCase) checkEvent(f *framework.Framework) {
 // checkConfigMetrics makes sure the Kubelet's config related metrics are as we expect, given the test case
 func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 	const (
-		timeout                = time.Minute
+		timeout                = time.Minute * 3
 		interval               = time.Second
 		assignedConfigKey      = metrics.KubeletSubsystem + "_" + metrics.AssignedConfigKey
 		activeConfigKey        = metrics.KubeletSubsystem + "_" + metrics.ActiveConfigKey
