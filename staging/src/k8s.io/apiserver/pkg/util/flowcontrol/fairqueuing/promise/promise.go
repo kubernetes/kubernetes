@@ -30,9 +30,12 @@ import (
 // varible to be set and incremented when such a goroutine is
 // unblocked.
 type promise struct {
+	lock sync.Mutex
+
 	doneCh        chan struct{}
 	activeCounter counter.GoRoutineCounter // counter of active goroutines
 	waitingCount  int                      // number of goroutines idle due to this being unset
+
 	isSet         bool
 	value         interface{}
 }
@@ -50,38 +53,60 @@ func NewWriteOnce(activeCounter counter.GoRoutineCounter) WriteOnce {
 // FIXME:
 var timeoutErr = fmt.Errorf("timeout")
 
-func (p *promise) Get(lock sync.Locker, stopCh <-chan struct{}) (interface{}, error) {
-	if !p.isSet {
+func (p *promise) WaitAndGet(stopCh <-chan struct{}) (interface{}, error) {
+	isSet := func() bool {
+		p.lock.Lock()
+		defer p.lock.Unlock()
+		if p.isSet {
+			return true
+		}
+
 		p.waitingCount++
 		p.activeCounter.Add(-1)
+		return false
+	}()
+	if isSet {
+		return p.value, nil
+	}
 
-		lock.Unlock()
-
+	select {
+	case <-p.doneCh:
+		return p.value, nil
+	case <-stopCh:
+		p.lock.Lock()
+		defer p.lock.Unlock()
+		// Check if in the meantime value wasn't set (and thus the goroutine wasn't activated).
 		select {
 		case <-p.doneCh:
-			lock.Lock()
-		case <-stopCh:
-			lock.Lock()
-			return nil, timeoutErr
+			return p.value, nil
+		default:
 		}
+		// Now we know we really timed out. So we reactivate the goroutine.
+		p.waitingCount--
+		p.activeCounter.Add(1)
+		return nil, timeoutErr
 	}
-	return p.value, nil
 }
 
 func (p *promise) IsSet() bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	return p.isSet
 }
 
 func (p *promise) Set(value interface{}) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	if p.isSet {
 		return false
 	}
+
 	p.isSet = true
 	p.value = value
-	close(p.doneCh)
 	if p.waitingCount > 0 {
 		p.activeCounter.Add(p.waitingCount)
 		p.waitingCount = 0
 	}
+	close(p.doneCh)
 	return true
 }

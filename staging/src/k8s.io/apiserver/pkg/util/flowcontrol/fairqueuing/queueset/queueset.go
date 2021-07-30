@@ -345,26 +345,29 @@ func (req *request) Finish(execFn func()) bool {
 
 func (req *request) wait() (bool, bool) {
 	qs := req.qs
-	qs.lock.Lock()
-	defer qs.lock.Unlock()
-	if req.waitStarted {
-		// This can not happen, because the client is forbidden to
-		// call Wait twice on the same request
-		panic(fmt.Sprintf("Multiple calls to the Wait method, QueueSet=%s, startTime=%s, descr1=%#+v, descr2=%#+v", req.qs.qCfg.Name, req.startTime, req.descr1, req.descr2))
-	}
-	req.waitStarted = true
+
+	func() {
+		qs.lock.Lock()
+		defer qs.lock.Unlock()
+		if req.waitStarted {
+			// This can not happen, because the client is forbidden to
+			// call Wait twice on the same request
+			panic(fmt.Sprintf("Multiple calls to the Wait method, QueueSet=%s, startTime=%s, descr1=%#+v, descr2=%#+v", req.qs.qCfg.Name, req.startTime, req.descr1, req.descr2))
+		}
+		req.waitStarted = true
+	}()
 
 	// ========================================================================
 	// Step 4:
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
-	decisionAny, err := req.decision.Get(&qs.lock, req.ctx.Done())
-	qs.syncTimeLocked()
+	decisionAny, err := req.decision.WaitAndGet(req.ctx.Done())
 
-	// FIXME: double-check
+	qs.lock.Lock()
+	defer qs.lock.Unlock()
+	qs.syncTimeLocked()
 	if err != nil {
 		qs.cancelWaitLocked(req)
-		qs.goroutineDoneOrBlocked()
 		return false, qs.isIdleLocked()
 	}
 
