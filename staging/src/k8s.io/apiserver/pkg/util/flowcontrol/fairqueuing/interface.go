@@ -25,22 +25,16 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
-// QueueSetFactory is used to create QueueSet objects.  Creation, like
-// config update, is done in two phases: the first phase consumes the
-// QueuingConfig and the second consumes the DispatchingConfig.  They
-// are separated so that errors from the first phase can be found
-// before committing to a concurrency allotment for the second.
+// QueueSetFactory is used to create QueueSet objects.
+// The explicit validation method is used so that errors can be
+// found before committing to a concurrency allotment.
 type QueueSetFactory interface {
-	// BeginConstruction does the first phase of creating a QueueSet
-	BeginConstruction(QueuingConfig, metrics.TimedObserverPair) (QueueSetCompleter, error)
-}
+	// ValidateConfig validate if the config can be used to create
+	// a QueueSet.
+	ValidateConfig(QueuingConfig) error
 
-// QueueSetCompleter finishes the two-step process of creating or
-// reconfiguring a QueueSet
-type QueueSetCompleter interface {
-	// Complete returns a QueueSet configured by the given
-	// dispatching configuration.
-	Complete(DispatchingConfig) QueueSet
+	// Create creates a QueueSet.
+	Create(QueuingConfig, DispatchingConfig, metrics.TimedObserverPair) (QueueSet, error)
 }
 
 // QueueSet is the abstraction for the queuing and dispatching
@@ -51,15 +45,17 @@ type QueueSetCompleter interface {
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
-	// BeginConfigChange starts the two-step process of updating the
-	// configuration.  No change is made until Complete is called.  If
-	// `C := X.BeginConstruction(q)` then `C.Complete(d)` returns the
-	// same value `X`.  If the QueuingConfig's DesiredNumQueues field
-	// is zero then the other queuing-specific config parameters are
-	// not changed, so that the queues continue draining as before.
-	// In any case, reconfiguration does not discard any queue unless
-	// and until it is undesired and empty.
-	BeginConfigChange(QueuingConfig) (QueueSetCompleter, error)
+	// UpdateConfig updates the config of the QueueSet.
+	// If the QueuingConfig's DesiredNumQueues field is zero then
+	// the other queuing-specific config parameters are not changed,
+	// so that the queues continue draining as before.  In any case,
+	// reconfiguration does not discard any queue unless and until
+	// it is undesired and empty.
+	//
+	// To ensure that the config will not be rejected (thus requiring
+	// recalculations of concurrency limits) ValidateConfig should be
+	// called first.
+	UpdateConfig(QueuingConfig, DispatchingConfig) error
 
 	// IsIdle returns a bool indicating whether the QueueSet was idle
 	// at the moment of the return.  Idle means the QueueSet has zero

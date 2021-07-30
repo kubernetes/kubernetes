@@ -36,5 +36,5 @@ func (pls *priorityLevelState) GoString() string {
 	if pls == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("&priorityLevelState{pl:%s, qsCompleter:%#+v, queues:%#+v, quiescing:%#v, numPending:%d}", fcfmt.Fmt(pls.pl), pls.qsCompleter, pls.queues, pls.quiescing, pls.numPending)
+	return fmt.Sprintf("&priorityLevelState{pl:%s, qCfgr:%#+v, queues:%#+v, quiescing:%#v, numPending:%d}", fcfmt.Fmt(pls.pl), *pls.qCfg, pls.queues, pls.quiescing, pls.numPending)
 }

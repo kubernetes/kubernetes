@@ -44,16 +44,6 @@ type queueSetFactory struct {
 	clock   clock.PassiveClock
 }
 
-// `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
-// the fields `factory` and `theSet` is non-nil.
-type queueSetCompleter struct {
-	factory *queueSetFactory
-	obsPair metrics.TimedObserverPair
-	theSet  *queueSet
-	qCfg    fq.QueuingConfig
-	dealer  *shufflesharding.Dealer
-}
-
 // queueSet implements the Fair Queuing for Server Requests technique
 // described in this package's doc, and a pointer to one implements
 // the QueueSet interface.  The clock, GoRoutineCounter, and estimated
@@ -121,16 +111,29 @@ func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) 
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, obsPair metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) ValidateConfig(qCfg fq.QueuingConfig) error {
+	if _, err := checkConfig(qCfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (qsf *queueSetFactory) Create(qCfg fq.QueuingConfig, dCfg fq.DispatchingConfig, obsPair metrics.TimedObserverPair) (fq.QueueSet, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
 	}
-	return &queueSetCompleter{
-		factory: qsf,
-		obsPair: obsPair,
-		qCfg:    qCfg,
-		dealer:  dealer}, nil
+	qs := &queueSet{
+		clock:                qsf.clock,
+		counter:              qsf.counter,
+		estimatedServiceTime: 60,
+		obsPair:              obsPair,
+		qCfg:                 qCfg,
+		virtualTime:          0,
+		lastRealTime:         qsf.clock.Now(),
+	}
+	qs.setConfiguration(qCfg, dealer, dCfg)
+	return qs, nil
 }
 
 // checkConfig returns a non-nil Dealer if the config is valid and
@@ -147,23 +150,6 @@ func checkConfig(qCfg fq.QueuingConfig) (*shufflesharding.Dealer, error) {
 	return dealer, err
 }
 
-func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
-	qs := qsc.theSet
-	if qs == nil {
-		qs = &queueSet{
-			clock:                qsc.factory.clock,
-			counter:              qsc.factory.counter,
-			estimatedServiceTime: 60,
-			obsPair:              qsc.obsPair,
-			qCfg:                 qsc.qCfg,
-			virtualTime:          0,
-			lastRealTime:         qsc.factory.clock.Now(),
-		}
-	}
-	qs.setConfiguration(qsc.qCfg, qsc.dealer, dCfg)
-	return qs
-}
-
 // createQueues is a helper method for initializing an array of n queues
 func createQueues(n, baseIndex int) []*queue {
 	fqqueues := make([]*queue, n)
@@ -173,15 +159,13 @@ func createQueues(n, baseIndex int) []*queue {
 	return fqqueues
 }
 
-func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (qs *queueSet) UpdateConfig(qCfg fq.QueuingConfig, dCfg fq.DispatchingConfig) error {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &queueSetCompleter{
-		theSet: qs,
-		qCfg:   qCfg,
-		dealer: dealer}, nil
+	qs.setConfiguration(qCfg, dealer, dCfg)
+	return nil
 }
 
 // SetConfiguration is used to set the configuration for a queueSet.

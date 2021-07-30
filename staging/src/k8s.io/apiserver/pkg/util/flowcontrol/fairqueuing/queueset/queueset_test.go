@@ -377,11 +377,10 @@ func TestNoRestraint(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
 	clk, counter := testclock.NewFakeEventClock(now, 0, nil)
-	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
+	nr, err := test.NewNoRestraintFactory().Create(fq.QueuingConfig{}, fq.DispatchingConfig{}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	nr := nrc.Complete(fq.DispatchingConfig{})
 	uniformScenario{name: "NoRestraint",
 		qs: nr,
 		clients: []uniformClient{
@@ -411,11 +410,10 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 4}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -448,11 +446,11 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 4}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -484,11 +482,10 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 4}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -521,11 +518,10 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 3}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -558,11 +554,10 @@ func TestWindup(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 3}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
 
 	uniformScenario{name: qCfg.Name, qs: qs,
 		clients: []uniformClient{
@@ -591,11 +586,10 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		DesiredNumQueues: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 4}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -627,11 +621,10 @@ func TestTimeout(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 1}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -663,11 +656,11 @@ func TestContextCancel(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 1}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+
 	counter.Add(1) // account for the goroutine running this test
 	ctx1 := context.Background()
 	b2i := map[bool]int{false: 0, true: 1}
@@ -740,11 +733,11 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 		DesiredNumQueues: 0,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	qs, err := qsf.Create(qCfg, fq.DispatchingConfig{ConcurrencyLimit: 1}, newObserverPair(clk))
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+
 	counter.Add(1) // account for the goroutine running this test
 
 	queue, ok := qs.(*queueSet)

@@ -86,12 +86,6 @@ type heldRequest struct {
 
 var _ fq.QueueSetFactory = (*ctlrTestState)(nil)
 
-type ctlrTestQueueSetCompleter struct {
-	cts *ctlrTestState
-	cqs *ctlrTestQueueSet
-	qc  fq.QueuingConfig
-}
-
 type ctlrTestQueueSet struct {
 	cts         *ctlrTestState
 	qc          fq.QueuingConfig
@@ -105,12 +99,19 @@ type ctlrTestRequest struct {
 	descr1, descr2 interface{}
 }
 
-func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, ip metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
-	return ctlrTestQueueSetCompleter{cts, nil, qc}, nil
+func (cts *ctlrTestState) ValidateConfig(qc fq.QueuingConfig) error {
+	return nil
 }
 
-func (cqs *ctlrTestQueueSet) BeginConfigChange(qc fq.QueuingConfig) (fq.QueueSetCompleter, error) {
-	return ctlrTestQueueSetCompleter{cqs.cts, cqs, qc}, nil
+func (cts *ctlrTestState) Create(qc fq.QueuingConfig, dc fq.DispatchingConfig, ip metrics.TimedObserverPair) (fq.QueueSet, error) {
+	qs := &ctlrTestQueueSet{cts: cts, qc: qc, dc: dc}
+	cts.queues[qc.Name] = qs
+	return qs, nil
+}
+
+func (cqs *ctlrTestQueueSet) UpdateConfig(qc fq.QueuingConfig, dc fq.DispatchingConfig) error {
+	cqs.qc, cqs.dc = qc, dc
+	return nil
 }
 
 func (cqs *ctlrTestQueueSet) UpdateObservations() {
@@ -118,19 +119,6 @@ func (cqs *ctlrTestQueueSet) UpdateObservations() {
 
 func (cqs *ctlrTestQueueSet) Dump(bool) debug.QueueSetDump {
 	return debug.QueueSetDump{}
-}
-
-func (cqc ctlrTestQueueSetCompleter) Complete(dc fq.DispatchingConfig) fq.QueueSet {
-	cqc.cts.lock.Lock()
-	defer cqc.cts.lock.Unlock()
-	qs := cqc.cqs
-	if qs == nil {
-		qs = &ctlrTestQueueSet{cts: cqc.cts, qc: cqc.qc, dc: dc}
-		cqc.cts.queues[cqc.qc.Name] = qs
-	} else {
-		qs.qc, qs.dc = cqc.qc, dc
-	}
-	return qs
 }
 
 func (cqs *ctlrTestQueueSet) IsIdle() bool {

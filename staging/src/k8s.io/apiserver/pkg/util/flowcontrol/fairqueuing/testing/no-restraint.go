@@ -34,22 +34,20 @@ func NewNoRestraintFactory() fq.QueueSetFactory {
 
 type noRestraintFactory struct{}
 
-type noRestraintCompleter struct{}
-
 type noRestraint struct{}
 
 type noRestraintRequest struct{}
 
-func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
-	return noRestraintCompleter{}, nil
+func (noRestraintFactory) ValidateConfig(fq.QueuingConfig) error {
+	return nil
 }
 
-func (noRestraintCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
-	return noRestraint{}
+func (noRestraintFactory) Create(fq.QueuingConfig, fq.DispatchingConfig, metrics.TimedObserverPair) (fq.QueueSet, error) {
+	return noRestraint{}, nil
 }
 
-func (noRestraint) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
-	return noRestraintCompleter{}, nil
+func (noRestraint) UpdateConfig(fq.QueuingConfig, fq.DispatchingConfig) error {
+	return nil
 }
 
 func (noRestraint) IsIdle() bool {
