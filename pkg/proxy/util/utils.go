@@ -97,7 +97,7 @@ func IsProxyableIP(ip string) error {
 }
 
 func isProxyableIP(ip net.IP) error {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() {
+	if !ip.IsGlobalUnicast() {
 		return ErrAddressNotAllowed
 	}
 	return nil
