@@ -129,8 +129,8 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				uptimeStats[host] = append(uptimeStats[host], uptime)
 			}
 
-			ginkgo.By(fmt.Sprintf("Inject log to trigger AUFSUmountHung on node %q", host))
-			log := "INFO: task umount.aufs:21568 blocked for more than 120 seconds."
+			ginkgo.By(fmt.Sprintf("Inject log to trigger DockerHung on node %q", host))
+			log := "INFO: task docker:12345 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
@@ -141,13 +141,13 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		for _, node := range nodes {
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KernelDeadlock condition on node %q", node.Name))
 			gomega.Eventually(func() error {
-				return verifyNodeCondition(f, "KernelDeadlock", v1.ConditionTrue, "AUFSUmountHung", node.Name)
+				return verifyNodeCondition(f, "KernelDeadlock", v1.ConditionTrue, "DockerHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted AUFSUmountHung event on node %q", node.Name))
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted DockerHung event on node %q", node.Name))
 			eventListOptions := metav1.ListOptions{FieldSelector: fields.Set{"involvedObject.kind": "Node"}.AsSelector().String()}
 			gomega.Eventually(func() error {
-				return verifyEvents(f, eventListOptions, 1, "AUFSUmountHung", node.Name)
+				return verifyEvents(f, eventListOptions, 1, "DockerHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 
 			// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
