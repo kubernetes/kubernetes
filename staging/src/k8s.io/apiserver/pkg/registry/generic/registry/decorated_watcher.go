@@ -31,8 +31,8 @@ type decoratedWatcher struct {
 	resultCh  chan watch.Event
 }
 
-func newDecoratedWatcher(w watch.Interface, decorator ObjectFunc) *decoratedWatcher {
-	ctx, cancel := context.WithCancel(context.Background())
+func newDecoratedWatcher(ctx context.Context, w watch.Interface, decorator ObjectFunc) *decoratedWatcher {
+	ctx, cancel := context.WithCancel(ctx)
 	d := &decoratedWatcher{
 		w:         w,
 		decorator: decorator,
@@ -43,14 +43,18 @@ func newDecoratedWatcher(w watch.Interface, decorator ObjectFunc) *decoratedWatc
 	return d
 }
 
+// run decorates watch events from the underlying watcher until its result channel
+// is closed or the passed in context is done.
+// When run() returns, decoratedWatcher#resultCh is closed.
 func (d *decoratedWatcher) run(ctx context.Context) {
 	var recv, send watch.Event
 	var ok bool
+	defer close(d.resultCh)
 	for {
 		select {
 		case recv, ok = <-d.w.ResultChan():
-			// The underlying channel may be closed after timeout.
 			if !ok {
+				// The underlying channel was closed, cancel our context
 				d.cancel()
 				return
 			}
@@ -67,20 +71,24 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 			}
 			select {
 			case d.resultCh <- send:
-				if send.Type == watch.Error {
-					d.cancel()
-				}
+				// propagated event successfully
 			case <-ctx.Done():
+				// context timed out or was cancelled, stop the underlying watcher
+				d.w.Stop()
+				return
 			}
 		case <-ctx.Done():
+			// context timed out or was cancelled, stop the underlying watcher
 			d.w.Stop()
-			close(d.resultCh)
 			return
 		}
 	}
 }
 
 func (d *decoratedWatcher) Stop() {
+	// stop the underlying watcher
+	d.w.Stop()
+	// cancel our context
 	d.cancel()
 }
 

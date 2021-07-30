@@ -25,6 +25,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/proxy:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/golang.org/x/net/websocket:go_default_library",
     ],
 )
 
