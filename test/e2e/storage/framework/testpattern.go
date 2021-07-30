@@ -85,6 +85,7 @@ type TestPattern struct {
 	SnapshotDeletionPolicy TestSnapshotDeletionPolicy  // Deletion policy of the snapshot class
 	BindingMode            storagev1.VolumeBindingMode // VolumeBindingMode of the volume
 	AllowExpansion         bool                        // AllowVolumeExpansion flag of the StorageClass
+	NeedAuth               bool                        // Determine if auth is required in StorageClass
 }
 
 var (
@@ -369,6 +370,12 @@ var (
 		Name:        "Dynamic PV (delayed binding)",
 		VolType:     DynamicPV,
 		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
+
+	AuthDynamicPV = TestPattern{
+		Name:     "Dynamic PV (auth)",
+		VolType:  DynamicPV,
+		NeedAuth: true,
 	}
 )
 

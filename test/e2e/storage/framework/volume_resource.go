@@ -94,6 +94,13 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 			}
 			r.Sc.AllowVolumeExpansion = &pattern.AllowExpansion
 
+			if pattern.NeedAuth {
+				authDriver, ok := driver.(AuthTestDriver)
+				framework.ExpectEqual(ok, true, "driver should implements AuthTestDriver interface in auth test pattern")
+				authParams := authDriver.GetStorageClassAuthParameters(r.Config)
+				mergeStorageClassParameters(r.Sc, authParams)
+			}
+
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
 			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
@@ -312,4 +319,14 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
 	}
 	return false
+}
+
+func mergeStorageClassParameters(sc *storagev1.StorageClass, params map[string]string) {
+	if params == nil {
+		return
+	}
+
+	for k, v := range params {
+		sc.Parameters[k] = v
+	}
 }

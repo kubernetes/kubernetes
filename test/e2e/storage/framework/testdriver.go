@@ -135,6 +135,63 @@ type CustomTimeoutsTestDriver interface {
 	GetTimeouts() *framework.TimeoutContext
 }
 
+// AuthTestDriver represents an interface for a TestDriver that supports auth
+type AuthTestDriver interface {
+	TestDriver
+
+	// GetStorageClassAuthParameters get the StorageClass auth related parameters, these parameters' key
+	// normal use type CSIStorageClassAuthParamKey, for an implementation example:
+	// func (d *Driver) GetStorageClassAuthParameters(config *PerTestConfig) map[string]string {
+	//         return map[string]string{
+	//                 "auth": "true",
+	//                 CSIControllerPublishSecretName.ToString(): "controller-publish-secret",
+	//                 CSIControllerPublishSecretNS.ToString():   config.Framework.Namespace.Name,
+	//                 CSINodeStageSecretName.ToString():         "node-stage-secret",
+	//                 CSINodeStageSecretNS.ToString():           config.Framework.Namespace.Name,
+	//         }
+	// }
+	GetStorageClassAuthParameters(config *PerTestConfig) map[string]string
+
+	// GetAuthSecretData get the data in secret which define in StorageClass parameters, the return map
+	// will be filled into the stringData field of k8s corev1.Secret struct.
+	//
+	// If the number of returned maps is greater than one, multiple secret(in multiple StorageClass) tests
+	// will be performed automatically,This is the recommended practice.
+	//
+	// Users should ensure that these data are correct, which meaning CSI can use these data to successfully
+	// create/pulish pv etc.
+	//
+	// For an implementation example:
+	//  func (d *Driver) GetAuthSecretData() []map[string]string {
+	//	  return []map[string]string{
+	//		  {
+	//			  "username": "user1",
+	//			  "password": "123456789qwer",
+	//		  },
+	//		  {
+	//			  "username": "user2",
+	//                        "password": "tyuiop11asdf",
+	//		  },
+	//	  }
+	//  }
+	GetAuthSecretData() []map[string]string
+
+	// GetAuthMatchGroup declare some match group, CSIStorageClassAuthParamKey in the same group
+	// must have same data secret to pass authentication.
+	//
+	// for example, if you want secret data must match in CreateVolume/DeleteVolume stage and
+	// PublishVolume/UnPublishVolume stage, this function will be implemented as follow:
+	// func (d *Driver) GetAuthMatchGroup() [][]storageframework.CSIStorageClassAuthParamKey {
+	//           return [][]storageframework.CSIStorageClassAuthParamKey{
+	//                   {
+	//                          storageframework.CSIProvisionerSecretName,
+	//                          storageframework.CSIControllerPublishSecretName,
+	//                   },
+	//           }
+	// }
+	GetAuthMatchGroup() [][]CSIStorageClassAuthParamKey
+}
+
 // GetDriverTimeouts returns the timeout of the driver operation
 func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
 	if d, ok := driver.(CustomTimeoutsTestDriver); ok {
@@ -175,6 +232,30 @@ const (
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
 )
+
+// CSIStorageClassAuthParamKey represents which CSI operation need authorized, set the secret
+// used for authentication in StorageClass.parameters. More detail in
+// https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html
+type CSIStorageClassAuthParamKey string
+
+const (
+	AuthParamKeyPrefix                                         = "csi.storage.k8s.io/"
+	CSIProvisionerSecretName       CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "provisioner-secret-name"
+	CSIControllerPublishSecretName CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "controller-publish-secret-name"
+	CSINodeStageSecretName         CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "node-stage-secret-name"
+	CSINodePublishSecretName       CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "node-publish-secret-name"
+	CSIControllerExpandSecretName  CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "controller-expand-secret-name"
+
+	CSIProvisionerSecretNS       CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "provisioner-secret-namespace"
+	CSIControllerPublishSecretNS CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "controller-publish-secret-namespace"
+	CSINodeStageSecretNS         CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "node-stage-secret-namespace"
+	CSINodePublishSecretNS       CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "node-publish-secret-namespace"
+	CSIControllerExpandSecretNS  CSIStorageClassAuthParamKey = AuthParamKeyPrefix + "controller-expand-secret-namespace"
+)
+
+func (key CSIStorageClassAuthParamKey) ToString() string {
+	return string(key)
+}
 
 // DriverInfo represents static information about a TestDriver.
 type DriverInfo struct {
