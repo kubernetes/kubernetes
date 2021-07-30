@@ -44,7 +44,7 @@ type NodeInfo struct {
 }
 
 func (n NodeInfo) String() string {
-	return fmt.Sprintf("{datacenter: %v, vm: %v, vcServer: %s, vmUUID: %s, zone: %v}",
+	return fmt.Sprintf("{datacenter: %v, vm: %v, vcServer: %q, vmUUID: %q, zone: %v}",
 		*n.dataCenter, n.vm.Reference(), n.vcServer, n.vmUUID, *n.zone)
 }
 
