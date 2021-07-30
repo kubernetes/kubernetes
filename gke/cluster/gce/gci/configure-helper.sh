@@ -2446,7 +2446,9 @@ function copy-manifests {
   fi
   chown -R root:root "${dst_dir}"
   chmod 755 "${dst_dir}"
-  chmod 644 "${dst_dir}"/*
+  if [[ "$(ls ${dst_dir})" ]]; then
+    chmod 644 "${dst_dir}"/*
+  fi
 }
 
 # Fluentd resources are modified using ScalingPolicy CR, which may not be
