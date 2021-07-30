@@ -949,6 +949,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: availableReplicas
       type:
         scalar: numeric
+      default: 0
     - name: collisionCount
       type:
         scalar: numeric
@@ -1236,6 +1237,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: availableReplicas
       type:
         scalar: numeric
+      default: 0
     - name: collisionCount
       type:
         scalar: numeric
@@ -1721,6 +1723,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: availableReplicas
       type:
         scalar: numeric
+      default: 0
     - name: collisionCount
       type:
         scalar: numeric
