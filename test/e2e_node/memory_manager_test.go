@@ -339,12 +339,17 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
+
 			// stop the kubelet and wait until the server will restart it automatically
 			stopKubelet()
+
 			// wait until the kubelet health check will fail
 			gomega.Eventually(func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+			restartKubelet()
+
 			// wait until the kubelet health check will pass
 			gomega.Eventually(func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
