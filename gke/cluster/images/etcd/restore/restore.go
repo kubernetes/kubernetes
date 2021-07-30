@@ -34,6 +34,10 @@ const (
 	versionFilename = "version.txt"
 	// Snapshot file in backup-dir to restore the backup from.
 	snapshotFilename = "snapshot.db"
+	// File in the backup-dir containing etcd initial cluster token.
+	tokenFilename = "initial-cluster-token.txt"
+	// File in the backup-dir to which end result will be written.
+	resultFilename = "result.txt"
 )
 
 var (
@@ -102,12 +106,18 @@ func runRestore() {
 	}
 	klog.Info("found correct etcdctl binary")
 
+	tokenData, err := ioutil.ReadFile(filepath.Join(backupDir, tokenFilename))
+	if err != nil {
+		cleanupAndExit(fmt.Sprintf("error reading token file: %v", err))
+	}
+	token := strings.TrimSpace(string(tokenData))
+
 	if err := os.Rename(dataDir, fmt.Sprintf("%s.bak", dataDir)); err != nil && !os.IsNotExist(err) {
 		cleanupAndExit(fmt.Sprintf("error moving current data directory to %v: %v", fmt.Sprintf("%s.bak", dataDir), err))
 	}
 	klog.Infof("moved current data directory to %v", fmt.Sprintf("%s.bak", dataDir))
 
-	if err = runEtcdctlRestore(etcdctlBin, etcdctlApi); err != nil {
+	if err = runEtcdctlRestore(etcdctlBin, etcdctlApi, token); err != nil {
 		// If restoring the snapshot failed, attempt to move back the original data.
 		os.Rename(fmt.Sprintf("%s.bak", dataDir), dataDir)
 		cleanupAndExit(fmt.Sprintf("error restoring backup from snapshot: %v", err))
@@ -124,7 +134,14 @@ func runRestore() {
 
 func cleanupAndExit(err string) {
 	os.RemoveAll(fmt.Sprintf("%s.bak", dataDir))
-	os.RemoveAll(backupDir)
+	os.Remove(filepath.Join(backupDir, versionFilename))
+	os.Remove(filepath.Join(backupDir, snapshotFilename))
+	os.Remove(filepath.Join(backupDir, tokenFilename))
+
+	e := ioutil.WriteFile(filepath.Join(backupDir, resultFilename), []byte(err), 0666)
+	if e != nil {
+		klog.Fatalf("failed to write result to the file: %v", e)
+	}
 
 	if err != "" {
 		klog.Fatalf("%v", err)
@@ -146,7 +163,7 @@ func findEtcdctlBinary(version string) (string, string, error) {
 	return etcdctlBins[0], versionSplit[0], nil
 }
 
-func runEtcdctlRestore(binary, etcdctlApi string) error {
+func runEtcdctlRestore(binary, etcdctlApi, token string) error {
 	cmd := exec.Command(
 		binary,
 		"snapshot", "restore",
@@ -155,6 +172,7 @@ func runEtcdctlRestore(binary, etcdctlApi string) error {
 		"--name", memberName,
 		"--initial-advertise-peer-urls", peerAdvertiseUrls,
 		"--initial-cluster", initialCluster,
+		"--initial-cluster-token", token,
 	)
 	cmd.Env = []string{fmt.Sprintf("ETCDCTL_API=%v", etcdctlApi)}
 	cmd.Stdout = os.Stdout
