@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockarmclient/interface.go -package=mockarmclient Interface
 package armclient
 
 import (
@@ -35,8 +36,6 @@ type PutResourcesResponse struct {
 }
 
 // Interface is the client interface for ARM.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/interface.go -package=mockarmclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient/interface.go
 type Interface interface {
 	// Send sends a http request to ARM service with possible retry to regional ARM endpoint.
 	Send(ctx context.Context, request *http.Request) (*http.Response, *retry.Error)
