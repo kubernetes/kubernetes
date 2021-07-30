@@ -202,6 +202,8 @@ func (c *Config) String() string {
 type ImpersonationConfig struct {
 	// UserName is the username to impersonate on each request.
 	UserName string
+	// UID is a unique value that identifies the user.
+	UID string
 	// Groups are the groups to impersonate on each request.
 	Groups []string
 	// Extra is a free-form field which can be used to link some authentication information
@@ -608,9 +610,10 @@ func CopyConfig(config *Config) *Config {
 		BearerToken:     config.BearerToken,
 		BearerTokenFile: config.BearerTokenFile,
 		Impersonate: ImpersonationConfig{
+			UserName: config.Impersonate.UserName,
+			UID:      config.Impersonate.UID,
 			Groups:   config.Impersonate.Groups,
 			Extra:    config.Impersonate.Extra,
-			UserName: config.Impersonate.UserName,
 		},
 		AuthProvider:        config.AuthProvider,
 		AuthConfigPersister: config.AuthConfigPersister,

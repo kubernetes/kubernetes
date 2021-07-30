@@ -25,6 +25,9 @@ const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
 	ImpersonateUserHeader = "Impersonate-User"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request.
+	ImpersonateUidHeader = "Impersonate-Uid"
+
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
