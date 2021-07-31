@@ -340,9 +340,17 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 
 func TestCheckLeftoverEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, _ := makeTestServer(t, ns)
-	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	client, endpoints := newFakeController(0 * time.Second)
+	client.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "bar",
+			Namespace:       ns,
+			ResourceVersion: "2",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{Port: 1000}},
+		},
+	}, metav1.CreateOptions{})
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -352,6 +360,17 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 			Ports:     []v1.EndpointPort{{Port: 1000}},
+		}},
+	})
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "bar",
+			Namespace:       ns,
+			ResourceVersion: "3",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "7.8.9.10", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 2000}},
 		}},
 	})
 	endpoints.checkLeftoverEndpoints()

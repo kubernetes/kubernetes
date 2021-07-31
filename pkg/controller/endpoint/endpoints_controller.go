@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	"k8s.io/kubernetes/pkg/features"
@@ -615,7 +615,20 @@ func (e *Controller) checkLeftoverEndpoints() {
 			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
 			continue
 		}
-		e.queue.Add(key)
+		namespace, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Unable to split meta namespace key for endpoint %#v", ep))
+			continue
+		}
+		_, err = e.serviceLister.Services(namespace).Get(name)
+		if errors.IsNotFound(err) {
+			// if the service informer receive event slower than endpoint informer,
+			// an existing service may not be found in the lister,
+			// so we should perform a consistency read to ensure that the service does not exist
+			if _, err := e.client.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{}); errors.IsNotFound(err) {
+				e.queue.Add(key)
+			}
+		}
 	}
 }
 
