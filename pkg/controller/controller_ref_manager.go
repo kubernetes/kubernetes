@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+	patch "k8s.io/kubernetes/pkg/controller/util/patch"
 )
 
 type BaseControllerRefManager struct {
@@ -232,7 +233,7 @@ func (m *PodControllerRefManager) AdoptPod(ctx context.Context, pod *v1.Pod) err
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID(), m.finalizers...)
+	patchBytes, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes(pod.UID, []types.UID{m.Controller.GetUID()}, m.finalizers...)
 	if err != nil {
 		return err
 	}
@@ -357,7 +358,7 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(ctx context.Context, rs
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
 	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	patchBytes, err := deleteOwnerRefStrategicMergePatch(replicaSet.UID, m.Controller.GetUID())
+	patchBytes, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes(replicaSet.UID, []types.UID{m.Controller.GetUID()})
 	if err != nil {
 		return err
 	}
@@ -495,7 +496,7 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(ctx con
 func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
 	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
 		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	patchBytes, err := deleteOwnerRefStrategicMergePatch(history.UID, m.Controller.GetUID())
+	patchBytes, err := patch.GenerateDeleteOwnerRefStrategicMergeBytes(history.UID, []types.UID{m.Controller.GetUID()})
 	if err != nil {
 		return err
 	}
@@ -515,36 +516,6 @@ func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(histo
 		}
 	}
 	return err
-}
-
-type objectForDeleteOwnerRefStrategicMergePatch struct {
-	Metadata objectMetaForMergePatch `json:"metadata"`
-}
-
-type objectMetaForMergePatch struct {
-	UID              types.UID           `json:"uid"`
-	OwnerReferences  []map[string]string `json:"ownerReferences"`
-	DeleteFinalizers []string            `json:"$deleteFromPrimitiveList/finalizers,omitempty"`
-}
-
-func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUID types.UID, finalizers ...string) ([]byte, error) {
-	patch := objectForDeleteOwnerRefStrategicMergePatch{
-		Metadata: objectMetaForMergePatch{
-			UID: dependentUID,
-			OwnerReferences: []map[string]string{
-				{
-					"$patch": "delete",
-					"uid":    string(ownerUID),
-				},
-			},
-			DeleteFinalizers: finalizers,
-		},
-	}
-	patchBytes, err := json.Marshal(&patch)
-	if err != nil {
-		return nil, err
-	}
-	return patchBytes, nil
 }
 
 type objectForAddOwnerRefPatch struct {

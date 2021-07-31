@@ -202,7 +202,7 @@ func TestClaimPods(t *testing.T) {
 				}
 				for _, f := range test.manager.finalizers {
 					if !strings.Contains(patch, f) {
-						t.Errorf("Patch doesn't contain finalizer %q", f)
+						t.Errorf("Patch doesn't contain finalizer %s, %q", patch, f)
 					}
 				}
 			}
