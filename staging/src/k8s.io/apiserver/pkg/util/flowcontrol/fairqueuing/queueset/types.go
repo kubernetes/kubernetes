@@ -50,11 +50,10 @@ type request struct {
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
 	// is removed from its queue.  The value will be decisionReject,
-	// decisionCancel, or decisionExecute; decisionTryAnother never
-	// appears here.
+	// decisionCancel, or decisionExecute.
 	//
-	// The field is NOT thread-safe and should be protected by the
-	// queueset's lock.
+	// decision.Set is called with the queueSet locked.
+	// decision.Get is called without the queueSet locked.
 	decision promise.WriteOnce
 
 	// arrivalTime is the real time when the request entered this system

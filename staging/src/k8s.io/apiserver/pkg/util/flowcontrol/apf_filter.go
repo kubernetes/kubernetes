@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -82,7 +81,6 @@ func New(
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
-	grc := counter.NoOp{}
 	clk := clock.RealClock{}
 	return NewTestable(TestableConfig{
 		Name:                   "Controller",
@@ -94,7 +92,7 @@ func New(
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk, grc),
+		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 }
 

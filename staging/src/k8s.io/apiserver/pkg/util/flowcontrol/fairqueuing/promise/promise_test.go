@@ -17,105 +17,141 @@ limitations under the License.
 package promise
 
 import (
-	"sync"
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	testclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock/testing"
 )
 
-func TestLockingWriteOnce(t *testing.T) {
-	now := time.Now()
-	clock, counter := testclock.NewFakeEventClock(now, 0, nil)
-	var lock sync.Mutex
-	wr := NewWriteOnce(&lock, counter)
+func TestWriteOnce(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	wr := NewWriteOnce(nil, ctx.Done(), cval)
 	var gots int32
 	var got atomic.Value
-	counter.Add(1)
 	go func() {
-		lock.Lock()
-		defer lock.Unlock()
-
 		got.Store(wr.Get())
 		atomic.AddInt32(&gots, 1)
-		counter.Add(-1)
 	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 	if atomic.LoadInt32(&gots) != 0 {
 		t.Error("Get returned before Set")
 	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.IsSet() {
-			t.Error("IsSet before Set")
-		}
-	}()
+	now := time.Now()
 	aval := &now
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.Set(aval) {
-			t.Error("Set() returned false")
-		}
-	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
+	if !wr.Set(aval) {
+		t.Error("Set() returned false")
+	}
+	time.Sleep(5 * time.Second)
 	if atomic.LoadInt32(&gots) != 1 {
 		t.Error("Get did not return after Set")
 	}
 	if got.Load() != aval {
 		t.Error("Get did not return what was Set")
 	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet()==false after Set")
-		}
-	}()
-	counter.Add(1)
 	go func() {
-		lock.Lock()
-		defer lock.Unlock()
-
 		got.Store(wr.Get())
 		atomic.AddInt32(&gots, 1)
-		counter.Add(-1)
 	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 	if atomic.LoadInt32(&gots) != 2 {
-		t.Error("Second Get did not return immediately")
+		t.Error("Second Get did not return quickly")
 	}
 	if got.Load() != aval {
 		t.Error("Second Get did not return what was Set")
 	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet()==false after second Get")
-		}
-	}()
 	later := time.Now()
 	bval := &later
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.Set(bval) {
-			t.Error("second Set() returned true")
-		}
+	if wr.Set(bval) {
+		t.Error("second Set() returned true")
+	}
+	if wr.Get() != aval {
+		t.Error("Get() after second Set returned wrong value")
+	}
+	cancel()
+	time.Sleep(5 * time.Second)
+	go func() {
+		got.Store(wr.Get())
+		atomic.AddInt32(&gots, 1)
 	}()
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet() returned false after second set")
-		} else if wr.Get() != aval {
-			t.Error("Get() after second Set returned wrong value")
-		}
+	time.Sleep(5 * time.Second)
+	if atomic.LoadInt32(&gots) != 3 {
+		t.Error("Third Get did not return quickly")
+	}
+	if got.Load() != aval {
+		t.Error("Third Get did not return what was Set")
+	}
+}
+
+func TestWriteOnceCancel(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	wr := NewWriteOnce(nil, ctx.Done(), cval)
+	var gots int32
+	var got atomic.Value
+	go func() {
+		got.Store(wr.Get())
+		atomic.AddInt32(&gots, 1)
 	}()
+	time.Sleep(5 * time.Second)
+	if atomic.LoadInt32(&gots) != 0 {
+		t.Error("Get returned before Cancel")
+	}
+	cancel()
+	time.Sleep(5 * time.Second)
+	if atomic.LoadInt32(&gots) != 1 {
+		t.Error("Get did not return after Cancel")
+	}
+	if got.Load() != cval {
+		t.Error("Get after Cancel did not return cval")
+	}
+	go func() {
+		got.Store(wr.Get())
+		atomic.AddInt32(&gots, 1)
+	}()
+	time.Sleep(5 * time.Second)
+	if atomic.LoadInt32(&gots) != 2 {
+		t.Error("Second Get did not return quickly")
+	}
+	if got.Load() != cval {
+		t.Error("Second Get did not return cval")
+	}
+	later := time.Now()
+	bval := &later
+	if wr.Set(bval) {
+		t.Error("second Set() returned true")
+	}
+	if wr.Get() != cval {
+		t.Error("Get() after Cancel then Set returned wrong value")
+	}
+}
+
+func TestWriteOnceInitial(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	now := time.Now()
+	aval := &now
+	wr := NewWriteOnce(aval, ctx.Done(), cval)
+	if wr.Get() != aval {
+		t.Error("First Get of initialized promise did not return initial value")
+	}
+	later := time.Now()
+	bval := &later
+	if wr.Set(bval) {
+		t.Error("Set of initialized promise returned true")
+	}
+	if wr.Get() != aval {
+		t.Error("Second Get of initialized promise did not return initial value")
+	}
+	cancel()
+	time.Sleep(5 * time.Second)
+	if wr.Get() != aval {
+		t.Error("Get of initialized promise after cancel did not return initial value")
+	}
 }
