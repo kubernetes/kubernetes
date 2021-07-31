@@ -192,7 +192,7 @@ func splitHostIntPort(s string) (string, int, error) {
 // Flags returns flags for a specific scheduler by section name
 func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs := nfs.FlagSet("misc")
-	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, `The path to the configuration file. The following flags can overwrite fields in this file:
+	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, `The path to the kube-scheduler configuration file. The following flags can overwrite fields in this file:
   --policy-config-file
   --policy-configmap
   --policy-configmap-namespace`)
