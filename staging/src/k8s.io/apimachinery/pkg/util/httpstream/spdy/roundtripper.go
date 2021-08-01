@@ -259,38 +259,7 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 		return rwc, nil
 	}
 
-	host, _, err := net.SplitHostPort(targetHost)
-
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig := s.tlsConfig
-	switch {
-	case tlsConfig == nil:
-		tlsConfig = &tls.Config{ServerName: host}
-	case len(tlsConfig.ServerName) == 0:
-		tlsConfig = tlsConfig.Clone()
-		tlsConfig.ServerName = host
-	}
-
-	tlsConn := tls.Client(rwc, tlsConfig)
-
-	// need to manually call Handshake() so we can call VerifyHostname() below
-	if err := tlsConn.Handshake(); err != nil {
-		return nil, err
-	}
-
-	// Return if we were configured to skip validation
-	if tlsConfig.InsecureSkipVerify {
-		return tlsConn, nil
-	}
-
-	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
-		return nil, err
-	}
-
-	return tlsConn, nil
+	return s.tlsConn(req.URL, rwc, targetHost)
 }
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
@@ -323,60 +292,26 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 		return nil, err
 	}
 
-	proxyDialConn, err := proxyDialer.(proxy.ContextDialer).DialContext(req.Context(), "tcp", targetHost)
+	var rwc net.Conn
+	if xd, ok := proxyDialer.(proxy.ContextDialer); ok {
+		rwc, err = xd.DialContext(req.Context(), "tcp", targetHost)
+	} else {
+		rwc, err = dialContext(req.Context(), proxyDialer, "tcp", targetHost)
+	}
 
 	if err != nil {
 		return nil, err
 	}
-
-	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
-
-	rwc, _ := proxyClientConn.Hijack()
 
 	if req.URL.Scheme != "https" {
 		return rwc, nil
 	}
 
-	host, _, err := net.SplitHostPort(targetHost)
-
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig := s.tlsConfig
-	switch {
-	case tlsConfig == nil:
-		tlsConfig = &tls.Config{ServerName: host}
-	case len(tlsConfig.ServerName) == 0:
-		tlsConfig = tlsConfig.Clone()
-		tlsConfig.ServerName = host
-	}
-
-	tlsConn := tls.Client(rwc, tlsConfig)
-
-	// need to manually call Handshake() so we can call VerifyHostname() below
-	if err := tlsConn.Handshake(); err != nil {
-		return nil, err
-	}
-
-	// Return if we were configured to skip validation
-	if tlsConfig.InsecureSkipVerify {
-		return tlsConn, nil
-	}
-
-	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
-		return nil, err
-	}
-
-	return tlsConn, nil
+	return s.tlsConn(req.URL, rwc, targetHost)
 }
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
 func (s *SpdyRoundTripper) tlsConn(requestUrl *url.URL, rwc net.Conn, targetHost string) (net.Conn, error) {
-
-	if requestUrl.Scheme != "https" {
-		return rwc, nil
-	}
 
 	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
@@ -537,6 +472,29 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 	}
 
 	return NewClientConnectionWithPings(s.conn, s.pingPeriod)
+}
+
+// WARNING: this can leak a goroutine for as long as the underlying Dialer implementation takes to timeout
+// A Conn returned from a successful Dial after the context has been cancelled will be immediately closed.
+func dialContext(ctx context.Context, d proxy.Dialer, network, address string) (net.Conn, error) {
+	var (
+		conn net.Conn
+		done = make(chan struct{}, 1)
+		err  error
+	)
+	go func() {
+		conn, err = d.Dial(network, address)
+		close(done)
+		if conn != nil && ctx.Err() != nil {
+			conn.Close()
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+	case <-done:
+	}
+	return conn, err
 }
 
 // statusScheme is private scheme for the decoding here until someone fixes the TODO in NewConnection
