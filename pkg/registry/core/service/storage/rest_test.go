@@ -521,6 +521,7 @@ func TestServiceRegistryUpdateLoadBalancerService(t *testing.T) {
 	// Modify to be loadbalancer.
 	svc2 := obj.(*api.Service).DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
+	svc2.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
 	svc2.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 	obj, _, err = storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
