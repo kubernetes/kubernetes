@@ -133,6 +133,10 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return true, nil, nil
 
 		case PatchActionImpl:
+			if action.GetPatchType() == types.ApplyPatchType {
+				return true, nil, fmt.Errorf("PatchType %s is not supported by default, please prepend a reactor to the fake client to handle apply", action.GetPatchType())
+			}
+
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
 				return true, nil, err
