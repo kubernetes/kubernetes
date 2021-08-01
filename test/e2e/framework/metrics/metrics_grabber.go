@@ -203,7 +203,7 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	var err error
 
 	g.waitForSchedulerReadyOnce.Do(func() {
-		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, g.kubeScheduler, 0); readyErr != nil {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, g.kubeScheduler, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
 			err = fmt.Errorf("error waiting for kube-scheduler pod to be ready: %w", readyErr)
 		}
 	})
@@ -254,7 +254,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	var err error
 
 	g.waitForControllerManagerReadyOnce.Do(func() {
-		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, g.kubeControllerManager, 0); readyErr != nil {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, g.kubeControllerManager, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
 			err = fmt.Errorf("error waiting for kube-controller-manager pod to be ready: %w", readyErr)
 		}
 	})
@@ -293,7 +293,7 @@ func (g *Grabber) GrabFromSnapshotController(podName string, port int) (Snapshot
 	var err error
 
 	g.waitForSnapshotControllerReadyOnce.Do(func() {
-		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, podName, 0); readyErr != nil {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, podName, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
 			err = fmt.Errorf("error waiting for volume-snapshot-controller pod to be ready: %w", readyErr)
 		}
 	})
