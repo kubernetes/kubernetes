@@ -80,8 +80,6 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TokenStr,
 			options.CertificateKey,
 			options.Patches,
-			// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-			options.ExperimentalPatches,
 		}
 	case "download-certs":
 		flags = []string{
@@ -127,8 +125,6 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.CfgPath,
 			options.ControlPlane,
 			options.Patches,
-			// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-			options.ExperimentalPatches,
 		}
 	default:
 		flags = []string{}

@@ -101,8 +101,6 @@ func getControlPlanePhaseFlags(name string) []string {
 		options.KubernetesVersion,
 		options.ImageRepository,
 		options.Patches,
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-		options.ExperimentalPatches,
 		options.DryRun,
 	}
 	if name == "all" || name == kubeadmconstants.KubeAPIServer {

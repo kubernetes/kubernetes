@@ -102,7 +102,4 @@ func AddPatchesFlag(fs *pflag.FlagSet, patchesDir *string) {
 		`"json" or "yaml". "suffix" is an optional string that can be used to determine ` +
 		`which patches are applied first alpha-numerically.`
 	fs.StringVar(patchesDir, Patches, *patchesDir, usage)
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-	fs.StringVar(patchesDir, ExperimentalPatches, *patchesDir, usage)
-	fs.MarkDeprecated(ExperimentalPatches, "This flag will be removed in a future version. Please use '--patches' instead.")
 }

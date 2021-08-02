@@ -44,8 +44,6 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	}
 	if name == "etcd" || name == "all" {
 		flags = append(flags, options.Patches)
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-		flags = append(flags, options.ExperimentalPatches)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
