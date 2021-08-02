@@ -1154,6 +1154,50 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ExpectNoError(err)
 		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 1)
 	})
+
+	ginkgo.It("AvailableReplicas should get updated accordingly when MinReadySeconds is enabled", func() {
+		ssName := "test-ss"
+		headlessSvcName := "test"
+		// Define StatefulSet Labels
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+			"pod":  WebserverImageName,
+		}
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
+		ss.Spec.MinReadySeconds = 30
+		setHTTPProbe(ss)
+		ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+		// let's check that the availableReplicas have still not updated
+		time.Sleep(5 * time.Second)
+		ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		if ss.Status.AvailableReplicas != 0 {
+			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 0, ss.Status.AvailableReplicas)
+		}
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+
+		ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			update.Spec.MinReadySeconds = 3600
+		})
+		framework.ExpectNoError(err)
+		// We don't expect replicas to be updated till 1 hour, so the availableReplicas should be 0
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+
+		ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			update.Spec.MinReadySeconds = 0
+		})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+
+		ginkgo.By("check availableReplicas are shown in status")
+		out, err := framework.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
+		framework.ExpectNoError(err)
+		if !strings.Contains(out, "availableReplicas: 2") {
+			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
+		}
+	})
 })
 
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
