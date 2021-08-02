@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -87,6 +88,32 @@ func commandToString(c *exec.Cmd) string {
 		return ""
 	}
 	return strings.Join(append([]string{c.Path}, c.Args[1:]...), " ")
+}
+
+func DumpKubeletLogs() {
+	kubeletServiceName := findKubletServiceName(false)
+	framework.Logf("===================== BEGIN journalctl for kubelet =====================")
+	stdout, err := exec.Command("sudo", "journalctl", "--no-pager", "-xeu", kubeletServiceName).CombinedOutput()
+	framework.Logf("[%s] %s", err, stdout)
+	framework.Logf("===================== END journalctl for kubelet =====================")
+}
+
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func findKubletServiceName(running bool) string {
+	cmdLine := []string{
+		"systemctl", "list-units", "*kubelet*",
+	}
+	if running {
+		cmdLine = append(cmdLine, "--state=running")
+	}
+	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-\\w+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
+	kubeletServiceName := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
+	return kubeletServiceName
 }
 
 func (s *server) String() string {
@@ -176,6 +203,7 @@ func (s *server) start() error {
 						klog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
 						s.startCommand.Wait() // Release resources if necessary.
 					}
+					DumpKubeletLogs()
 					// This should not happen, immediately stop the e2eService process.
 					klog.Fatalf("Restart loop readinessCheck failed for %q", s.name)
 				} else {
