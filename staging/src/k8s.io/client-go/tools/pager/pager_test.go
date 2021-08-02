@@ -19,6 +19,7 @@ package pager
 import (
 	"context"
 	"fmt"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -28,6 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func list(count int, rv string) *metainternalversion.List {
@@ -112,6 +116,16 @@ func (p *testPager) ExpiresOnSecondPage(ctx context.Context, options metav1.List
 	return p.PagedList(ctx, options)
 }
 
+func (p *testPager) ErrorOnSecondPage(err error) func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+		if p.continuing && err != nil {
+			defer func() { err = nil }()
+			return nil, err
+		}
+		return p.PagedList(ctx, options)
+	}
+}
+
 func (p *testPager) ExpiresOnSecondPageThenFullList(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 	if p.continuing {
 		p.reset()
@@ -176,6 +190,34 @@ func TestListPager_List(t *testing.T) {
 			wantPaged: true,
 		},
 		{
+			name:      "EOF on second page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ErrorOnSecondPage(io.EOF)},
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name:      "ErrUnexpectedEOF on second page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ErrorOnSecondPage(io.ErrUnexpectedEOF)},
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name:      "ServerTimeout on second page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ErrorOnSecondPage(errors.NewServerTimeout(schema.GroupResource{Group: "abelian", Resource: "grapes"}, "list", 1))},
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name:      "TooManyRequests on second page",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ErrorOnSecondPage(errors.NewTooManyRequests("test too many", 1))},
+			args:      args{},
+			want:      list(21, "rv:20"),
+			wantPaged: true,
+		},
+		{
 			name:      "expires on second page",
 			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 21, rv: "rv:20"}).ExpiresOnSecondPage},
 			args:      args{},
@@ -205,6 +247,9 @@ func TestListPager_List(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &ListPager{
+				Name:              "test",
+				Backoff:           wait.NewExponentialBackoffManager(time.Millisecond, time.Second, time.Minute, 2, 0, clock.RealClock{}),
+				Retries:           3,
 				PageSize:          tt.fields.PageSize,
 				PageFn:            tt.fields.PageFn,
 				FullListIfExpired: tt.fields.FullListIfExpired,

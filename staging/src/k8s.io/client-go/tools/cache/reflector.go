@@ -275,7 +275,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// list request will return the full response.
 			pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
 				return r.listerWatcher.List(opts)
-			}))
+			})).SetRetries(5, r.backoffManager).SetName(r.name)
 			switch {
 			case r.WatchListPageSize != 0:
 				pager.PageSize = r.WatchListPageSize

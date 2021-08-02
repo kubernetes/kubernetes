@@ -302,6 +302,13 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				{Type: watch.Added, Object: mkPod("qux", "5")},
 			},
 		}, {
+			list:    mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
+			listErr: apierrors.NewBadRequest("test bad request"),
+		}, {
+			list:    mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
+			listErr: apierrors.NewTooManyRequests("test too many", 1),
+		}, {
+			list:    mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			listErr: fmt.Errorf("a list error"),
 		}, {
 			list:     mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
@@ -318,45 +325,53 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 
 	s := NewFIFO(MetaNamespaceKeyFunc)
 	for line, item := range table {
-		if item.list != nil {
-			// Test that the list is what currently exists in the store.
-			current := s.List()
-			checkMap := map[string]string{}
-			for _, item := range current {
-				pod := item.(*v1.Pod)
-				checkMap[pod.Name] = pod.ResourceVersion
-			}
-			for _, pod := range item.list.Items {
-				if e, a := pod.ResourceVersion, checkMap[pod.Name]; e != a {
-					t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.Name)
+		t.Run(fmt.Sprintf("%d", line), func(t *testing.T) {
+			if item.list != nil {
+				// Test that the list is what currently exists in the store.
+				current := s.List()
+				checkMap := map[string]string{}
+				for _, item := range current {
+					pod := item.(*v1.Pod)
+					checkMap[pod.Name] = pod.ResourceVersion
 				}
-			}
-			if e, a := len(item.list.Items), len(checkMap); e != a {
-				t.Errorf("%v: expected %v, got %v", line, e, a)
-			}
-		}
-		watchRet, watchErr := item.events, item.watchErr
-		lw := &testLW{
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				if watchErr != nil {
-					return nil, watchErr
-				}
-				watchErr = fmt.Errorf("second watch")
-				fw := watch.NewFake()
-				go func() {
-					for _, e := range watchRet {
-						fw.Action(e.Type, e.Object)
+				for _, pod := range item.list.Items {
+					if e, a := pod.ResourceVersion, checkMap[pod.Name]; e != a {
+						t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.Name)
 					}
-					fw.Stop()
-				}()
-				return fw, nil
-			},
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return item.list, item.listErr
-			},
-		}
-		r := NewReflector(lw, &v1.Pod{}, s, 0)
-		r.ListAndWatch(wait.NeverStop)
+				}
+				if e, a := len(item.list.Items), len(checkMap); e != a {
+					t.Errorf("%v: expected %v, got %v", line, e, a)
+				}
+			}
+			watchRet, watchErr := item.events, item.watchErr
+			listErr := item.listErr
+			lw := &testLW{
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					if watchErr != nil {
+						return nil, watchErr
+					}
+					watchErr = fmt.Errorf("second watch")
+					fw := watch.NewFake()
+					go func() {
+						for _, e := range watchRet {
+							fw.Action(e.Type, e.Object)
+						}
+						fw.Stop()
+					}()
+					return fw, nil
+				},
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					if listErr != nil {
+						err := listErr
+						listErr = nil
+						return nil, err
+					}
+					return item.list, nil
+				},
+			}
+			r := NewReflector(lw, &v1.Pod{}, s, 0)
+			r.ListAndWatch(wait.NeverStop)
+		})
 	}
 }
 

@@ -19,6 +19,7 @@ package pager
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -26,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 )
 
 const defaultPageSize = 500
@@ -46,6 +49,16 @@ func SimplePageFunc(fn func(opts metav1.ListOptions) (runtime.Object, error)) Li
 // metav1.ListOptions that supports paging and return a list. The pager does
 // not alter the field or label selectors on the initial options list.
 type ListPager struct {
+	// Name is reported in log entries
+	Name string
+
+	// Backoff applies to retries due to transient errors
+	Backoff wait.BackoffManager
+
+	// Retries, if positive and Backoff is not nil, is how many times one call
+	// will be retried due to transient errors
+	Retries int
+
 	PageSize int64
 	PageFn   ListPageFunc
 
@@ -67,6 +80,19 @@ func New(fn ListPageFunc) *ListPager {
 	}
 }
 
+// SetName stores the given name into the ListPager and returns it
+func (p *ListPager) SetName(name string) *ListPager {
+	p.Name = name
+	return p
+}
+
+// SetRetries stores the given retry parameters into the ListPager and returns it
+func (p *ListPager) SetRetries(retries int, backoff wait.BackoffManager) *ListPager {
+	p.Retries = retries
+	p.Backoff = backoff
+	return p
+}
+
 // TODO: introduce other types of paging functions - such as those that retrieve from a list
 // of namespaces.
 
@@ -81,6 +107,11 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 	var list *metainternalversion.List
 	paginatedResult := false
 
+	var retriesPerCall int
+	if p.Backoff != nil {
+		retriesPerCall = p.Retries
+	}
+	retries := retriesPerCall
 	for {
 		select {
 		case <-ctx.Done():
@@ -90,6 +121,17 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 
 		obj, err := p.PageFn(ctx, options)
 		if err != nil {
+			if isTransientError(err) && retries > 0 {
+				// If a retry could fix the problem, try it after backoff
+				retries--
+				klog.InfoS("Retry after transient error", "name", p.Name, "err", err, "remaining", retries)
+				select {
+				case <-p.Backoff.Backoff().C():
+				case <-ctx.Done(): // early out if appropriate
+				}
+				continue
+			}
+
 			// Only fallback to full list if an "Expired" errors is returned, FullListIfExpired is true, and
 			// the "Expired" error occurred in page 2 or later (since full list is intended to prevent a pager.List from
 			// failing when the resource versions is established by the first page request falls out of the compaction
@@ -105,6 +147,7 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 			result, err := p.PageFn(ctx, options)
 			return result, paginatedResult, err
 		}
+		retries = retriesPerCall
 		m, err := meta.ListAccessor(obj)
 		if err != nil {
 			return nil, paginatedResult, fmt.Errorf("returned object must be a list: %v", err)
@@ -244,4 +287,17 @@ func (p *ListPager) eachListChunk(ctx context.Context, options metav1.ListOption
 		// set the next loop up
 		options.Continue = m.GetContinue()
 	}
+}
+
+func isTransientError(err error) bool {
+	switch err {
+	case io.EOF, io.ErrUnexpectedEOF:
+		return true
+	}
+	reason := errors.ReasonForError(err)
+	switch reason {
+	case metav1.StatusReasonServerTimeout, metav1.StatusReasonTooManyRequests:
+		return true
+	}
+	return false
 }
