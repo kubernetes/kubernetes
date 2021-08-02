@@ -40,7 +40,7 @@ The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
 and documentation, who to contact about what, etc.
 
-If you want to build Kubernetes right away there are two options:
+If you want to build Kubernetes right away, there are two options:
 
 ##### You have a working [Go environment].
 
