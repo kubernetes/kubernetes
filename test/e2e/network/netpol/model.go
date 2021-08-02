@@ -90,7 +90,7 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 
 // GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
 func (m *Model) GetProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
+	timeoutSeconds := 3
 	if framework.NodeOSDistroIs("windows") {
 		timeoutSeconds = 3
 	}
