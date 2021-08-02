@@ -546,8 +546,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 						extender, err)
 					continue
 				}
-
-				return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
+	                        return filtered, failedPredicateMap, filteredNodesStatuses, nil
 			}
 
 			for failedNodeName, failedMsg := range failedMap {
