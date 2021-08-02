@@ -1,0 +1,9 @@
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/logging/properties/access/properties/destination/properties/syslog/oneOf
+  value:
+  - properties:
+      address:
+        format: ipv4
+  - properties:
+      address:
+        format: ipv6

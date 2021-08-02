@@ -73,7 +73,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 
 		defer func() {
 			if e := recover(); e != nil || !finished {
-				r.failer.Panic(codelocation.New(2), e)
+				r.failer.Panic(codelocation.NewWithStack(2), e)
 				select {
 				case <-done:
 					break
@@ -104,7 +104,7 @@ func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) 
 
 	defer func() {
 		if e := recover(); e != nil || !finished {
-			r.failer.Panic(codelocation.New(2), e)
+			r.failer.Panic(codelocation.NewWithStack(2), e)
 		}
 
 		failure, outcome = r.failer.Drain(r.nodeType, r.componentIndex, r.codeLocation)

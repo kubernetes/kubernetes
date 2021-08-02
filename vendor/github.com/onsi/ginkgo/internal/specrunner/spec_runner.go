@@ -300,7 +300,7 @@ func (runner *SpecRunner) reportSpecWillRun(summary *types.SpecSummary) {
 }
 
 func (runner *SpecRunner) reportSpecDidComplete(summary *types.SpecSummary, failed bool) {
-	if len(summary.CapturedOutput) == 0 {
+	if failed && len(summary.CapturedOutput) == 0 {
 		summary.CapturedOutput = string(runner.writer.Bytes())
 	}
 	for i := len(runner.reporters) - 1; i >= 1; i-- {

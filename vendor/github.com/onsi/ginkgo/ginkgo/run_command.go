@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -164,19 +163,15 @@ func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) erro
 
 	fmt.Println("path is " + path)
 
-	combined, err := os.OpenFile(
-		filepath.Join(path, r.getCoverprofile()),
-		os.O_WRONLY|os.O_CREATE,
-		0666,
-	)
+	combined, err := os.OpenFile(filepath.Join(path, r.getCoverprofile()),
+		os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 
 	if err != nil {
 		fmt.Printf("Unable to create combined profile, %v\n", err)
 		return nil // non-fatal error
 	}
 
-	modeRegex := regexp.MustCompile(`^mode: .*\n`)
-	for index, runner := range runners {
+	for _, runner := range runners {
 		contents, err := ioutil.ReadFile(runner.CoverageFile)
 
 		if err != nil {
@@ -184,18 +179,7 @@ func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) erro
 			return nil // non-fatal error
 		}
 
-		// remove the cover mode line from every file
-		// except the first one
-		if index > 0 {
-			contents = modeRegex.ReplaceAll(contents, []byte{})
-		}
-
 		_, err = combined.Write(contents)
-
-		// Add a newline to the end of every file if missing.
-		if err == nil && len(contents) > 0 && contents[len(contents)-1] != '\n' {
-			_, err = combined.Write([]byte("\n"))
-		}
 
 		if err != nil {
 			fmt.Printf("Unable to append to coverprofile, %v\n", err)

@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
-	github.com/imdario/mergo v0.3.5
+	github.com/imdario/mergo v0.3.7
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
@@ -30,8 +30,8 @@ require (
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/protobuf v1.26.0
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
+	k8s.io/api v0.22.0-rc.0
+	k8s.io/apimachinery v0.22.0-rc.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2
@@ -39,6 +39,8 @@ require (
 )
 
 replace (
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
