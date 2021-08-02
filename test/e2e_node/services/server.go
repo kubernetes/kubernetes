@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	utils "k8s.io/kubernetes/test/e2e_node"
 )
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
@@ -176,6 +177,7 @@ func (s *server) start() error {
 						klog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
 						s.startCommand.Wait() // Release resources if necessary.
 					}
+					utils.DumpKubeletLogs()
 					// This should not happen, immediately stop the e2eService process.
 					klog.Fatalf("Restart loop readinessCheck failed for %q", s.name)
 				} else {

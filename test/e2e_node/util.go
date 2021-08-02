@@ -396,6 +396,14 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	return r, i, nil
 }
 
+func DumpKubeletLogs() {
+	kubeletServiceName := findKubletServiceName(false)
+	framework.Logf("===================== BEGIN journalctl for kubelet =====================")
+	stdout, err := exec.Command("sudo", "journalctl", "--no-pager", "-xeu", kubeletServiceName).CombinedOutput()
+	framework.Logf("[%s] %s", err, stdout)
+	framework.Logf("===================== END journalctl for kubelet =====================")
+}
+
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
 func findRunningKubletServiceName() string {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "*kubelet*", "--state=running").CombinedOutput()
