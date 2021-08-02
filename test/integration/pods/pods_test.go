@@ -453,8 +453,8 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 				},
 			},
 			patchType: types.JSONPatchType,
-			patchBody: []byte(`[{"op":"remove","path":"/ephemeralContainers/0"}]`),
-			valid:     false, // disallowed by policy rather than patch semantics
+			patchBody: []byte(`[{"op":"remove","path":"/spec/ephemeralContainers/0"}]`),
+			valid:     true,
 		},
 		{
 			name: "remove all containers (JSON)",
@@ -469,8 +469,8 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 				},
 			},
 			patchType: types.JSONPatchType,
-			patchBody: []byte(`[{"op":"remove","path":"/ephemeralContainers"}]`),
-			valid:     false, // disallowed by policy rather than patch semantics
+			patchBody: []byte(`[{"op":"remove","path":"/spec/ephemeralContainers"}]`),
+			valid:     true,
 		},
 	}
 
