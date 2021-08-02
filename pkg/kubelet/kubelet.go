@@ -143,10 +143,6 @@ const (
 	// housekeeping is running no new pods are started or deleted).
 	housekeepingWarningDuration = time.Second * 15
 
-	// Period for performing eviction monitoring.
-	// ensure this is kept in sync with internal cadvisor housekeeping.
-	evictionMonitoringPeriod = time.Second * 10
-
 	// The path in containers' filesystems where the hosts file is mounted.
 	linuxEtcHostsPath   = "/etc/hosts"
 	windowsEtcHostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
@@ -567,6 +563,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
 		lastContainerStartedTime:                newTimeCache(),
+		evictionMonitoringPeriod:                kubeCfg.EvictionMonitoringPeriod,
 	}
 
 	if klet.cloud != nil {
@@ -1215,6 +1212,9 @@ type Kubelet struct {
 
 	// Handles node shutdown events for the Node.
 	shutdownManager *nodeshutdown.Manager
+
+	// Check for eviction period
+	evictionMonitoringPeriod metav1.Duration
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1424,7 +1424,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		os.Exit(1)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, kl.evictionMonitoringPeriod.Duration)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.

@@ -426,6 +426,10 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+	// EvictionMonitoringPeriod interval to check for evictions
+	// Default: "10s"
+	// +optional
+	EvictionMonitoringPeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -1035,6 +1035,10 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
+	// EvictionMonitoringPeriod interval to check for evictions
+	// Default: "10s"
+	// +optional
+	EvictionMonitoringPeriod metav1.Duration `json:"evictionMonitoringPeriod,omitempty"`
 }
 
 type KubeletAuthorizationMode string

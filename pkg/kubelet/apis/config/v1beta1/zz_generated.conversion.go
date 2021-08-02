@@ -389,6 +389,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.MemoryThrottlingFactor = (*float64)(unsafe.Pointer(in.MemoryThrottlingFactor))
+	out.EvictionMonitoringPeriod = in.EvictionMonitoringPeriod
 	return nil
 }
 
@@ -558,6 +559,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.MemoryThrottlingFactor = (*float64)(unsafe.Pointer(in.MemoryThrottlingFactor))
+	out.EvictionMonitoringPeriod = in.EvictionMonitoringPeriod
 	return nil
 }
 

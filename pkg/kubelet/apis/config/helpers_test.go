@@ -177,6 +177,7 @@ var (
 		"EvictionHard[*]",
 		"EvictionMaxPodGracePeriod",
 		"EvictionMinimumReclaim[*]",
+		"EvictionMonitoringPeriod.Duration",
 		"EvictionPressureTransitionPeriod.Duration",
 		"EvictionSoft[*]",
 		"EvictionSoftGracePeriod[*]",

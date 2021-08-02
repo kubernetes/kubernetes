@@ -294,6 +294,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(float64)
 		**out = **in
 	}
+	out.EvictionMonitoringPeriod = in.EvictionMonitoringPeriod
 	return
 }
 
