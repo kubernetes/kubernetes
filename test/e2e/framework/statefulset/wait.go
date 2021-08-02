@@ -136,7 +136,7 @@ func WaitForStatusAvailableReplicas(c clientset.Interface, ss *appsv1.StatefulSe
 				return false, nil
 			}
 			if ssGet.Status.AvailableReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
 				return false, nil
 			}
 			return true, nil
