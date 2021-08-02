@@ -145,9 +145,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		})
 
 		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func() {
-			egressRule := networkingv1.NetworkPolicyEgressRule{}
-			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
-			policy := GenNetworkPolicyWithNameAndPodSelector("deny-all-tcp-allow-dns", metav1.LabelSelector{}, SetSpecIngressRules(), SetSpecEgressRules(egressRule))
+			policy := GenNetworkPolicyWithNameAndPodSelector("deny-all", metav1.LabelSelector{}, SetSpecIngressRules(), SetSpecEgressRules())
 
 			nsX, _, _, k8s := getK8sNamespaces(f)
 			CreatePolicy(k8s, policy, nsX)
@@ -519,7 +517,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ginkgo.By("validating egress from port 81 to port 80")
 			egressRule := networkingv1.NetworkPolicyEgressRule{}
 			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80-tcp"}})
-			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-egress", map[string]string{}, SetSpecEgressRules(egressRule))
 
 			nsX, _, _, k8s := getK8sNamespaces(f)
@@ -686,10 +683,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 							// don't use named ports
 							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 						},
-						{
-							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-						},
 					},
 				},
 			}
@@ -732,9 +725,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			}
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{NamespaceSelector: allowedEgressNamespaces, PodSelector: allowedEgressPods})
-			egressRule2 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule2.Ports = append(egressRule2.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
-			egressPolicy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-to-ns-y-pod-a", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1, egressRule2))
+			egressPolicy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-to-ns-y-pod-a", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1))
 			CreatePolicy(k8s, egressPolicy, nsX)
 
 			// Creating ingress policy to allow from x/a to y/a and y/b
@@ -820,9 +811,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			}
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{NamespaceSelector: allowedNamespaces, PodSelector: allowedPods})
-			egressRule2 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule2.Ports = append(egressRule2.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
-			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-to-ns-y-pod-a", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1, egressRule2))
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-to-ns-y-pod-a", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1))
 			CreatePolicy(k8s, policy, nsX)
 
 			reachability := NewReachability(model.AllPods(), true)
@@ -871,7 +860,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 		ginkgo.It("should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]", func() {
 			egressRule := networkingv1.NetworkPolicyEgressRule{}
 			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80}})
-			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
 			policyAllowPort80 := GenNetworkPolicyWithNameAndPodMatchLabel("allow-egress-port-80", map[string]string{}, SetSpecEgressRules(egressRule))
 			nsX, _, _, k8s := getK8sNamespaces(f)
 			CreatePolicy(k8s, policyAllowPort80, nsX)
@@ -930,10 +918,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 			podServerCIDR := fmt.Sprintf("%s/%d", pod.Status.PodIP, hostMask)
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podServerCIDR}})
-			egressRule2 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule2.Ports = append(egressRule2.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
 			policyAllowCIDR := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule",
-				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1, egressRule2))
+				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1))
 			CreatePolicy(k8s, policyAllowCIDR, nsX)
 
 			reachability := NewReachability(model.AllPods(), true)
@@ -963,9 +949,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podServerAllowCIDR, Except: podServerExceptList}})
-			egressRule2 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule2.Ports = append(egressRule2.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
-			policyAllowCIDR := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1, egressRule2))
+			policyAllowCIDR := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1))
 
 			CreatePolicy(k8s, policyAllowCIDR, nsX)
 
@@ -996,10 +980,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 			podServerExceptList := []string{fmt.Sprintf("%s/%d", podB.Status.PodIP, hostMask)}
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podServerAllowCIDR, Except: podServerExceptList}})
-			egressRule2 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule2.Ports = append(egressRule2.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
 			policyAllowCIDR := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule",
-				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1, egressRule2))
+				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule1))
 			CreatePolicy(k8s, policyAllowCIDR, nsX)
 
 			reachability := NewReachability(model.AllPods(), true)
@@ -1011,10 +993,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 			//// Create NetworkPolicy which allows access to the podServer using podServer's IP in allow CIDR.
 			egressRule3 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule3.To = append(egressRule3.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podBIP}})
-			egressRule4 := networkingv1.NetworkPolicyEgressRule{}
-			egressRule4.Ports = append(egressRule4.Ports, networkingv1.NetworkPolicyPort{Protocol: &protocolUDP, Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 53}})
 			allowPolicy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule",
-				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule3, egressRule4))
+				map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule3))
 			// SHOULD THIS BE UPDATE OR CREATE JAY TESTING 10/31
 			UpdatePolicy(k8s, allowPolicy, nsX)
 
