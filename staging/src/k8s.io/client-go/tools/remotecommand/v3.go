@@ -75,7 +75,7 @@ func (p *streamProtocolV3) handleResizes() {
 			if size == nil {
 				return
 			}
-			if err := encoder.Encode(&size); err != nil {
+			if err := encoder.Encode(&size); err != nil && err != io.EOF {
 				runtime.HandleError(err)
 			}
 		}
