@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -416,15 +417,14 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 
 		// if we are going to issue an update, be sure we track every name we update so we know if we update it too often.
 		currResult.updatedItems.Insert(fsu.flowSchema.Name)
-
-		enc, err := json.Marshal(fsu.condition)
+		patchBytes, err := makeFlowSchemaConditionPatch(fsu.condition)
 		if err != nil {
 			// should never happen because these conditions are created here and well formed
 			panic(fmt.Sprintf("Failed to json.Marshall(%#+v): %s", fsu.condition, err.Error()))
 		}
-		klog.V(4).Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s", cfgCtlr.name, string(enc), fsu.flowSchema.Name, fsu.flowSchema.ResourceVersion, fcfmt.Fmt(fsu.oldValue))
+		klog.V(4).Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s, diff: %s",
+			cfgCtlr.name, fsu.condition, fsu.flowSchema.Name, fsu.flowSchema.ResourceVersion, fcfmt.Fmt(fsu.oldValue), cmp.Diff(fsu.oldValue, fsu.condition))
 		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
-		patchBytes := []byte(fmt.Sprintf(`{"status": {"conditions": [ %s ] } }`, string(enc)))
 		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
 		_, err = fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
 		if err != nil {
@@ -440,6 +440,20 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 	cfgCtlr.addUpdateResult(currResult)
 
 	return suggestedDelay, utilerrors.NewAggregate(errs)
+}
+
+// makeFlowSchemaConditionPatch takes in a condition and returns the patch status as a json.
+func makeFlowSchemaConditionPatch(condition flowcontrol.FlowSchemaCondition) ([]byte, error) {
+	o := struct {
+		Status flowcontrol.FlowSchemaStatus `json:"status"`
+	}{
+		Status: flowcontrol.FlowSchemaStatus{
+			Conditions: []flowcontrol.FlowSchemaCondition{
+				condition,
+			},
+		},
+	}
+	return json.Marshal(o)
 }
 
 // shouldDelayUpdate checks to see if a flowschema has been updated too often and returns true if a delay is needed.
