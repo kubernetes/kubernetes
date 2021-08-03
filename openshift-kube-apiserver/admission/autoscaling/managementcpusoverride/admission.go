@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
@@ -183,9 +184,16 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return admission.NewForbidden(attr, err) // can happen due to informer latency
 	}
 
-	// we can not decide the cluster type without status.controlPlaneTopology and status.infrastructureTopology
-	if clusterInfra.Status.ControlPlaneTopology == "" || clusterInfra.Status.InfrastructureTopology == "" {
-		return admission.NewForbidden(attr, fmt.Errorf("%s infrastructure resource has empty status.controlPlaneTopology or status.infrastructureTopology", PluginName))
+	// the infrastructure status is empty, so we can not decide the cluster type
+	if reflect.DeepEqual(clusterInfra.Status, configv1.InfrastructureStatus{}) {
+		return admission.NewForbidden(attr, fmt.Errorf("%s infrastructure resource has empty status", PluginName))
+	}
+
+	// the infrastructure status is not empty, but topology related fields do not have any values indicates that
+	// the cluster is during the roll-back process to the version that does not support the topology fields
+	// the upgrade to 4.8 handled by the CR defaulting
+	if clusterInfra.Status.ControlPlaneTopology == "" && clusterInfra.Status.InfrastructureTopology == "" {
+		return nil
 	}
 
 	// not the SNO cluster, skip mutation
@@ -193,7 +201,6 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 	// should be on or off in a multi-node cluster, and computing that state incorrectly could lead to breaking running clusters.
 	if clusterInfra.Status.InfrastructureTopology != configv1.SingleReplicaTopologyMode ||
 		clusterInfra.Status.ControlPlaneTopology != configv1.SingleReplicaTopologyMode {
-		pod.Annotations[workloadAdmissionWarning] = "only single-node clusters support workload partitioning"
 		return nil
 	}
 
