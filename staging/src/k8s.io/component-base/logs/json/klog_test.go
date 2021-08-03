@@ -37,7 +37,7 @@ func TestKlogIntegration(t *testing.T) {
 	}
 	fs := flag.FlagSet{}
 	klog.InitFlags(&fs)
-	err := fs.Set("v", fmt.Sprintf("%d", 1))
+	err := fs.Set("v", "2")
 	if err != nil {
 		t.Fatalf("Failed to set verbosity")
 	}
@@ -110,6 +110,20 @@ func TestKlogIntegration(t *testing.T) {
 			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":1,"count":1}`,
 		},
 		{
+			name: "V(2).InfoS",
+			fun: func() {
+				klog.V(2).InfoS("test", "count", 1)
+			},
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":2,"count":1}`,
+		},
+		{
+			name: "V(3).InfoS",
+			fun: func() {
+				klog.V(3).InfoS("test", "count", 1)
+			},
+			// no output because of threshold 2
+		},
+		{
 			name: "InfoSDepth",
 			fun: func() {
 				klog.InfoSDepth(1, "test", "count", 1)
@@ -149,28 +163,28 @@ func TestKlogIntegration(t *testing.T) {
 			fun: func() {
 				klog.Error("test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
 		},
 		{
 			name: "ErrorDepth",
 			fun: func() {
 				klog.ErrorDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
 		},
 		{
 			name: "Errorln",
 			fun: func() {
 				klog.Errorln("test", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
 		},
 		{
 			name: "Errorf",
 			fun: func() {
 				klog.Errorf("test %d", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
 		},
 		{
 			name: "ErrorS",
@@ -178,7 +192,7 @@ func TestKlogIntegration(t *testing.T) {
 				err := errors.New("fail")
 				klog.ErrorS(err, "test", "count", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1,"err":"fail"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","count":1,"err":"fail"}`,
 		},
 		{
 			name: "ErrorSDepth",
@@ -186,7 +200,7 @@ func TestKlogIntegration(t *testing.T) {
 				err := errors.New("fail")
 				klog.ErrorSDepth(1, err, "test", "count", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1,"err":"fail"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","count":1,"err":"fail"}`,
 		},
 	}
 	for _, tc := range tcs {
@@ -194,12 +208,18 @@ func TestKlogIntegration(t *testing.T) {
 			var buffer bytes.Buffer
 			var logger = NewJSONLogger(zapcore.AddSync(&buffer))
 			klog.SetLogger(logger)
-			defer klog.SetLogger(nil)
+			defer klog.ClearLogger()
 
 			tc.fun()
 			var ts float64
 			var lineNo int
 			logString := strings.TrimSuffix(buffer.String(), "\n")
+			if tc.format == "" {
+				if logString != "" {
+					t.Fatalf("expected no output, got: %s", logString)
+				}
+				return
+			}
 			n, err := fmt.Sscanf(logString, tc.format, &ts, &lineNo)
 			if n != 2 || err != nil {
 				t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logString)
@@ -218,7 +238,7 @@ func TestKlogV(t *testing.T) {
 	var buffer testBuff
 	logger := NewJSONLogger(&buffer)
 	klog.SetLogger(logger)
-	defer klog.SetLogger(nil)
+	defer klog.ClearLogger()
 	fs := flag.FlagSet{}
 	klog.InitFlags(&fs)
 	totalLogsWritten := 0

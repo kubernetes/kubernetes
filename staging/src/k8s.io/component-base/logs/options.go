@@ -59,7 +59,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 func (o *Options) Apply() {
 	// if log format not exists, use nil loggr
 	loggr, _ := LogRegistry.Get(o.Config.Format)
-	klog.SetLogger(loggr)
+	if loggr == nil {
+		klog.ClearLogger()
+	} else {
+		klog.SetLogger(*loggr)
+	}
 	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})
 	}
