@@ -55,12 +55,12 @@ func PodWithDeletionTimestamp(pod *v1.Pod) string {
 	return Pod(pod) + deletionTimestamp
 }
 
-// Pods returns a list of pods as ObjectRef
-func Pods(pods []*v1.Pod) []klog.ObjectRef {
-	podKObjs := make([]klog.ObjectRef, 0, len(pods))
+// Pods returns a list of pods as strings of the form $ns/$name
+func Pods(pods []*v1.Pod) []string {
+	podKObjs := make([]string, 0, len(pods))
 	for _, p := range pods {
 		if p != nil {
-			podKObjs = append(podKObjs, klog.KObj(p))
+			podKObjs = append(podKObjs, klog.KObj(p).String())
 		}
 	}
 	return podKObjs
