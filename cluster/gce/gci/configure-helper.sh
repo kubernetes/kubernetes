@@ -1944,6 +1944,8 @@ function prepare-konnectivity-server-manifest {
   params+=("--authentication-audience=system:konnectivity-server")
   params+=("--kubeconfig-qps=75")
   params+=("--kubeconfig-burst=150")
+  params+=("--keepalive-time=60s")
+  params+=("--frontend-keepalive-time=60s")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
