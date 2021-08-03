@@ -95,7 +95,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// either 0 or between 10000 and 2e9.
 						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
 						// for more information.
-						"UsageNanoCores":       gomega.SatisfyAny(gomega.BeZero(), bounded(10000, 2e9)),
+						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e9)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
