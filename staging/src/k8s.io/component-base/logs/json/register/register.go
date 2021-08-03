@@ -23,5 +23,5 @@ import (
 
 func init() {
 	// JSON format is optional klog format
-	logs.LogRegistry.Register(logs.JSONLogFormat, json.JSONLogger)
+	logs.LogRegistry.Register(logs.JSONLogFormat, &json.JSONLogger)
 }

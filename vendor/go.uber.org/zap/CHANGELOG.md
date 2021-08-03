@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.19.0 (9 Aug 2021)
+
+Enhancements:
+* [#975][]: Avoid panicking in Sampler core if the level is out of bounds.
+* [#984][]: Reduce the size of BufferedWriteSyncer by aligning the fields
+  better.
+
+[#975]: https://github.com/uber-go/zap/pull/975
+[#984]: https://github.com/uber-go/zap/pull/984
+
+Thanks to @lancoLiu and @thockin for their contributions to this release.
+
+## 1.18.1 (28 Jun 2021)
+
+Bugfixes:
+* [#974][]: Fix nil dereference in logger constructed by `zap.NewNop`.
+
+[#974]: https://github.com/uber-go/zap/pull/974
+
+## 1.18.0 (28 Jun 2021)
+
+Enhancements:
+* [#961][]: Add `zapcore.BufferedWriteSyncer`, a new `WriteSyncer` that buffers
+  messages in-memory and flushes them periodically.
+* [#971][]: Add `zapio.Writer` to use a Zap logger as an `io.Writer`.
+* [#897][]: Add `zap.WithClock` option to control the source of time via the
+  new `zapcore.Clock` interface.
+* [#949][]: Avoid panicking in `zap.SugaredLogger` when arguments of `*w`
+  methods don't match expectations.
+* [#943][]: Add support for filtering by level or arbitrary matcher function to
+  `zaptest/observer`.
+* [#691][]: Comply with `io.StringWriter` and `io.ByteWriter` in Zap's
+  `buffer.Buffer`.
+
+Thanks to @atrn0, @ernado, @heyanfu, @hnlq715, @zchee
+for their contributions to this release.
+
+[#691]: https://github.com/uber-go/zap/pull/691
+[#897]: https://github.com/uber-go/zap/pull/897
+[#943]: https://github.com/uber-go/zap/pull/943
+[#949]: https://github.com/uber-go/zap/pull/949
+[#961]: https://github.com/uber-go/zap/pull/961
+[#971]: https://github.com/uber-go/zap/pull/971
+
 ## 1.17.0 (25 May 2021)
 
 Bugfixes:
