@@ -1506,11 +1506,12 @@ function set_docker_options_non_ubuntu() {
 
    addockeropt "\"mtu\": 1460,"
    addockeropt "\"storage-driver\": \"overlay2\","
-
    echo "setting live restore"
    # Disable live-restore if the environment variable is set.
    if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-      addockeropt "\"live-restore\": \"false\","
+      addockeropt "\"live-restore\": false,"
+   else
+      addockeropt "\"live-restore\": true,"
    fi
 }
 
@@ -1557,6 +1558,7 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   
   disable_aufs
   set_docker_options_non_ubuntu
+
 
   echo "setting docker logging options"
   # Configure docker logging
