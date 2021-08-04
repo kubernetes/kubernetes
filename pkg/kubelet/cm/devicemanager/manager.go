@@ -1103,12 +1103,12 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 	return false
 }
 
-// GetAllocatableDevices returns information about all the devices known to the manager
+// GetAllocatableDevices returns information about all the healthy devices known to the manager
 func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	m.mutex.Lock()
-	resp := m.allDevices.Clone()
-	m.mutex.Unlock()
-	klog.V(4).InfoS("Known devices", "numDevices", len(resp))
+	defer m.mutex.Unlock()
+	resp := m.allDevices.Filter(m.healthyDevices)
+	klog.V(4).InfoS("GetAllocatableDevices", "known", len(m.allDevices), "allocatable", len(resp))
 	return resp
 }
 
