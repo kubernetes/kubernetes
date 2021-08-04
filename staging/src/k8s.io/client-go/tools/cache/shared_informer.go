@@ -137,7 +137,7 @@ type SharedInformer interface {
 	// between different handlers.
 	// It returns a handle for the handler that can be used to remove
 	// the handler again.
-	AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerHandle, error)
+	AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerRegistration, error)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer with the requested resync period; zero means
 	// this handler does not care about resyncs.  The resync operation
@@ -154,8 +154,8 @@ type SharedInformer interface {
 	// be competing load and scheduling noise.
 	// It returns a handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
-	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerHandle, error)
-	// RemoveEventHandlerByHandle removes a formerly added event handler given by
+	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerRegistration, error)
+	// RemoveEventHandlerByRegistration removes a formerly added event handler given by
 	// its registration handle.
 	// If, for some reason, the same handler has been added multiple
 	// times, only the registration for the given registration handle
@@ -165,7 +165,7 @@ type SharedInformer interface {
 	// Calling Remove on an already removed handle returns no error
 	// because the handler is finally (still) removed after calling this
 	// method.
-	RemoveEventHandlerByHandle(handle *ResourceEventHandlerHandle) error
+	RemoveEventHandlerByRegistration(handle *ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -203,21 +203,21 @@ type SharedInformer interface {
 	IsStopped() bool
 }
 
-// ResourceEventHandlerHandle is a handle returned by the
+// ResourceEventHandlerRegistration is a handle returned by the
 // registration methods of SharedInformers for a registered
 // ResourceEventHandler. It can be used later on to remove
 // a registration again.
 // This indirection is required, because the ResourceEventHandler
 // interface can be implemented by non-go-comparable handlers, which
 // could not be removed from a list anymore.
-type ResourceEventHandlerHandle struct {
+type ResourceEventHandlerRegistration struct {
 	listener *processorListener
 }
 
-// IsActive reports whether this registration is still active
+// isActive reports whether this registration is still active
 // meaning that the handler registered with this handle is
 // still registered.
-func (h *ResourceEventHandlerHandle) IsActive() bool {
+func (h *ResourceEventHandlerRegistration) isActive() bool {
 	return h.listener != nil
 }
 
@@ -502,7 +502,7 @@ func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerHandle, error) {
+func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerRegistration, error) {
 	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
 }
 
@@ -523,7 +523,7 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
-func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerHandle, error) {
+func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -553,7 +553,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	}
 
 	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
-	handle := &ResourceEventHandlerHandle{listener}
+	handle := &ResourceEventHandlerRegistration{listener}
 
 	if !s.started {
 		s.processor.addListener(listener)
@@ -627,17 +627,18 @@ func (s *sharedIndexInformer) IsStopped() bool {
 	return s.stopped
 }
 
-// RemoveEventHandlerByHandle tries to remove a formerly added event handler by its
-// handle returned for its registration.
-// If a handler has been added multiple times, only the registration for the
-// given handle will be removed.
-func (s *sharedIndexInformer) RemoveEventHandlerByHandle(handle *ResourceEventHandlerHandle) error {
+// RemoveEventHandlerByRegistration tries to remove a formerly added event handler by its
+// registration handle returned for its registration.
+// If a handler has been added multiple times, only the actual registration for the
+// handler will be removed. Other registrations of the same handler will still be
+// active until they are explicitly removes, also.
+func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle *ResourceEventHandlerRegistration) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
 	if handle.listener == nil {
 		return nil
 	}
-
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
 
 	if s.stopped {
 		return fmt.Errorf("handler %v is not removed from shared informer because it has stopped already", handle.listener.handler)

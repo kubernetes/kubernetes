@@ -395,14 +395,14 @@ func TestSharedInformerRemoveHandler(t *testing.T) {
 		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(handle2); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(handle2); err != nil {
 		t.Errorf("removing of first pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 1 {
 		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(handle1); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(handle1); err != nil {
 		t.Errorf("removing of second pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 0 {
@@ -433,14 +433,14 @@ func TestSharedInformerRemoveNonComparableHandler(t *testing.T) {
 		t.Errorf("informer has %d registered handler(s), instead of 2", eventHandlerCount(informer))
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(handle2); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(handle2); err != nil {
 		t.Errorf("removing of pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 1 {
 		t.Errorf("after removal informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(handle1); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(handle1); err != nil {
 		t.Errorf("removing of non-pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 0 {
@@ -461,7 +461,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !reg1.IsActive() {
+	if !reg1.isActive() {
 		t.Errorf("handle1 is not active after successful registration")
 		return
 	}
@@ -472,7 +472,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !reg2.IsActive() {
+	if !reg2.isActive() {
 		t.Errorf("handle2 is not active after successful registration")
 		return
 	}
@@ -481,15 +481,15 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		t.Errorf("informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(reg1); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(reg1); err != nil {
 		t.Errorf("removing of duplicate handler registration failed: %s", err)
 	}
 
-	if reg1.IsActive() {
+	if reg1.isActive() {
 		t.Errorf("handle1 is still active after successful remove")
 		return
 	}
-	if !reg2.IsActive() {
+	if !reg2.isActive() {
 		t.Errorf("handle2 is not active after removing handle1")
 		return
 	}
@@ -502,11 +502,11 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		}
 	}
 
-	if err := informer.RemoveEventHandlerByHandle(reg2); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(reg2); err != nil {
 		t.Errorf("removing of second handler registration failed: %s", err)
 	}
 
-	if reg2.IsActive() {
+	if reg2.isActive() {
 		t.Errorf("handle2 is still active after successful remove")
 		return
 	}
@@ -528,18 +528,18 @@ func TestRemovingRemovedSharedInformer(t *testing.T) {
 		t.Errorf("informer did not add handler for the first time: %s", err)
 		return
 	}
-	if err := informer.RemoveEventHandlerByHandle(reg); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(reg); err != nil {
 		t.Errorf("removing of handler registration failed: %s", err)
 		return
 	}
-	if reg.IsActive() {
+	if reg.isActive() {
 		t.Errorf("handle is still active after successful remove")
 		return
 	}
-	if err := informer.RemoveEventHandlerByHandle(reg); err != nil {
+	if err := informer.RemoveEventHandlerByRegistration(reg); err != nil {
 		t.Errorf("removing of already removed registration yields unexpected error: %s", err)
 	}
-	if reg.IsActive() {
+	if reg.isActive() {
 		t.Errorf("handle is still active after second remove")
 		return
 	}
@@ -646,7 +646,7 @@ func TestRemoveOnStoppedSharedInformer(t *testing.T) {
 		t.Errorf("informer reports not to be stopped although stop channel closed")
 		return
 	}
-	err = informer.RemoveEventHandlerByHandle(handle)
+	err = informer.RemoveEventHandlerByRegistration(handle)
 	if err == nil {
 		t.Errorf("informer removes handler on stopped informer")
 		return
