@@ -343,24 +343,61 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	testServer, _ := makeTestServer(t, ns)
 	defer testServer.Close()
 	endpoints := newController(testServer.URL, 0*time.Second)
-	endpoints.endpointsStore.Add(&v1.Endpoints{
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go endpoints.Run(1, stopCh)
+	// cache.WaitForNamedCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
+	// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
+	// a single cache sync period and worker period, with some fudge room.
+	time.Sleep(150 * time.Millisecond)
+	endpoints.onEndpointsAdd(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				metav1.ManagedFieldsEntry{
+					Manager:    controllerName,
+					Operation:  "Update",
+					FieldsType: "FieldsV1",
+				},
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 			Ports:     []v1.EndpointPort{{Port: 1000}},
 		}},
 	})
-	endpoints.checkLeftoverEndpoints()
-	if e, a := 1, endpoints.queue.Len(); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
+	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
+	if err := wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		return endpoints.queue.Len() > 0, nil
+	}); err != nil {
+		t.Fatalf("Expected 1 endpoint processed on startup %v", err)
 	}
-	got, _ := endpoints.queue.Get()
-	if e, a := ns+"/foo", got; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
+	time.Sleep(150 * time.Millisecond)
+	endpoints.onEndpointsAdd(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo2",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				metav1.ManagedFieldsEntry{
+					Manager:    "custom-manager",
+					Operation:  "Update",
+					FieldsType: "FieldsV1",
+				},
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 1000}},
+		}},
+	})
+	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
+	if err := wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		return endpoints.queue.Len() > 0, nil
+	}); err == nil {
+		t.Fatalf("Not expected any endpoint processed on startup %v", err)
 	}
 }
 
