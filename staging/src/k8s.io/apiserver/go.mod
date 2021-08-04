@@ -20,6 +20,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+	github.com/klauspost/compress v1.13.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect

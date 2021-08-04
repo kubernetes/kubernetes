@@ -268,6 +268,7 @@ replace (
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock => github.com/golang/mock v1.4.4
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
+	github.com/golang/snappy => github.com/golang/snappy v0.0.3
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
 	github.com/google/cadvisor => github.com/google/cadvisor v0.39.2
@@ -325,6 +326,7 @@ replace (
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0
 	github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
+	github.com/klauspost/compress => github.com/klauspost/compress v1.13.0
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.2
 	github.com/kr/pretty => github.com/kr/pretty v0.2.1
 	github.com/kr/text => github.com/kr/text v0.2.0
