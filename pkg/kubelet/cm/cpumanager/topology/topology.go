@@ -61,6 +61,8 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 }
 
 // CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
+// In some real world cases, CoreIDs on different sockets are the same,
+// So, in Discover() function, CoreIDs are masqueraded via coreID + core.SocketID * len(node.Cores).
 type CPUInfo struct {
 	NUMANodeID int
 	SocketID   int
@@ -230,7 +232,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 			if coreID, err := getUniqueCoreID(core.Threads); err == nil {
 				for _, cpu := range core.Threads {
 					CPUDetails[cpu] = CPUInfo{
-						CoreID:     coreID,
+						CoreID:     coreID + core.SocketID*len(node.Cores),
 						SocketID:   core.SocketID,
 						NUMANodeID: node.Id,
 					}
