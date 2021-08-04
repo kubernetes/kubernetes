@@ -434,6 +434,100 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.True(testManager.isDevicePluginResource(resourceName2))
 }
 
+func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	topologyStore := topologymanager.NewFakeManager()
+	require.NoError(t, err)
+	defer os.RemoveAll(socketDir)
+	testManager, err := newManagerImpl(socketName, nil, topologyStore)
+	as := assert.New(t)
+	as.NotNil(testManager)
+	as.Nil(err)
+
+	resource1Devs := []pluginapi.Device{
+		{ID: "R1Device1", Health: pluginapi.Healthy},
+		{ID: "R1Device2", Health: pluginapi.Healthy},
+		{ID: "R1Device3", Health: pluginapi.Unhealthy},
+	}
+	resourceName1 := "domain1.com/resource1"
+	e1 := &endpointImpl{}
+	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
+	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
+
+	resource2Devs := []pluginapi.Device{
+		{ID: "R2Device1", Health: pluginapi.Healthy},
+	}
+	resourceName2 := "other.domain2.org/resource2"
+	e2 := &endpointImpl{}
+	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
+	testManager.genericDeviceUpdateCallback(resourceName2, resource2Devs)
+
+	allocatableDevs := testManager.GetAllocatableDevices()
+	as.Equal(2, len(allocatableDevs))
+
+	devInstances1, ok := allocatableDevs[resourceName1]
+	as.True(ok)
+	checkAllocatableDevicesConsistsOf(as, devInstances1, []string{"R1Device1", "R1Device2"})
+
+	devInstances2, ok := allocatableDevs[resourceName2]
+	as.True(ok)
+	checkAllocatableDevicesConsistsOf(as, devInstances2, []string{"R2Device1"})
+
+}
+
+func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	topologyStore := topologymanager.NewFakeManager()
+	require.NoError(t, err)
+	defer os.RemoveAll(socketDir)
+	testManager, err := newManagerImpl(socketName, nil, topologyStore)
+	as := assert.New(t)
+	as.NotNil(testManager)
+	as.Nil(err)
+
+	resource1Devs := []pluginapi.Device{
+		{ID: "R1Device1", Health: pluginapi.Healthy},
+		{ID: "R1Device2", Health: pluginapi.Healthy},
+		{ID: "R1Device3", Health: pluginapi.Unhealthy},
+	}
+
+	// Adds three devices for resource1, two healthy and one unhealthy.
+	// Expects allocatable devices for resource1 to be 2.
+	resourceName1 := "domain1.com/resource1"
+	e1 := &endpointImpl{}
+	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
+
+	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
+
+	allocatableDevs := testManager.GetAllocatableDevices()
+	as.Equal(1, len(allocatableDevs))
+	devInstances, ok := allocatableDevs[resourceName1]
+	as.True(ok)
+	checkAllocatableDevicesConsistsOf(as, devInstances, []string{"R1Device1", "R1Device2"})
+
+	// Unhealthy device becomes healthy
+	resource1Devs = []pluginapi.Device{
+		{ID: "R1Device1", Health: pluginapi.Healthy},
+		{ID: "R1Device2", Health: pluginapi.Healthy},
+		{ID: "R1Device3", Health: pluginapi.Healthy},
+	}
+	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
+
+	allocatableDevs = testManager.GetAllocatableDevices()
+	as.Equal(1, len(allocatableDevs))
+	devInstances, ok = allocatableDevs[resourceName1]
+	as.True(ok)
+	checkAllocatableDevicesConsistsOf(as, devInstances, []string{"R1Device1", "R1Device2", "R1Device3"})
+}
+
+func checkAllocatableDevicesConsistsOf(as *assert.Assertions, devInstances DeviceInstances, expectedDevs []string) {
+	as.Equal(len(expectedDevs), len(devInstances))
+	for _, deviceID := range expectedDevs {
+		_, ok := devInstances[deviceID]
+		as.True(ok)
+	}
+}
+
 func constructDevices(devices []string) checkpoint.DevicesPerNUMA {
 	ret := checkpoint.DevicesPerNUMA{}
 	for _, dev := range devices {
