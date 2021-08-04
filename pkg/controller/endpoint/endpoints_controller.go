@@ -84,6 +84,9 @@ const (
 	// endpoint resource and indicates that the number of endpoints have been truncated to
 	// maxCapacity
 	truncated = "truncated"
+
+	// name of the controller
+	controllerName = "endpoint-controller"
 )
 
 // NewEndpointController returns a new *Controller.
@@ -92,7 +95,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
@@ -122,6 +125,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.podsSynced = podInformer.Informer().HasSynced
 
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.onEndpointsAdd,
+		UpdateFunc: e.onEndpointsUpdate,
 		DeleteFunc: e.onEndpointsDelete,
 	})
 	e.endpointsLister = endpointsInformer.Lister()
@@ -202,11 +207,6 @@ func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.worker, e.workerLoopPeriod, stopCh)
 	}
-
-	go func() {
-		defer utilruntime.HandleCrash()
-		e.checkLeftoverEndpoints()
-	}()
 
 	<-stopCh
 }
@@ -325,6 +325,31 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 	}
 
 	e.serviceSelectorCache.Delete(key)
+	e.queue.Add(key)
+}
+
+func (e *Controller) onEndpointsAdd(obj interface{}) {
+	if !managedByController(obj.(*v1.Endpoints)) {
+		return
+	}
+
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	e.queue.Add(key)
+}
+
+func (e *Controller) onEndpointsUpdate(old, cur interface{}) {
+	if !managedByController(cur.(*v1.Endpoints)) {
+		return
+	}
+	key, err := controller.KeyFunc(cur)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", cur, err))
+		return
+	}
 	e.queue.Add(key)
 }
 
@@ -559,10 +584,10 @@ func (e *Controller) syncService(key string) error {
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{FieldManager: controllerName})
 	} else {
 		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{FieldManager: controllerName})
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {
@@ -746,4 +771,23 @@ func addressSubset(addresses []v1.EndpointAddress, maxNum int) []v1.EndpointAddr
 		return addresses
 	}
 	return addresses[0:maxNum]
+}
+
+// managedByController returns true if the endpoint is managed by this endpoints controller
+func managedByController(endpoint *v1.Endpoints) bool {
+	if _, ok := endpoint.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
+		// when there are multiple controller-manager instances,
+		// we observe that it will delete leader-election endpoints after 5min
+		// and cause re-election
+		// so skip the delete here
+		// as leader-election only have endpoints without service
+		return false
+	}
+	// endpoints without managed fields are not handled by this controller
+	// for backwards compatibility
+	if len(endpoint.ManagedFields) == 0 {
+		return false
+	}
+	// manage all endpoints created by this controller
+	return endpoint.ManagedFields[0].Manager == controllerName
 }
