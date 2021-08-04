@@ -70,11 +70,11 @@ type conversionInformer struct {
 	cache.SharedIndexInformer
 }
 
-func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) (*cache.ResourceEventHandlerHandle, error) {
+func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) (*cache.ResourceEventHandlerRegistration, error) {
 	return i.SharedIndexInformer.AddEventHandler(conversionEventHandler{handler})
 }
 
-func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (*cache.ResourceEventHandlerHandle, error) {
+func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (*cache.ResourceEventHandlerRegistration, error) {
 	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
 }
 
