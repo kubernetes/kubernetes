@@ -83,6 +83,8 @@ type Range struct {
 
 // NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
+	registerMetrics()
+
 	max := utilnet.RangeSize(cidr)
 	base := utilnet.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
@@ -165,31 +167,58 @@ func (r *Range) CIDR() net.IPNet {
 // or has already been reserved.  ErrFull will be returned if there
 // are no addresses left.
 func (r *Range) Allocate(ip net.IP) error {
+	label := r.CIDR()
 	ok, offset := r.contains(ip)
 	if !ok {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return &ErrNotInRange{r.net.String()}
 	}
 
 	allocated, err := r.alloc.Allocate(offset)
 	if err != nil {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return err
 	}
 	if !allocated {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return ErrAllocated
 	}
+	// update metrics
+	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+
 	return nil
 }
 
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
+	label := r.CIDR()
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return nil, err
 	}
 	if !ok {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return nil, ErrFull
 	}
+	// update metrics
+	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+
 	return utilnet.AddIPOffset(r.base, offset), nil
 }
 
@@ -202,7 +231,14 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	return r.alloc.Release(offset)
+	err := r.alloc.Release(offset)
+	if err == nil {
+		// update metrics
+		label := r.CIDR()
+		clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+		clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+	}
+	return err
 }
 
 // ForEach calls the provided function for each allocated IP.

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -359,5 +360,156 @@ func TestNewFromSnapshot(t *testing.T) {
 		if !r.Has(ip) {
 			t.Fatalf("expected IP to be allocated, but it was not")
 		}
+	}
+}
+
+func TestClusterIPMetrics(t *testing.T) {
+	// create IPv4 allocator
+	cidrIPv4 := "10.0.0.0/24"
+	_, clusterCIDRv4, _ := net.ParseCIDR(cidrIPv4)
+	a, err := NewCIDRRange(clusterCIDRv4)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"cidr": cidrIPv4})
+	// create IPv6 allocator
+	cidrIPv6 := "2001:db8::/112"
+	_, clusterCIDRv6, _ := net.ParseCIDR(cidrIPv6)
+	b, err := NewCIDRRange(clusterCIDRv6)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"cidr": cidrIPv6})
+
+	// Check initial state
+	em := testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, cidrIPv4, em)
+	em = testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, cidrIPv6, em)
+
+	// allocate 2 IPv4 addresses
+	found := sets.NewString()
+	for i := 0; i < 2; i++ {
+		ip, err := a.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if found.Has(ip.String()) {
+			t.Fatalf("already reserved: %s", ip)
+		}
+		found.Insert(ip.String())
+	}
+
+	em = testMetrics{
+		free:      252,
+		used:      2,
+		allocated: 2,
+		errors:    0,
+	}
+	expectMetrics(t, cidrIPv4, em)
+
+	// try to allocate the same IP addresses
+	for s := range found {
+		if !a.Has(net.ParseIP(s)) {
+			t.Fatalf("missing: %s", s)
+		}
+		if err := a.Allocate(net.ParseIP(s)); err != ErrAllocated {
+			t.Fatal(err)
+		}
+	}
+	em = testMetrics{
+		free:      252,
+		used:      2,
+		allocated: 2,
+		errors:    2,
+	}
+	expectMetrics(t, cidrIPv4, em)
+
+	// release the addresses allocated
+	for s := range found {
+		if !a.Has(net.ParseIP(s)) {
+			t.Fatalf("missing: %s", s)
+		}
+		if err := a.Release(net.ParseIP(s)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	em = testMetrics{
+		free:      254,
+		used:      0,
+		allocated: 2,
+		errors:    2,
+	}
+	expectMetrics(t, cidrIPv4, em)
+
+	// allocate 264 addresses for each allocator
+	// the full range and 10 more (254 + 10 = 264) for IPv4
+	for i := 0; i < 264; i++ {
+		a.AllocateNext()
+		b.AllocateNext()
+	}
+	em = testMetrics{
+		free:      0,
+		used:      254,
+		allocated: 256, // this is a counter, we already had 2 allocations and we did 254 more
+		errors:    12,
+	}
+	expectMetrics(t, cidrIPv4, em)
+	em = testMetrics{
+		free:      65271, // IPv6 clusterIP range is capped to 2^16 and consider the broadcast address as valid
+		used:      264,
+		allocated: 264,
+		errors:    0,
+	}
+	expectMetrics(t, cidrIPv6, em)
+}
+
+// Metrics helpers
+func clearMetrics(labels map[string]string) {
+	clusterIPAllocated.Delete(labels)
+	clusterIPAvailable.Delete(labels)
+	clusterIPAllocations.Delete(labels)
+	clusterIPAllocationErrors.Delete(labels)
+}
+
+type testMetrics struct {
+	free      float64
+	used      float64
+	allocated float64
+	errors    float64
+}
+
+func expectMetrics(t *testing.T, label string, em testMetrics) {
+	var m testMetrics
+	var err error
+	m.free, err = testutil.GetGaugeMetricValue(clusterIPAvailable.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAvailable.Name, err)
+	}
+	m.used, err = testutil.GetGaugeMetricValue(clusterIPAllocated.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocated.Name, err)
+	}
+	m.allocated, err = testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocations.Name, err)
+	}
+	m.errors, err = testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocationErrors.Name, err)
+	}
+
+	if m != em {
+		t.Fatalf("metrics error: expected %v, received %v", em, m)
 	}
 }
