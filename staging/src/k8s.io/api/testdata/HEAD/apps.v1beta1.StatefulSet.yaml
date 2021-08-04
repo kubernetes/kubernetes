@@ -32,9 +32,6 @@ metadata:
   uid: "7"
 spec:
   minReadySeconds: -619299042
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: 弞þƔ剛Ʃ°qgWǰ绿络a
-    whenScaled: 7ɞŶJŖ)j{驟ʦcȃ/I
   podManagementPolicy: 軈ĕʦ竳÷ 骵蓧應ĸ簋涼ĥ訛\`ĝňY
   replicas: 896585016
   revisionHistoryLimit: -827620894
@@ -1133,18 +1130,18 @@ spec:
         type: A麭T棞詢¡ɅǏõxġ疾ɇ
       phase: h蹤?攫垳ȿūDmÒ侠泊蠻毜鷟傚罢ț
 status:
-  availableReplicas: 1369790557
-  collisionCount: -696643813
+  availableReplicas: 597030717
+  collisionCount: 1054770378
   conditions:
-  - lastTransitionTime: "2522-06-10T02:30:22Z"
+  - lastTransitionTime: "2919-04-11T18:57:19Z"
     message: "529"
     reason: "528"
-    status: ůk`磾ƃ妹浓ª斈2婵=ǻ4 ʙ但Ǭ
-    type: ""
-  currentReplicas: -281508057
+    status: 驟ʦcȃ/ILǓ巟軷p羯孛
+    type: gWǰ绿络aw壳Ĝxɮǻ蝀}
+  currentReplicas: 214266202
   currentRevision: "526"
-  observedGeneration: -5220291719109120281
-  readyReplicas: -1313274125
-  replicas: -1497706631
+  observedGeneration: 186539306115504993
+  readyReplicas: -425205512
+  replicas: 807518438
   updateRevision: "527"
-  updatedReplicas: 222952727
+  updatedReplicas: 702030092

@@ -637,12 +637,6 @@ const (
 	// alpha: v1.21
 	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
 
-	// owner: @mattcary
-	// alpha: v1.22
-	//
-	// Enables policies controlling deletion of PVCs created by a StatefulSet.
-	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
-
 	// owner: @ahg-g
 	// alpha: v1.21
 	// beta: v1.22
@@ -895,10 +889,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},
 	PreferNominatedNode:                            {Default: true, PreRelease: featuregate.Beta},
-	ProbeTerminationGracePeriod:                    {Default: false, PreRelease: featuregate.Alpha},
+	ProbeTerminationGracePeriod:                    {Default: false, PreRelease: featuregate.Beta}, // Default to false in beta 1.22, set to true in 1.24
 	NodeSwap:                                       {Default: false, PreRelease: featuregate.Alpha},
 	PodDeletionCost:                                {Default: true, PreRelease: featuregate.Beta},
-	StatefulSetAutoDeletePVC:                       {Default: false, PreRelease: featuregate.Alpha},
 	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.Beta},

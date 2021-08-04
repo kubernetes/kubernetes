@@ -50,7 +50,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			}
 		})
 
-		ginkgo.It("should be able to create and delete a critical pod", func() {
+		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func() {
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {

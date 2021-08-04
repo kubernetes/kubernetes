@@ -428,23 +428,6 @@ func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, erro
 	return nil, fmt.Errorf("event object not of type node")
 }
 
-// detectNodeIP returns the nodeIP used by the proxier
-// The order of precedence is:
-// 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
-// 2. the primary IP from the Node object, if set
-// 3. if no IP is found it defaults to 127.0.0.1 and IPv4
-func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
-	nodeIP := net.ParseIP(bindAddress)
-	if nodeIP.IsUnspecified() {
-		nodeIP = utilnode.GetNodeIP(client, hostname)
-	}
-	if nodeIP == nil {
-		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = net.ParseIP("127.0.0.1")
-	}
-	return nodeIP
-}
-
 func detectNumCPU() int {
 	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
 	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
@@ -568,22 +551,6 @@ func cidrTuple(cidrList string) [2]string {
 	}
 
 	return cidrs
-}
-
-// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
-// will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
-
-	adr := net.ParseIP(bindAddress)
-	if utilsnet.IsIPv6(adr) {
-		nodes[1] = adr
-	} else {
-		nodes[0] = adr
-	}
-
-	return nodes
 }
 
 func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {

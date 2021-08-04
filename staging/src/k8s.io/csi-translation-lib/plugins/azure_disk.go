@@ -44,6 +44,7 @@ const (
 var (
 	managedDiskPathRE   = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/disks/(.+)`)
 	unmanagedDiskPathRE = regexp.MustCompile(`http(?:.*)://(?:.*)/vhds/(.+)`)
+	managed             = string(v1.AzureManagedDisk)
 )
 
 var _ InTreePlugin = &azureDiskCSITranslator{}
@@ -99,6 +100,9 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	}
 
 	azureSource := volume.AzureDisk
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// Must be unique per disk as it is used as the unique part of the
@@ -110,7 +114,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
 					VolumeHandle:     azureSource.DataDiskURI,
-					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+					VolumeAttributes: map[string]string{azureDiskKind: managed},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -127,9 +131,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		pv.Spec.PersistentVolumeSource.CSI.FSType = *azureSource.FSType
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
-	if azureSource.Kind != nil {
-		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
-	}
+	pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskKind] = managed
 
 	return pv, nil
 }
@@ -147,10 +149,14 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		// refer to https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
 		csiSource = &v1.CSIPersistentVolumeSource{
 			Driver:           AzureDiskDriverName,
-			VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
+			VolumeAttributes: map[string]string{azureDiskKind: managed},
 			VolumeHandle:     azureSource.DataDiskURI,
 		}
 	)
+
+	if azureSource.Kind != nil && !strings.EqualFold(string(*azureSource.Kind), managed) {
+		return nil, fmt.Errorf("kind(%v) is not supported in csi migration", *azureSource.Kind)
+	}
 
 	if azureSource.CachingMode != nil {
 		csiSource.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
@@ -160,10 +166,7 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		csiSource.FSType = *azureSource.FSType
 		csiSource.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
-
-	if azureSource.Kind != nil {
-		csiSource.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
-	}
+	csiSource.VolumeAttributes[azureDiskKind] = managed
 
 	if azureSource.ReadOnly != nil {
 		csiSource.ReadOnly = *azureSource.ReadOnly
@@ -208,11 +211,7 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 		if fsType, ok := csiSource.VolumeAttributes[azureDiskFSType]; ok && fsType != "" {
 			azureSource.FSType = &fsType
 		}
-
-		if kind, ok := csiSource.VolumeAttributes[azureDiskKind]; ok && kind != "" {
-			diskKind := v1.AzureDataDiskKind(kind)
-			azureSource.Kind = &diskKind
-		}
+		azureSource.Kind = &managed
 	}
 
 	pv.Spec.CSI = nil

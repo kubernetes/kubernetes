@@ -69,13 +69,13 @@ const InvalidOpCode OpCode = 0xff
 // rawInstructions returns the number of BPF instructions required
 // to encode this opcode.
 func (op OpCode) rawInstructions() int {
-	if op.isDWordLoad() {
+	if op.IsDWordLoad() {
 		return 2
 	}
 	return 1
 }
 
-func (op OpCode) isDWordLoad() bool {
+func (op OpCode) IsDWordLoad() bool {
 	return op == LoadImmOp(DWord)
 }
 

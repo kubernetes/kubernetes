@@ -6032,6 +6032,133 @@ func TestValidateProbe(t *testing.T) {
 	}
 }
 
+func Test_validateProbe(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, true)()
+
+	fldPath := field.NewPath("test")
+	type args struct {
+		probe   *core.Probe
+		fldPath *field.Path
+	}
+	tests := []struct {
+		name string
+		args args
+		want field.ErrorList
+	}{
+		{
+			args: args{
+				probe:   &core.Probe{},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Required(fldPath, "must specify a handler type")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler: core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:             core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					InitialDelaySeconds: -1,
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("initialDelaySeconds"), -1, "must be greater than or equal to 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:        core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					TimeoutSeconds: -1,
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("timeoutSeconds"), -1, "must be greater than or equal to 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					PeriodSeconds: -1,
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("periodSeconds"), -1, "must be greater than or equal to 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					SuccessThreshold: -1,
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("successThreshold"), -1, "must be greater than or equal to 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					FailureThreshold: -1,
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("failureThreshold"), -1, "must be greater than or equal to 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), -1, "must be greater than 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					TerminationGracePeriodSeconds: utilpointer.Int64(0),
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), 0, "must be greater than 0")},
+		},
+		{
+			args: args{
+				probe: &core.Probe{
+					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateProbe(tt.args.probe, tt.args.fldPath)
+			if len(got) != len(tt.want) {
+				t.Errorf("validateProbe() = %v, want %v", got, tt.want)
+				return
+			}
+			for i := range got {
+				if got[i].Type != tt.want[i].Type ||
+					got[i].Field != tt.want[i].Field {
+					t.Errorf("validateProbe()[%d] = %v, want %v", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestValidateHandler(t *testing.T) {
 	successCases := []core.Handler{
 		{Exec: &core.ExecAction{Command: []string{"echo"}}},

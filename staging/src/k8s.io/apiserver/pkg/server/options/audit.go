@@ -511,21 +511,21 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 		return nil, nil
 	}
 
-	if err := o.ensureLogFile(); err != nil {
-		return nil, err
+	if o.Path == "-" {
+		return os.Stdout, nil
 	}
 
-	var w io.Writer = os.Stdout
-	if o.Path != "-" {
-		w = &lumberjack.Logger{
-			Filename:   o.Path,
-			MaxAge:     o.MaxAge,
-			MaxBackups: o.MaxBackups,
-			MaxSize:    o.MaxSize,
-			Compress:   o.Compress,
-		}
+	if err := o.ensureLogFile(); err != nil {
+		return nil, fmt.Errorf("ensureLogFile: %w", err)
 	}
-	return w, nil
+
+	return &lumberjack.Logger{
+		Filename:   o.Path,
+		MaxAge:     o.MaxAge,
+		MaxBackups: o.MaxBackups,
+		MaxSize:    o.MaxSize,
+		Compress:   o.Compress,
+	}, nil
 }
 
 func (o *AuditLogOptions) ensureLogFile() error {

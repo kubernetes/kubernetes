@@ -194,6 +194,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
+			"-p", "StandardError=file:"+framework.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,
 			"--slice=runtime.slice",
 			"--remain-after-exit",
@@ -201,10 +202,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
-		e.logs["kubelet.log"] = LogFileData{
-			Name:              "kubelet.log",
-			JournalctlCommand: []string{"-u", unitName},
-		}
 
 		kc.KubeletCgroups = "/kubelet.slice"
 		kubeletConfigFlags = append(kubeletConfigFlags, "kubelet-cgroups")

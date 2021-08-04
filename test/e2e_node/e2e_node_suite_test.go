@@ -41,10 +41,12 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/util/rlimit"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -92,6 +94,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 
 func init() {
 	// Enable embedded FS file lookup as fallback
+	e2etestfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 	e2etestfiles.AddFileSource(e2enodetestingmanifests.GetE2ENodeTestingManifestsFS())
 }
 
@@ -121,6 +124,12 @@ func TestMain(m *testing.M) {
 const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
+
+	// Make sure we are not limited by sshd when it comes to open files
+	if err := rlimit.SetNumFiles(1000000); err != nil {
+		klog.Infof("failed to set rlimit on max file handles: %v", err)
+	}
+
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices(t)
