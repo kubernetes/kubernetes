@@ -3,3 +3,4 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
       - k8s.io/kubernetes/pkg/cloudprovider/providers
+      - k8s.io/kubernetes/third_party/cloudproviders/gce

@@ -273,4 +273,6 @@ rules:
   # TODO: why is this here?
   - selectorRegexp: k8s[.]io/kubernetes/third_party/
     allowedPrefixes:
+    - k8s.io/kubernetes/third_party/cloudproviders/gce
+    - k8s.io/kubernetes/third_party/cloudproviders/gce/gcpcredential
     - k8s.io/kubernetes/third_party/forked/golang/expansion
