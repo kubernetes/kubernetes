@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package testing
 
 import (
 	"container/heap"
@@ -24,50 +24,14 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	baseclocktest "k8s.io/utils/clock/testing"
+
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 	"k8s.io/klog/v2"
 )
 
-// EventFunc does some work that needs to be done at or after the
-// given time. After this function returns, associated work may continue
-//  on other goroutines only if they are counted by the GoRoutineCounter
-// of the FakeEventClock handling this EventFunc.
-type EventFunc func(time.Time)
-
-// EventClock fires event on time
-type EventClock interface {
-	clock.PassiveClock
-	EventAfterDuration(f EventFunc, d time.Duration)
-	EventAfterTime(f EventFunc, t time.Time)
-}
-
-// RealEventClock fires event on real world time
-type RealEventClock struct {
-	clock.RealClock
-}
-
-// EventAfterDuration schedules an EventFunc
-func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
-	ch := time.After(d)
-	go func() {
-		t := <-ch
-		f(t)
-	}()
-}
-
-// EventAfterTime schedules an EventFunc
-func (r RealEventClock) EventAfterTime(f EventFunc, t time.Time) {
-	now := time.Now()
-	d := t.Sub(now)
-	if d <= 0 {
-		go f(now)
-	} else {
-		r.EventAfterDuration(f, d)
-	}
-}
-
-// waitGroupCounter is a wait group used for a GoRoutine Counter.  This private
+// waitGroupCounter is a wait group used for a GoRoutineCounter.  This private
 // type is used to disallow direct waitGroup access
 type waitGroupCounter struct {
 	wg sync.WaitGroup
@@ -102,9 +66,20 @@ func (wgc *waitGroupCounter) Wait() {
 }
 
 // FakeEventClock is one whose time does not pass implicitly but
-// rather is explicitly set by invocations of its SetTime method
+// rather is explicitly set by invocations of its SetTime method.
+// Each FakeEventClock has an associated GoRoutineCounter that is
+// used to track associated activity.
+// For the EventAfterDuration and EventAfterTime methods,
+// the clock itself counts the start and stop of the EventFunc
+// and the client is responsible for counting any suspend and
+// resume internal to the EventFunc.
+// The Sleep method must only be invoked from a goroutine that is
+// counted in that GoRoutineCounter.
+// The SetTime method does not return until all the triggered
+// EventFuncs return.  Consequently, an EventFunc given to a method
+// of this clock must not wait for this clock to advance.
 type FakeEventClock struct {
-	clock.FakePassiveClock
+	baseclocktest.FakePassiveClock
 
 	// waiters is a heap of waiting work, sorted by time
 	waiters     eventWaiterHeap
@@ -131,7 +106,7 @@ var _ heap.Interface = (*eventWaiterHeap)(nil)
 
 type eventWaiter struct {
 	targetTime time.Time
-	f          EventFunc
+	f          clock.EventFunc
 }
 
 // NewFakeEventClock constructor.  The given `r *rand.Rand` must
@@ -149,7 +124,7 @@ func NewFakeEventClock(t time.Time, fuzz time.Duration, r *rand.Rand) (*FakeEven
 		r.Uint64()
 	}
 	return &FakeEventClock{
-		FakePassiveClock: *clock.NewFakePassiveClock(t),
+		FakePassiveClock: *baseclocktest.NewFakePassiveClock(t),
 		clientWG:         grc,
 		fuzz:             fuzz,
 		rand:             r,
@@ -169,8 +144,9 @@ func (fec *FakeEventClock) GetNextTime() (time.Time, bool) {
 
 // Run runs all the events scheduled, and all the events they
 // schedule, and so on, until there are none scheduled or the limit is not
-// nil and the next time would exceed the limit.  The clientWG given in
-// the constructor gates each advance of time.
+// nil and the next time would exceed the limit.  The associated
+// GoRoutineCounter gates the advancing of time.  That is,
+// time is not advanced until all the associated work is finished.
 func (fec *FakeEventClock) Run(limit *time.Time) {
 	for {
 		fec.clientWG.Wait()
@@ -200,7 +176,7 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 			for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
 				ew := heap.Pop(&fec.waiters).(eventWaiter)
 				wg.Add(1)
-				go func(f EventFunc) { f(now); wg.Done() }(ew.f)
+				go func(f clock.EventFunc) { f(now); wg.Done() }(ew.f)
 				foundSome = true
 			}
 			wg.Wait()
@@ -211,9 +187,24 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 	}
 }
 
+// Sleep returns after the given duration has passed.
+// Sleep must only be invoked in a goroutine that is counted
+// in the FakeEventClock's associated GoRoutineCounter.
+// Unlike the base FakeClock's Sleep, this method does not itself advance the clock
+// but rather leaves that up to other actors (e.g., Run).
+func (fec *FakeEventClock) Sleep(duration time.Duration) {
+	doneCh := make(chan struct{})
+	fec.EventAfterDuration(func(time.Time) {
+		fec.clientWG.Add(1)
+		close(doneCh)
+	}, duration)
+	fec.clientWG.Add(-1)
+	<-doneCh
+}
+
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
-func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
+func (fec *FakeEventClock) EventAfterDuration(f clock.EventFunc, d time.Duration) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	now := fec.Now()
@@ -223,7 +214,7 @@ func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 
 // EventAfterTime schedules the given function to be invoked once
 // the given time has arrived.
-func (fec *FakeEventClock) EventAfterTime(f EventFunc, t time.Time) {
+func (fec *FakeEventClock) EventAfterTime(f clock.EventFunc, t time.Time) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())

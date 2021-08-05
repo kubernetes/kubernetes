@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
+	testclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock/testing"
 )
 
 func TestLockingWriteOnce(t *testing.T) {
 	now := time.Now()
-	clock, counter := clock.NewFakeEventClock(now, 0, nil)
+	clock, counter := testclock.NewFakeEventClock(now, 0, nil)
 	var lock sync.Mutex
 	wr := NewWriteOnce(&lock, counter)
 	var gots int32

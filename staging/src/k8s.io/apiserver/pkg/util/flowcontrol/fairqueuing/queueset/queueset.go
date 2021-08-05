@@ -23,7 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
@@ -33,6 +34,12 @@ import (
 	fqrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog/v2"
+
+	// The following hack is needed to work around a tooling deficiency.
+	// Packages imported only for test code are not included in vendor.
+	// See https://kubernetes.slack.com/archives/C0EG7JC6T/p1626985671458800?thread_ts=1626983387.450800&cid=C0EG7JC6T
+	// The need for this hack will be removed when we make queueset use an EventClock rather than a PassiveClock.
+	_ "k8s.io/utils/clock/testing"
 )
 
 const nsTimeFmt = "2006-01-02 15:04:05.000000000"
@@ -299,7 +306,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 		go func() {
 			defer runtime.HandleCrash()
 			qs.goroutineDoneOrBlocked()
-			_ = <-doneCh
+			<-doneCh
 			// Whatever goroutine unblocked the preceding receive MUST
 			// have already either (a) incremented qs.counter or (b)
 			// known that said counter is not actually counting or (c)
