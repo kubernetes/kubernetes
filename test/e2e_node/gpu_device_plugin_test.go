@@ -77,6 +77,10 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 				ginkgo.Skip("Nvidia GPUs do not exist on the node. Skipping test.")
 			}
 
+			if framework.TestContext.ContainerRuntime != "docker" {
+				ginkgo.Skip("Test works only with in-tree dockershim. Skipping test.")
+			}
+
 			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
 			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), NVIDIADevicePlugin(), metav1.CreateOptions{})
 			framework.ExpectNoError(err)
