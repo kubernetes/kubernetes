@@ -190,7 +190,7 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of ready pods targeted by this deployment.
+  // readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
@@ -446,7 +446,7 @@ message StatefulSetStatus {
   // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
 
-  // readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+  // readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.
   optional int32 readyReplicas = 3;
 
   // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
