@@ -1,5 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+# Currently assigned to api-approvers since feature gates are the API
+# for enabling/disabling other APIs.
+
 # Disable inheritance as this is an api owners file
 options:
   no_parent_owners: true
@@ -7,11 +10,8 @@ approvers:
 - api-approvers
 reviewers:
 - api-reviewers
-emeritus_reviewers:
-- luxas
-- mtaufen
-- sttts
+
 labels:
 - kind/api-change
 - sig/api-machinery
-- sig/scheduling
+- sig/cluster-lifecycle
