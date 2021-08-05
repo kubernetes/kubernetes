@@ -125,8 +125,7 @@ type configController struct {
 	requestWaitLimit time.Duration
 
 	// This must be locked while accessing flowSchemas or
-	// priorityLevelStates.  It is the lock involved in
-	// LockingWriteMultiple.
+	// priorityLevelStates.
 	lock sync.Mutex
 
 	// flowSchemas holds the flow schema objects, sorted by increasing

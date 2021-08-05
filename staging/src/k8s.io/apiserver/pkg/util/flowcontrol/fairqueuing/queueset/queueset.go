@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fqrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
@@ -356,7 +356,7 @@ func (req *request) wait() (bool, bool) {
 	// Step 4:
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
-	decisionAny := req.decision.GetLocked()
+	decisionAny := req.decision.Get()
 	qs.syncTimeLocked()
 	decision, isDecision := decisionAny.(requestDecision)
 	if !isDecision {
@@ -453,7 +453,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		fsName:            fsName,
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
-		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		decision:          promise.NewWriteOnce(&qs.lock, qs.counter),
 		arrivalTime:       qs.clock.Now(),
 		queue:             queue,
 		descr1:            descr1,
@@ -503,7 +503,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 	waitLimit := now.Add(-qs.qCfg.RequestWaitLimit)
 	reqs.Walk(func(req *request) bool {
 		if waitLimit.After(req.arrivalTime) {
-			req.decision.SetLocked(decisionReject)
+			req.decision.Set(decisionReject)
 			timeoutCount++
 			metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 			req.NoteQueued(false)
@@ -588,13 +588,13 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
 		startTime:         now,
-		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		decision:          promise.NewWriteOnce(&qs.lock, qs.counter),
 		arrivalTime:       now,
 		descr1:            descr1,
 		descr2:            descr2,
 		workEstimate:      *workEstimate,
 	}
-	req.decision.SetLocked(decisionExecute)
+	req.decision.Set(decisionExecute)
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += req.Seats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
@@ -643,7 +643,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G
 	queue.virtualStart += qs.estimatedServiceTime * float64(request.Seats())
-	request.decision.SetLocked(decisionExecute)
+	request.decision.Set(decisionExecute)
 	return ok
 }
 
@@ -652,12 +652,12 @@ func (qs *queueSet) dispatchLocked() bool {
 func (qs *queueSet) cancelWait(req *request) {
 	qs.lock.Lock()
 	defer qs.lock.Unlock()
-	if req.decision.IsSetLocked() {
+	if req.decision.IsSet() {
 		// The request has already been removed from the queue
 		// and so we consider its wait to be over.
 		return
 	}
-	req.decision.SetLocked(decisionCancel)
+	req.decision.Set(decisionCancel)
 
 	// remove the request from the queue as it has timed out
 	req.removeFromQueueFn()
