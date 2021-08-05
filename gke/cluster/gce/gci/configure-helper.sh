@@ -1537,7 +1537,9 @@ function set_docker_options_non_ubuntu() {
    echo "setting live restore"
    # Disable live-restore if the environment variable is set.
    if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-      addockeropt "\"live-restore\": \"false\","
+      addockeropt "\"live-restore\": false,"
+   else
+      addockeropt "\"live-restore\": true,"
    fi
 }
 
