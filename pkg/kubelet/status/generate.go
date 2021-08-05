@@ -77,8 +77,8 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 	if len(unreadyContainers) > 0 {
 		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unready status: %s", unreadyContainers))
 	}
-	unreadyMessage := strings.Join(unreadyMessages, ", ")
-	if unreadyMessage != "" {
+	if len(unreadyMessages) != 0 {
+		unreadyMessage := strings.Join(unreadyMessages, ", ")
 		return v1.PodCondition{
 			Type:    v1.ContainersReady,
 			Status:  v1.ConditionFalse,
@@ -176,8 +176,8 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	if len(unreadyContainers) > 0 {
 		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with incomplete status: %s", unreadyContainers))
 	}
-	unreadyMessage := strings.Join(unreadyMessages, ", ")
-	if unreadyMessage != "" {
+	if len(unreadyMessages) != 0 {
+		unreadyMessage := strings.Join(unreadyMessages, ", ")
 		return v1.PodCondition{
 			Type:    v1.PodInitialized,
 			Status:  v1.ConditionFalse,
