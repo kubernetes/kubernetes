@@ -216,7 +216,7 @@ dependencies:
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
   - name: "k8s.gcr.io/setcap: dependents"
-    version: buster-v2.0.3
+    version: buster-v2.0.4
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=
