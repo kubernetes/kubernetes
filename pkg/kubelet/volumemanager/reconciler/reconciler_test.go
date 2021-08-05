@@ -36,6 +36,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -1861,10 +1862,11 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	fakePlugin.UnmountDeviceHook = func(mountPath string) error {
 		// Act:
 		// 3. While a volume is being unmounted, add it back to the desired state of world
-		t.Logf("UnmountDevice called")
-		generatedVolumeName, err = dsw.AddPodToVolume(
+		klog.InfoS("UnmountDevice called")
+		var generatedVolumeNameCopy v1.UniqueVolumeName
+		generatedVolumeNameCopy, err = dsw.AddPodToVolume(
 			podName, pod, volumeSpecCopy, volumeSpec.Name(), "" /* volumeGidValue */)
-		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeNameCopy})
 		return nil
 	}
 
@@ -1872,7 +1874,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		// Assert
 		// 4. When the volume is mounted again, expect that UnmountDevice operation did not clear devicePath
 		if devicePath == "" {
-			t.Errorf("Expected WaitForAttach called with devicePath from Node.Status")
+			klog.ErrorS(nil, "Expected WaitForAttach called with devicePath from Node.Status")
 			close(finished)
 			return "", fmt.Errorf("Expected devicePath from Node.Status")
 		}
