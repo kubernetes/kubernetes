@@ -571,7 +571,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatalf("No expectations found for DaemonSet %q", oldDSKey)
 	}
 	if dsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
+		t.Errorf("There should be unfulfilled expectation for creating new pods for DaemonSet %q", oldDSKey)
 	}
 
 	// process updates DS, update adds to queue
@@ -641,7 +641,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatalf("No expectations found for DaemonSet %q", oldDSKey)
 	}
 	if dsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
+		t.Errorf("There should be unfulfilled expectation for creating new pods for DaemonSet %q", oldDSKey)
 	}
 
 	err = validateSyncDaemonSets(manager, fakePodControl, 1, 0, 0)
