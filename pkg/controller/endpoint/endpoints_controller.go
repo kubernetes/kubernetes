@@ -328,6 +328,11 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 	e.queue.Add(key)
 }
 
+// onEndpointsAdd replaces checkLeftoverEndpoints()
+// on startup all current endpoints are added to the queue
+// and endpoints without a service associated will be removed
+// discard endpoints that are not managed by this controller
+// to avoid deleting custom endpoints
 func (e *Controller) onEndpointsAdd(obj interface{}) {
 	if !managedByController(obj.(*v1.Endpoints)) {
 		return
@@ -341,16 +346,25 @@ func (e *Controller) onEndpointsAdd(obj interface{}) {
 	e.queue.Add(key)
 }
 
+// onEndpointsUpdate handles the case when an user modifies an endpoint
+// so the controller can detect the change and set the correct status.
 func (e *Controller) onEndpointsUpdate(old, cur interface{}) {
-	if !managedByController(cur.(*v1.Endpoints)) {
-		return
-	}
 	key, err := controller.KeyFunc(cur)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", cur, err))
 		return
 	}
-	e.queue.Add(key)
+
+	// Ignore endpoints that are going to be deleted
+	ep := cur.(*v1.Endpoints)
+	if !ep.DeletionTimestamp.IsZero() {
+		return
+	}
+
+	// Process the endpoint if it has been owned by this controller but modified by others
+	if managedByController(ep) && managedByChanged(ep) {
+		e.queue.Add(key)
+	}
 }
 
 func (e *Controller) onEndpointsDelete(obj interface{}) {
@@ -614,36 +628,6 @@ func (e *Controller) syncService(key string) error {
 	return nil
 }
 
-// checkLeftoverEndpoints lists all currently existing endpoints and adds their
-// service to the queue. This will detect endpoints that exist with no
-// corresponding service; these endpoints need to be deleted. We only need to
-// do this once on startup, because in steady-state these are detected (but
-// some stragglers could have been left behind if the endpoint controller
-// reboots).
-func (e *Controller) checkLeftoverEndpoints() {
-	list, err := e.endpointsLister.List(labels.Everything())
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
-		return
-	}
-	for _, ep := range list {
-		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
-			// when there are multiple controller-manager instances,
-			// we observe that it will delete leader-election endpoints after 5min
-			// and cause re-election
-			// so skip the delete here
-			// as leader-election only have endpoints without service
-			continue
-		}
-		key, err := controller.KeyFunc(ep)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
-			continue
-		}
-		e.queue.Add(key)
-	}
-}
-
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int
@@ -773,21 +757,44 @@ func addressSubset(addresses []v1.EndpointAddress, maxNum int) []v1.EndpointAddr
 	return addresses[0:maxNum]
 }
 
-// managedByController returns true if the endpoint is managed by this endpoints controller
+// managedByController returns true if the endpoint is or has been managed by this endpoints controller
 func managedByController(endpoint *v1.Endpoints) bool {
+	// skip leader election endpoints
 	if _, ok := endpoint.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
-		// when there are multiple controller-manager instances,
-		// we observe that it will delete leader-election endpoints after 5min
-		// and cause re-election
-		// so skip the delete here
-		// as leader-election only have endpoints without service
 		return false
 	}
-	// endpoints without managed fields are not handled by this controller
-	// for backwards compatibility
+
+	// skip kubernetes.default that is the endpoint managed by the apiserver
+	if endpoint.Name == "kubernetes" && endpoint.Namespace == "default" {
+		return false
+	}
+
+	// ignore endpoints without SSA fields for backwards compatibility
 	if len(endpoint.ManagedFields) == 0 {
 		return false
 	}
-	// manage all endpoints created by this controller
-	return endpoint.ManagedFields[0].Manager == controllerName
+
+	// if the endpoint has been managed by this controller process it
+	for _, f := range endpoint.ManagedFields {
+		if f.Manager == controllerName {
+			return true
+		}
+	}
+	return false
+}
+
+// managedByChanged use SSA fields to detect if the Endpoint was not modified by this controller
+func managedByChanged(endpoint *v1.Endpoints) bool {
+	// ignore endpoints without SSA fields
+	if len(endpoint.ManagedFields) == 0 {
+		return false
+	}
+
+	// return true if the endpoint was not modified by this controller
+	for _, f := range endpoint.ManagedFields {
+		if f.Manager != controllerName {
+			return true
+		}
+	}
+	return false
 }
