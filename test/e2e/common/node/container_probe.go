@@ -406,17 +406,18 @@ var _ = SIGDescribe("Probing container", func() {
 	ginkgo.It("should be ready immediately after startupProbe succeeds", func() {
 		// Probe workers sleep at Kubelet start for a random time which is at most PeriodSeconds
 		// this test requires both readiness and startup workers running before updating statuses
-		// to avoid flakes, ensure sleep before startup (22s) > readinessProbe.PeriodSeconds
-		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 22; echo ok >/tmp/startup; sleep 600"}
+		// to avoid flakes, ensure sleep before startup (32s) > readinessProbe.PeriodSeconds
+		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 32; echo ok >/tmp/startup; sleep 600"}
 		readinessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/health"}),
 			InitialDelaySeconds: 0,
-			PeriodSeconds:       20,
+			PeriodSeconds:       30,
 		}
 		startupProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/startup"}),
 			InitialDelaySeconds: 0,
-			FailureThreshold:    60,
+			FailureThreshold:    120,
+			PeriodSeconds:       5,
 		}
 		p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
@@ -445,8 +446,8 @@ var _ = SIGDescribe("Probing container", func() {
 		if readyIn < 0 {
 			framework.Failf("Pod became ready before startupProbe succeeded")
 		}
-		if readyIn > 5*time.Second {
-			framework.Failf("Pod became ready in %v, more than 5s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
+		if readyIn > 25*time.Second {
+			framework.Failf("Pod became ready in %v, more than 25s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
 		}
 	})
 
