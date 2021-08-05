@@ -587,7 +587,7 @@ function ensure-container-runtime {
   container_runtime="${CONTAINER_RUNTIME:-docker}"
   if [[ "${container_runtime}" == "docker" ]]; then
     if ! command -v docker >/dev/null 2>&1; then
-      install-docker
+      log-wrap "InstallDocker" install-docker
       if ! command -v docker >/dev/null 2>&1; then
         echo "ERROR docker not found. Aborting."
         exit 2
@@ -597,7 +597,7 @@ function ensure-container-runtime {
   elif [[ "${container_runtime}" == "containerd" ]]; then
     # Install containerd/runc if requested
     if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-      install-containerd-ubuntu
+      log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
     fi
     # Verify presence and print versions of ctr, containerd, runc
     if ! command -v ctr >/dev/null 2>&1; then
@@ -633,7 +633,7 @@ function install-kube-binary-config {
     local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
   else
     echo "Downloading binary release sha512 (not found in env)"
-    download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
+    log-wrap "DownloadServerBinarySHA" download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
     local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha512")
   fi
 
@@ -641,8 +641,8 @@ function install-kube-binary-config {
     echo "${server_binary_tar} is preloaded."
   else
     echo "Downloading binary release tar"
-    download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
-    tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
+    log-wrap "DownloadServerBinary" download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
+    log-wrap "UntarServerBinary" tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
     # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
     local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
     local dst_dir="${KUBE_HOME}/kube-docker-files"
@@ -656,7 +656,7 @@ function install-kube-binary-config {
       cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
       cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
     fi
-    load-docker-images
+    log-wrap "LoadDockerImages" load-docker-images
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
@@ -669,31 +669,31 @@ function install-kube-binary-config {
 
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
      [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    install-node-problem-detector
+    log-wrap "InstallNodeProblemDetector" install-node-problem-detector
   fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    install-cni-binaries
+    log-wrap "InstallCNIBinaries" install-cni-binaries
   fi
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
-  install-kube-manifests
+  log-wrap "InstallKubeManifests" install-kube-manifests
   chmod -R 755 "${KUBE_BIN}"
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
-  install-gci-mounter-tools
+  log-wrap "InstallGCIMounterTools" install-gci-mounter-tools
 
   # Remount the Flexvolume directory with the "exec" option, if needed.
   if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
-    remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+    log-wrap "RemountFlexVolume" remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
 
   # Install crictl on each node.
-  install-crictl
+  log-wrap "InstallCrictl" install-crictl
 
   # TODO(awly): include the binary and license in the OS image.
-  install-exec-auth-plugin
+  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
