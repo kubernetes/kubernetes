@@ -550,7 +550,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -576,7 +575,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -601,7 +599,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -633,7 +630,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -665,7 +661,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -698,7 +693,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -733,7 +727,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -766,7 +759,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -801,7 +793,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -855,7 +846,6 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			expectedArgFunc: func(tmpdir string) []string {
 				return []string{
 					"kube-controller-manager",
-					"--port=0",
 					"--bind-address=127.0.0.1",
 					"--leader-elect=true",
 					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
@@ -885,7 +875,6 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			expectedArgFunc: func(tmpdir string) []string {
 				return []string{
 					"kube-controller-manager",
-					"--port=0",
 					"--bind-address=127.0.0.1",
 					"--leader-elect=true",
 					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
