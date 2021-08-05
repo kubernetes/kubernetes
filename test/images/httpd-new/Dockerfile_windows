@@ -43,5 +43,4 @@ ENV PATH="C:\dig;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\
 
 USER ContainerAdministrator
 EXPOSE 80
-LABEL image_version="2.4.39-1"
 ENTRYPOINT ["C:/usr/local/apache2/bin/httpd.exe"]
