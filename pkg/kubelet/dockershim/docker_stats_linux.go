@@ -20,42 +20,30 @@ limitations under the License.
 package dockershim
 
 import (
-	"context"
 	"time"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
-	info, err := ds.client.Info()
+func (ds *dockerService) getContainerStats(c *runtimeapi.Container) (*runtimeapi.ContainerStats, error) {
+	statsJSON, err := ds.client.GetContainerStats(c.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	statsJSON, err := ds.client.GetContainerStats(containerID)
+	containerJSON, err := ds.client.InspectContainerWithSize(c.Id)
 	if err != nil {
 		return nil, err
 	}
-
-	containerJSON, err := ds.client.InspectContainerWithSize(containerID)
-	if err != nil {
-		return nil, err
-	}
-
-	statusResp, err := ds.ContainerStatus(context.Background(), &runtimeapi.ContainerStatusRequest{ContainerId: containerID})
-	if err != nil {
-		return nil, err
-	}
-	status := statusResp.GetStatus()
 
 	dockerStats := statsJSON.Stats
 	timestamp := time.Now().UnixNano()
 	containerStats := &runtimeapi.ContainerStats{
 		Attributes: &runtimeapi.ContainerAttributes{
-			Id:          containerID,
-			Metadata:    status.Metadata,
-			Labels:      status.Labels,
-			Annotations: status.Annotations,
+			Id:          c.Id,
+			Metadata:    c.Metadata,
+			Labels:      c.Labels,
+			Annotations: c.Annotations,
 		},
 		Cpu: &runtimeapi.CpuUsage{
 			Timestamp:            timestamp,
@@ -67,7 +55,7 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp: timestamp,
-			FsId:      &runtimeapi.FilesystemIdentifier{Mountpoint: info.DockerRootDir},
+			FsId:      &runtimeapi.FilesystemIdentifier{Mountpoint: ds.dockerRootDir},
 			UsedBytes: &runtimeapi.UInt64Value{Value: uint64(*containerJSON.SizeRw)},
 		},
 	}
