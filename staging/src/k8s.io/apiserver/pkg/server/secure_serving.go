@@ -157,6 +157,9 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig:      tlsConfig,
+
+		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
@@ -164,7 +167,9 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	// and small enough to allow a per connection buffer of this size multiplied by `MaxConcurrentStreams`.
 	const resourceBody99Percentile = 256 * 1024
 
-	http2Options := &http2.Server{}
+	http2Options := &http2.Server{
+		IdleTimeout: 90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+	}
 
 	// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
 	http2Options.MaxUploadBufferPerStream = resourceBody99Percentile
@@ -218,6 +223,9 @@ func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutd
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig:      tlsConfig,
+
+		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
@@ -225,7 +233,9 @@ func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutd
 	// and small enough to allow a per connection buffer of this size multiplied by `MaxConcurrentStreams`.
 	const resourceBody99Percentile = 256 * 1024
 
-	http2Options := &http2.Server{}
+	http2Options := &http2.Server{
+		IdleTimeout: 90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+	}
 
 	// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
 	http2Options.MaxUploadBufferPerStream = resourceBody99Percentile
