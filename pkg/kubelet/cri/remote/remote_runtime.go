@@ -569,6 +569,46 @@ func (r *remoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerSt
 	return resp.GetStats(), nil
 }
 
+// PodSandboxStats returns the stats of the pod.
+func (r *remoteRuntimeService) PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
+	klog.V(10).InfoS("[RemoteRuntimeService] PodSandboxStats", "podSandboxID", podSandboxID, "timeout", r.timeout)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.PodSandboxStats(ctx, &runtimeapi.PodSandboxStatsRequest{
+		PodSandboxId: podSandboxID,
+	})
+	if err != nil {
+		if r.logReduction.ShouldMessageBePrinted(err.Error(), podSandboxID) {
+			klog.ErrorS(err, "PodSandbox from runtime service failed", "podSandboxID", podSandboxID)
+		}
+		return nil, err
+	}
+	r.logReduction.ClearID(podSandboxID)
+	klog.V(10).InfoS("[RemoteRuntimeService] PodSandbox Response", "podSandboxID", podSandboxID, "stats", resp.GetStats())
+
+	return resp.GetStats(), nil
+}
+
+// ListPodSandboxStats returns the list of pod sandbox stats given the filter
+func (r *remoteRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	klog.V(10).InfoS("[RemoteRuntimeService] ListPodSandboxStats", "filter", filter)
+	// Set timeout, because runtimes are able to cache disk stats results
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.ListPodSandboxStats(ctx, &runtimeapi.ListPodSandboxStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		klog.ErrorS(err, "ListPodSandboxStats with filter from runtime service failed", "filter", filter)
+		return nil, err
+	}
+	klog.V(10).InfoS("[RemoteRuntimeService] ListPodSandboxStats Response", "filter", filter, "stats", resp.GetStats())
+
+	return resp.GetStats(), nil
+}
+
 // ReopenContainerLog reopens the container log file.
 func (r *remoteRuntimeService) ReopenContainerLog(containerID string) error {
 	klog.V(10).InfoS("[RemoteRuntimeService] ReopenContainerLog", "containerID", containerID, "timeout", r.timeout)
