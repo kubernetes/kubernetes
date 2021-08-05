@@ -746,10 +746,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for j := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[j]
-		for k := range container.Ports {
-			podPort := &container.Ports[k]
+	for _, container := range pod.Spec.Containers {
+		for _, podPort := range container.Ports {
 			if add {
 				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {
