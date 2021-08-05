@@ -464,7 +464,10 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 		return []string{"Failed to list pods"}
 	}
 
-	var warnings []string
+	var (
+		warnings        []string
+		warningsPodsMap = make(map[string][]string)
+	)
 	if len(pods) > namespaceMaxPodsToCheck {
 		warnings = append(warnings, fmt.Sprintf("Large namespace: only checking the first %d of %d pods", namespaceMaxPodsToCheck, len(pods)))
 		pods = pods[0:namespaceMaxPodsToCheck]
@@ -477,15 +480,34 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 		}
 		r := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(enforce, &pod.ObjectMeta, &pod.Spec))
 		if !r.Allowed {
-			// TODO: consider aggregating results (e.g. multiple pods failed for the same reasons)
-			warnings = append(warnings, fmt.Sprintf("%s: %s", pod.Name, r.ForbiddenReason()))
+			warningsPodsMap[r.ForbiddenReason()] = append(warningsPodsMap[r.ForbiddenReason()], pod.Name)
 		}
 		if time.Now().After(deadline) {
+			warnings = aggregatePodsWarnings(warningsPodsMap, warnings)
 			return append(warnings, fmt.Sprintf("Timeout reached after checking %d pods", i+1))
 		}
 	}
 
-	return warnings
+	return aggregatePodsWarnings(warningsPodsMap, warnings)
+}
+
+// Convert unordered map to []string
+func aggregatePodsWarnings(podsWarings map[string][]string, warning []string) []string {
+	var aggregatePodsWarning []string
+	for reason, podNames := range podsWarings {
+		var aggregaterPods string
+		switch len(podNames) {
+		case 1:
+			aggregaterPods = podNames[0]
+		case 2:
+			aggregaterPods = fmt.Sprintf("%s (and 1 other pod)", podNames[0])
+		default:
+			aggregaterPods = fmt.Sprintf("%s (and %d other pods)", podNames[0], len(podNames)-1)
+		}
+		aggregatePodsWarning = append(aggregatePodsWarning, fmt.Sprintf("%s: %s", aggregaterPods, reason))
+	}
+
+	return append(warning, aggregatePodsWarning...)
 }
 
 func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, error) {
