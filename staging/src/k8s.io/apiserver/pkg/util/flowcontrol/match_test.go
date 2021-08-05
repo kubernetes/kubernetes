@@ -102,8 +102,8 @@ func TestLiterals(t *testing.T) {
 			Name:              "eman",
 			Parts:             []string{"goodrscs", "eman"},
 		},
-		User:  ui,
-		Width: fcrequest.Width{Seats: 1},
+		User:         ui,
+		WorkEstimate: fcrequest.WorkEstimate{Seats: 1},
 	}
 	reqRU := RequestDigest{
 		RequestInfo: &request.RequestInfo{
@@ -118,8 +118,8 @@ func TestLiterals(t *testing.T) {
 			Name:              "eman",
 			Parts:             []string{"goodrscs", "eman"},
 		},
-		User:  ui,
-		Width: fcrequest.Width{Seats: 1},
+		User:         ui,
+		WorkEstimate: fcrequest.WorkEstimate{Seats: 1},
 	}
 	reqN := RequestDigest{
 		RequestInfo: &request.RequestInfo{
@@ -127,8 +127,8 @@ func TestLiterals(t *testing.T) {
 			Path:              "/openapi/v2",
 			Verb:              "goodverb",
 		},
-		User:  ui,
-		Width: fcrequest.Width{Seats: 1},
+		User:         ui,
+		WorkEstimate: fcrequest.WorkEstimate{Seats: 1},
 	}
 	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
 		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,

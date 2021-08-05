@@ -70,7 +70,9 @@ const (
 	decisionSkipFilter
 )
 
-var defaultRequestWidthEstimator = func(*http.Request) fcrequest.Width { return fcrequest.Width{Seats: 1} }
+var defaultRequestWorkEstimator = func(*http.Request) fcrequest.WorkEstimate {
+	return fcrequest.WorkEstimate{Seats: 1}
+}
 
 type fakeApfFilter struct {
 	mockDecision mockDecision
@@ -165,7 +167,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter, defaultRequestWidthEstimator)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -649,7 +651,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 	reqDigestExpected := &utilflowcontrol.RequestDigest{
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
-		Width: fcrequest.Width{
+		WorkEstimate: fcrequest.WorkEstimate{
 			Seats: 5,
 		},
 	}
@@ -657,7 +659,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request) fcrequest.Width { return reqDigestExpected.Width },
+		func(_ *http.Request) fcrequest.WorkEstimate { return reqDigestExpected.WorkEstimate },
 	)
 
 	w := httptest.NewRecorder()
@@ -1171,7 +1173,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWidthEstimator)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
