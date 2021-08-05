@@ -106,6 +106,10 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				framework.ExpectNoError(err)
 				beforeKC = kc
 			}
+
+			// show hidden metrics for release 1.22
+			beforeKC = updateShowHiddenMetricsForVersion(beforeKC, "1.22")
+
 			// reset the node's assigned/active/last-known-good config by setting the source to nil,
 			// so each test starts from a clean-slate
 			(&nodeConfigTestCase{
@@ -118,6 +122,9 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				framework.ExpectNoError(err)
 				localKC = kc
 			}
+
+			// show hidden metrics for release 1.22
+			localKC = updateShowHiddenMetricsForVersion(localKC, "1.22")
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1190,4 +1197,15 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		}
 		return nil
 	}, timeout, interval).Should(gomega.BeNil())
+}
+
+func updateShowHiddenMetricsForVersion(cfg *kubeletconfig.KubeletConfiguration, version string) *kubeletconfig.KubeletConfiguration {
+	if cfg == nil {
+		return &kubeletconfig.KubeletConfiguration{
+			ShowHiddenMetricsForVersion: version,
+		}
+	}
+
+	cfg.ShowHiddenMetricsForVersion = version
+	return cfg
 }
