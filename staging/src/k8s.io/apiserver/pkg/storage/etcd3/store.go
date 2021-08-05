@@ -230,12 +230,22 @@ func (s *store) conditionalDelete(
 				}
 
 				// It's possible we're working with stale data.
+				// Remember the revision of the potentially stale data and the resulting update error
+				cachedRev := origState.rev
+				cachedUpdateErr := err
+
 				// Actually fetch
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
 				origStateIsCurrent = true
+
+				// it turns out our cached data was not stale, return the error
+				if cachedRev == origState.rev {
+					return cachedUpdateErr
+				}
+
 				// Retry
 				continue
 			}
@@ -246,12 +256,22 @@ func (s *store) conditionalDelete(
 			}
 
 			// It's possible we're working with stale data.
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}
@@ -345,12 +365,22 @@ func (s *store) GuaranteedUpdate(
 			}
 
 			// It's possible we were working with stale data
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}
