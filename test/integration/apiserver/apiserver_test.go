@@ -269,6 +269,54 @@ func TestCacheControl(t *testing.T) {
 	}
 }
 
+// Tests that the apiserver returns HSTS headers as expected.
+func TestHSTS(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.GenericConfig.HSTSDirectives = []string{"max-age=31536000", "includeSubDomains"}
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		// untyped
+		"/",
+		// health
+		"/healthz",
+		// openapi
+		"/openapi/v2",
+		// discovery
+		"/api",
+		"/api/v1",
+		"/apis",
+		"/apis/apps",
+		"/apis/apps/v1",
+		// apis
+		"/api/v1/namespaces",
+		"/apis/apps/v1/deployments",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cc := resp.Header.Get("Strict-Transport-Security")
+			if !strings.Contains(cc, "max-age=31536000; includeSubDomains") {
+				t.Errorf("expected max-age=31536000; includeSubDomains, got %q", cc)
+			}
+		})
+	}
+}
+
 // Tests that the apiserver returns 202 status code as expected.
 func Test202StatusCode(t *testing.T) {
 	s, clientSet, closeFn := setup(t)
