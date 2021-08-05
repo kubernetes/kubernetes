@@ -44,6 +44,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
@@ -1413,7 +1414,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.StorageVersioner = opts.StorageConfig.EncodeVersioner
 
 		if opts.CountMetricPollPeriod > 0 {
-			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod)
+			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker)
 			previousDestroy := e.DestroyFunc
 			e.DestroyFunc = func() {
 				stopFunc()
@@ -1428,7 +1429,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 }
 
 // startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
-func (e *Store) startObservingCount(period time.Duration) func() {
+func (e *Store) startObservingCount(period time.Duration, objectCountTracker flowcontrolrequest.StorageObjectCountTracker) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
 	klog.V(2).InfoS("Monitoring resource count at path", "resource", resourceName, "path", "<storage-prefix>/"+prefix)
@@ -1437,9 +1438,12 @@ func (e *Store) startObservingCount(period time.Duration) func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
 			klog.V(5).InfoS("Failed to update storage count metric", "err", err)
-			metrics.UpdateObjectCount(resourceName, -1)
-		} else {
-			metrics.UpdateObjectCount(resourceName, count)
+			count = -1
+		}
+
+		metrics.UpdateObjectCount(resourceName, count)
+		if objectCountTracker != nil {
+			objectCountTracker.Set(resourceName, count)
 		}
 	}, period, resourceCountPollPeriodJitter, true, stopCh)
 	return func() { close(stopCh) }
