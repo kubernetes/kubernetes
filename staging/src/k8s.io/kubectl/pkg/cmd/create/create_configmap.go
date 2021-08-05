@@ -69,7 +69,7 @@ var (
 		  kubectl create configmap my-config --from-file=path/to/bar
 
 		  # Create a new config map named my-config from an env file
-		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
+		  kubectl create configmap my-config --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`))
 )
 
 // ConfigMapOptions holds properties for create configmap sub-command
@@ -86,8 +86,8 @@ type ConfigMapOptions struct {
 	FileSources []string
 	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
-	// EnvFileSource to derive the configMap from (optional)
-	EnvFileSource string
+	// EnvFileSources to derive the configMap from (optional)
+	EnvFileSources []string
 	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
 	AppendHash bool
 
@@ -106,10 +106,8 @@ type ConfigMapOptions struct {
 // NewConfigMapOptions creates a new *ConfigMapOptions with default value
 func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOptions {
 	return &ConfigMapOptions{
-		FileSources:    []string{},
-		LiteralSources: []string{},
-		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		IOStreams:      ioStreams,
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
 	}
 }
 
@@ -138,7 +136,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key file can be specified using its file path, in which case file basename will be used as configmap key, or optionally with a key and file path, in which case the given key will be used.  Specifying a directory will iterate each named file in the directory whose basename is a valid configmap key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
-	cmd.Flags().StringVar(&o.EnvFileSource, "from-env-file", o.EnvFileSource, "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
+	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the configmap to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
@@ -205,7 +203,7 @@ func (o *ConfigMapOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if len(o.EnvFileSource) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
+	if len(o.EnvFileSources) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
 		return fmt.Errorf("from-env-file cannot be combined with from-file or from-literal")
 	}
 	return nil
@@ -272,8 +270,8 @@ func (o *ConfigMapOptions) createConfigMap() (*corev1.ConfigMap, error) {
 			return nil, err
 		}
 	}
-	if len(o.EnvFileSource) > 0 {
-		if err := handleConfigMapFromEnvFileSource(configMap, o.EnvFileSource); err != nil {
+	if len(o.EnvFileSources) > 0 {
+		if err := handleConfigMapFromEnvFileSources(configMap, o.EnvFileSources); err != nil {
 			return nil, err
 		}
 	}
@@ -351,25 +349,31 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 	return nil
 }
 
-// handleConfigMapFromEnvFileSource adds the specified env file source information
+// handleConfigMapFromEnvFileSources adds the specified env file source information
 // into the provided configMap
-func handleConfigMapFromEnvFileSource(configMap *corev1.ConfigMap, envFileSource string) error {
-	info, err := os.Stat(envFileSource)
-	if err != nil {
-		switch err := err.(type) {
-		case *os.PathError:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
-		default:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err)
+func handleConfigMapFromEnvFileSources(configMap *corev1.ConfigMap, envFileSources []string) error {
+	for _, envFileSource := range envFileSources {
+		info, err := os.Stat(envFileSource)
+		if err != nil {
+			switch err := err.(type) {
+			case *os.PathError:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
+			default:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err)
+			}
+		}
+		if info.IsDir() {
+			return fmt.Errorf("env config file cannot be a directory")
+		}
+		err = cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
+			return addKeyFromLiteralToConfigMap(configMap, key, value)
+		})
+		if err != nil {
+			return err
 		}
 	}
-	if info.IsDir() {
-		return fmt.Errorf("env config file cannot be a directory")
-	}
 
-	return cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
-		return addKeyFromLiteralToConfigMap(configMap, key, value)
-	})
+	return nil
 }
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
