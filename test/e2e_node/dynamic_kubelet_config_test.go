@@ -143,7 +143,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			restore.run(f, setConfigSourceFunc, false, 0)
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: state transitions:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: state transitions:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -308,7 +308,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -372,7 +372,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
 			ginkgo.It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
@@ -427,7 +427,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 		})
 
 		// previously, we missed a panic because we were not exercising this path
-		ginkgo.Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
