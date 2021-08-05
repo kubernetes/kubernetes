@@ -598,7 +598,7 @@ The CSI health monitoring feature is being released as a second Alpha in Kuberne
 
 ### `TopologyAwareHints` feature falls back to default behavior
 
-The feature gate currently falls back to the default behavior in most cases. Enabling the feature gate will add hints to `EndpointSlices`, but functional differences are only observed in non-dual stack kube-proxy implementation. [The fix will be available in coming releases](https://github.com/kubernetes/kubernetes/pull/100804).
+The feature gate currently falls back to the default behavior in most cases. Enabling the feature gate will add hints to `EndpointSlices`, but functional differences are only observed in non-dual stack kube-proxy implementation. This is fixed by [#101054](https://github.com/kubernetes/kubernetes/pull/101054).
 
 ## Urgent Upgrade Notes 
 
