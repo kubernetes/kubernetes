@@ -77,7 +77,7 @@ network_closure.sh
 # Karma output
 /www/test_out
 
-# precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
+# Precommit temporary directories created by ./hack/verify-generated-docs.sh and ./hack/lib/util.sh
 /_tmp/
 /doc_tmp/
 
