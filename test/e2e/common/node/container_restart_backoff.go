@@ -78,6 +78,7 @@ var _ = SIGDescribe("ContainerRestartBackoff", func() {
 				300, // Maximum duration of retreat backoff from pkg/kubelet.MaxContainerBackOff
 				300,
 				300,
+				300,
 			}
 
 			ginkgo.By("watch container restart")

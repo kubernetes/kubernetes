@@ -1740,6 +1740,12 @@
     accordingly.
   release: v1.13
   file: test/e2e/common/node/runtime.go
+- testname: Kubelet, Container, Restart, Backoff
+  codename: '[sig-node] ContainerRestartBackoff when a container restart Should be
+    restarted the container with an exponential backoff [NodeConformance] [Conformance]'
+  description: Restarted the container with an exponential backoff.
+  release: v1.23
+  file: test/e2e/common/node/container_restart_backoff.go
 - testname: Containers, with arguments
   codename: '[sig-node] Containers should be able to override the image''s default
     arguments (container cmd) [NodeConformance] [Conformance]'
