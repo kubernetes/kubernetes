@@ -49,6 +49,8 @@ type Interface interface {
 	MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error
 	// MountSensitiveWithoutSystemd is the same as MountSensitive() but this method disable using systemd mount.
 	MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error
+	// MountSensitiveWithoutSystemdWithMountFlags is the same as MountSensitiveWithoutSystemd() with additional mount flags
+	MountSensitiveWithoutSystemdWithMountFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error
 	// Unmount unmounts given target.
 	Unmount(target string) error
 	// List returns a list of all mounted filesystems.  This can be large.
