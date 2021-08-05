@@ -217,6 +217,12 @@ func TestTaint(t *testing.T) {
 			expectTaint: false,
 		},
 		{
+			description: "add and remove taint with same key and effect should be rejected",
+			args:        []string{"node", "node-name", "foo=:NoExcute", "foo=:NoExcute-"},
+			expectFatal: true,
+			expectTaint: false,
+		},
+		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
 			oldTaints: []corev1.Taint{{
 				Key:    "foo",
