@@ -323,7 +323,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
-	encoder := json.NewEncoder(w)
+	encoder := jsoniter.ConfigCompatibleWithStandardLibrary.NewEncoder(w)
 	return encoder.Encode(obj)
 }
 
