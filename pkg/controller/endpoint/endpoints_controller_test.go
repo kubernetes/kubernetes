@@ -442,7 +442,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
@@ -513,7 +513,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "UDP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsProtocolSCTP(t *testing.T) {
@@ -557,7 +557,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "SCTP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
@@ -597,7 +597,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
@@ -637,7 +637,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Ports:             []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
@@ -678,7 +678,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Ports:             []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
@@ -721,7 +721,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -794,7 +794,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
 	})
 	endpointsHandler.ValidateRequestCount(t, 1)
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints?fieldManager="+controllerName, "POST", &data)
 }
 
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
@@ -842,7 +842,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
 	})
 	endpointsHandler.ValidateRequestCount(t, 1)
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints?fieldManager="+controllerName, "POST", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
@@ -892,7 +892,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
@@ -997,7 +997,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 		t.Fatalf("syncing endpoints changed service: %s", diff.ObjectReflectDiff(service, originalService))
 	}
 	endpointsHandler.ValidateRequestCount(t, 1)
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFailed(t *testing.T) {
@@ -1036,7 +1036,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucceeded(t *testing.T) {
@@ -1075,7 +1075,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhaseSucceeded(t *testing.T) {
@@ -1114,7 +1114,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
@@ -1145,7 +1145,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 			Ports:     nil,
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints?fieldManager="+controllerName, "POST", &data)
 }
 
 // There are 3*5 possibilities(3 types of RestartPolicy by 5 types of PodPhase). Not list them all here.
@@ -1539,7 +1539,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
@@ -1589,7 +1589,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
@@ -1637,7 +1637,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo?fieldManager="+controllerName, "PUT", &data)
 }
 
 // TestPodUpdatesBatching verifies that endpoint updates caused by pod updates are batched together.
