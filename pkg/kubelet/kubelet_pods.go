@@ -1791,7 +1791,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 // ServeLogs returns logs of current machine.
 func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
-	// TODO: whitelist logs we are willing to serve
+	// TODO: allowlist logs we are willing to serve
 	kl.logServer.ServeHTTP(w, req)
 }
 

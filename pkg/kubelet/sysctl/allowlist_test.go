@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 )
 
-func TestNewWhitelist(t *testing.T) {
+func TestNewAllowlist(t *testing.T) {
 	type Test struct {
 		sysctls []string
 		err     bool
@@ -35,16 +35,16 @@ func TestNewWhitelist(t *testing.T) {
 		{sysctls: []string{"net.*.foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
 	} {
-		_, err := NewWhitelist(append(sysctl.SafeSysctlWhitelist(), test.sysctls...))
+		_, err := NewAllowlist(append(sysctl.SafeSysctlAllowlist(), test.sysctls...))
 		if test.err && err == nil {
-			t.Errorf("expected an error creating a whitelist for %v", test.sysctls)
+			t.Errorf("expected an error creating a allowlist for %v", test.sysctls)
 		} else if !test.err && err != nil {
-			t.Errorf("got unexpected error creating a whitelist for %v: %v", test.sysctls, err)
+			t.Errorf("got unexpected error creating a allowlist for %v: %v", test.sysctls, err)
 		}
 	}
 }
 
-func TestWhitelist(t *testing.T) {
+func TestAllowlist(t *testing.T) {
 	type Test struct {
 		sysctl           string
 		hostNet, hostIPC bool
@@ -65,14 +65,14 @@ func TestWhitelist(t *testing.T) {
 		{sysctl: "kernel.sem", hostIPC: true},
 	}
 
-	w, err := NewWhitelist(append(sysctl.SafeSysctlWhitelist(), "kernel.msg*", "kernel.sem"))
+	w, err := NewAllowlist(append(sysctl.SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem"))
 	if err != nil {
-		t.Fatalf("failed to create whitelist: %v", err)
+		t.Fatalf("failed to create allowlist: %v", err)
 	}
 
 	for _, test := range valid {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err != nil {
-			t.Errorf("expected to be whitelisted: %+v, got: %v", test, err)
+			t.Errorf("expected to be allowlisted: %+v, got: %v", test, err)
 		}
 	}
 

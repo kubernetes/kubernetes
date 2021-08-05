@@ -1006,19 +1006,19 @@ func TestValidatePodSuccess(t *testing.T) {
 			pod: seccompPod,
 			psp: seccompPSP,
 		},
-		"flex volume driver in a whitelist (all volumes are allowed)": {
+		"flex volume driver in a allowlist (all volumes are allowed)": {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(false, true),
 		},
-		"flex volume driver with empty whitelist (all volumes are allowed)": {
+		"flex volume driver with empty allowlist (all volumes are allowed)": {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(true, true),
 		},
-		"flex volume driver in a whitelist (only flex volumes are allowed)": {
+		"flex volume driver in a allowlist (only flex volumes are allowed)": {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(false, false),
 		},
-		"flex volume driver with empty whitelist (only flex volumes volumes are allowed)": {
+		"flex volume driver with empty allowlist (only flex volumes volumes are allowed)": {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(true, false),
 		},
