@@ -584,7 +584,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		devicePath := volumeToMount.DevicePath
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
 
 			devicePath, err = volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, devicePath, volumeToMount.Pod, waitForAttachTimeout)
@@ -594,7 +594,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 
-			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
+			klog.InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)), "pod", klog.KObj(volumeToMount.Pod))
 		}
 
 		var resizeDone bool
@@ -627,7 +627,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 
-			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath)))
+			klog.InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath)), "pod", klog.KObj(volumeToMount.Pod))
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
@@ -659,9 +659,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 					volumeToMount.VolumeName, devicePath, deviceMountPath)
 				if markDeviceUncertainErr != nil {
 					// just log, return the resizeError error instead
-					klog.Infof(volumeToMount.GenerateMsgDetailed(
+					klog.InfoS(volumeToMount.GenerateMsgDetailed(
 						"MountVolume.MountDevice failed to mark volume as uncertain",
-						markDeviceUncertainErr.Error()))
+						markDeviceUncertainErr.Error()), "pod", klog.KObj(volumeToMount.Pod))
 				}
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -704,12 +704,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
-		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
+		detailedMsg := volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", "")
 		verbosity := klog.Level(1)
 		if isRemount {
 			verbosity = klog.Level(4)
 		}
-		klog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 
@@ -1070,7 +1070,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			klog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.InfoS(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
 
 			devicePath, err = volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, volumeToMount.Pod, waitForAttachTimeout)
@@ -1080,7 +1080,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 
-			klog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
+			klog.InfoS(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)), "pod", klog.KObj(volumeToMount.Pod))
 
 		}
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
@@ -1188,13 +1188,13 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MapVolume.MapPodDevice succeeded", fmt.Sprintf("globalMapPath %q", globalMapPath))
 		verbosity := klog.Level(4)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
-		klog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 
 		// Device mapping for pod device map path succeeded
 		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapPodDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
 		verbosity = klog.Level(1)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
-		klog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 
 		resizeOptions := volume.NodeResizeOptions{
 			DevicePath:      devicePath,
@@ -1520,7 +1520,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				klog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
+				klog.InfoS(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
 					eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
@@ -1835,7 +1835,7 @@ func (og *operationGenerator) nodeExpandVolume(
 		pvSpecCap := pv.Spec.Capacity[v1.ResourceStorage]
 		if pvcStatusCap.Cmp(pvSpecCap) < 0 {
 			// File system resize was requested, proceed
-			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
 
 			if volumeToMount.VolumeSpec.ReadOnly {
 				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume failed", "requested read-only file system")
@@ -1868,7 +1868,7 @@ func (og *operationGenerator) nodeExpandVolume(
 			simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume succeeded", "")
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 			og.recorder.Eventf(pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-			klog.Infof(detailedMsg)
+			klog.InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
 			err = util.MarkFSResizeFinished(pvc, pvSpecCap, og.kubeClient)
 			if err != nil {
