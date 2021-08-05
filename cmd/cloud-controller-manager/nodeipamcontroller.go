@@ -53,8 +53,8 @@ type nodeIPAMController struct {
 }
 
 func (nodeIpamController *nodeIPAMController) startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
-	errors := nodeIpamController.nodeIPAMControllerOptions.Validate()
-	if len(errors) > 0 {
+	allErrors := nodeIpamController.nodeIPAMControllerOptions.Validate()
+	if len(allErrors) > 0 {
 		klog.Fatal("NodeIPAM controller values are not properly set.")
 	}
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
