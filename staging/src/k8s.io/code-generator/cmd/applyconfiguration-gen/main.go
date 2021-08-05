@@ -19,10 +19,8 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
@@ -33,7 +31,7 @@ import (
 func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
 	if err := flag.Set("logtostderr", "true"); err != nil {

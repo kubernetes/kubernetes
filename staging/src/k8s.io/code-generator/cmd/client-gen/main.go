@@ -19,10 +19,8 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/client-gen/args"
@@ -36,7 +34,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of client-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
 
 	genericArgs.AddFlags(pflag.CommandLine)
