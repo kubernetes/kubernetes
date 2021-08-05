@@ -43,7 +43,7 @@ var (
 	kubeCIBucketURL       = "https://storage.googleapis.com/k8s-release-dev"
 	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
 	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?)\z`)
-	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci|ci-cross)/)?([-\w_\.+]+)$`)
+	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci)/)?([-\w_\.+]+)$`)
 )
 
 // KubernetesReleaseVersion is helper function that can fetch

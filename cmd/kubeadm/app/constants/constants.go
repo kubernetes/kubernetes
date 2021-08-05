@@ -312,7 +312,7 @@ const (
 	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
 	NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
-	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
+	// DefaultCIImageRepository points to image registry where CI uploads images from ci build job
 	DefaultCIImageRepository = "gcr.io/k8s-staging-ci-images"
 
 	// CoreDNSConfigMap specifies in what ConfigMap in the kube-system namespace the CoreDNS config should be stored
