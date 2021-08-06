@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -504,7 +505,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	kubelet.podWorkers.(*fakePodWorkers).statusLock.Lock()
 	kubelet.podWorkers.(*fakePodWorkers).removeRuntime = map[types.UID]bool{pod.UID: true}
+	kubelet.podWorkers.(*fakePodWorkers).statusLock.Unlock()
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
