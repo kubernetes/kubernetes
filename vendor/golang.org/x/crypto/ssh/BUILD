@@ -49,7 +49,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/golang.org/x/crypto/ssh/internal/bcrypt_pbkdf:all-srcs",
-        "//vendor/golang.org/x/crypto/ssh/terminal:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

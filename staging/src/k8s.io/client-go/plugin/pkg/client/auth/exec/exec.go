@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -193,7 +193,7 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
-		interactive: terminal.IsTerminal(int(os.Stdout.Fd())),
+		interactive: term.IsTerminal(int(os.Stdout.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
 	}

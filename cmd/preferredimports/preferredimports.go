@@ -35,14 +35,14 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var (
 	importAliases = flag.String("import-aliases", "hack/.import-aliases", "json file with import aliases")
 	confirm       = flag.Bool("confirm", false, "update file with the preferred aliases for imports")
 	regex         = flag.String("include-path", "(test/e2e/|test/e2e_node)", "only files with paths matching this regex is touched")
-	isTerminal    = terminal.IsTerminal(int(os.Stdout.Fd()))
+	isTerminal    = term.IsTerminal(int(os.Stdout.Fd()))
 	logPrefix     = ""
 	aliases       map[string]string
 )

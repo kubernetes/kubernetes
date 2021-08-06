@@ -1257,9 +1257,9 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 => golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+# golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
 ## explicit
-# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -1277,7 +1277,6 @@ golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-golang.org/x/crypto/ssh/terminal
 # golang.org/x/exp => golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 # golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 # golang.org/x/lint => golang.org/x/lint v0.0.0-20200302205851-738671d3881b
@@ -1324,11 +1323,16 @@ golang.org/x/sync/singleflight
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
+# golang.org/x/term v0.0.0-20201117132131-f5c789dd3221 => golang.org/x/term v0.0.0-20201117132131-f5c789dd3221
+## explicit
+golang.org/x/term
+# golang.org/x/term => golang.org/x/term v0.0.0-20201117132131-f5c789dd3221
 # golang.org/x/text v0.3.4 => golang.org/x/text v0.3.4
 # golang.org/x/text => golang.org/x/text v0.3.4
 golang.org/x/text/encoding

@@ -15,7 +15,7 @@ go_library(
     name = "go_default_library",
     srcs = ["preferredimports.go"],
     importpath = "k8s.io/kubernetes/cmd/preferredimports",
-    deps = ["//vendor/golang.org/x/crypto/ssh/terminal:go_default_library"],
+    deps = ["//vendor/golang.org/x/term:go_default_library"],
 )
 
 filegroup(
