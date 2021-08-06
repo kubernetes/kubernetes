@@ -128,10 +128,11 @@ func TestSchedulerCreation(t *testing.T) {
 		"Foo": defaultbinder.New,
 	}
 	cases := []struct {
-		name         string
-		opts         []Option
-		wantErr      string
-		wantProfiles []string
+		name          string
+		opts          []Option
+		wantErr       string
+		wantProfiles  []string
+		wantExtenders []string
 	}{
 		{
 			name:         "default scheduler",
@@ -165,6 +166,18 @@ func TestSchedulerCreation(t *testing.T) {
 			)},
 			wantErr: "duplicate profile with scheduler name \"foo\"",
 		},
+		{
+			name: "With extenders",
+			opts: []Option{
+				WithExtenders(
+					schedulerapi.Extender{
+						URLPrefix: "http://extender.kube-system/",
+					},
+				),
+			},
+			wantProfiles:  []string{"default-scheduler"},
+			wantExtenders: []string{"http://extender.kube-system/"},
+		},
 	}
 
 	for _, tc := range cases {
@@ -183,6 +196,7 @@ func TestSchedulerCreation(t *testing.T) {
 				tc.opts...,
 			)
 
+			// Errors
 			if len(tc.wantErr) != 0 {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Errorf("got error %q, want %q", err, tc.wantErr)
@@ -192,6 +206,8 @@ func TestSchedulerCreation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
+
+			// Profiles
 			profiles := make([]string, 0, len(s.Profiles))
 			for name := range s.Profiles {
 				profiles = append(profiles, name)
@@ -199,6 +215,29 @@ func TestSchedulerCreation(t *testing.T) {
 			sort.Strings(profiles)
 			if diff := cmp.Diff(tc.wantProfiles, profiles); diff != "" {
 				t.Errorf("unexpected profiles (-want, +got):\n%s", diff)
+			}
+
+			// Extenders
+			if len(tc.wantExtenders) != 0 {
+				// Scheduler.Extenders
+				extenders := make([]string, 0, len(s.Algorithm.Extenders()))
+				for _, e := range s.Algorithm.Extenders() {
+					extenders = append(extenders, e.Name())
+				}
+				if diff := cmp.Diff(tc.wantExtenders, extenders); diff != "" {
+					t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
+				}
+
+				// framework.Handle.Extenders()
+				for _, p := range s.Profiles {
+					extenders := make([]string, 0, len(p.PreemptHandle().Extenders()))
+					for _, e := range p.PreemptHandle().Extenders() {
+						extenders = append(extenders, e.Name())
+					}
+					if diff := cmp.Diff(tc.wantExtenders, extenders); diff != "" {
+						t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
+					}
+				}
 			}
 		})
 	}
