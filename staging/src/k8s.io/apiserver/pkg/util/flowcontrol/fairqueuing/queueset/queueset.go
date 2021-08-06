@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/utils/clock"
 
-	_ "k8s.io/apiserver/pkg/util/flowcontrol/counter" // hack to keep test code in vendor
+	// _ "k8s.io/apiserver/pkg/util/flowcontrol/counter" // hack to keep test code in vendor
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
