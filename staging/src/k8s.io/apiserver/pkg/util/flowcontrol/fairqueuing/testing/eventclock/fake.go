@@ -18,8 +18,10 @@ package eventclock
 
 import (
 	"container/heap"
+	"fmt"
 	"math/rand"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,22 +45,52 @@ var _ counter.GoRoutineCounter = (*waitGroupCounter)(nil)
 
 func (wgc *waitGroupCounter) Add(delta int) {
 	if klog.V(7).Enabled() {
-		var pcs [5]uintptr
+		var pcs [10]uintptr
 		nCallers := runtime.Callers(2, pcs[:])
 		frames := runtime.CallersFrames(pcs[:nCallers])
-		frame1, more1 := frames.Next()
-		fileParts1 := strings.Split(frame1.File, "/")
-		tail2 := "(none)"
-		line2 := 0
-		if more1 {
-			frame2, _ := frames.Next()
-			fileParts2 := strings.Split(frame2.File, "/")
-			tail2 = fileParts2[len(fileParts2)-1]
-			line2 = frame2.Line
+		callers := make(stackExcerpt, 0, 10)
+		more := frames != nil
+		boundary := 1
+		for i := 0; more && len(callers) < cap(callers); i++ {
+			var frame runtime.Frame
+			frame, more = frames.Next()
+			fileParts := strings.Split(frame.File, "/")
+			isMine := strings.HasSuffix(frame.File, "/fairqueuing/eventclock/testing/fake.go")
+			if isMine {
+				boundary = 2
+			}
+			callers = append(callers, stackFrame{file: fileParts[len(fileParts)-1], line: frame.Line})
+			if i >= boundary && !isMine {
+				break
+			}
 		}
-		klog.Infof("GRC(%p).Add(%d) from %s:%d from %s:%d", wgc, delta, fileParts1[len(fileParts1)-1], frame1.Line, tail2, line2)
+		klog.InfoS("Add", "counter", fmt.Sprintf("%p", wgc), "delta", delta, "callers", callers)
 	}
 	wgc.wg.Add(delta)
+}
+
+type stackExcerpt []stackFrame
+
+type stackFrame struct {
+	file string
+	line int
+}
+
+var _ fmt.Stringer = stackExcerpt(nil)
+
+func (se stackExcerpt) String() string {
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i, sf := range se {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(sf.file)
+		sb.WriteString(":")
+		sb.WriteString(strconv.FormatInt(int64(sf.line), 10))
+	}
+	sb.WriteString("]")
+	return sb.String()
 }
 
 func (wgc *waitGroupCounter) Wait() {
