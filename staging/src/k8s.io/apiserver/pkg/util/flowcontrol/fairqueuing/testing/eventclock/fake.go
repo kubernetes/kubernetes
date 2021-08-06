@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package eventclock
 
 import (
 	"container/heap"
@@ -27,7 +27,7 @@ import (
 	baseclocktest "k8s.io/utils/clock/testing"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	"k8s.io/klog/v2"
 )
 
@@ -65,9 +65,9 @@ func (wgc *waitGroupCounter) Wait() {
 	wgc.wg.Wait()
 }
 
-// FakeEventClock is one whose time does not pass implicitly but
+// Fake is one whose time does not pass implicitly but
 // rather is explicitly set by invocations of its SetTime method.
-// Each FakeEventClock has an associated GoRoutineCounter that is
+// Each Fake has an associated GoRoutineCounter that is
 // used to track associated activity.
 // For the EventAfterDuration and EventAfterTime methods,
 // the clock itself counts the start and stop of the EventFunc
@@ -75,10 +75,7 @@ func (wgc *waitGroupCounter) Wait() {
 // resume internal to the EventFunc.
 // The Sleep method must only be invoked from a goroutine that is
 // counted in that GoRoutineCounter.
-// The SetTime method does not return until all the triggered
-// EventFuncs return.  Consequently, an EventFunc given to a method
-// of this clock must not wait for this clock to advance.
-type FakeEventClock struct {
+type Fake struct {
 	baseclocktest.FakePassiveClock
 
 	// waiters is a heap of waiting work, sorted by time
@@ -100,21 +97,23 @@ type FakeEventClock struct {
 	rand *rand.Rand
 }
 
+var _ eventclock.Interface = &Fake{}
+
 type eventWaiterHeap []eventWaiter
 
 var _ heap.Interface = (*eventWaiterHeap)(nil)
 
 type eventWaiter struct {
 	targetTime time.Time
-	f          clock.EventFunc
+	f          eventclock.EventFunc
 }
 
-// NewFakeEventClock constructor.  The given `r *rand.Rand` must
+// NewFake constructs a new fake event clock.  The given `r *rand.Rand` must
 // henceforth not be used for any other purpose.  If `r` is nil then a
 // fresh one will be constructed, seeded with the current real time.
 // The clientWG can be `nil` and if not is used to let Run know about
 // additional work that has to complete before time can advance.
-func NewFakeEventClock(t time.Time, fuzz time.Duration, r *rand.Rand) (*FakeEventClock, counter.GoRoutineCounter) {
+func NewFake(t time.Time, fuzz time.Duration, r *rand.Rand) (*Fake, counter.GoRoutineCounter) {
 	grc := &waitGroupCounter{}
 
 	if r == nil {
@@ -123,7 +122,7 @@ func NewFakeEventClock(t time.Time, fuzz time.Duration, r *rand.Rand) (*FakeEven
 		r.Uint64()
 		r.Uint64()
 	}
-	return &FakeEventClock{
+	return &Fake{
 		FakePassiveClock: *baseclocktest.NewFakePassiveClock(t),
 		clientWG:         grc,
 		fuzz:             fuzz,
@@ -133,7 +132,7 @@ func NewFakeEventClock(t time.Time, fuzz time.Duration, r *rand.Rand) (*FakeEven
 
 // GetNextTime returns the next time at which there is work scheduled,
 // and a bool indicating whether there is any such time
-func (fec *FakeEventClock) GetNextTime() (time.Time, bool) {
+func (fec *Fake) GetNextTime() (time.Time, bool) {
 	fec.waitersLock.RLock()
 	defer fec.waitersLock.RUnlock()
 	if len(fec.waiters) > 0 {
@@ -147,7 +146,7 @@ func (fec *FakeEventClock) GetNextTime() (time.Time, bool) {
 // nil and the next time would exceed the limit.  The associated
 // GoRoutineCounter gates the advancing of time.  That is,
 // time is not advanced until all the associated work is finished.
-func (fec *FakeEventClock) Run(limit *time.Time) {
+func (fec *Fake) Run(limit *time.Time) {
 	for {
 		fec.clientWG.Wait()
 		t, ok := fec.GetNextTime()
@@ -161,7 +160,7 @@ func (fec *FakeEventClock) Run(limit *time.Time) {
 // SetTime sets the time and runs to completion all events that should
 // be started by the given time --- including any further events they
 // schedule
-func (fec *FakeEventClock) SetTime(t time.Time) {
+func (fec *Fake) SetTime(t time.Time) {
 	fec.FakePassiveClock.SetTime(t)
 	for {
 		foundSome := false
@@ -172,27 +171,29 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 			// events to run at that or an earlier time.
 			// Events should not advance the clock.  But just in case they do...
 			now := fec.Now()
-			var wg sync.WaitGroup
 			for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
 				ew := heap.Pop(&fec.waiters).(eventWaiter)
-				wg.Add(1)
-				go func(f clock.EventFunc) { f(now); wg.Done() }(ew.f)
+				fec.clientWG.Add(1)
+				go func(f eventclock.EventFunc, now time.Time) {
+					f(now)
+					fec.clientWG.Add(-1)
+				}(ew.f, now)
 				foundSome = true
 			}
-			wg.Wait()
 		}()
 		if !foundSome {
 			break
 		}
+		fec.clientWG.Wait()
 	}
 }
 
 // Sleep returns after the given duration has passed.
 // Sleep must only be invoked in a goroutine that is counted
-// in the FakeEventClock's associated GoRoutineCounter.
+// in the Fake's associated GoRoutineCounter.
 // Unlike the base FakeClock's Sleep, this method does not itself advance the clock
 // but rather leaves that up to other actors (e.g., Run).
-func (fec *FakeEventClock) Sleep(duration time.Duration) {
+func (fec *Fake) Sleep(duration time.Duration) {
 	doneCh := make(chan struct{})
 	fec.EventAfterDuration(func(time.Time) {
 		fec.clientWG.Add(1)
@@ -204,7 +205,7 @@ func (fec *FakeEventClock) Sleep(duration time.Duration) {
 
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
-func (fec *FakeEventClock) EventAfterDuration(f clock.EventFunc, d time.Duration) {
+func (fec *Fake) EventAfterDuration(f eventclock.EventFunc, d time.Duration) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	now := fec.Now()
@@ -214,7 +215,7 @@ func (fec *FakeEventClock) EventAfterDuration(f clock.EventFunc, d time.Duration
 
 // EventAfterTime schedules the given function to be invoked once
 // the given time has arrived.
-func (fec *FakeEventClock) EventAfterTime(f clock.EventFunc, t time.Time) {
+func (fec *Fake) EventAfterTime(f eventclock.EventFunc, t time.Time) {
 	fec.waitersLock.Lock()
 	defer fec.waitersLock.Unlock()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())

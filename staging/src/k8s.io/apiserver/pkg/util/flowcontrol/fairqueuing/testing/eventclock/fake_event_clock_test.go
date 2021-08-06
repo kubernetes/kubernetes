@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package eventclock
 
 import (
 	"math/rand"
@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 )
 
 type TestableEventClock interface {
-	clock.EventClock
+	eventclock.Interface
 	SetTime(time.Time)
 	Run(*time.Time)
 }
@@ -122,10 +122,10 @@ func exerciseSettablePassiveClock(t *testing.T, pc TestableEventClock) {
 	}
 }
 
-func TestFakeEventClock(t *testing.T) {
+func TestFake(t *testing.T) {
 	startTime := time.Now()
-	fec, _ := NewFakeEventClock(startTime, 0, nil)
+	fec, _ := NewFake(startTime, 0, nil)
 	exerciseTestableEventClock(t, fec, 0)
-	fec, _ = NewFakeEventClock(startTime, time.Second, nil)
+	fec, _ = NewFake(startTime, time.Second, nil)
 	exerciseTestableEventClock(t, fec, time.Second)
 }

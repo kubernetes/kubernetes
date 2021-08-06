@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package eventclock
 
 import (
 	"time"
@@ -31,7 +31,7 @@ type EventFunc func(time.Time)
 // advanced.  The timing paradigm is invoking EventFuncs rather than
 // synchronizing through channels, so that the fake clock has a handle
 // on when associated activity is done.
-type EventClock interface {
+type Interface interface {
 	baseclock.PassiveClock
 
 	// Sleep returns after the given duration (or more).
