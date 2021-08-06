@@ -92,9 +92,13 @@ function main {
   echo 'etcd-main.sh: Starting etcd script ...'
 
   DATA_DIRECTORY=${DATA_DIRECTORY:-/var/etcd/data/}
+  BACKUP_DIR=${ETCD_BACKUP_DIR:-/var/etcd/backup-to-restore}
 
   echo "etcd-main.sh: environment:"
   declare -x
+
+  echo 'etcd-main.sh: Backup restore ...'
+  run /usr/local/bin/restore --backup-dir=${BACKUP_DIR} --data-dir=${DATA_DIRECTORY} --member-name=etcd-${ETCD_HOSTNAME} --initial-cluster=${INITIAL_CLUSTER} --peer-advertise-urls=${INITIAL_ADVERTISE_PEER_URLS} || true
 
   echo 'etcd-main.sh: Backup before start ...'
   # Failure to perform a backup should not cause lack of ability to run etcd.

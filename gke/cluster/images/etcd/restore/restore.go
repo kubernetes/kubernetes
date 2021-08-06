@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -38,6 +39,8 @@ const (
 	tokenFilename = "initial-cluster-token.txt"
 	// File in the backup-dir to which end result will be written.
 	resultFilename = "result.txt"
+	// Path of the db file within etcd data directory.
+	dbFilepath = "/member/snap/db"
 )
 
 var (
@@ -48,6 +51,13 @@ var (
 	initialCluster    string
 	peerAdvertiseUrls string
 )
+
+type SnapshotStatus struct {
+	Hash      int
+	Revision  int
+	TotalKey  int
+	TotalSize int
+}
 
 var restoreCmd = &cobra.Command{
 	Short: "Restore etcd from backup if backup is present",
@@ -127,7 +137,12 @@ func runRestore() {
 	if err = writeVersionFile(filepath.Join(dataDir, versionFilename), version, storageVersion); err != nil {
 		cleanupAndExit(fmt.Sprintf("error writing new version file after restoring backup: %v", err))
 	}
-	klog.Info("successfully written new version file - restore done, exiting")
+	klog.Info("successfully written new version file")
+
+	if err = verifyDataIntegrity(etcdctlBin, etcdctlApi); err != nil {
+		cleanupAndExit(fmt.Sprintf("failed to verify integity of the restored data: %v", err))
+	}
+	klog.Info("successfully verified integity of the recovered data - restore done, exiting")
 
 	cleanupAndExit("")
 }
@@ -146,6 +161,23 @@ func cleanupAndExit(err string) {
 	if err != "" {
 		klog.Fatalf("%v", err)
 	}
+}
+
+func verifyDataIntegrity(etcdctlBin, etcdctlApi string) error {
+	statusBackup, err := runEtcdctlStatus(etcdctlBin, etcdctlApi, filepath.Join(backupDir, snapshotFilename))
+	if err != nil {
+		return fmt.Errorf("error running etcdctl status on snapshot file: %v", err)
+	}
+	statusDB, err := runEtcdctlStatus(etcdctlBin, etcdctlApi, filepath.Join(dataDir, dbFilepath))
+	if err != nil {
+		return fmt.Errorf("error running etcdctl status on restored db file: %v", err)
+	}
+
+	if statusBackup.TotalKey != statusDB.TotalKey || statusDB.TotalSize != statusBackup.TotalSize {
+		return fmt.Errorf("restored db (hash may differ) want: %v, got: %v", statusBackup, statusDB)
+	}
+
+	return nil
 }
 
 // findEtcdctlBinary looks for binary which matches selected minor and major version.
@@ -178,6 +210,28 @@ func runEtcdctlRestore(binary, etcdctlApi, token string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func runEtcdctlStatus(binary, etcdctlApi, file string) (*SnapshotStatus, error) {
+	cmd := exec.Command(
+		binary,
+		"snapshot", "status",
+		file,
+		"--write-out", "json",
+	)
+
+	cmd.Env = []string{fmt.Sprintf("ETCDCTL_API=%v", etcdctlApi)}
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	status := SnapshotStatus{}
+	if err = json.Unmarshal(out, &status); err != nil {
+		return nil, err
+	}
+
+	return &status, nil
 }
 
 // parseVersionFile, given an etcd version file path, returns etcd version
