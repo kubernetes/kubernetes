@@ -24,7 +24,7 @@ import (
 )
 
 func TestConverter_byteSlice(t *testing.T) {
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	src := []byte{1, 2, 3}
 	dest := []byte{}
 	err := c.Convert(&src, &dest, nil)
@@ -37,7 +37,7 @@ func TestConverter_byteSlice(t *testing.T) {
 }
 
 func TestConverter_MismatchedTypes(t *testing.T) {
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 
 	convertFn := func(in *[]string, out *int, s Scope) error {
 		if str, err := strconv.Atoi((*in)[0]); err != nil {
@@ -76,7 +76,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		Baz int
 	}
 	type C struct{}
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	convertFn1 := func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		out.Baz = in.Baz
@@ -151,7 +151,7 @@ func TestConverter_IgnoredConversion(t *testing.T) {
 	type B struct{}
 
 	count := 0
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	convertFn := func(in *A, out *B, s Scope) error {
 		count++
 		return nil
@@ -180,7 +180,7 @@ func TestConverter_IgnoredConversion(t *testing.T) {
 func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	convertFn1 := func(in *A, out *B, s Scope) error {
 		return nil
 	}
@@ -214,7 +214,7 @@ func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 func TestConverter_WithConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	convertFn1 := func(in *A, out *B, s Scope) error {
 		return fmt.Errorf("conversion function should be overridden")
 	}
@@ -260,7 +260,7 @@ func TestConverter_WithConversionOverridden(t *testing.T) {
 func TestConverter_meta(t *testing.T) {
 	type Foo struct{ A string }
 	type Bar struct{ A string }
-	c := NewConverter(DefaultNameFunc)
+	c := NewConverter(nil)
 	checks := 0
 	convertFn1 := func(in *Foo, out *Bar, s Scope) error {
 		if s.Meta() == nil {
