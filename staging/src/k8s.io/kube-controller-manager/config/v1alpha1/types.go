@@ -119,6 +119,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointSliceMirroringControllerConfiguration holds configuration for
 	// EndpointSliceMirroringController related features.
 	EndpointSliceMirroringController EndpointSliceMirroringControllerConfiguration
+	// EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController
+	// related features.
+	EphemeralVolumeController EphemeralVolumeControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -298,6 +301,14 @@ type EndpointSliceMirroringControllerConfiguration struct {
 	// single EndpointSlice update. Default 0 value means that each Endpoints
 	// update triggers an EndpointSlice update.
 	MirroringEndpointUpdatesBatchPeriod metav1.Duration
+}
+
+// EphemeralVolumeControllerConfiguration contains elements describing EphemeralVolumeController.
+type EphemeralVolumeControllerConfiguration struct {
+	// ConcurrentEphemeralVolumeSyncseSyncs is the number of ephemeral volume syncing operations
+	// that will be done concurrently. Larger number = faster ephemeral volume updating,
+	// but more CPU (and network) load.
+	ConcurrentEphemeralVolumeSyncs int32
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
