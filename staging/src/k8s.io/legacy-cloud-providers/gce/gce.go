@@ -435,9 +435,15 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	serviceAlpha.UserAgent = userAgent
 
 	if config.APIEndpoint != "" {
-		service.BasePath = config.APIEndpoint
-		serviceBeta.BasePath = strings.Replace(config.APIEndpoint, "v1", "beta", -1)
-		serviceAlpha.BasePath = strings.Replace(config.APIEndpoint, "v1", "alpha", -1)
+		if strings.HasSuffix(service.BasePath, "/projects/") {
+			service.BasePath = getProjectsBasePath(config.APIEndpoint)
+			serviceBeta.BasePath = getProjectsBasePath(strings.Replace(config.APIEndpoint, "v1", "beta", -1))
+			serviceAlpha.BasePath = getProjectsBasePath(strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
+		} else {
+			service.BasePath = config.APIEndpoint
+			serviceBeta.BasePath = strings.Replace(config.APIEndpoint, "v1", "beta", -1)
+			serviceAlpha.BasePath = strings.Replace(config.APIEndpoint, "v1", "alpha", -1)
+		}
 	}
 
 	containerService, err := container.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
