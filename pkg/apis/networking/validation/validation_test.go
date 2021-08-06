@@ -1566,154 +1566,109 @@ func TestValidateIngressUpdate(t *testing.T) {
 	}
 }
 
+type netIngressTweak func(ingressClass *networking.IngressClass)
+
+func makeValidIngressClass(name, controller string, tweaks ...netIngressTweak) *networking.IngressClass {
+	ingressClass := &networking.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: networking.IngressClassSpec{
+			Controller: controller,
+		},
+	}
+
+	for _, fn := range tweaks {
+		fn(ingressClass)
+	}
+	return ingressClass
+}
+
+func makeIngressClassParams(apiGroup *string, kind, name string, scope, namespace *string) *networking.IngressClassParametersReference {
+	return &networking.IngressClassParametersReference{
+		APIGroup:  apiGroup,
+		Kind:      kind,
+		Name:      name,
+		Scope:     scope,
+		Namespace: namespace,
+	}
+}
+
 func TestValidateIngressClass(t *testing.T) {
+	setParams := func(params *networking.IngressClassParametersReference) netIngressTweak {
+		return func(ingressClass *networking.IngressClass) {
+			ingressClass.Spec.Parameters = params
+		}
+	}
+
 	testCases := map[string]struct {
-		ingressClass                    networking.IngressClass
+		ingressClass                    *networking.IngressClass
 		expectedErrs                    field.ErrorList
 		enableNamespaceScopedParamsGate bool
 	}{
 		"valid name, valid controller": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar"),
 			expectedErrs: field.ErrorList{},
 		},
 		"invalid name, valid controller": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test*123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-				},
-			},
+			ingressClass: makeValidIngressClass("test*123", "foo.co/bar"),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("metadata.name"), "test*123", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 		},
 		"valid name, empty controller": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "",
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", ""),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.controller"), "")},
 		},
 		"valid name, controller max length": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/" + strings.Repeat("a", 243),
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/"+strings.Repeat("a", 243)),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid name, controller too long": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/" + strings.Repeat("a", 244),
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/"+strings.Repeat("a", 244)),
 			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("spec.controller"), "", 250)},
 		},
 		"valid name, valid controller, valid params": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						APIGroup: utilpointer.StringPtr("example.com"),
-						Kind:     "foo",
-						Name:     "bar",
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "foo", "bar", nil, nil)),
+			),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid name, valid controller, invalid params (no kind)": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						APIGroup: utilpointer.StringPtr("example.com"),
-						Name:     "bar",
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "", "bar", nil, nil)),
+			),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.kind"), "kind is required")},
 		},
 		"valid name, valid controller, invalid params (no name)": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind: "foo",
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "foo", "", nil, nil)),
+			),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.name"), "name is required")},
 		},
 		"valid name, valid controller, invalid params (bad kind)": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind: "foo/",
-						Name: "bar",
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo/", "bar", nil, nil)),
+			),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.parameters.kind"), "foo/", "may not contain '/'")},
 		},
 		"valid name, valid controller, invalid params (bad scope)": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:  "foo",
-						Name:  "bar",
-						Scope: utilpointer.StringPtr("bad-scope"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("bad-scope"), nil)),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("spec.parameters.scope"),
 				"bad-scope", []string{"Cluster", "Namespace"})},
 		},
 		"valid name, valid controller, valid Namespace scope": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:      "foo",
-						Name:      "bar",
-						Scope:     utilpointer.StringPtr("Namespace"),
-						Namespace: utilpointer.StringPtr("foo-ns"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("foo-ns"))),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs:                    field.ErrorList{},
 		},
 		"valid name, valid controller, valid scope, invalid namespace": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:      "foo",
-						Name:      "bar",
-						Scope:     utilpointer.StringPtr("Namespace"),
-						Namespace: utilpointer.StringPtr("foo_ns"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("foo_ns"))),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.parameters.namespace"), "foo_ns",
 				"a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-',"+
@@ -1721,112 +1676,55 @@ func TestValidateIngressClass(t *testing.T) {
 					"regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
 		},
 		"valid name, valid controller, valid Cluster scope": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:  "foo",
-						Name:  "bar",
-						Scope: utilpointer.StringPtr("Cluster"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), nil)),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs:                    field.ErrorList{},
 		},
 		"namespace not set when scope is Namespace": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:  "foo",
-						Name:  "bar",
-						Scope: utilpointer.StringPtr("Namespace"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), nil)),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Namespace'")},
 		},
 		"namespace is forbidden when scope is Cluster": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:      "foo",
-						Name:      "bar",
-						Scope:     utilpointer.StringPtr("Cluster"),
-						Namespace: utilpointer.StringPtr("foo-ns"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), utilpointer.StringPtr("foo-ns"))),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Cluster'")},
 		},
 		"empty namespace is forbidden when scope is Cluster": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:      "foo",
-						Name:      "bar",
-						Scope:     utilpointer.StringPtr("Cluster"),
-						Namespace: utilpointer.StringPtr(""),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), utilpointer.StringPtr(""))),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Cluster'")},
 		},
 		"validation is performed when feature gate is disabled and scope is not empty": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:  "foo",
-						Name:  "bar",
-						Scope: utilpointer.StringPtr("bad-scope"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("bad-scope"), nil)),
+			),
 			enableNamespaceScopedParamsGate: false,
 			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("spec.parameters.scope"),
 				"bad-scope", []string{"Cluster", "Namespace"})},
 		},
 		"validation fails when feature gate is enabled and scope is not set": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind: "foo",
-						Name: "bar",
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", nil, nil)),
+			),
 			enableNamespaceScopedParamsGate: true,
 			expectedErrs:                    field.ErrorList{field.Required(field.NewPath("spec.parameters.scope"), "")},
 		},
 		"validation is performed when feature gate is disabled and namespace is not empty": {
-			ingressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						Kind:      "foo",
-						Name:      "bar",
-						Namespace: utilpointer.StringPtr("foo-ns"),
-					},
-				},
-			},
+			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setParams(makeIngressClassParams(nil, "foo", "bar", nil, utilpointer.StringPtr("foo-ns"))),
+			),
 			enableNamespaceScopedParamsGate: false,
 			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("spec.parameters.scope"),
 				"", []string{"Cluster", "Namespace"})},
@@ -1836,7 +1734,7 @@ func TestValidateIngressClass(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IngressClassNamespacedParams, testCase.enableNamespaceScopedParamsGate)()
-			errs := ValidateIngressClass(&testCase.ingressClass)
+			errs := ValidateIngressClass(testCase.ingressClass)
 
 			if len(errs) != len(testCase.expectedErrs) {
 				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
@@ -1852,59 +1750,43 @@ func TestValidateIngressClass(t *testing.T) {
 }
 
 func TestValidateIngressClassUpdate(t *testing.T) {
+	setResourceVersion := func(version string) netIngressTweak {
+		return func(ingressClass *networking.IngressClass) {
+			ingressClass.ObjectMeta.ResourceVersion = version
+		}
+	}
+
+	setParams := func(params *networking.IngressClassParametersReference) netIngressTweak {
+		return func(ingressClass *networking.IngressClass) {
+			ingressClass.Spec.Parameters = params
+		}
+	}
+
 	testCases := map[string]struct {
-		newIngressClass networking.IngressClass
-		oldIngressClass networking.IngressClass
+		newIngressClass *networking.IngressClass
+		oldIngressClass *networking.IngressClass
 		expectedErrs    field.ErrorList
 	}{
 		"name change": {
-			newIngressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test123",
-					ResourceVersion: "2",
-				},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-				},
-			},
-			oldIngressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/different",
-				},
-			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("controller"), "foo.co/bar", apimachineryvalidation.FieldImmutableErrorMsg)},
+			newIngressClass: makeValidIngressClass("test123", "foo.co/bar", setResourceVersion("2")),
+			oldIngressClass: makeValidIngressClass("test123", "foo.co/different"),
+			expectedErrs:    field.ErrorList{field.Invalid(field.NewPath("spec").Child("controller"), "foo.co/bar", apimachineryvalidation.FieldImmutableErrorMsg)},
 		},
 		"parameters change": {
-			newIngressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test123",
-					ResourceVersion: "2",
-				},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-					Parameters: &networking.IngressClassParametersReference{
-						APIGroup:  utilpointer.StringPtr("v1"),
-						Scope:     utilpointer.StringPtr("Namespace"),
-						Kind:      "ConfigMap",
-						Name:      "foo",
-						Namespace: utilpointer.StringPtr("bar"),
-					},
-				},
-			},
-			oldIngressClass: networking.IngressClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "test123"},
-				Spec: networking.IngressClassSpec{
-					Controller: "foo.co/bar",
-				},
-			},
-			expectedErrs: field.ErrorList{},
+			newIngressClass: makeValidIngressClass("test123", "foo.co/bar",
+				setResourceVersion("2"),
+				setParams(
+					makeIngressClassParams(utilpointer.StringPtr("v1"), "ConfigMap", "foo", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("bar")),
+				),
+			),
+			oldIngressClass: makeValidIngressClass("test123", "foo.co/bar"),
+			expectedErrs:    field.ErrorList{},
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateIngressClassUpdate(&testCase.newIngressClass, &testCase.oldIngressClass)
+			errs := ValidateIngressClassUpdate(testCase.newIngressClass, testCase.oldIngressClass)
 
 			if len(errs) != len(testCase.expectedErrs) {
 				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
