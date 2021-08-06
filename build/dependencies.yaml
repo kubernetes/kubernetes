@@ -161,7 +161,7 @@ dependencies:
     version: 3.6
     refPaths:
     - path: build/pause/Makefile
-      match: TAG =
+      match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
     version: 3.5
