@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -136,7 +137,9 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 // - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+// - whenever a referenced object is created or updated or deleted, onPodUpdate
+//   will be called with all pods that reference it.
+func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval time.Duration, onPodUpdate func(uid types.UID)) Manager {
 	listSecret := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
 	}
@@ -154,6 +157,6 @@ func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval tim
 	}
 	gr := corev1.Resource("secret")
 	return &secretManager{
-		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, isImmutable, gr, resyncInterval, getSecretNames),
+		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, onPodUpdate, isImmutable, gr, resyncInterval, getSecretNames),
 	}
 }

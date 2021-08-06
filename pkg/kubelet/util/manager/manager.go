@@ -19,6 +19,7 @@ package manager
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Manager is the interface for registering and unregistering
@@ -49,12 +50,12 @@ type Store interface {
 	// AddReference adds a reference to the object to the store.
 	// Note that multiple additions to the store has to be allowed
 	// in the implementations and effectively treated as refcounted.
-	AddReference(namespace, name string)
+	AddReference(namespace, name string, podUID types.UID)
 	// DeleteReference deletes reference to the object from the store.
 	// Note that object should be deleted only when there was a
 	// corresponding Delete call for each of Add calls (effectively
 	// when refcount was reduced to zero).
-	DeleteReference(namespace, name string)
+	DeleteReference(namespace, name string, podUID types.UID)
 	// Get an object from a store.
 	Get(namespace, name string) (runtime.Object, error)
 }

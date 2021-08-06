@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -88,13 +89,13 @@ func newCacheBasedSecretManager(store Store) Manager {
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.AddReference("ns1", "name1")
-	store.AddReference("ns2", "name2")
-	store.AddReference("ns1", "name1")
-	store.AddReference("ns1", "name1")
-	store.DeleteReference("ns1", "name1")
-	store.DeleteReference("ns2", "name2")
-	store.AddReference("ns3", "name3")
+	store.AddReference("ns1", "name1", "pod1")
+	store.AddReference("ns2", "name2", "pod2")
+	store.AddReference("ns1", "name1", "pod3")
+	store.AddReference("ns1", "name1", "pod4")
+	store.DeleteReference("ns1", "name1", "pod1")
+	store.DeleteReference("ns2", "name2", "pod2")
+	store.AddReference("ns3", "name3", "pod5")
 
 	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
@@ -122,7 +123,7 @@ func TestSecretStore(t *testing.T) {
 func TestSecretStoreDeletingSecret(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 
 	result := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
@@ -154,7 +155,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
-		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i), types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	fakeClient.ClearActions()
 
@@ -181,7 +182,7 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
-		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i), types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	fakeClient.ClearActions()
 
@@ -210,7 +211,7 @@ func TestCustomTTL(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Time{})
 	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	store.Get("ns", "name")
 	fakeClient.ClearActions()
 

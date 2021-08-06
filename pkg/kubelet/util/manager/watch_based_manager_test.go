@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -62,11 +64,33 @@ func isSecretImmutable(object runtime.Object) bool {
 	return false
 }
 
-func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
+type podUpdateRecorder struct {
+	sync.RWMutex
+	podUpdates map[types.UID]int
+}
+
+func newPodUpdateRecorder() *podUpdateRecorder {
+	return &podUpdateRecorder{podUpdates: map[types.UID]int{}}
+}
+
+func (r *podUpdateRecorder) updatePod(uid types.UID) {
+	r.Lock()
+	defer r.Unlock()
+	r.podUpdates[uid] = r.podUpdates[uid] + 1
+}
+
+func (r *podUpdateRecorder) getPodUpdates(uid types.UID) int {
+	r.RLock()
+	defer r.RUnlock()
+	return r.podUpdates[uid]
+}
+
+func newSecretCache(fakeClient clientset.Interface, fakeOnPodUpdate onPodUpdateFunc, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
 		listObject:    listSecret(fakeClient),
 		watchObject:   watchSecret(fakeClient),
 		newObject:     func() runtime.Object { return &v1.Secret{} },
+		onPodUpdate:   fakeOnPodUpdate,
 		isImmutable:   isSecretImmutable,
 		groupResource: corev1.Resource("secret"),
 		clock:         fakeClock,
@@ -91,12 +115,18 @@ func TestSecretCache(t *testing.T) {
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	podUpdateRecorder := newPodUpdateRecorder()
+	store := newSecretCache(fakeClient, podUpdateRecorder.updatePod, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "podUID")
 	_, err := store.Get("ns", "name")
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("Expected NotFound error, got: %v", err)
+	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+		return podUpdateRecorder.getPodUpdates("podUID") == 1, nil
+	}); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 
 	// Eventually we should be able to read added secret.
@@ -121,6 +151,11 @@ func TestSecretCache(t *testing.T) {
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+		return podUpdateRecorder.getPodUpdates("podUID") == 2, nil
+	}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	// Eventually we should observer secret deletion.
 	fakeWatch.Delete(secret)
@@ -137,8 +172,13 @@ func TestSecretCache(t *testing.T) {
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+		return podUpdateRecorder.getPodUpdates("podUID") == 3, nil
+	}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "podUID")
 	_, err = store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -161,9 +201,10 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	podUpdateRecorder := newPodUpdateRecorder()
+	store := newSecretCache(fakeClient, podUpdateRecorder.updatePod, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "podUID")
 	// This should trigger List and Watch actions eventually.
 	actionsFn := func() (bool, error) {
 		actions := fakeClient.Actions()
@@ -181,17 +222,46 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, actionsFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+		return podUpdateRecorder.getPodUpdates("podUID") == 1, nil
+	}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	// Next registrations shouldn't trigger any new actions.
 	for i := 0; i < 20; i++ {
-		store.AddReference("ns", "name")
-		store.DeleteReference("ns", "name")
+		podUID := types.UID(fmt.Sprintf("podUID%d", i))
+		store.AddReference("ns", "name", podUID)
 	}
 	actions := fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 
+	// Adding the secret should trigger the updates of all registered pods.
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "125"},
+	}
+	fakeWatch.Add(secret)
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+		if podUpdateRecorder.getPodUpdates("podUID") != 2 {
+			return false, nil
+		}
+		for i := 0; i < 20; i++ {
+			if podUpdateRecorder.getPodUpdates(types.UID(fmt.Sprintf("podUID%d", i))) != 1 {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Unregistrations shouldn't trigger any new actions.
+	for i := 0; i < 20; i++ {
+		podUID := types.UID(fmt.Sprintf("podUID%d", i))
+		store.DeleteReference("ns", "name", podUID)
+	}
 	// Final delete also doesn't trigger any action.
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "podUID")
 	_, err := store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -267,7 +337,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			store := newSecretCache(fakeClient, fakeClock, time.Minute)
+			store := newSecretCache(fakeClient, nil, fakeClock, time.Minute)
 
 			key := objectKey{namespace: "ns", name: "name"}
 			itemExists := func() (bool, error) {
@@ -287,7 +357,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			}
 
 			// AddReference should start reflector.
-			store.AddReference("ns", "name")
+			store.AddReference("ns", "name", "podUID")
 			if err := wait.Poll(10*time.Millisecond, time.Second, itemExists); err != nil {
 				t.Errorf("item wasn't added to cache")
 			}
@@ -354,7 +424,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(fakeClient, nil, fakeClock, time.Minute)
 
 	key := objectKey{namespace: "ns", name: "name"}
 	itemExists := func() (bool, error) {
@@ -375,7 +445,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "podUID")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -436,7 +506,7 @@ func TestReflectorNotStopedOnSlowInitialization(t *testing.T) {
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(fakeClient, nil, fakeClock, time.Minute)
 
 	key := objectKey{namespace: "ns", name: "name"}
 	itemExists := func() (bool, error) {
@@ -467,7 +537,7 @@ func TestReflectorNotStopedOnSlowInitialization(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "podUID")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}

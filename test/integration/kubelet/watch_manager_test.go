@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -38,6 +39,7 @@ import (
 
 func TestWatchBasedManager(t *testing.T) {
 	testNamespace := "test-watch-based-manager"
+	testPod := types.UID("test-referenced-pod")
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -63,7 +65,7 @@ func TestWatchBasedManager(t *testing.T) {
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, nil, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
@@ -104,7 +106,7 @@ func TestWatchBasedManager(t *testing.T) {
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
-				store.AddReference(testNamespace, name)
+				store.AddReference(testNamespace, name, testPod)
 				err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 					obj, err := store.Get(testNamespace, name)
 					if err != nil {

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -135,7 +136,9 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 // - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+// - whenever a referenced object is created or updated or deleted, onPodUpdate
+//   will be called with all pods that reference it.
+func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval time.Duration, onPodUpdate func(uid types.UID)) Manager {
 	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().ConfigMaps(namespace).List(context.TODO(), opts)
 	}
@@ -153,6 +156,6 @@ func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval 
 	}
 	gr := corev1.Resource("configmap")
 	return &configMapManager{
-		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, isImmutable, gr, resyncInterval, getConfigMapNames),
+		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, onPodUpdate, isImmutable, gr, resyncInterval, getConfigMapNames),
 	}
 }

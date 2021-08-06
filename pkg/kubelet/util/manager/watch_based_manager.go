@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,10 +42,11 @@ type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
 type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
 type newObjectFunc func() runtime.Object
 type isImmutableFunc func(runtime.Object) bool
+type onPodUpdateFunc func(uid types.UID)
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
-	refCount  int
+	refPods   map[types.UID]int
 	store     *cacheStore
 	reflector *cache.Reflector
 
@@ -159,6 +161,7 @@ type objectCache struct {
 	listObject    listObjectFunc
 	watchObject   watchObjectFunc
 	newObject     newObjectFunc
+	onPodUpdate   onPodUpdateFunc
 	isImmutable   isImmutableFunc
 	groupResource schema.GroupResource
 	clock         clock.Clock
@@ -175,6 +178,7 @@ func NewObjectCache(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
+	onPodUpdate onPodUpdateFunc,
 	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	clock clock.Clock,
@@ -188,6 +192,7 @@ func NewObjectCache(
 		listObject:    listObject,
 		watchObject:   watchObject,
 		newObject:     newObject,
+		onPodUpdate:   onPodUpdate,
 		isImmutable:   isImmutable,
 		groupResource: groupResource,
 		clock:         clock,
@@ -200,13 +205,13 @@ func NewObjectCache(
 	return store
 }
 
-func (c *objectCache) newStore() *cacheStore {
+func (c *objectCache) newStore(pushFunc func([]interface{})) *cacheStore {
 	// TODO: We may consider created a dedicated store keeping just a single
 	// item, instead of using a generic store implementation for this purpose.
 	// However, simple benchmarks show that memory overhead in that case is
 	// decrease from ~600B to ~300B per object. So we are not optimizing it
 	// until we will see a good reason for that.
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	store := cache.NewUndeltaStore(pushFunc, cache.MetaNamespaceKeyFunc)
 	return &cacheStore{store, sync.Mutex{}, false}
 }
 
@@ -220,7 +225,19 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 		options.FieldSelector = fieldSelector
 		return c.watchObject(namespace, options)
 	}
-	store := c.newStore()
+	refPods := map[types.UID]int{}
+	// onUpdateFunc will be called when the object is updated.
+	onUpdateFunc := func([]interface{}) {
+		if c.onPodUpdate == nil {
+			return
+		}
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		for pod := range refPods {
+			c.onPodUpdate(pod)
+		}
+	}
+	store := c.newStore(onUpdateFunc)
 	reflector := cache.NewNamedReflector(
 		fmt.Sprintf("object-%q/%q", namespace, name),
 		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
@@ -229,7 +246,7 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 		0,
 	)
 	item := &objectCacheItem{
-		refCount:  0,
+		refPods:   refPods,
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
@@ -239,7 +256,7 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 	return item
 }
 
-func (c *objectCache) AddReference(namespace, name string) {
+func (c *objectCache) AddReference(namespace, name string, podUID types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
@@ -254,17 +271,20 @@ func (c *objectCache) AddReference(namespace, name string) {
 		item = c.newReflector(namespace, name)
 		c.items[key] = item
 	}
-	item.refCount++
+	item.refPods[podUID] += 1
 }
 
-func (c *objectCache) DeleteReference(namespace, name string) {
+func (c *objectCache) DeleteReference(namespace, name string, podUID types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refCount--
-		if item.refCount == 0 {
+		item.refPods[podUID]--
+		if item.refPods[podUID] == 0 {
+			delete(item.refPods, podUID)
+		}
+		if len(item.refPods) == 0 {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)
@@ -345,10 +365,13 @@ func (c *objectCache) startRecycleIdleWatch() {
 // - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
+// - whenever a referenced object is created or updated or deleted, onPodUpdate
+//   will be called with all pods that reference it.
 func NewWatchBasedManager(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
+	onPodUpdate onPodUpdateFunc,
 	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	resyncInterval time.Duration,
@@ -360,6 +383,6 @@ func NewWatchBasedManager(
 	// We currently set it to 5 times.
 	maxIdleTime := resyncInterval * 5
 
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
+	objectStore := NewObjectCache(listObject, watchObject, newObject, onPodUpdate, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }
