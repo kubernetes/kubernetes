@@ -21,14 +21,15 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	fairqueuingclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
+	utilclock "k8s.io/utils/clock"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
@@ -83,7 +84,7 @@ func New(
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
-	clk := clock.RealClock{}
+	clk := fairqueuingclock.RealEventClock{}
 	return NewTestable(TestableConfig{
 		Name:                   "Controller",
 		Clock:                  clk,
@@ -104,7 +105,7 @@ type TestableConfig struct {
 	Name string
 
 	// Clock to use in timing deliberate delays
-	Clock clock.PassiveClock
+	Clock utilclock.PassiveClock
 
 	// AsFieldManager is the string to use in the metadata for
 	// server-side apply.  Normally this is

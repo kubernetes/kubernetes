@@ -23,12 +23,11 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/utils/clock"
-
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	fairqueuingclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fqrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
@@ -48,7 +47,7 @@ const nsTimeFmt = "2006-01-02 15:04:05.000000000"
 // queueSetFactory makes QueueSet objects.
 type queueSetFactory struct {
 	counter counter.GoRoutineCounter
-	clock   clock.PassiveClock
+	clock   fairqueuingclock.EventClock
 }
 
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
@@ -71,7 +70,7 @@ type queueSetCompleter struct {
 // not end in "Locked" either acquires the lock or does not care about
 // locking.
 type queueSet struct {
-	clock                clock.PassiveClock
+	clock                fairqueuingclock.EventClock
 	counter              counter.GoRoutineCounter
 	estimatedServiceTime float64
 	obsPair              metrics.TimedObserverPair
@@ -121,7 +120,7 @@ type queueSet struct {
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
-func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) fq.QueueSetFactory {
+func NewQueueSetFactory(c fairqueuingclock.EventClock, counter counter.GoRoutineCounter) fq.QueueSetFactory {
 	return &queueSetFactory{
 		counter: counter,
 		clock:   c,
