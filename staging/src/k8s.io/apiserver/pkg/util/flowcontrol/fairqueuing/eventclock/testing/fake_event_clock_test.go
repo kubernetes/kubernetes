@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/clock"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 )
 
 type TestableEventClock interface {
-	clock.EventClock
+	eventclock.EventClock
 	SetTime(time.Time)
 	Run(*time.Time)
 }
