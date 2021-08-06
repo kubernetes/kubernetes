@@ -117,6 +117,13 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+  - path: /etc/modprobe.d/sunrpc.conf
+    permissions: 0644
+    owner: root
+    # The GKE metadata server uses ports 987-989, so the sunrpc range should be restricted to be below.
+    content: |
+      options sunrpc max_resvport=986
+
 runcmd:
  - systemctl daemon-reload
  - systemctl enable kube-node-installation.service
