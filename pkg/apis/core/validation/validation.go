@@ -819,7 +819,7 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 	return allErrs
 }
 
-func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource, pvName string, fldPath *field.Path) field.ErrorList {
+func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource, oldPVSource *core.ISCSIPersistentVolumeSource, pvName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(iscsi.TargetPortal) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("targetPortal"), ""))
@@ -847,7 +847,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
-	if iscsi.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(iscsi.SecretRef, oldPVSource.SecretRef)) && iscsi.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(iscsi.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	if iscsi.InitiatorName != nil {
@@ -1293,7 +1293,7 @@ func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) fie
 	return allErrs
 }
 
-func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, oldPVSource *core.RBDPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rbd.CephMonitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
@@ -1301,7 +1301,7 @@ func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldP
 	if len(rbd.RBDImage) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
 	}
-	if rbd.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(rbd.SecretRef, oldPVSource.SecretRef)) && rbd.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(rbd.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
@@ -1320,12 +1320,12 @@ func validateCinderVolumeSource(cd *core.CinderVolumeSource, fldPath *field.Path
 	return allErrs
 }
 
-func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource, oldPVSource *core.CinderPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
-	if cd.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(cd.SecretRef, oldPVSource.SecretRef)) && cd.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(cd.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
@@ -1339,12 +1339,12 @@ func validateCephFSVolumeSource(cephfs *core.CephFSVolumeSource, fldPath *field.
 	return allErrs
 }
 
-func validateCephFSPersistentVolumeSource(cephfs *core.CephFSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateCephFSPersistentVolumeSource(cephfs *core.CephFSPersistentVolumeSource, oldPVSource *core.CephFSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cephfs.Monitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
-	if cephfs.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(cephfs.SecretRef, oldPVSource.SecretRef)) && cephfs.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(cephfs.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
@@ -1371,7 +1371,7 @@ func validateFlexVolumeSource(fv *core.FlexVolumeSource, fldPath *field.Path) fi
 	return allErrs
 }
 
-func validateFlexPersistentVolumeSource(fv *core.FlexPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateFlexPersistentVolumeSource(fv *core.FlexPersistentVolumeSource, oldPVSource *core.FlexPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
@@ -1389,7 +1389,7 @@ func validateFlexPersistentVolumeSource(fv *core.FlexPersistentVolumeSource, fld
 		}
 	}
 
-	if fv.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(fv.SecretRef, oldPVSource.SecretRef)) && fv.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(fv.SecretRef, fldPath.Child("secretRef"))...)
 	}
 
@@ -1407,11 +1407,11 @@ func validateAzureFile(azure *core.AzureFileVolumeSource, fldPath *field.Path) f
 	return allErrs
 }
 
-func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, oldPVSource *core.AzureFilePersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if azure.SecretName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
-	} else {
+	} else if oldPVSource == nil || !apiequality.Semantic.DeepEqual(azure.SecretName, oldPVSource.SecretName) {
 		for _, msg := range ValidateSecretName(azure.SecretName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("secretName"), azure.SecretName, msg))
 		}
@@ -1422,7 +1422,7 @@ func validateAzureFilePV(azure *core.AzureFilePersistentVolumeSource, fldPath *f
 	if azure.SecretNamespace != nil {
 		if len(*azure.SecretNamespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("secretNamespace"), ""))
-		} else {
+		} else if oldPVSource == nil || !apiequality.Semantic.DeepEqual(azure.SecretNamespace, oldPVSource.SecretNamespace) {
 			allErrs = append(allErrs, ValidateDNS1123Label(*azure.SecretNamespace, fldPath.Child("secretNamespace"))...)
 		}
 	}
@@ -1503,7 +1503,7 @@ func validateScaleIOVolumeSource(sio *core.ScaleIOVolumeSource, fldPath *field.P
 	return allErrs
 }
 
-func validateScaleIOPersistentVolumeSource(sio *core.ScaleIOPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateScaleIOPersistentVolumeSource(sio *core.ScaleIOPersistentVolumeSource, oldPVSource *core.ScaleIOPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if sio.Gateway == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("gateway"), ""))
@@ -1514,7 +1514,7 @@ func validateScaleIOPersistentVolumeSource(sio *core.ScaleIOPersistentVolumeSour
 	if sio.VolumeName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
 	}
-	if sio.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(sio.SecretRef, oldPVSource.SecretRef)) && sio.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(sio.SecretRef, fldPath.Child("secretRed"))...)
 	}
 	return allErrs
@@ -1549,7 +1549,7 @@ func validateStorageOSVolumeSource(storageos *core.StorageOSVolumeSource, fldPat
 	return allErrs
 }
 
-func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistentVolumeSource, oldPVSource *core.StorageOSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(storageos.VolumeName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
@@ -1559,7 +1559,7 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	if len(storageos.VolumeNamespace) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(storageos.VolumeNamespace, fldPath.Child("volumeNamespace"))...)
 	}
-	if storageos.SecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(storageos.SecretRef, oldPVSource.SecretRef)) && storageos.SecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretObjectReference(storageos.SecretRef, fldPath.Child("secretRef"))...)
 	}
 	return allErrs
@@ -1583,7 +1583,7 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 	return allErrs
 }
 
-func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, oldPVSource *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
@@ -1591,16 +1591,16 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
 	}
-	if csi.ControllerPublishSecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(csi.ControllerPublishSecretRef, oldPVSource.ControllerPublishSecretRef)) && csi.ControllerPublishSecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(csi.ControllerPublishSecretRef, fldPath.Child("controllerPublishSecretRef"))...)
 	}
-	if csi.ControllerExpandSecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(csi.ControllerExpandSecretRef, oldPVSource.ControllerExpandSecretRef)) && csi.ControllerExpandSecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(csi.ControllerExpandSecretRef, fldPath.Child("controllerExpandSecretRef"))...)
 	}
-	if csi.NodePublishSecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(csi.NodePublishSecretRef, oldPVSource.NodePublishSecretRef)) && csi.NodePublishSecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(csi.NodePublishSecretRef, fldPath.Child("nodePublishSecretRef"))...)
 	}
-	if csi.NodeStageSecretRef != nil {
+	if (oldPVSource == nil || !apiequality.Semantic.DeepEqual(csi.NodeStageSecretRef, oldPVSource.NodeStageSecretRef)) && csi.NodeStageSecretRef != nil {
 		allErrs = append(allErrs, ValidateSecretReference(csi.NodeStageSecretRef, fldPath.Child("nodeStageSecretRef"))...)
 	}
 	return allErrs
@@ -1690,7 +1690,7 @@ func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) Pers
 	return opts
 }
 
-func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
+func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, oldPVSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if validateInlinePersistentVolumeSpec {
@@ -1821,7 +1821,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("rbd"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateRBDPersistentVolumeSource(pvSpec.RBD, fldPath.Child("rbd"))...)
+			var oldPVSource *core.RBDPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.RBD
+			}
+			allErrs = append(allErrs, validateRBDPersistentVolumeSource(pvSpec.RBD, oldPVSource, fldPath.Child("rbd"))...)
 		}
 	}
 	if pvSpec.Quobyte != nil {
@@ -1837,7 +1841,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cephFS"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCephFSPersistentVolumeSource(pvSpec.CephFS, fldPath.Child("cephfs"))...)
+			var oldPVSource *core.CephFSPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.CephFS
+			}
+			allErrs = append(allErrs, validateCephFSPersistentVolumeSource(pvSpec.CephFS, oldPVSource, fldPath.Child("cephfs"))...)
 		}
 	}
 	if pvSpec.ISCSI != nil {
@@ -1845,7 +1853,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("iscsi"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateISCSIPersistentVolumeSource(pvSpec.ISCSI, pvName, fldPath.Child("iscsi"))...)
+			var oldPVSource *core.ISCSIPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.ISCSI
+			}
+			allErrs = append(allErrs, validateISCSIPersistentVolumeSource(pvSpec.ISCSI, oldPVSource, pvName, fldPath.Child("iscsi"))...)
 		}
 	}
 	if pvSpec.Cinder != nil {
@@ -1853,7 +1865,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cinder"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCinderPersistentVolumeSource(pvSpec.Cinder, fldPath.Child("cinder"))...)
+			var oldPVSoruce *core.CinderPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSoruce = oldPVSpec.Cinder
+			}
+			allErrs = append(allErrs, validateCinderPersistentVolumeSource(pvSpec.Cinder, oldPVSoruce, fldPath.Child("cinder"))...)
 		}
 	}
 	if pvSpec.FC != nil {
@@ -1866,7 +1882,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	}
 	if pvSpec.FlexVolume != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateFlexPersistentVolumeSource(pvSpec.FlexVolume, fldPath.Child("flexVolume"))...)
+		var oldPVSource *core.FlexPersistentVolumeSource = nil
+		if oldPVSpec != nil {
+			oldPVSource = oldPVSpec.FlexVolume
+		}
+		allErrs = append(allErrs, validateFlexPersistentVolumeSource(pvSpec.FlexVolume, oldPVSource, fldPath.Child("flexVolume"))...)
 	}
 	if pvSpec.AzureFile != nil {
 		if numVolumes > 0 {
@@ -1874,7 +1894,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateAzureFilePV(pvSpec.AzureFile, fldPath.Child("azureFile"))...)
+			var oldPVSource *core.AzureFilePersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.AzureFile
+			}
+			allErrs = append(allErrs, validateAzureFilePV(pvSpec.AzureFile, oldPVSource, fldPath.Child("azureFile"))...)
 		}
 	}
 
@@ -1915,7 +1939,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("scaleIO"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateScaleIOPersistentVolumeSource(pvSpec.ScaleIO, fldPath.Child("scaleIO"))...)
+			var oldPVSource *core.ScaleIOPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.ScaleIO
+			}
+			allErrs = append(allErrs, validateScaleIOPersistentVolumeSource(pvSpec.ScaleIO, oldPVSource, fldPath.Child("scaleIO"))...)
 		}
 	}
 	if pvSpec.Local != nil {
@@ -1935,7 +1963,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("storageos"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateStorageOSPersistentVolumeSource(pvSpec.StorageOS, fldPath.Child("storageos"))...)
+			var oldPVSource *core.StorageOSPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.StorageOS
+			}
+			allErrs = append(allErrs, validateStorageOSPersistentVolumeSource(pvSpec.StorageOS, oldPVSource, fldPath.Child("storageos"))...)
 		}
 	}
 
@@ -1944,7 +1976,11 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("csi"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCSIPersistentVolumeSource(pvSpec.CSI, fldPath.Child("csi"))...)
+			var oldPVSource *core.CSIPersistentVolumeSource = nil
+			if oldPVSpec != nil {
+				oldPVSource = oldPVSpec.CSI
+			}
+			allErrs = append(allErrs, validateCSIPersistentVolumeSource(pvSpec.CSI, oldPVSource, fldPath.Child("csi"))...)
 		}
 	}
 
@@ -1980,17 +2016,21 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	return allErrs
 }
 
-func ValidatePersistentVolume(pv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
+func ValidatePersistentVolume(pv *core.PersistentVolume, oldPv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
+	var oldPVSpec *core.PersistentVolumeSpec = nil
+	if oldPv != nil {
+		oldPVSpec = &oldPv.Spec
+	}
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
-	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec, pv.ObjectMeta.Name, false, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec, oldPVSpec, pv.ObjectMeta.Name, false, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
 // ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
 // newPv is updated with fields that cannot be changed.
 func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
-	allErrs := ValidatePersistentVolume(newPv, opts)
+	var allErrs field.ErrorList
 
 	// if oldPV does not have ControllerExpandSecretRef then allow it to be set
 	if (oldPv.Spec.CSI != nil && oldPv.Spec.CSI.ControllerExpandSecretRef == nil) &&
@@ -2010,6 +2050,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	if oldPv.Spec.NodeAffinity != nil {
 		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
+	allErrs = append(allErrs, ValidatePersistentVolume(newPv, oldPv, opts)...)
 
 	return allErrs
 }

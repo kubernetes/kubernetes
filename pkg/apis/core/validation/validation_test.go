@@ -467,7 +467,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
-			errs := ValidatePersistentVolume(scenario.volume, opts)
+			errs := ValidatePersistentVolume(scenario.volume, nil, opts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -611,7 +611,7 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 	}
 	for name, scenario := range scenarios {
 		opts := PersistentVolumeSpecValidationOptions{}
-		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"), opts)
+		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, nil, "", scenario.isInlineSpec, field.NewPath("field"), opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -863,7 +863,7 @@ func TestValidateLocalVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
-		errs := ValidatePersistentVolume(scenario.volume, opts)
+		errs := ValidatePersistentVolume(scenario.volume, nil, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -2507,7 +2507,7 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
+		errs := validateCSIPersistentVolumeSource(tc.csi, nil, field.NewPath("field"))
 
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
@@ -4648,7 +4648,7 @@ func TestPVVolumeMode(t *testing.T) {
 	}
 	for k, v := range successCasesPV {
 		opts := ValidationOptionsForPersistentVolume(v, nil)
-		if errs := ValidatePersistentVolume(v, opts); len(errs) != 0 {
+		if errs := ValidatePersistentVolume(v, nil, opts); len(errs) != 0 {
 			t.Errorf("expected success for %s", k)
 		}
 	}
@@ -4660,7 +4660,7 @@ func TestPVVolumeMode(t *testing.T) {
 	}
 	for k, v := range errorCasesPV {
 		opts := ValidationOptionsForPersistentVolume(v, nil)
-		if errs := ValidatePersistentVolume(v, opts); len(errs) == 0 {
+		if errs := ValidatePersistentVolume(v, nil, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}

@@ -72,7 +72,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(persistentvolume, nil)
-	errorList := validation.ValidatePersistentVolume(persistentvolume, opts)
+	errorList := validation.ValidatePersistentVolume(persistentvolume, nil, opts)
 	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
 }
 
@@ -102,8 +102,7 @@ func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(newPv, oldPv)
-	errorList := validation.ValidatePersistentVolume(newPv, opts)
-	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
+	errorList := volumevalidation.ValidatePersistentVolume(newPv)
 	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
 }
 
