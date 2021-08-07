@@ -193,7 +193,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 		}
 	case source.InlineVolumeSpec != nil:
 		opts := apivalidation.PersistentVolumeSpecValidationOptions{}
-		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, nil,"", true, fldPath.Child("inlineVolumeSpec"), opts)...)
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, nil, "", true, fldPath.Child("inlineVolumeSpec"), opts)...)
 	}
 	return allErrs
 }
