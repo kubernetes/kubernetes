@@ -5837,4 +5837,199 @@ func TestDeleteDryRun(t *testing.T) {
 	}
 }
 
+// Prove that a dry-run update doesn't actually allocate or deallocate IPs or ports.
+func TestUpdateDryRun(t *testing.T) {
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		svc             *api.Service
+		update          *api.Service
+		verifyDryAllocs bool
+	}{{
+		name:            "singlestack:v4_NoAllocs-Allocs",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc:             svctest.MakeService("foo", svctest.SetTypeExternalName),
+		update: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		verifyDryAllocs: true, // make sure values were not allocated.
+	}, {
+		name:            "singlestack:v4_Allocs-NoAllocs",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		update:          svctest.MakeService("foo", svctest.SetTypeExternalName),
+		verifyDryAllocs: false, // make sure values were not released.
+	}, {
+		name:            "singlestack:v6_NoAllocs-Allocs",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc:             svctest.MakeService("foo", svctest.SetTypeExternalName),
+		update: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		verifyDryAllocs: true, // make sure values were not allocated.
+	}, {
+		name:            "singlestack:v6_Allocs-NoAllocs",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		update:          svctest.MakeService("foo", svctest.SetTypeExternalName),
+		verifyDryAllocs: false, // make sure values were not released.
+	}, {
+		name:            "dualstack:v4v6_NoAllocs-Allocs",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc:             svctest.MakeService("foo", svctest.SetTypeExternalName),
+		update: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		verifyDryAllocs: true, // make sure values were not allocated.
+	}, {
+		name:            "dualstack:v4v6_Allocs-NoAllocs",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		update:          svctest.MakeService("foo", svctest.SetTypeExternalName),
+		verifyDryAllocs: false, // make sure values were not released.
+	}, {
+		name:            "dualstack:v6v4_NoAllocs-Allocs",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc:             svctest.MakeService("foo", svctest.SetTypeExternalName),
+		update: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		verifyDryAllocs: true, // make sure values were not allocated.
+	}, {
+		name:            "dualstack:v6v4_Allocs-NoAllocs",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		update:          svctest.MakeService("foo", svctest.SetTypeExternalName),
+		verifyDryAllocs: false, // make sure values were not released.
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage, _, server := newStorage(t, tc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			obj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			createdSvc := obj.(*api.Service)
+
+			if tc.verifyDryAllocs {
+				// Dry allocs means no allocs on create.  Ensure values were
+				// NOT allocated.
+				for i, fam := range createdSvc.Spec.IPFamilies {
+					if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+						t.Errorf("expected IP to not be allocated: %q", createdSvc.Spec.ClusterIPs[i])
+					}
+				}
+				for _, p := range createdSvc.Spec.Ports {
+					if p.NodePort != 0 {
+						t.Errorf("expected port to not be assigned: %d", p.NodePort)
+						if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+							t.Errorf("expected port to not be allocated: %d", p.NodePort)
+						}
+					}
+				}
+				if createdSvc.Spec.HealthCheckNodePort != 0 {
+					t.Errorf("expected HCNP to not be assigned: %d", createdSvc.Spec.HealthCheckNodePort)
+					if portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+						t.Errorf("expected HCNP to not be allocated: %d", createdSvc.Spec.HealthCheckNodePort)
+					}
+				}
+			} else {
+				// Ensure IPs were allocated
+				for i, fam := range createdSvc.Spec.IPFamilies {
+					if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+						t.Errorf("expected IP to be allocated: %q", createdSvc.Spec.ClusterIPs[i])
+					}
+				}
+				for _, p := range createdSvc.Spec.Ports {
+					if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+						t.Errorf("expected port to be allocated: %d", p.NodePort)
+					}
+				}
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+					t.Errorf("expected port to be allocated: %d", createdSvc.Spec.HealthCheckNodePort)
+				}
+			}
+
+			// Update the object to the new state and check the results.
+			obj, _, err = storage.Update(ctx, tc.update.Name,
+				rest.DefaultUpdatedObjectInfo(tc.update), rest.ValidateAllObjectFunc,
+				rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+			if err != nil {
+				t.Fatalf("unexpected error updating service: %v", err)
+			}
+			updatedSvc := obj.(*api.Service)
+
+			if tc.verifyDryAllocs {
+				// Dry allocs means the values are assigned but not
+				// allocated.
+				if net.ParseIP(updatedSvc.Spec.ClusterIP) == nil {
+					t.Errorf("expected valid clusterIP: %q", updatedSvc.Spec.ClusterIP)
+				}
+				for _, ip := range updatedSvc.Spec.ClusterIPs {
+					if net.ParseIP(ip) == nil {
+						t.Errorf("expected valid clusterIP: %q", updatedSvc.Spec.ClusterIP)
+					}
+				}
+				for i, fam := range updatedSvc.Spec.IPFamilies {
+					if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], updatedSvc.Spec.ClusterIPs[i]) {
+						t.Errorf("expected IP to not be allocated: %q", updatedSvc.Spec.ClusterIPs[i])
+					}
+				}
+
+				for _, p := range updatedSvc.Spec.Ports {
+					if p.NodePort == 0 {
+						t.Errorf("expected nodePort to be assigned: %d", p.NodePort)
+					}
+					if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+						t.Errorf("expected nodePort to not be allocated: %d", p.NodePort)
+					}
+				}
+
+				if updatedSvc.Spec.HealthCheckNodePort == 0 {
+					t.Errorf("expected HCNP to be assigned: %d", updatedSvc.Spec.HealthCheckNodePort)
+				}
+				if portIsAllocated(t, storage.alloc.serviceNodePorts, updatedSvc.Spec.HealthCheckNodePort) {
+					t.Errorf("expected HCNP to not be allocated: %d", updatedSvc.Spec.HealthCheckNodePort)
+				}
+			} else {
+				// Ensure IPs were unassigned but not deallocated.
+				if updatedSvc.Spec.ClusterIP != "" {
+					t.Errorf("expected clusterIP to be unset: %q", updatedSvc.Spec.ClusterIP)
+				}
+				if len(updatedSvc.Spec.ClusterIPs) != 0 {
+					t.Errorf("expected clusterIPs to be unset: %q", updatedSvc.Spec.ClusterIPs)
+				}
+				for i, fam := range createdSvc.Spec.IPFamilies {
+					if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+						t.Errorf("expected IP to still be allocated: %q", createdSvc.Spec.ClusterIPs[i])
+					}
+				}
+
+				for _, p := range updatedSvc.Spec.Ports {
+					if p.NodePort != 0 {
+						t.Errorf("expected nodePort to be unset: %d", p.NodePort)
+					}
+				}
+				for _, p := range createdSvc.Spec.Ports {
+					if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+						t.Errorf("expected nodePort to still be allocated: %d", p.NodePort)
+					}
+				}
+
+				if updatedSvc.Spec.HealthCheckNodePort != 0 {
+					t.Errorf("expected HCNP to be unset: %d", updatedSvc.Spec.HealthCheckNodePort)
+				}
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+					t.Errorf("expected HCNP to still be allocated: %d", createdSvc.Spec.HealthCheckNodePort)
+				}
+			}
+		})
+	}
+}
+
 //FIXME: Tests for update()
