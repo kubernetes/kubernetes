@@ -287,17 +287,14 @@ func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRu
 	}
 
 	// Allocate ClusterIPs
-	//FIXME: we need to put values in, even if dry run - else validation should
-	//not pass.  It does but that should be fixed.  Plumb dryRun thru update
-	//logic.
-	// xref: https://groups.google.com/g/kubernetes-sig-api-machinery/c/_-5TKHXHcXE/m/RfKj7CtzAQAJ
-	if !dryRun {
-		if txn, err := al.allocUpdateServiceClusterIPsNew(service, oldService); err != nil {
-			result.Revert()
-			return nil, err
-		} else {
-			result = append(result, txn)
-		}
+	//TODO(thockin): validation should not pass with empty clusterIP, but it
+	//does (and is tested!).  Fixing that all is a big PR and will have to
+	//happen later.
+	if txn, err := al.allocUpdateServiceClusterIPsNew(service, oldService, dryRun); err != nil {
+		result.Revert()
+		return nil, err
+	} else {
+		result = append(result, txn)
 	}
 
 	// Allocate ports
@@ -592,8 +589,8 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bo
 }
 
 //FIXME: rename and merge with handleClusterIPsForUpdatedService
-func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, oldService *api.Service) (transaction, error) {
-	allocated, released, err := al.handleClusterIPsForUpdatedService(oldService, service)
+func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, oldService *api.Service, dryRun bool) (transaction, error) {
+	allocated, released, err := al.handleClusterIPsForUpdatedService(oldService, service, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -605,12 +602,18 @@ func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, 
 	//             released
 	txn := callbackTransaction{
 		commit: func() {
+			if dryRun {
+				return
+			}
 			if actuallyReleased, err := al.releaseClusterIPs(released); err != nil {
 				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v",
 					service.Namespace, service.Name, err, released, actuallyReleased)
 			}
 		},
 		revert: func() {
+			if dryRun {
+				return
+			}
 			if actuallyReleased, err := al.releaseClusterIPs(allocated); err != nil {
 				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v",
 					service.Namespace, service.Name, err, allocated, actuallyReleased)
@@ -624,7 +627,7 @@ func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, 
 // this func does not perform actual release of clusterIPs. it returns
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
-func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Service, service *api.Service) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Service, service *api.Service, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
 
 	// We don't want to upgrade (add an IP) or downgrade (remove an IP)
 	// following a cluster downgrade/upgrade to/from dual-stackness
@@ -647,8 +650,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 	// CASE A:
 	// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
 	if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-		//FIXME: plumb dryRun down here
-		allocated, err := al.allocServiceClusterIPs(service, false)
+		allocated, err := al.allocServiceClusterIPs(service, dryRun)
 		return allocated, nil, err
 	}
 
@@ -694,7 +696,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 		toAllocate[service.Spec.IPFamilies[1]] = service.Spec.ClusterIPs[1]
 
 		// allocate
-		allocated, err := al.allocClusterIPs(service, toAllocate, false) //FIXME: plumb dry-run down here
+		allocated, err := al.allocClusterIPs(service, toAllocate, dryRun)
 		// set if successful
 		if err == nil {
 			service.Spec.ClusterIPs[1] = allocated[service.Spec.IPFamilies[1]]
