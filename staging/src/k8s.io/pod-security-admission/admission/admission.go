@@ -44,6 +44,7 @@ const (
 	namespacePodCheckTimeout = 1 * time.Second
 )
 
+
 // Admission implements the core admission logic for the Pod Security Admission controller.
 // The admission logic can be
 type Admission struct {
@@ -196,7 +197,7 @@ var (
 // Validate admits an API request.
 // The objects in admission attributes are expected to be external v1 objects that we care about.
 // The returned response may be shared and must not be mutated.
-func (a *Admission) Validate(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
+func (a *Admission) Validate(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	var response *admissionv1.AdmissionResponse
 	switch attrs.GetResource().GroupResource() {
 	case namespacesResource:
@@ -206,16 +207,13 @@ func (a *Admission) Validate(ctx context.Context, attrs Attributes) *admissionv1
 	default:
 		response = a.ValidatePodController(ctx, attrs)
 	}
-
-	// TODO: record metrics.
-
 	return response
 }
 
 // ValidateNamespace evaluates a namespace create or update request to ensure the pod security labels are valid,
 // and checks existing pods in the namespace for violations of the new policy when updating the enforce level on a namespace.
 // The returned response may be shared between evaluations and must not be mutated.
-func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
+func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
 		return sharedAllowedResponse()
@@ -303,13 +301,15 @@ var ignoredPodSubresources = map[string]bool{
 
 // ValidatePod evaluates a pod create or update request against the effective policy for the namespace.
 // The returned response may be shared between evaluations and must not be mutated.
-func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionExempt, attrs)
 		return sharedAllowedResponse()
 	}
 
@@ -327,26 +327,31 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode object")
 	}
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode pod")
 	}
 	if attrs.GetOperation() == admissionv1.Update {
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
+			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 			return badRequestResponse("failed to decode old object")
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
 			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
+			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 			return badRequestResponse("failed to decode old pod")
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
+			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 			return sharedAllowedResponse()
 		}
 	}
@@ -355,13 +360,15 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 
 // ValidatePodController evaluates a pod controller create or update request against the effective policy for the namespace.
 // The returned response may be shared between evaluations and must not be mutated.
-func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
+func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionExempt, attrs)
 		return sharedAllowedResponse()
 	}
 
@@ -379,15 +386,18 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode object")
 	}
 	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to extract pod template")
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
+		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, attrs, false)
@@ -396,9 +406,13 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 // EvaluatePod evaluates the given policy against the given pod(-like) object.
 // The enforce policy is only checked if enforce=true.
 // The returned response may be shared between evaluations and must not be mutated.
-func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs Attributes, enforce bool) *admissionv1.AdmissionResponse {
+func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs api.Attributes, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
+	var decision metrics.Decision = metrics.DecisionAllow
+	var p = a.defaultPolicy
+	defer a.RecordEvaluation(p, decision, attrs)
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
+		decision = metrics.DecisionExempt
 		return sharedAllowedResponse()
 	}
 
@@ -412,10 +426,11 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		klog.InfoS("Pod Security evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
 
-	response := allowedResponse()
+	response := sharedAllowedResponse()
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(result.ForbiddenDetail())
+			decision = metrics.DecisionDeny
 		}
 	}
 
@@ -438,6 +453,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		}
 	}
 
+	p = nsPolicy
 	response.AuditAnnotations = auditAnnotations
 	return response
 }
@@ -492,6 +508,20 @@ var _sharedAllowedResponse = allowedResponse()
 
 func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 	return _sharedAllowedResponse
+}
+
+func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes)  {
+	if a.Metrics != nil{
+		if policy.Audit.Valid(){
+			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Audit, metrics.ModeAudit, attrs)
+		}
+		if policy.Warn.Valid() {
+			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Warn, metrics.ModeWarn, attrs)
+		}
+		if policy.Enforce.Valid(){
+			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Enforce, metrics.ModeEnforce, attrs)
+		}
+	}
 }
 
 // allowedResponse is the response used when the admission decision is allow.
