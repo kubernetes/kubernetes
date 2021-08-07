@@ -407,9 +407,9 @@ func prioritizeNodes(
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !fwk.HasScorePlugins() {
 		result := make(framework.NodeScoreList, 0, len(nodes))
-		for i := range nodes {
+		for _, node := range nodes {
 			result = append(result, framework.NodeScore{
-				Name:  nodes[i].Name,
+				Name:  node.Name,
 				Score: 1,
 			})
 		}
@@ -467,8 +467,8 @@ func prioritizeNodes(
 					return
 				}
 				mu.Lock()
-				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+				for _, p := range *prioritizedList {
+					host, score := p.Host, p.Score
 					if klog.V(10).Enabled() {
 						klog.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
 					}
@@ -487,8 +487,8 @@ func prioritizeNodes(
 	}
 
 	if klog.V(10).Enabled() {
-		for i := range result {
-			klog.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
+		for _, node := range result {
+			klog.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", node.Name, "score", node.Score)
 		}
 	}
 	return result, nil
