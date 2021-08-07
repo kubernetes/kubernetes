@@ -18,7 +18,6 @@ package responsewriters
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -34,6 +33,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"

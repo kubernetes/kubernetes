@@ -17,7 +17,6 @@ limitations under the License.
 package responsewriters
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 
 	"k8s.io/apiserver/pkg/features"
 
