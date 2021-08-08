@@ -24,9 +24,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
-type fakeGroupRegisty struct{}
+type fakeGroupRegistry struct{}
 
-func (f fakeGroupRegisty) IsGroupRegistered(group string) bool {
+func (f fakeGroupRegistry) IsGroupRegistered(group string) bool {
 	return group == "apiregistration.k8s.io"
 }
 
@@ -67,11 +67,11 @@ func TestAPIEnablementOptionsValidate(t *testing.T) {
 			},
 		},
 	}
-	testGroupRegisty := fakeGroupRegisty{}
+	testGroupRegistry := fakeGroupRegistry{}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			errs := testcase.testOptions.Validate(testGroupRegisty)
+			errs := testcase.testOptions.Validate(testGroupRegistry)
 			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
 			}
