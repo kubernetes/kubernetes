@@ -59,19 +59,18 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		bs, _ := ioutil.ReadAll(resp.Body)
-		klog.V(2).Infof("body of failing http response: %s", bs)
-		return nil, &HTTPError{
-			StatusCode: resp.StatusCode,
-			URL:        url,
-		}
-	}
-
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxReadLength}
 	contents, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		klog.V(2).Infof("body of failing http response: %s", contents)
+		return nil, &HTTPError{
+			StatusCode: resp.StatusCode,
+			URL:        url,
+		}
 	}
 
 	if limitedReader.N <= 0 {
