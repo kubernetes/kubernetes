@@ -68,12 +68,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// volumeattachments
-	volumeAttachmentStorage, err := volumeattachmentstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
 	// register csistoragecapacities
 	csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
@@ -87,33 +81,6 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// storageclasses
-	storageClassStorage, err := storageclassstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["storageclasses"] = storageClassStorage
-
-	// volumeattachments
-	volumeAttachmentStorage, err := volumeattachmentstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
-
-	// register csinodes
-	csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["csinodes"] = csiNodeStorage.CSINode
-
-	// register csidrivers
-	csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["csidrivers"] = csiDriverStorage.CSIDriver
 
 	// register csistoragecapacities
 	csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
