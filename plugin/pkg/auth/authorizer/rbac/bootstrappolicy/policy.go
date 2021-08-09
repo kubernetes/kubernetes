@@ -57,6 +57,7 @@ const (
 	storageGroup           = "storage.k8s.io"
 	resMetricsGroup        = "metrics.k8s.io"
 	customMetricsGroup     = "custom.metrics.k8s.io"
+	externalMetricsGroup   = "external.metrics.k8s.io"
 	networkingGroup        = "networking.k8s.io"
 	eventsGroup            = "events.k8s.io"
 	internalAPIServerGroup = "internal.apiserver.k8s.io"
