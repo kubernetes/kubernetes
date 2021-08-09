@@ -39,6 +39,7 @@ filegroup(
         ":package-srcs",
         "//vendor/github.com/cilium/ebpf/asm:all-srcs",
         "//vendor/github.com/cilium/ebpf/internal:all-srcs",
+        "//vendor/github.com/cilium/ebpf/link:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

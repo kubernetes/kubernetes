@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/logs",
     importpath = "github.com/opencontainers/runc/libcontainer/logs",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/sirupsen/logrus:go_default_library"],
+    deps = [
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+    ],
 )
 
 filegroup(

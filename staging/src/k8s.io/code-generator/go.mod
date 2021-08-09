@@ -12,11 +12,15 @@ require (
 	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1 // indirect
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
+	golang.org/x/net v0.0.0-20201224014010-6772e930b67b // indirect
 	golang.org/x/text v0.3.4 // indirect
 	k8s.io/gengo v0.0.0-20201113003025-83324d819ded
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	k8s.io/code-generator => ../code-generator
+)

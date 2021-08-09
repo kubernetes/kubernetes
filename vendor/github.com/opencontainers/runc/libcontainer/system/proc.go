@@ -71,16 +71,6 @@ func Stat(pid int) (stat Stat_t, err error) {
 	return parseStat(string(bytes))
 }
 
-// GetProcessStartTime is deprecated.  Use Stat(pid) and
-// Stat_t.StartTime instead.
-func GetProcessStartTime(pid int) (string, error) {
-	stat, err := Stat(pid)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%d", stat.StartTime), nil
-}
-
 func parseStat(data string) (stat Stat_t, err error) {
 	// From proc(5), field 2 could contain space and is inside `(` and `)`.
 	// The following is an example:
@@ -106,7 +96,7 @@ func parseStat(data string) (stat Stat_t, err error) {
 	// one (PID) and two (Name) in the paren-split.
 	parts = strings.Split(data[i+2:], " ")
 	var state int
-	fmt.Sscanf(parts[3-3], "%c", &state)
+	fmt.Sscanf(parts[3-3], "%c", &state) //nolint:staticcheck // "3-3" is more readable in this context.
 	stat.State = State(state)
 	fmt.Sscanf(parts[22-3], "%d", &stat.StartTime)
 	return stat, nil

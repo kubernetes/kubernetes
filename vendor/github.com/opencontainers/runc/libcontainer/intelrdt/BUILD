@@ -16,9 +16,11 @@ go_library(
         "//vendor/github.com/sirupsen/logrus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/moby/sys/mountinfo:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/moby/sys/mountinfo:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         ],
         "//conditions:default": [],

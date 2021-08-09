@@ -12,6 +12,9 @@ require (
 )
 
 replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	google.golang.org/protobuf => google.golang.org/protobuf v1.25.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib

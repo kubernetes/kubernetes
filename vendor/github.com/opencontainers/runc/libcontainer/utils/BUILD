@@ -10,7 +10,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/utils",
     importpath = "github.com/opencontainers/runc/libcontainer/utils",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
+    deps = [
+        "//vendor/github.com/cyphar/filepath-securejoin:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+    ],
 )
 
 filegroup(

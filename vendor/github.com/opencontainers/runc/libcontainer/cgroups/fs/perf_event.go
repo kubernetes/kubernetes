@@ -7,8 +7,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type PerfEventGroup struct {
-}
+type PerfEventGroup struct{}
 
 func (s *PerfEventGroup) Name() string {
 	return "perf_event"
@@ -18,7 +17,7 @@ func (s *PerfEventGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *PerfEventGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *PerfEventGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 

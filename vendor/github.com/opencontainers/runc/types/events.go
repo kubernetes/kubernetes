@@ -12,6 +12,7 @@ type Event struct {
 // stats is the runc specific stats structure for stability when encoding and decoding stats.
 type Stats struct {
 	CPU               Cpu                 `json:"cpu"`
+	CPUSet            CPUSet              `json:"cpuset"`
 	Memory            Memory              `json:"memory"`
 	Pids              Pids                `json:"pids"`
 	Blkio             Blkio               `json:"blkio"`
@@ -68,6 +69,20 @@ type CpuUsage struct {
 type Cpu struct {
 	Usage      CpuUsage   `json:"usage,omitempty"`
 	Throttling Throttling `json:"throttling,omitempty"`
+}
+
+type CPUSet struct {
+	CPUs                  []uint16 `json:"cpus,omitempty"`
+	CPUExclusive          uint64   `json:"cpu_exclusive"`
+	Mems                  []uint16 `json:"mems,omitempty"`
+	MemHardwall           uint64   `json:"mem_hardwall"`
+	MemExclusive          uint64   `json:"mem_exclusive"`
+	MemoryMigrate         uint64   `json:"memory_migrate"`
+	MemorySpreadPage      uint64   `json:"memory_spread_page"`
+	MemorySpreadSlab      uint64   `json:"memory_spread_slab"`
+	MemoryPressure        uint64   `json:"memory_pressure"`
+	SchedLoadBalance      uint64   `json:"sched_load_balance"`
+	SchedRelaxDomainLevel int64    `json:"sched_relax_domain_level"`
 }
 
 type MemoryEntry struct {

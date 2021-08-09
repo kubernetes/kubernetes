@@ -3,9 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "lookup.go",
         "lookup_unix.go",
-        "lookup_windows.go",
         "user.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/user",

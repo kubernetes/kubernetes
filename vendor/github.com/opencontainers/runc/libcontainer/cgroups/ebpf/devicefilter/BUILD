@@ -8,7 +8,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/cilium/ebpf/asm:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/devices:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/devices:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/golang.org/x/sys/unix:go_default_library",
     ],

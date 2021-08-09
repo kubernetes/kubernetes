@@ -26,10 +26,10 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd // indirect
+	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
+	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887 // indirect
 	golang.org/x/text v0.3.4 // indirect
-	google.golang.org/protobuf v1.25.0 // indirect
+	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/klog/v2 v2.4.0
@@ -38,4 +38,9 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	google.golang.org/protobuf => google.golang.org/protobuf v1.25.0
+	k8s.io/apimachinery => ../apimachinery
+)

@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "cgroups.go",
         "cgroups_unsupported.go",
+        "file.go",
         "stats.go",
         "utils.go",
         "v1_utils.go",
@@ -14,15 +15,18 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/cyphar/filepath-securejoin:go_default_library",
+        "//vendor/github.com/moby/sys/mountinfo:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
         "//vendor/golang.org/x/sys/unix:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//vendor/github.com/docker/go-units:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/userns:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/docker/go-units:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/userns:go_default_library",
         ],
         "//conditions:default": [],
     }),

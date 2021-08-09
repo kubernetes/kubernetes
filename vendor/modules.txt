@@ -182,6 +182,9 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
 # github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
+# github.com/bits-and-blooms/bitset v1.2.0 => github.com/bits-and-blooms/bitset v1.2.0
+github.com/bits-and-blooms/bitset
+# github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 # github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 # github.com/blang/semver v3.5.1+incompatible => github.com/blang/semver v3.5.1+incompatible
 ## explicit
@@ -205,21 +208,23 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/checkpoint-restore/go-criu/v4 v4.1.0 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
-github.com/checkpoint-restore/go-criu/v4
 # github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
-github.com/checkpoint-restore/go-criu/v4/rpc
+# github.com/checkpoint-restore/go-criu/v5 v5.0.0 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
+github.com/checkpoint-restore/go-criu/v5
+# github.com/checkpoint-restore/go-criu/v5 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
+github.com/checkpoint-restore/go-criu/v5/rpc
 # github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 # github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-# github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775 => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
+# github.com/cilium/ebpf v0.6.2 => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 github.com/cilium/ebpf
 # github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
+github.com/cilium/ebpf/link
 # github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 ## explicit
 github.com/clusterhq/flocker-go
@@ -235,7 +240,7 @@ github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
+# github.com/containerd/console v1.0.2 => github.com/containerd/console v1.0.0
 github.com/containerd/console
 # github.com/containerd/console => github.com/containerd/console v1.0.0
 # github.com/containerd/containerd v1.4.1 => github.com/containerd/containerd v1.4.1
@@ -287,7 +292,7 @@ github.com/coreos/go-semver/semver
 github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
-# github.com/coreos/go-systemd/v22 v22.1.0 => github.com/coreos/go-systemd/v22 v22.1.0
+# github.com/coreos/go-systemd/v22 v22.3.2 => github.com/coreos/go-systemd/v22 v22.1.0
 # github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
 github.com/coreos/go-systemd/v22/dbus
 # github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
@@ -458,7 +463,7 @@ github.com/go-ozzo/ozzo-validation/is
 # github.com/go-stack/stack v1.8.0 => github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
-# github.com/godbus/dbus/v5 v5.0.3 => github.com/godbus/dbus/v5 v5.0.3
+# github.com/godbus/dbus/v5 v5.0.4 => github.com/godbus/dbus/v5 v5.0.3
 ## explicit
 github.com/godbus/dbus/v5
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
@@ -808,7 +813,7 @@ github.com/mitchellh/mapstructure
 ## explicit
 github.com/moby/ipvs
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
-# github.com/moby/sys/mountinfo v0.1.3 => github.com/moby/sys/mountinfo v0.1.3
+# github.com/moby/sys/mountinfo v0.4.1 => github.com/moby/sys/mountinfo v0.1.3
 github.com/moby/sys/mountinfo
 # github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3
 # github.com/moby/term v0.0.0-20200312100748-672ec06f55cd => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
@@ -828,7 +833,7 @@ github.com/mohae/deepcopy
 # github.com/morikuni/aec v1.0.0 => github.com/morikuni/aec v1.0.0
 github.com/morikuni/aec
 # github.com/morikuni/aec => github.com/morikuni/aec v1.0.0
-# github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976 => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
+# github.com/mrunalp/fileutils v0.5.0 => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
 ## explicit
 github.com/mrunalp/fileutils
 # github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
@@ -900,11 +905,12 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc v1.0.1 => github.com/opencontainers/runc v1.0.1
 ## explicit
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
+github.com/opencontainers/runc/libcontainer/capabilities
 github.com/opencontainers/runc/libcontainer/cgroups
 github.com/opencontainers/runc/libcontainer/cgroups/devices
 github.com/opencontainers/runc/libcontainer/cgroups/ebpf
@@ -915,19 +921,22 @@ github.com/opencontainers/runc/libcontainer/cgroups/fscommon
 github.com/opencontainers/runc/libcontainer/cgroups/systemd
 github.com/opencontainers/runc/libcontainer/configs
 github.com/opencontainers/runc/libcontainer/configs/validate
+github.com/opencontainers/runc/libcontainer/devices
 github.com/opencontainers/runc/libcontainer/intelrdt
 github.com/opencontainers/runc/libcontainer/keys
 github.com/opencontainers/runc/libcontainer/logs
 github.com/opencontainers/runc/libcontainer/seccomp
+github.com/opencontainers/runc/libcontainer/seccomp/patchbpf
 github.com/opencontainers/runc/libcontainer/stacktrace
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
+github.com/opencontainers/runc/libcontainer/userns
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
+# github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.6.0 => github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux v1.8.2 => github.com/opencontainers/selinux v1.6.0
 ## explicit
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
 github.com/opencontainers/selinux/go-selinux
@@ -1008,7 +1017,7 @@ github.com/seccomp/libseccomp-golang
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
-# github.com/sirupsen/logrus v1.6.0 => github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.8.1 => github.com/sirupsen/logrus v1.6.0
 github.com/sirupsen/logrus
 # github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.6.0
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
@@ -1060,7 +1069,7 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0 => github.com/subosito/gotenv v1.2.0
 github.com/subosito/gotenv
 # github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
-# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 # github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 github.com/syndtr/gocapability/capability
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
@@ -1286,7 +1295,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/mod => golang.org/x/mod v0.3.0
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20201110031124-69a78807bb2b => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+# golang.org/x/net v0.0.0-20201224014010-6772e930b67b => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 ## explicit
 # golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 golang.org/x/net/bpf
@@ -1319,7 +1328,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20201112073958-5cba982894dd => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+# golang.org/x/sys v0.0.0-20210426230700-d19ff857e887 => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 ## explicit
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 golang.org/x/sys/cpu
@@ -1498,7 +1507,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.25.0 => google.golang.org/protobuf v1.25.0
+# google.golang.org/protobuf v1.26.0 => google.golang.org/protobuf v1.25.0
 # google.golang.org/protobuf => google.golang.org/protobuf v1.25.0
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext

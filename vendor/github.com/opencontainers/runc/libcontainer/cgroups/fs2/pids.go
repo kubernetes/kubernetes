@@ -3,7 +3,7 @@
 package fs2
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -14,16 +14,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func isPidsSet(cgroup *configs.Cgroup) bool {
-	return cgroup.Resources.PidsLimit != 0
+func isPidsSet(r *configs.Resources) bool {
+	return r.PidsLimit != 0
 }
 
-func setPids(dirPath string, cgroup *configs.Cgroup) error {
-	if !isPidsSet(cgroup) {
+func setPids(dirPath string, r *configs.Resources) error {
+	if !isPidsSet(r) {
 		return nil
 	}
-	if val := numToStr(cgroup.Resources.PidsLimit); val != "" {
-		if err := fscommon.WriteFile(dirPath, "pids.max", val); err != nil {
+	if val := numToStr(r.PidsLimit); val != "" {
+		if err := cgroups.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
 	}
@@ -31,23 +31,18 @@ func setPids(dirPath string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
+func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
-	contents, err := ioutil.ReadFile(filepath.Join(dirPath, "cgroup.procs"))
+	contents, err := cgroups.ReadFile(dirPath, "cgroup.procs")
 	if errors.Is(err, unix.ENOTSUP) {
-		contents, err = ioutil.ReadFile(filepath.Join(dirPath, "cgroup.threads"))
+		contents, err = cgroups.ReadFile(dirPath, "cgroup.threads")
 	}
 	if err != nil {
 		return err
 	}
-	pids := make(map[string]string)
-	for _, i := range strings.Split(string(contents), "\n") {
-		if i != "" {
-			pids[i] = i
-		}
-	}
-	stats.PidsStats.Current = uint64(len(pids))
+	pids := strings.Count(contents, "\n")
+	stats.PidsStats.Current = uint64(pids)
 	stats.PidsStats.Limit = 0
 	return nil
 }
@@ -55,6 +50,9 @@ func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 func statPids(dirPath string, stats *cgroups.Stats) error {
 	current, err := fscommon.GetCgroupParamUint(dirPath, "pids.current")
 	if err != nil {
+		if os.IsNotExist(err) {
+			return statPidsFromCgroupProcs(dirPath, stats)
+		}
 		return errors.Wrap(err, "failed to parse pids.current")
 	}
 
