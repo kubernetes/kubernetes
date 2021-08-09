@@ -262,10 +262,6 @@ func validateMetricFamily(gatherer metrics.Gatherer, metricName string) (*dto.Me
 		}
 	}
 
-	if metricFamily == nil {
-		return nil, fmt.Errorf("metric %q not found", metricName)
-	}
-
 	if metricFamily.GetMetric() == nil {
 		return nil, fmt.Errorf("metric %q is empty", metricName)
 	}
@@ -278,7 +274,7 @@ func validateMetricFamily(gatherer metrics.Gatherer, metricName string) (*dto.Me
 
 // GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map
 // from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
-// All metrics within the metricFamily will be assembled as a single HistogramVec. Quantle, Average etc. are caculated based on
+// All metrics within the metricFamily will be assembled as a single HistogramVec. Quantile, Average etc. are caculated based on
 // the accumulated data from the HistogramVec.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
 func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
@@ -303,10 +299,10 @@ type LabeledHistogram struct {
 	Histogram Histogram
 }
 
-// GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// GetHistogramsFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // If the metric is a HistogramVec, each metric from the HistogramVec will be collected with a label map one by one.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) ([]LabeledHistogram, error) {
+func GetHistogramsFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) ([]LabeledHistogram, error) {
 	metricFamily, err := validateMetricFamily(gatherer, metricName)
 	if err != nil {
 		return nil, err

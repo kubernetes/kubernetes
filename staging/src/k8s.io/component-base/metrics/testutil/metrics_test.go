@@ -22,8 +22,12 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/utils/pointer"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -510,5 +514,40 @@ func TestHistogramVec_Validate(t *testing.T) {
 				t.Errorf("Validate() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetHistogramFromGatherer(t *testing.T) {
+	// Have multiple labels defined here, but we only care about the first label, i.e. "extension_point".
+	labels := []string{"extension_point", "status"}
+	lvMap := map[string]string{"extension_point": "*"}
+	HistogramOpts := &metrics.HistogramOpts{
+		Namespace: "namespace",
+		Name:      "metric_test_name",
+		Subsystem: "subsystem",
+		Help:      "histogram help message",
+		Buckets:   prometheus.DefBuckets,
+	}
+	vec := metrics.NewHistogramVec(HistogramOpts, labels)
+	legacyregistry.MustRegister(vec)
+	vec.WithLabelValues("filter", "0").Observe(1.5)
+	vec.WithLabelValues("score", "0").Observe(3.5)
+	metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
+	histogramList, err := GetHistogramsFromGatherer(legacyregistry.DefaultGatherer, metricName, lvMap)
+	if err != nil {
+		t.Errorf("Got error %v", err)
+	}
+	expectedList := []LabeledHistogram{
+		{
+			Labels:    map[string]string{"extension_point": "filter"},
+			Histogram: samples2Histogram([]float64{1.5}, prometheus.DefBuckets),
+		},
+		{
+			Labels:    map[string]string{"extension_point": "score"},
+			Histogram: samples2Histogram([]float64{3.5}, prometheus.DefBuckets),
+		},
+	}
+	if diff := cmp.Diff(histogramList, expectedList); diff != "" {
+		t.Errorf("Got unexpected histogramList:\n%s", diff)
 	}
 }

@@ -256,7 +256,7 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 
 func collectHistogram(metric string, labels map[string]string, lvMap map[string]string) []DataItem {
 	var dataItems []DataItem
-	vec, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
+	vec, err := testutil.GetHistogramsFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
 		klog.Error(err)
 		return nil
