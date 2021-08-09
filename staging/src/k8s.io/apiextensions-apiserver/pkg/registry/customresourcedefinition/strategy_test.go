@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/pointer"
 )
@@ -43,29 +42,19 @@ func TestValidateAPIApproval(t *testing.T) {
 	tests := []struct {
 		name string
 
-		version            string
 		group              string
 		annotationValue    string
 		oldAnnotationValue *string
 		validateError      func(t *testing.T, errors field.ErrorList)
 	}{
 		{
-			name:            "ignore v1beta1",
-			version:         "v1beta1",
-			group:           "sigs.k8s.io",
-			annotationValue: "invalid",
-			validateError:   okFn,
-		},
-		{
 			name:            "ignore non-k8s group",
-			version:         "v1",
 			group:           "other.io",
 			annotationValue: "invalid",
 			validateError:   okFn,
 		},
 		{
 			name:            "invalid annotation create",
-			version:         "v1",
 			group:           "sigs.k8s.io",
 			annotationValue: "invalid",
 			validateError: func(t *testing.T, errors field.ErrorList) {
@@ -80,7 +69,6 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:               "invalid annotation update",
-			version:            "v1",
 			group:              "sigs.k8s.io",
 			annotationValue:    "invalid",
 			oldAnnotationValue: strPtr("invalid"),
@@ -88,7 +76,6 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:               "invalid annotation to missing",
-			version:            "v1",
 			group:              "sigs.k8s.io",
 			annotationValue:    "",
 			oldAnnotationValue: strPtr("invalid"),
@@ -104,7 +91,6 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:               "missing to invalid annotation",
-			version:            "v1",
 			group:              "sigs.k8s.io",
 			annotationValue:    "invalid",
 			oldAnnotationValue: strPtr(""),
@@ -120,7 +106,6 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:            "missing annotation",
-			version:         "v1",
 			group:           "sigs.k8s.io",
 			annotationValue: "",
 			validateError: func(t *testing.T, errors field.ErrorList) {
@@ -135,7 +120,6 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:               "missing annotation update",
-			version:            "v1",
 			group:              "sigs.k8s.io",
 			annotationValue:    "",
 			oldAnnotationValue: strPtr(""),
@@ -143,32 +127,15 @@ func TestValidateAPIApproval(t *testing.T) {
 		},
 		{
 			name:            "url",
-			version:         "v1",
 			group:           "sigs.k8s.io",
 			annotationValue: "https://github.com/kubernetes/kubernetes/pull/79724",
 			validateError:   okFn,
 		},
 		{
 			name:            "unapproved",
-			version:         "v1",
 			group:           "sigs.k8s.io",
 			annotationValue: "unapproved, other reason",
 			validateError:   okFn,
-		},
-		{
-			name:            "next version validates",
-			version:         "v2",
-			group:           "sigs.k8s.io",
-			annotationValue: "invalid",
-			validateError: func(t *testing.T, errors field.ErrorList) {
-				t.Helper()
-				if len(errors) == 0 {
-					t.Fatal("expected errors, got none")
-				}
-				if e, a := `metadata.annotations[api-approved.kubernetes.io]: Invalid value: "invalid": protected groups must have approval annotation "api-approved.kubernetes.io" with either a URL or a reason starting with "unapproved", see https://github.com/kubernetes/enhancements/pull/1111`, errors.ToAggregate().Error(); e != a {
-					t.Fatal(errors)
-				}
-			},
 		},
 	}
 
@@ -212,9 +179,9 @@ func TestValidateAPIApproval(t *testing.T) {
 
 			var actual field.ErrorList
 			if oldCRD == nil {
-				actual = validation.ValidateCustomResourceDefinition(crd, schema.GroupVersion{Group: "apiextensions.k8s.io", Version: test.version})
+				actual = validation.ValidateCustomResourceDefinition(crd)
 			} else {
-				actual = validation.ValidateCustomResourceDefinitionUpdate(crd, oldCRD, schema.GroupVersion{Group: "apiextensions.k8s.io", Version: test.version})
+				actual = validation.ValidateCustomResourceDefinitionUpdate(crd, oldCRD)
 			}
 			test.validateError(t, actual)
 		})
