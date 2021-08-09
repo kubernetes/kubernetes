@@ -166,6 +166,9 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		// of every loop to prevent extra executions of f().
 		select {
 		case <-stopCh:
+			if !t.Stop() {
+				<-t.C()
+			}
 			return
 		case <-t.C():
 		}
