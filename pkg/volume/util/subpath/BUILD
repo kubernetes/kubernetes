@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "subpath.go",
+        "subpath_mount_linux.go",
         "subpath_linux.go",
         "subpath_unsupported.go",
         "subpath_windows.go",
