@@ -17,13 +17,13 @@ limitations under the License.
 package volumeattachment
 
 import (
+	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -196,77 +196,22 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	}
 }
 
-func TestBetaAndV1StatusUpdate(t *testing.T) {
-	tests := []struct {
-		requestInfo    genericapirequest.RequestInfo
-		newStatus      bool
-		expectedStatus bool
-	}{
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "storage.k8s.io",
-				APIVersion: "v1",
-				Resource:   "volumeattachments",
-			},
-			true,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "storage.k8s.io",
-				APIVersion: "v1beta1",
-				Resource:   "volumeattachments",
-			},
-			true,
-			true,
-		},
+func TestUpdatePreventsStatusWrite(t *testing.T) {
+	va := getValidVolumeAttachment("valid-attachment")
+	newAttachment := va.DeepCopy()
+	newAttachment.Status.Attached = true
+	Strategy.PrepareForUpdate(context.TODO(), newAttachment, va)
+	if newAttachment.Status.Attached {
+		t.Errorf("expected status to be %v got %v", false, newAttachment.Status.Attached)
 	}
-	for _, test := range tests {
-		va := getValidVolumeAttachment("valid-attachment")
-		newAttachment := va.DeepCopy()
-		newAttachment.Status.Attached = test.newStatus
-		context := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &test.requestInfo)
-		Strategy.PrepareForUpdate(context, newAttachment, va)
-		if newAttachment.Status.Attached != test.expectedStatus {
-			t.Errorf("expected status to be %v got %v", test.expectedStatus, newAttachment.Status.Attached)
-		}
-	}
-
 }
 
-func TestBetaAndV1StatusCreate(t *testing.T) {
-	tests := []struct {
-		requestInfo    genericapirequest.RequestInfo
-		newStatus      bool
-		expectedStatus bool
-	}{
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "storage.k8s.io",
-				APIVersion: "v1",
-				Resource:   "volumeattachments",
-			},
-			true,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "storage.k8s.io",
-				APIVersion: "v1beta1",
-				Resource:   "volumeattachments",
-			},
-			true,
-			true,
-		},
-	}
-	for _, test := range tests {
-		va := getValidVolumeAttachment("valid-attachment")
-		va.Status.Attached = test.newStatus
-		context := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &test.requestInfo)
-		Strategy.PrepareForCreate(context, va)
-		if va.Status.Attached != test.expectedStatus {
-			t.Errorf("expected status to be %v got %v", test.expectedStatus, va.Status.Attached)
-		}
+func TestCreatePreventsStatusWrite(t *testing.T) {
+	va := getValidVolumeAttachment("valid-attachment")
+	va.Status.Attached = true
+	Strategy.PrepareForCreate(context.TODO(), va)
+	if va.Status.Attached {
+		t.Errorf("expected status to be false got %v", va.Status.Attached)
 	}
 }
 
@@ -276,13 +221,11 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 	tests := []struct {
 		name             string
 		volumeAttachment *storage.VolumeAttachment
-		expectBetaError  bool
-		expectV1Error    bool
+		expectError      bool
 	}{
 		{
 			"valid attachment",
 			getValidVolumeAttachment("foo"),
-			false,
 			false,
 		},
 		{
@@ -299,7 +242,6 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 					NodeName: "valid-node",
 				},
 			},
-			false,
 			true,
 		},
 		{
@@ -316,7 +258,6 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 					NodeName: "valid-node",
 				},
 			},
-			false,
 			true,
 		},
 		{
@@ -334,36 +275,17 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 			true,
-			true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			testValidation := func(va *storage.VolumeAttachment, apiVersion string) field.ErrorList {
-				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
-					APIGroup:   "storage.k8s.io",
-					APIVersion: apiVersion,
-					Resource:   "volumeattachments",
-				})
-				return Strategy.Validate(ctx, va)
+			err := Strategy.Validate(context.TODO(), test.volumeAttachment)
+			if len(err) > 0 && !test.expectError {
+				t.Errorf("Validation of object failed: %+v", err)
 			}
-
-			v1Err := testValidation(test.volumeAttachment, "v1")
-			if len(v1Err) > 0 && !test.expectV1Error {
-				t.Errorf("Validation of v1 object failed: %+v", v1Err)
-			}
-			if len(v1Err) == 0 && test.expectV1Error {
-				t.Errorf("Validation of v1 object unexpectedly succeeded")
-			}
-
-			betaErr := testValidation(test.volumeAttachment, "v1beta1")
-			if len(betaErr) > 0 && !test.expectBetaError {
-				t.Errorf("Validation of v1beta1 object failed: %+v", betaErr)
-			}
-			if len(betaErr) == 0 && test.expectBetaError {
-				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
+			if len(err) == 0 && test.expectError {
+				t.Errorf("Validation of object unexpectedly succeeded")
 			}
 		})
 	}
