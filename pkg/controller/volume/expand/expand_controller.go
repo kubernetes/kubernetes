@@ -319,7 +319,7 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 	return detailedErr
 }
 
-// TODO make concurrency configurable (workers/threadiness argument). previously, nestedpendingoperations spawned unlimited goroutines
+// TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()

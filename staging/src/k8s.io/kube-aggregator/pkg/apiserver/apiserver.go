@@ -270,7 +270,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		// if we end up blocking for long periods of time, we may need to increase threadiness.
+		// if we end up blocking for long periods of time, we may need to increase workers.
 		go availableController.Run(5, context.StopCh)
 		return nil
 	})
