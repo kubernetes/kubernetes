@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package eventclock
 
 import (
 	"math/rand"
@@ -24,7 +24,7 @@ import (
 )
 
 func TestRealEventClock(t *testing.T) {
-	ec := RealEventClock{}
+	ec := Real{}
 	var numDone int32
 	now := ec.Now()
 	const batchSize = 100

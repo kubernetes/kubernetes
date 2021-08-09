@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package eventclock
 
 import (
 	"time"
@@ -23,12 +23,14 @@ import (
 )
 
 // RealEventClock fires event on real world time
-type RealEventClock struct {
+type Real struct {
 	clock.RealClock
 }
 
+var _ Interface = Real{}
+
 // EventAfterDuration schedules an EventFunc
-func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
+func (Real) EventAfterDuration(f EventFunc, d time.Duration) {
 	ch := time.After(d)
 	go func() {
 		t := <-ch
@@ -37,6 +39,6 @@ func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 }
 
 // EventAfterTime schedules an EventFunc
-func (r RealEventClock) EventAfterTime(f EventFunc, t time.Time) {
+func (r Real) EventAfterTime(f EventFunc, t time.Time) {
 	r.EventAfterDuration(f, time.Until(t))
 }
