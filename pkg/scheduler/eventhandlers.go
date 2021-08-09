@@ -174,7 +174,12 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		klog.ErrorS(err, "Unable to get profile", "pod", klog.KObj(pod))
 		return
 	}
-	fwk.RejectWaitingPod(pod.UID)
+	// If a waiting pod is rejected, it indicates it's previously assumed and we're
+	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
+	// event to immediately retry some unscheduled Pods.
+	if fwk.RejectWaitingPod(pod.UID) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete, nil)
+	}
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {

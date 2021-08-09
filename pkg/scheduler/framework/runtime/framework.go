@@ -1092,11 +1092,13 @@ func (f *frameworkImpl) GetWaitingPod(uid types.UID) framework.WaitingPod {
 }
 
 // RejectWaitingPod rejects a WaitingPod given its UID.
-func (f *frameworkImpl) RejectWaitingPod(uid types.UID) {
-	waitingPod := f.waitingPods.get(uid)
-	if waitingPod != nil {
+// The returned value indicates if the given pod is waiting or not.
+func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
+	if waitingPod := f.waitingPods.get(uid); waitingPod != nil {
 		waitingPod.Reject("", "removed")
+		return true
 	}
+	return false
 }
 
 // HasFilterPlugins returns true if at least one filter plugin is defined.
