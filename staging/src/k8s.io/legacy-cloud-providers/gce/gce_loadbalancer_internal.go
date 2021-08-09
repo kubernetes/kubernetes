@@ -885,7 +885,7 @@ func getPortRanges(ports []int) (ranges []string) {
 }
 
 func (g *Cloud) getBackendServiceLink(name string) string {
-	return g.service.BasePath + strings.Join([]string{g.projectID, "regions", g.region, "backendServices", name}, "/")
+	return g.projectsBasePath + strings.Join([]string{g.projectID, "regions", g.region, "backendServices", name}, "/")
 }
 
 func getNameFromLink(link string) string {

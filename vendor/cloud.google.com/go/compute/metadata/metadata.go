@@ -140,7 +140,7 @@ func testOnGCE() bool {
 	}()
 
 	go func() {
-		addrs, err := net.LookupHost("metadata.google.internal")
+		addrs, err := net.DefaultResolver.LookupHost(ctx, "metadata.google.internal")
 		if err != nil || len(addrs) == 0 {
 			resc <- false
 			return
@@ -296,6 +296,7 @@ func (c *Client) getETag(suffix string) (value, etag string, err error) {
 		// being stable anyway.
 		host = metadataIP
 	}
+	suffix = strings.TrimLeft(suffix, "/")
 	u := "http://" + host + "/computeMetadata/v1/" + suffix
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {

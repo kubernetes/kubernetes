@@ -55,7 +55,7 @@ func (cs *contentSniffer) Read(p []byte) (n int, err error) {
 	return cs.r.Read(p)
 }
 
-// ContentType returns the sniffed content type, and whether the content type was succesfully sniffed.
+// ContentType returns the sniffed content type, and whether the content type was successfully sniffed.
 func (cs *contentSniffer) ContentType() (string, bool) {
 	if cs.sniffed {
 		return cs.ctype, cs.ctype != ""
@@ -88,7 +88,7 @@ func DetermineContentType(media io.Reader, ctype string) (io.Reader, string) {
 		return media, ctype
 	}
 
-	// For backwards compatability, allow clients to set content
+	// For backwards compatibility, allow clients to set content
 	// type by providing a ContentTyper for media.
 	if typer, ok := media.(googleapi.ContentTyper); ok {
 		return media, typer.ContentType()
