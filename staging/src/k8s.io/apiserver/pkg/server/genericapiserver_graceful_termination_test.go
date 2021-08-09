@@ -519,7 +519,8 @@ func newGenericAPIServer(t *testing.T, keepListening bool) *GenericAPIServer {
 	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 		if c.ShutdownSendRetryAfter {
-			handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.AfterShutdownDelayDuration.Signaled())
+			shouldRetryAfterFn := genericfilters.NewShouldRespondWithRetryAfterFunc(c.ShutdownSendRetryAfter, c.lifecycleSignals.AfterShutdownDelayDuration.Signaled())
+			handler = genericfilters.WithRetryAfter(handler, shouldRetryAfterFn)
 		}
 		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler

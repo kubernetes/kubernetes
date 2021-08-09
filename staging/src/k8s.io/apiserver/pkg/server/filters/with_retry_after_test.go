@@ -17,8 +17,10 @@ limitations under the License.
 package filters
 
 import (
+	"github.com/google/go-cmp/cmp"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -27,20 +29,20 @@ import (
 
 func TestWithRetryAfter(t *testing.T) {
 	tests := []struct {
-		name                           string
-		shutdownDelayDurationElapsedFn func() <-chan struct{}
-		requestURL                     string
-		userAgent                      string
-		safeWaitGroupIsWaiting         bool
-		handlerInvoked                 int
-		closeExpected                  string
-		retryAfterExpected             string
-		statusCodeExpected             int
+		name                   string
+		when                   ShouldRespondWithRetryAfterFunc
+		requestURL             string
+		userAgent              string
+		safeWaitGroupIsWaiting bool
+		handlerInvoked         int
+		closeExpected          string
+		retryAfterExpected     string
+		statusCodeExpected     int
 	}{
 		{
 			name: "retry-after disabled",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(false)
+			when: func() (*retryAfterParams, bool) {
+				return nil, false
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "foo",
@@ -51,8 +53,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is not exempt",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "foo",
@@ -62,9 +67,27 @@ func TestWithRetryAfter(t *testing.T) {
 			statusCodeExpected: http.StatusTooManyRequests,
 		},
 		{
+			name: "retry-after enabled, request is not exempt, no connection tear down",
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: false,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
+			},
+			requestURL:         "/api/v1/namespaces",
+			userAgent:          "foo",
+			handlerInvoked:     0,
+			closeExpected:      "",
+			retryAfterExpected: "5",
+			statusCodeExpected: http.StatusTooManyRequests,
+		},
+		{
 			name: "retry-after enabled, request is exempt(/metrics)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/metrics?foo=bar",
 			userAgent:          "foo",
@@ -75,8 +98,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/livez)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/livez?verbose",
 			userAgent:          "foo",
@@ -87,8 +113,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/readyz)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/readyz?verbose",
 			userAgent:          "foo",
@@ -99,8 +128,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/healthz)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/healthz?verbose",
 			userAgent:          "foo",
@@ -111,8 +143,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(local loopback)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "kube-apiserver/",
@@ -122,21 +157,12 @@ func TestWithRetryAfter(t *testing.T) {
 			statusCodeExpected: http.StatusOK,
 		},
 		{
-			name: "nil channel",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return nil
-			},
-			requestURL:         "/api/v1/namespaces",
-			userAgent:          "foo",
-			handlerInvoked:     1,
-			closeExpected:      "",
-			retryAfterExpected: "",
-			statusCodeExpected: http.StatusOK,
-		},
-		{
 			name: "retry-after enabled, request is exempt(/readyz), SafeWaitGroup is in waiting mode",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*retryAfterParams, bool) {
+				return &retryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:             "/readyz?verbose",
 			userAgent:              "foo",
@@ -165,7 +191,7 @@ func TestWithRetryAfter(t *testing.T) {
 			wrapped := WithWaitGroup(handler, func(*http.Request, *apirequest.RequestInfo) bool {
 				return false
 			}, safeWG)
-			wrapped = WithRetryAfter(wrapped, test.shutdownDelayDurationElapsedFn())
+			wrapped = WithRetryAfter(wrapped, test.when)
 
 			req, err := http.NewRequest(http.MethodGet, test.requestURL, nil)
 			if err != nil {
@@ -193,6 +219,58 @@ func TestWithRetryAfter(t *testing.T) {
 			retryAfterGot := w.Header().Get("Retry-After")
 			if test.retryAfterExpected != retryAfterGot {
 				t.Errorf("expected Retry-After: %s, but got: %s", test.retryAfterExpected, retryAfterGot)
+			}
+		})
+	}
+}
+
+func TestNewShouldRespondWithRetryAfterFunc(t *testing.T) {
+	tests := []struct {
+		name                     string
+		shutdownSendRetryAfter   bool
+		shutdownCh               <-chan struct{}
+		sendRetryAfterExpected   bool
+		retryAfterParamsExpected *retryAfterParams
+	}{
+		{
+			name:                     "shutdown-send-retry-after is disabled",
+			shutdownSendRetryAfter:   false,
+			shutdownCh:               newChannel(true),
+			sendRetryAfterExpected:   false,
+			retryAfterParamsExpected: nil,
+		},
+		{
+			name:                   "shutdown-send-retry-after is enabled, shutting down",
+			shutdownSendRetryAfter: true,
+			shutdownCh:             newChannel(true),
+			sendRetryAfterExpected: true,
+			retryAfterParamsExpected: &retryAfterParams{
+				TearDownConnection: true,
+				Message:            "The apiserver is shutting down, please try again later.",
+			},
+		},
+		{
+			name:                     "shutdown-send-retry-after is enabled, not shutting down",
+			shutdownSendRetryAfter:   true,
+			shutdownCh:               newChannel(false),
+			sendRetryAfterExpected:   false,
+			retryAfterParamsExpected: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fn := NewShouldRespondWithRetryAfterFunc(test.shutdownSendRetryAfter, test.shutdownCh)
+			if fn == nil {
+				t.Fatal("Expected a non nil ShouldRespondWithRetryAfterFunc")
+			}
+
+			retryAfterParamsGot, sendRetryAfterGot := fn()
+			if test.sendRetryAfterExpected != sendRetryAfterGot {
+				t.Errorf("Expected send retry-after: %t, but got: %t", test.sendRetryAfterExpected, sendRetryAfterGot)
+			}
+			if !reflect.DeepEqual(test.retryAfterParamsExpected, retryAfterParamsGot) {
+				t.Errorf("Expected retry-after params to match, diff: %s", cmp.Diff(test.retryAfterParamsExpected, retryAfterParamsGot))
 			}
 		})
 	}

@@ -46,11 +46,11 @@ type retryAfterParams struct {
 	Message string
 }
 
-// shouldRespondWithRetryAfterFunc returns true if the requests should
+// ShouldRespondWithRetryAfterFunc returns true if the requests should
 // be rejected with a Retry-After response once certain conditions are met.
 // The retryAfterParams returned contains instructions on how to
 // construct the Retry-After response.
-type shouldRespondWithRetryAfterFunc func() (*retryAfterParams, bool)
+type ShouldRespondWithRetryAfterFunc func() (*retryAfterParams, bool)
 
 // WithRetryAfter rejects any incoming new request(s) with a 429
 // if the specified shutdownDelayDurationElapsedFn channel is closed
@@ -62,25 +62,40 @@ type shouldRespondWithRetryAfterFunc func() (*retryAfterParams, bool)
 //   - 'Connection: close': tear down the TCP connection
 //
 // TODO: is there a way to merge WithWaitGroup and this filter?
-func WithRetryAfter(handler http.Handler, shutdownDelayDurationElapsedCh <-chan struct{}) http.Handler {
+func WithRetryAfter(handler http.Handler, when ShouldRespondWithRetryAfterFunc) http.Handler {
+	// NOTE: both WithRetryAfter and WithWaitGroup must use the same exact isRequestExemptFunc 'isRequestExemptFromRetryAfter,
+	// otherwise SafeWaitGroup might wait indefinitely and will prevent the server from shutting down gracefully.
+	return withRetryAfter(handler, isRequestExemptFromRetryAfter, when)
+}
+
+// NewShouldRespondWithRetryAfterFunc returns a ShouldRespondWithRetryAfterFunc
+func NewShouldRespondWithRetryAfterFunc(shutdownSendRetryAfter bool, shutdownCh <-chan struct{}) ShouldRespondWithRetryAfterFunc {
+	if !shutdownSendRetryAfter {
+		return func() (*retryAfterParams, bool) {
+			return nil, false
+		}
+	}
+
+	return newShutdownRetryAfterFunc(shutdownCh)
+}
+
+func newShutdownRetryAfterFunc(shutdownCh <-chan struct{}) ShouldRespondWithRetryAfterFunc {
 	shutdownRetryAfterParams := &retryAfterParams{
 		TearDownConnection: true,
 		Message:            "The apiserver is shutting down, please try again later.",
 	}
 
-	// NOTE: both WithRetryAfter and WithWaitGroup must use the same exact isRequestExemptFunc 'isRequestExemptFromRetryAfter,
-	// otherwise SafeWaitGroup might wait indefinitely and will prevent the server from shutting down gracefully.
-	return withRetryAfter(handler, isRequestExemptFromRetryAfter, func() (*retryAfterParams, bool) {
+	return func() (*retryAfterParams, bool) {
 		select {
-		case <-shutdownDelayDurationElapsedCh:
+		case <-shutdownCh:
 			return shutdownRetryAfterParams, true
 		default:
 			return nil, false
 		}
-	})
+	}
 }
 
-func withRetryAfter(handler http.Handler, isRequestExemptFn isRequestExemptFunc, shouldRespondWithRetryAfterFn shouldRespondWithRetryAfterFunc) http.Handler {
+func withRetryAfter(handler http.Handler, isRequestExemptFn isRequestExemptFunc, shouldRespondWithRetryAfterFn ShouldRespondWithRetryAfterFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		params, send := shouldRespondWithRetryAfterFn()
 		if !send || isRequestExemptFn(req) {
