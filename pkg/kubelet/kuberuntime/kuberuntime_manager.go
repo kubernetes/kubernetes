@@ -78,6 +78,7 @@ var (
 // podStateProvider can determine if none of the elements are necessary to retain (pod content)
 // or if none of the runtime elements are necessary to retain (containers)
 type podStateProvider interface {
+	IsPodTerminationRequested(kubetypes.UID) bool
 	ShouldPodContentBeRemoved(kubetypes.UID) bool
 	ShouldPodRuntimeBeRemoved(kubetypes.UID) bool
 }
@@ -805,8 +806,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			// or CRI if the Pod has been deleted while the POD is
 			// being created. If the pod has been deleted then it's
 			// not a real error.
-			// TODO: this is probably not needed now that termination is part of the sync loop
-			if m.podStateProvider.ShouldPodContentBeRemoved(pod.UID) {
+			//
+			// SyncPod can still be running when we get here, which
+			// means the PodWorker has not acked the deletion.
+			if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
 				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}
