@@ -180,17 +180,18 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 }
 
 // rootCertPool returns nil if caData is empty.  When passed along, this will mean "use system CAs".
-// When caData is not empty, it will be the ONLY information used in the CertPool.
+// When caData is not empty, the data will be appended to a CertPool that contains the system CAs.
 func rootCertPool(caData []byte) (*x509.CertPool, error) {
-	// What we really want is a copy of x509.systemRootsPool, but that isn't exposed.  It's difficult to build (see the go
-	// code for a look at the platform specific insanity), so we'll use the fact that RootCAs == nil gives us the system values
-	// It doesn't allow trusting either/or, but hopefully that won't be an issue
+	// If caData is empty, return nil, which will down the line imply using system CAs
 	if len(caData) == 0 {
 		return nil, nil
 	}
 
 	// if we have caData, use it
-	certPool := x509.NewCertPool()
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		certPool = x509.NewCertPool() // If unable to retrieve the SystemCertPool, create a blank CertPool
+	}
 	if ok := certPool.AppendCertsFromPEM(caData); !ok {
 		return nil, createErrorParsingCAData(caData)
 	}
