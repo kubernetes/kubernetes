@@ -1,0 +1,84 @@
+{
+  "kind": "AdmissionReview",
+  "apiVersion": "admission.k8s.io/v1beta1",
+  "request": {
+    "uid": "ő岅ȕHH壬%龺ǟ橸章蒪ʤǎ",
+    "kind": {
+      "group": "2",
+      "version": "3",
+      "kind": "4"
+    },
+    "resource": {
+      "group": "5",
+      "version": "6",
+      "resource": "7"
+    },
+    "subResource": "8",
+    "requestKind": {
+      "group": "9",
+      "version": "10",
+      "kind": "11"
+    },
+    "requestResource": {
+      "group": "12",
+      "version": "13",
+      "resource": "14"
+    },
+    "requestSubResource": "15",
+    "name": "16",
+    "namespace": "17",
+    "operation": "¡ıŵDz",
+    "userInfo": {
+      "username": "18",
+      "uid": "19",
+      "groups": [
+        "20"
+      ],
+      "extra": {
+        "21": [
+  "22"
+]
+      }
+    },
+    "object": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}},
+    "oldObject": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}},
+    "dryRun": false,
+    "options": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}}
+  },
+  "response": {
+    "uid": "輂]¨\u0026桰]]æȌ殸2爟¼ªov鈶",
+    "allowed": false,
+    "status": {
+      "metadata": {
+        "selfLink": "(湗Ć]ʪƬ滈憴Uą飋ī",
+        "resourceVersion": "71208173751669476"
+      },
+      "status": "23",
+      "message": "24",
+      "reason": "Hr鯹)晿\u003co,c鮽ort昍řČ扷5Ɨ",
+      "details": {
+        "name": "25",
+        "group": "26",
+        "kind": "27",
+        "uid": "Ƣ6/ʕVŚ(ĿȊ甞",
+        "causes": [
+          {
+            "reason": "颋ǅ",
+            "message": "28",
+            "field": "29"
+          }
+        ],
+        "retryAfterSeconds": 1001983654
+      },
+      "code": 153738858
+    },
+    "patch": "fQ==",
+    "patchType": "-Ǐ忄*齧獚敆Ȏțê",
+    "auditAnnotations": {
+      "30": "31"
+    },
+    "warnings": [
+      "32"
+    ]
+  }
+}
