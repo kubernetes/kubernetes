@@ -29,7 +29,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	componentversion "k8s.io/component-base/version"
 	utilnet "k8s.io/utils/net"
 
 	"github.com/pkg/errors"
@@ -448,13 +450,13 @@ var (
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.21.0")
+	MinimumControlPlaneVersion = getSkewedKubernetesVersion(-1)
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.21.0")
+	MinimumKubeletVersion = getSkewedKubernetesVersion(-1)
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.22.0")
+	CurrentKubernetesVersion = getSkewedKubernetesVersion(0)
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
@@ -483,7 +485,51 @@ var (
 		Factor:   1.0,
 		Jitter:   0.1,
 	}
+
+	// defaultKubernetesVersionForTests is the default version used for unit tests.
+	// The MINOR should be at least 3 as some tests subtract 3 from the MINOR version.
+	defaultKubernetesVersionForTests = version.MustParseSemantic("v1.3.0")
 )
+
+// isRunningInTest can be used to determine if the code in this file is being run in a test.
+func isRunningInTest() bool {
+	return strings.HasSuffix(os.Args[0], ".test")
+}
+
+// getSkewedKubernetesVersion returns the current MAJOR.(MINOR+n).0 Kubernetes version with a skew of 'n'
+// It uses the kubeadm version provided by the 'component-base/version' package. This version must be populated
+// by passing linker flags during the kubeadm build process. If the version is empty, assume that kubeadm
+// was either build incorrectly or this code is running in unit tests.
+func getSkewedKubernetesVersion(n int) *version.Version {
+	versionInfo := componentversion.Get()
+	ver := getSkewedKubernetesVersionImpl(&versionInfo, n, isRunningInTest)
+	if ver == nil {
+		panic("kubeadm is not build properly using 'make ...': missing component version information")
+	}
+	return ver
+}
+
+func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int, isRunningInTestFunc func() bool) *version.Version {
+	// TODO: update if the kubeadm version gets decoupled from the Kubernetes version.
+	// This would require keeping track of the supported skew in a table.
+	// More changes would be required if the kubelet version one day decouples from that of Kubernetes.
+	var ver *version.Version
+	if len(versionInfo.Major) == 0 {
+		if isRunningInTestFunc() {
+			ver = defaultKubernetesVersionForTests // An arbitrary version for testing purposes
+		} else {
+			// If this is not running in tests assume that the kubeadm binary is not build properly
+			return nil
+		}
+	} else {
+		ver = version.MustParseSemantic(versionInfo.GitVersion)
+	}
+	// Append the MINOR version skew.
+	// TODO: handle the case of Kubernetes moving to v2.0 or having MAJOR version updates in the future.
+	// This would require keeping track (in a table) of the last MINOR for a particular MAJOR.
+	minor := uint(int(ver.Minor()) + n)
+	return version.MustParseSemantic(fmt.Sprintf("v%d.%d.0", ver.Major(), minor))
+}
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release
 // If passed version is not in the given list, the function returns the nearest version with a warning

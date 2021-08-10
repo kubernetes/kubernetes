@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -233,6 +234,64 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 						actual.String(),
 					)
 				}
+			}
+		})
+	}
+}
+
+func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
+	tests := []struct {
+		name                string
+		versionInfo         *apimachineryversion.Info
+		n                   int
+		isRunningInTestFunc func() bool
+		expectedResult      *version.Version
+	}{
+		{
+			name:           "invalid versionInfo; running in test",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: defaultKubernetesVersionForTests,
+		},
+		{
+			name:                "invalid versionInfo; not running in test",
+			versionInfo:         &apimachineryversion.Info{},
+			isRunningInTestFunc: func() bool { return false },
+			expectedResult:      nil,
+		},
+		{
+			name:           "valid skew of -1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              -1,
+			expectedResult: version.MustParseSemantic("v1.22.0"),
+		},
+		{
+			name:           "valid skew of 0",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              0,
+			expectedResult: version.MustParseSemantic("v1.23.0"),
+		},
+		{
+			name:           "valid skew of +1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              1,
+			expectedResult: version.MustParseSemantic("v1.24.0"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.isRunningInTestFunc == nil {
+				tc.isRunningInTestFunc = func() bool { return true }
+			}
+			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n, tc.isRunningInTestFunc)
+			if (tc.expectedResult == nil) != (result == nil) {
+				t.Errorf("expected result: %v, got: %v", tc.expectedResult, result)
+			}
+			if result == nil {
+				return
+			}
+			if cmp, _ := result.Compare(tc.expectedResult.String()); cmp != 0 {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
 			}
 		})
 	}
