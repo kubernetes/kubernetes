@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/tools/cache"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -802,7 +801,7 @@ func TestAPIService(f *framework.Framework, aggrclient *aggregatorclient.Clients
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
 
 	// kubectl create -f apiservice.yaml
-	label := map[string]string{"apiservice": "created"}
+	label := map[string]string{"service-source": "e2e.test.k8s.io"}
 	_, err = aggrclient.ApiregistrationV1().APIServices().Create(context.TODO(), &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1beta1.wardle.example.com", Labels: label},
 		Spec: apiregistrationv1.APIServiceSpec{
@@ -873,7 +872,7 @@ func TestAPIService(f *framework.Framework, aggrclient *aggregatorclient.Clients
 
 	w := &cache.ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			options.LabelSelector = "apiservice=created"
+			options.LabelSelector = "service-source=e2e.test.k8s.io"
 			return apiServiceClient.Watch(context.TODO(), options)
 		},
 	}
@@ -904,7 +903,7 @@ func TestAPIService(f *framework.Framework, aggrclient *aggregatorclient.Clients
 	_, err = watchtools.Until(ctx, apiServiceList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 		if resource, ok := event.Object.(*apiregistrationv1.APIService); ok {
 			found := resource.ObjectMeta.Name == apiServiceName &&
-				resource.Labels["apiservice"] == "created"
+				resource.Labels["service-source"] == "e2e.test.k8s.io"
 			if !found {
 				framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", resource.ObjectMeta.Name, resource.Labels, resource.Status.Conditions)
 				return false, nil
@@ -931,7 +930,7 @@ func TestAPIService(f *framework.Framework, aggrclient *aggregatorclient.Clients
 	one := int64(1)
 	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(context.TODO(),
 		metav1.DeleteOptions{GracePeriodSeconds: &one},
-		metav1.ListOptions{LabelSelector: "apiservice=created"})
+		metav1.ListOptions{LabelSelector: "service-source=e2e.test.k8s.io"})
 	framework.ExpectNoError(err, "Unable to delete apiservice %s", apiServiceName)
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
