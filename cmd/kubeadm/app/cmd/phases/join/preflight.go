@@ -123,6 +123,11 @@ func runPreflight(c workflow.RunData) error {
 			return err
 		}
 
+		if j.DryRun() {
+			fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+			return nil
+		}
+
 		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")

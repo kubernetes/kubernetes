@@ -132,9 +132,13 @@ func runEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	// Create the etcd data directory
-	if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
-		return err
+	if !data.DryRun() {
+		// Create the etcd data directory
+		if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 	}
 
 	// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
@@ -147,8 +151,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
-	// TODO: add support for join dry-run: https://github.com/kubernetes/kubeadm/issues/2505
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false /* isDryRun */); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), data.CertificateWriteDir()); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
@@ -188,8 +191,12 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 		return err
 	}
 
-	if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error applying control-plane label and taints")
+	if !data.DryRun() {
+		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
+			return errors.Wrap(err, "error applying control-plane label and taints")
+		}
+	} else {
+		fmt.Printf("[dryrun] Would mark node %s as a control-plane\n", cfg.NodeRegistration.Name)
 	}
 
 	return nil
