@@ -120,7 +120,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe)
+	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe, s.GetNewOpenAPISpec)
 	if err != nil {
 		return nil, err
 	}
@@ -202,16 +202,21 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 	return specToReturn, nil
 }
 
+func (s *specAggregator) GetNewOpenAPISpec() (*spec.Swagger, error) {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+	return s.buildOpenAPISpec()
+}
+
+// TODO(DangerOnTheRanger): Rename this function to something more descriptive + update the comment below
 // updateOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.
 func (s *specAggregator) updateOpenAPISpec() error {
 	if s.openAPIVersionedService == nil {
 		return nil
 	}
-	specToServe, err := s.buildOpenAPISpec()
-	if err != nil {
-		return err
-	}
-	return s.openAPIVersionedService.UpdateSpec(specToServe)
+	s.openAPIVersionedService.MarkCacheDirty()
+	// TODO(DangerOnTheRanger): This function could return an error before, but not now - remove error-checking references from callers
+	return nil
 }
 
 // tryUpdatingServiceSpecs tries updating openAPISpecs map with specified specInfo, and keeps the map intact
