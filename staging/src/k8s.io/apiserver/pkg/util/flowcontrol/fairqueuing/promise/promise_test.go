@@ -17,105 +17,103 @@ limitations under the License.
 package promise
 
 import (
-	"sync"
-	"sync/atomic"
+	"context"
 	"testing"
 	"time"
 
-	testclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func TestLockingWriteOnce(t *testing.T) {
+func TestWriteOnceSet(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx, cancel := context.WithCancel(context.Background())
+	wr := NewWriteOnce(nil, ctx.Done(), cval)
+	gots := make(chan interface{})
+	goGetExpectNotYet(t, wr, gots, "Set")
 	now := time.Now()
-	clock, counter := testclock.NewFake(now, 0, nil)
-	var lock sync.Mutex
-	wr := NewWriteOnce(&lock, counter)
-	var gots int32
-	var got atomic.Value
-	counter.Add(1)
-	go func() {
-		lock.Lock()
-		defer lock.Unlock()
-
-		got.Store(wr.Get())
-		atomic.AddInt32(&gots, 1)
-		counter.Add(-1)
-	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
-	if atomic.LoadInt32(&gots) != 0 {
-		t.Error("Get returned before Set")
-	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.IsSet() {
-			t.Error("IsSet before Set")
-		}
-	}()
 	aval := &now
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.Set(aval) {
-			t.Error("Set() returned false")
-		}
-	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
-	if atomic.LoadInt32(&gots) != 1 {
-		t.Error("Get did not return after Set")
+	if !wr.Set(aval) {
+		t.Error("Set() returned false")
 	}
-	if got.Load() != aval {
-		t.Error("Get did not return what was Set")
-	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet()==false after Set")
-		}
-	}()
-	counter.Add(1)
-	go func() {
-		lock.Lock()
-		defer lock.Unlock()
-
-		got.Store(wr.Get())
-		atomic.AddInt32(&gots, 1)
-		counter.Add(-1)
-	}()
-	clock.Run(nil)
-	time.Sleep(time.Second)
-	if atomic.LoadInt32(&gots) != 2 {
-		t.Error("Second Get did not return immediately")
-	}
-	if got.Load() != aval {
-		t.Error("Second Get did not return what was Set")
-	}
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet()==false after second Get")
-		}
-	}()
+	expectGotValue(t, gots, aval)
+	goGetAndExpect(t, wr, gots, aval)
 	later := time.Now()
 	bval := &later
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.Set(bval) {
-			t.Error("second Set() returned true")
-		}
+	if wr.Set(bval) {
+		t.Error("second Set() returned true")
+	}
+	goGetAndExpect(t, wr, gots, aval)
+	cancel()
+	time.Sleep(time.Second) // give it a chance to misbehave
+	goGetAndExpect(t, wr, gots, aval)
+}
+
+func TestWriteOnceCancel(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx, cancel := context.WithCancel(context.Background())
+	wr := NewWriteOnce(nil, ctx.Done(), cval)
+	gots := make(chan interface{})
+	goGetExpectNotYet(t, wr, gots, "cancel")
+	cancel()
+	expectGotValue(t, gots, cval)
+	goGetAndExpect(t, wr, gots, cval)
+	later := time.Now()
+	bval := &later
+	if wr.Set(bval) {
+		t.Error("Set() after cancel returned true")
+	}
+	goGetAndExpect(t, wr, gots, cval)
+}
+
+func TestWriteOnceInitial(t *testing.T) {
+	oldTime := time.Now()
+	cval := &oldTime
+	ctx, cancel := context.WithCancel(context.Background())
+	now := time.Now()
+	aval := &now
+	wr := NewWriteOnce(aval, ctx.Done(), cval)
+	gots := make(chan interface{})
+	goGetAndExpect(t, wr, gots, aval)
+	later := time.Now()
+	bval := &later
+	if wr.Set(bval) {
+		t.Error("Set of initialized promise returned true")
+	}
+	goGetAndExpect(t, wr, gots, aval)
+	cancel()
+	time.Sleep(time.Second) // give it a chance to misbehave
+	goGetAndExpect(t, wr, gots, aval)
+}
+
+func goGetExpectNotYet(t *testing.T, wr WriteOnce, gots chan interface{}, trigger string) {
+	go func() {
+		gots <- wr.Get()
 	}()
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.IsSet() {
-			t.Error("IsSet() returned false after second set")
-		} else if wr.Get() != aval {
-			t.Error("Get() after second Set returned wrong value")
-		}
+	select {
+	case <-gots:
+		t.Errorf("Get returned before %s", trigger)
+	case <-time.After(time.Second):
+		t.Log("Good: Get did not return yet")
+	}
+}
+
+func goGetAndExpect(t *testing.T, wr WriteOnce, gots chan interface{}, expected interface{}) {
+	go func() {
+		gots <- wr.Get()
 	}()
+	expectGotValue(t, gots, expected)
+}
+
+func expectGotValue(t *testing.T, gots <-chan interface{}, expected interface{}) {
+	select {
+	case gotVal := <-gots:
+		t.Logf("Got %v", gotVal)
+		if gotVal != expected {
+			t.Errorf("Get returned %v, expected: %v", gotVal, expected)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Get did not return")
+	}
 }

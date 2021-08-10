@@ -18,57 +18,53 @@ package promise
 
 import (
 	"sync"
-
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 )
 
-// promise implements the promise.WriteOnce interface.
-// This implementation is based on a condition variable.
-// This implementation tracks active goroutines:
-// the given counter is decremented for a goroutine waiting for this
-// varible to be set and incremented when such a goroutine is
-// unblocked.
+// promise implements the WriteOnce interface.
 type promise struct {
-	cond          sync.Cond
-	activeCounter counter.GoRoutineCounter // counter of active goroutines
-	waitingCount  int                      // number of goroutines idle due to this being unset
-	isSet         bool
-	value         interface{}
+	doneCh  <-chan struct{}
+	doneVal interface{}
+	setCh   chan struct{}
+	onceler sync.Once
+	value   interface{}
 }
 
 var _ WriteOnce = &promise{}
 
-// NewWriteOnce makes a new promise.LockingWriteOnce
-func NewWriteOnce(lock sync.Locker, activeCounter counter.GoRoutineCounter) WriteOnce {
-	return &promise{
-		cond:          *sync.NewCond(lock),
-		activeCounter: activeCounter,
+// NewWriteOnce makes a new thread-safe WriteOnce.
+//
+// If `initial` is non-nil then that value is Set at creation time.
+//
+// If a `Get` is waiting soon after `doneCh` becomes selectable (which
+// never happens for the nil channel) then `Set(doneVal)` effectively
+// happens at that time.
+func NewWriteOnce(initial interface{}, doneCh <-chan struct{}, doneVal interface{}) WriteOnce {
+	p := &promise{
+		doneCh:  doneCh,
+		doneVal: doneVal,
+		setCh:   make(chan struct{}),
 	}
+	if initial != nil {
+		p.Set(initial)
+	}
+	return p
 }
 
 func (p *promise) Get() interface{} {
-	if !p.isSet {
-		p.waitingCount++
-		p.activeCounter.Add(-1)
-		p.cond.Wait()
+	select {
+	case <-p.setCh:
+	case <-p.doneCh:
+		p.Set(p.doneVal)
 	}
 	return p.value
 }
 
-func (p *promise) IsSet() bool {
-	return p.isSet
-}
-
 func (p *promise) Set(value interface{}) bool {
-	if p.isSet {
-		return false
-	}
-	p.isSet = true
-	p.value = value
-	if p.waitingCount > 0 {
-		p.activeCounter.Add(p.waitingCount)
-		p.waitingCount = 0
-		p.cond.Broadcast()
-	}
-	return true
+	var ans bool
+	p.onceler.Do(func() {
+		p.value = value
+		close(p.setCh)
+		ans = true
+	})
+	return ans
 }

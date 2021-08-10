@@ -1548,7 +1548,6 @@ k8s.io/apiserver/pkg/util/apihelpers
 k8s.io/apiserver/pkg/util/dryrun
 k8s.io/apiserver/pkg/util/feature
 k8s.io/apiserver/pkg/util/flowcontrol
-k8s.io/apiserver/pkg/util/flowcontrol/counter
 k8s.io/apiserver/pkg/util/flowcontrol/debug
 k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing
 k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock
