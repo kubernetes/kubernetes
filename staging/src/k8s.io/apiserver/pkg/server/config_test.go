@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -342,6 +343,159 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		if diff := cmp.Diff(want, event.Annotations); diff != "" {
 			t.Errorf("event has unexpected annotations (-want +got): %s", diff)
 		}
+	}
+}
+
+func TestShouldRespondWithRetryAfterFunc(t *testing.T) {
+	tests := []struct {
+		name                            string
+		config                          *Config
+		addWithRetryAfterFilterExpected bool
+		sendRetryAfterExpected          bool
+		retryAfterParamsExpected        *genericfilters.RetryAfterParams
+	}{
+		{
+			name: "both shutdown-send-retry-after and startup-send-retry-after-until-ready are not enabled",
+			config: &Config{
+				StartupSendRetryAfterUntilReady: false,
+				ShutdownSendRetryAfter:          false,
+			},
+			addWithRetryAfterFilterExpected: false,
+			sendRetryAfterExpected:          false,
+			retryAfterParamsExpected:        nil,
+		},
+		{
+			name: "shutdown-send-retry-after is enabled, the apserver is shutting down",
+			config: func() *Config {
+				c := &Config{
+					lifecycleSignals:                newLifecycleSignals(),
+					StartupSendRetryAfterUntilReady: false,
+					ShutdownSendRetryAfter:          true,
+				}
+				c.lifecycleSignals.HasBeenReady.Signal()
+				c.lifecycleSignals.AfterShutdownDelayDuration.Signal()
+				return c
+			}(),
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          true,
+			retryAfterParamsExpected: &genericfilters.RetryAfterParams{
+				TearDownConnection: true,
+				Message:            "The apiserver is shutting down, please try again later.",
+			},
+		},
+		{
+			name: "shutdown-send-retry-after is enabled, the apserver is not in shutdown mode",
+			config: &Config{
+				lifecycleSignals:                newLifecycleSignals(),
+				StartupSendRetryAfterUntilReady: false,
+				ShutdownSendRetryAfter:          true,
+			},
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          false,
+			retryAfterParamsExpected:        nil,
+		},
+		{
+			name: "startup-send-retry-after-until-ready is enabled, the apserver is not ready yet",
+			config: &Config{
+				lifecycleSignals:                newLifecycleSignals(),
+				StartupSendRetryAfterUntilReady: true,
+				ShutdownSendRetryAfter:          false,
+			},
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          true,
+			retryAfterParamsExpected: &genericfilters.RetryAfterParams{
+				TearDownConnection: false,
+				Message:            "The apiserver hasn't been fully initialized yet, please try again later.",
+			},
+		},
+		{
+			name: "startup-send-retry-after-until-ready is enabled, the apserver is ready",
+			config: func() *Config {
+				c := &Config{
+					lifecycleSignals:                newLifecycleSignals(),
+					StartupSendRetryAfterUntilReady: true,
+					ShutdownSendRetryAfter:          false,
+				}
+				c.lifecycleSignals.HasBeenReady.Signal()
+				return c
+			}(),
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          false,
+			retryAfterParamsExpected:        nil,
+		},
+		{
+			name: "both shutdown-send-retry-after is enabled and startup-send-retry-after-until-ready are enabled, the apserver is not ready",
+			config: &Config{
+				lifecycleSignals:                newLifecycleSignals(),
+				StartupSendRetryAfterUntilReady: true,
+				ShutdownSendRetryAfter:          true,
+			},
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          true,
+			retryAfterParamsExpected: &genericfilters.RetryAfterParams{
+				TearDownConnection: false,
+				Message:            "The apiserver hasn't been fully initialized yet, please try again later.",
+			},
+		},
+		{
+			name: "both shutdown-send-retry-after is enabled and startup-send-retry-after-until-ready are enabled, the apserver is ready",
+			config: func() *Config {
+				c := &Config{
+					lifecycleSignals:                newLifecycleSignals(),
+					StartupSendRetryAfterUntilReady: true,
+					ShutdownSendRetryAfter:          true,
+				}
+				c.lifecycleSignals.HasBeenReady.Signal()
+				return c
+			}(),
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          false,
+			retryAfterParamsExpected:        nil,
+		},
+		{
+			name: "both shutdown-send-retry-after is enabled and startup-send-retry-after-until-ready are enabled, the apserver is shutting down",
+			config: func() *Config {
+				c := &Config{
+					lifecycleSignals:                newLifecycleSignals(),
+					StartupSendRetryAfterUntilReady: true,
+					ShutdownSendRetryAfter:          true,
+				}
+				c.lifecycleSignals.HasBeenReady.Signal()
+				c.lifecycleSignals.AfterShutdownDelayDuration.Signal()
+				return c
+			}(),
+			addWithRetryAfterFilterExpected: true,
+			sendRetryAfterExpected:          true,
+			retryAfterParamsExpected: &genericfilters.RetryAfterParams{
+				TearDownConnection: true,
+				Message:            "The apiserver is shutting down, please try again later.",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			shouldRespondWithRetryAfterFn := test.config.shouldAddWithRetryAfterFilter()
+
+			// we need to sleep some time to allow the goroutine launched by
+			// shouldAddWithRetryAfterFilter to finish
+			time.Sleep(100 * time.Millisecond)
+
+			if test.addWithRetryAfterFilterExpected != (shouldRespondWithRetryAfterFn != nil) {
+				t.Errorf("Expected add WithRetryAfter: %t, but got: %t", test.addWithRetryAfterFilterExpected, shouldRespondWithRetryAfterFn != nil)
+			}
+			if !test.addWithRetryAfterFilterExpected {
+				return
+			}
+
+			paramsGot, sendRetryAfterGot := shouldRespondWithRetryAfterFn()
+			if test.sendRetryAfterExpected != sendRetryAfterGot {
+				t.Errorf("Expected send retry-after: %t, but got: %t", test.sendRetryAfterExpected, sendRetryAfterGot)
+			}
+			if !reflect.DeepEqual(test.retryAfterParamsExpected, paramsGot) {
+				t.Errorf("Expected retry-after params to match, diff: %s", cmp.Diff(test.retryAfterParamsExpected, paramsGot))
+			}
+		})
 	}
 }
 
