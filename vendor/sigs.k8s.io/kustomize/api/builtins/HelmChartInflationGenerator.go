@@ -267,6 +267,9 @@ func (p *HelmChartInflationGeneratorPlugin) templateCommand() []string {
 	if p.ReleaseName != "" {
 		args = append(args, p.ReleaseName)
 	}
+	if p.Namespace != "" {
+		args = append(args, "--namespace", p.Namespace)
+	}
 	args = append(args, filepath.Join(p.absChartHome(), p.Name))
 	if p.ValuesFile != "" {
 		args = append(args, "--values", p.ValuesFile)
@@ -276,6 +279,9 @@ func (p *HelmChartInflationGeneratorPlugin) templateCommand() []string {
 		// See https://github.com/helm/helm/issues/6019
 		// I've tried placing the flag before and after the name argument.
 		args = append(args, "--generate-name")
+	}
+	if p.IncludeCRDs {
+		args = append(args, "--include-crds")
 	}
 	return args
 }

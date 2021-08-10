@@ -16,7 +16,7 @@ limitations under the License.
 
 package openapi
 
-import "github.com/go-openapi/spec"
+import "k8s.io/kube-openapi/pkg/validation/spec"
 
 // PrintColumnsKey is the key that defines which columns should be printed
 const PrintColumnsKey = "x-kubernetes-print-columns"

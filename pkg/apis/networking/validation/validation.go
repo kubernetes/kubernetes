@@ -239,8 +239,7 @@ func validateIngress(ingress *networking.Ingress, opts IngressValidationOptions,
 // ValidateIngressCreate validates Ingresses on create.
 func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
-	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
+	opts := IngressValidationOptions{
 		AllowInvalidSecretName:       allowInvalidSecretName(requestGV, nil),
 		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(requestGV, nil),
 	}
@@ -256,8 +255,7 @@ func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVe
 // ValidateIngressUpdate validates ingresses on update.
 func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
+	opts := IngressValidationOptions{
 		AllowInvalidSecretName:       allowInvalidSecretName(requestGV, oldIngress),
 		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(requestGV, oldIngress),
 	}

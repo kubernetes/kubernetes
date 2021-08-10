@@ -17,7 +17,7 @@ spec:
     - name: v1
       schema:
         openAPIV3Schema:
-          description: Authentication provides information to configure an operator to manage authentication.
+          description: "Authentication provides information to configure an operator to manage authentication. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
           type: object
           required:
             - spec

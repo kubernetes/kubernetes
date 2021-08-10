@@ -123,12 +123,12 @@ func TestAttachDetach(t *testing.T) {
 	nodeName := types.NodeName("nodeName")
 	readOnly := false
 	spec := createVolSpec(volumeID, readOnly)
-	attachError := errors.New("Fake attach error")
-	detachError := errors.New("Fake detach error")
-	diskCheckError := errors.New("Fake DiskIsAttached error")
-	diskPathError := errors.New("Fake GetAttachmentDiskPath error")
-	disksCheckError := errors.New("Fake DisksAreAttached error")
-	operationFinishTimeout := errors.New("Fake waitOperationFinished error")
+	attachError := errors.New("fake attach error")
+	detachError := errors.New("fake detach error")
+	diskCheckError := errors.New("fake DiskIsAttached error")
+	diskPathError := errors.New("fake GetAttachmentDiskPath error")
+	disksCheckError := errors.New("fake DisksAreAttached error")
+	operationFinishTimeout := errors.New("fake waitOperationFinished error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -618,7 +618,7 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 }
 
 func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
-	return "", "", "", false, errors.New("Not implemented")
+	return "", "", "", false, errors.New("not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {
@@ -634,11 +634,11 @@ func (testcase *testcase) ExpandVolume(volumeID string, oldSize resource.Quantit
 }
 
 func (testcase *testcase) DeleteVolume(volumeID string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }
 
 func (testcase *testcase) GetAutoLabelsForPD(name string) (map[string]string, error) {
-	return map[string]string{}, errors.New("Not implemented")
+	return map[string]string{}, errors.New("not implemented")
 }
 
 func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
@@ -657,17 +657,17 @@ func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string
 	if len(expected.volumeIDs) == 0 && expected.instanceID == "" {
 		// testcase.volumeIDs looks uninitialized, test did not expect to call DisksAreAttached
 		testcase.t.Errorf("Unexpected DisksAreAttached call!")
-		return areAttached, errors.New("Unexpected DisksAreAttached call")
+		return areAttached, errors.New("unexpected DisksAreAttached call")
 	}
 
 	if !reflect.DeepEqual(expected.volumeIDs, volumeIDs) {
 		testcase.t.Errorf("Unexpected DisksAreAttached call: expected volumeIDs %v, got %v", expected.volumeIDs, volumeIDs)
-		return areAttached, errors.New("Unexpected DisksAreAttached call: wrong volumeID")
+		return areAttached, errors.New("unexpected DisksAreAttached call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
 		testcase.t.Errorf("Unexpected DisksAreAttached call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return areAttached, errors.New("Unexpected DisksAreAttached call: wrong instanceID")
+		return areAttached, errors.New("unexpected DisksAreAttached call: wrong instanceID")
 	}
 
 	klog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
@@ -682,22 +682,22 @@ func (testcase *testcase) DisksAreAttachedByName(nodeName types.NodeName, volume
 	instanceID := expected.instanceID
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong nodename")
+		return areAttached, errors.New("unexpected DisksAreAttachedByName call: wrong nodename")
 	}
 	if len(expected.volumeIDs) == 0 && expected.instanceID == "" {
 		// testcase.volumeIDs looks uninitialized, test did not expect to call DisksAreAttached
 		testcase.t.Errorf("Unexpected DisksAreAttachedByName call!")
-		return areAttached, errors.New("Unexpected DisksAreAttachedByName call")
+		return areAttached, errors.New("unexpected DisksAreAttachedByName call")
 	}
 
 	if !reflect.DeepEqual(expected.volumeIDs, volumeIDs) {
 		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected volumeIDs %v, got %v", expected.volumeIDs, volumeIDs)
-		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong volumeID")
+		return areAttached, errors.New("unexpected DisksAreAttachedByName call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
 		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong instanceID")
+		return areAttached, errors.New("unexpected DisksAreAttachedByName call: wrong instanceID")
 	}
 
 	klog.V(4).Infof("DisksAreAttachedByName call: %v, %s, returning %v, %v", volumeIDs, nodeName, expected.areAttached, expected.ret)
@@ -711,11 +711,11 @@ type instances struct {
 }
 
 func (instances *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("Not implemented")
+	return []v1.NodeAddress{}, errors.New("not implemented")
 }
 
 func (instances *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("Not implemented")
+	return []v1.NodeAddress{}, errors.New("not implemented")
 }
 
 func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
@@ -723,11 +723,11 @@ func (instances *instances) InstanceID(ctx context.Context, name types.NodeName)
 }
 
 func (instances *instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }
 
 func (instances *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }
 
 func (instances *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
@@ -743,7 +743,7 @@ func (instances *instances) InstanceMetadataByProviderID(ctx context.Context, pr
 }
 
 func (instances *instances) List(filter string) ([]types.NodeName, error) {
-	return []types.NodeName{}, errors.New("Not implemented")
+	return []types.NodeName{}, errors.New("not implemented")
 }
 
 func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
@@ -751,5 +751,5 @@ func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user st
 }
 
 func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }

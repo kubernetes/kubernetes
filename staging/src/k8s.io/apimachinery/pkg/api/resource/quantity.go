@@ -696,6 +696,15 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// NewDecimalQuantity returns a new Quantity representing the given
+// value in the given format.
+func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
+	return &Quantity{
+		d:      infDecAmount{&b},
+		Format: format,
+	}
+}
+
 // NewQuantity returns a new Quantity representing the given
 // value in the given format.
 func NewQuantity(value int64, format Format) *Quantity {

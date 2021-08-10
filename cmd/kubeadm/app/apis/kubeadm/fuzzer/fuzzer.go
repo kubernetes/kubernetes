@@ -17,12 +17,15 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -45,47 +48,21 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 
-	// Since ClusterConfiguration never get serialized in the external variant of InitConfiguration,
-	// it is necessary to apply external api defaults here to get the round trip internal->external->internal working.
-	// More specifically:
-	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
-	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
-		APIServer: kubeadm.APIServer{
-			TimeoutForControlPlane: &metav1.Duration{
-				Duration: constants.DefaultControlPlaneTimeout,
-			},
-		},
-		DNS: kubeadm.DNS{
-			Type: kubeadm.CoreDNS,
-		},
-		CertificatesDir: v1beta2.DefaultCertificatesDir,
-		ClusterName:     v1beta2.DefaultClusterName,
-		Etcd: kubeadm.Etcd{
-			Local: &kubeadm.LocalEtcd{
-				DataDir: v1beta2.DefaultEtcdDataDir,
-			},
-		},
-		ImageRepository:   v1beta2.DefaultImageRepository,
-		KubernetesVersion: v1beta2.DefaultKubernetesVersion,
-		Networking: kubeadm.Networking{
-			ServiceSubnet: v1beta2.DefaultServicesSubnet,
-			DNSDomain:     v1beta2.DefaultServiceDNSDomain,
-		},
-	}
-	// Adds the default bootstrap token to get the round working
-	obj.BootstrapTokens = []kubeadm.BootstrapToken{
-		{
-			// Description
-			// Expires
-			Groups: []string{"foo"},
-			// Token
-			TTL:    &metav1.Duration{Duration: 1234},
-			Usages: []string{"foo"},
-		},
-	}
+	// Avoid round tripping the ClusterConfiguration embedded in the InitConfiguration, since it is
+	// only present in the internal version and not in public versions
+	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{}
 
-	// Pin values for fields that are not present in v1beta1
-	obj.CertificateKey = ""
+	// Adds the default bootstrap token to get the round trip working
+	obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{
+		{
+			Groups: []string{"foo"},
+			Usages: []string{"foo"},
+			TTL:    &metav1.Duration{Duration: 1234},
+		},
+	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -146,11 +123,11 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		TLSBootstrapToken: "qux",
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
-
-	// Pin values for fields that are not present in v1beta1
-	obj.CertificateKey = ""
 }

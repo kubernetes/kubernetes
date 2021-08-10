@@ -50,7 +50,7 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // ExtractRoleBinding extracts the applied configuration owned by fieldManager from
 // roleBinding. If no managedFields are found in roleBinding for fieldManager, a
 // RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+	return extractRoleBinding(roleBinding, fieldManager, "")
+}
+
+// ExtractRoleBindingStatus is the same as ExtractRoleBinding except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractRoleBindingStatus(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+	return extractRoleBinding(roleBinding, fieldManager, "status")
+}
+
+func extractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
-	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.RoleBinding"), fieldManager, b)
+	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.RoleBinding"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

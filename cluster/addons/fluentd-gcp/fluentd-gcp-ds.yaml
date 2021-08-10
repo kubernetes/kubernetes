@@ -79,7 +79,7 @@ spec:
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
+        image: gke.gcr.io/prometheus-to-sd:v0.11.1-gke.1
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons

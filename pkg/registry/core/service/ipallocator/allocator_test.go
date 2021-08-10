@@ -28,6 +28,7 @@ func TestAllocate(t *testing.T) {
 	testCases := []struct {
 		name             string
 		cidr             string
+		family           api.IPFamily
 		free             int
 		released         string
 		outOfRange       []string
@@ -36,6 +37,7 @@ func TestAllocate(t *testing.T) {
 		{
 			name:     "IPv4",
 			cidr:     "192.168.1.0/24",
+			family:   api.IPv4Protocol,
 			free:     254,
 			released: "192.168.1.5",
 			outOfRange: []string{
@@ -49,6 +51,7 @@ func TestAllocate(t *testing.T) {
 		{
 			name:     "IPv6",
 			cidr:     "2001:db8:1::/48",
+			family:   api.IPv6Protocol,
 			free:     65535,
 			released: "2001:db8:1::5",
 			outOfRange: []string{
@@ -77,6 +80,10 @@ func TestAllocate(t *testing.T) {
 		rCIDR := r.CIDR()
 		if rCIDR.String() != tc.cidr {
 			t.Errorf("allocator returned a different cidr")
+		}
+
+		if r.IPFamily() != tc.family {
+			t.Errorf("allocator returned wrong IP family")
 		}
 
 		if f := r.Used(); f != 0 {

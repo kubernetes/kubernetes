@@ -77,7 +77,7 @@ func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) er
 		}
 		numTries++
 		if numTries == 10 {
-			return errors.New("Could not attach disk: Timeout after 60s")
+			return errors.New("could not attach disk: Timeout after 60s")
 		}
 		time.Sleep(time.Second * 6)
 	}

@@ -1264,6 +1264,7 @@ func autoConvert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta2.Sta
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -1282,6 +1283,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.Statef
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -1297,6 +1299,7 @@ func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
@@ -1317,6 +1320,7 @@ func autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.St
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]v1beta2.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 

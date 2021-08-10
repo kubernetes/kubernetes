@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,6 +96,8 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	return meta.SetList(obj, objs)
 }
 
+// SortObjects sorts the runtime.Object based on fieldInput and returns RuntimeSort that implements
+// the golang sort interface
 func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
 	for ix := range objs {
 		item := objs[ix]
@@ -151,6 +154,7 @@ type RuntimeSort struct {
 	origPosition []int
 }
 
+// NewRuntimeSort creates a new RuntimeSort struct that implements golang sort interface
 func NewRuntimeSort(field string, objs []runtime.Object) *RuntimeSort {
 	sorter := &RuntimeSort{field: field, objs: objs, origPosition: make([]int, len(objs))}
 	for ix := range objs {
@@ -187,6 +191,11 @@ func isLess(i, j reflect.Value) (bool, error) {
 			time := j.Interface().(metav1.Time)
 			return t.Before(&time), nil
 		}
+		// sort resource.Quantity
+		if iQuantity, ok := in.(resource.Quantity); ok {
+			jQuantity := j.Interface().(resource.Quantity)
+			return iQuantity.Cmp(jQuantity) < 0, nil
+		}
 		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {
 			less, err := isLess(i.Field(idx), j.Field(idx))
@@ -204,7 +213,6 @@ func isLess(i, j reflect.Value) (bool, error) {
 			}
 		}
 		return true, nil
-
 	case reflect.Interface:
 		if i.IsNil() && j.IsNil() {
 			return false, nil
@@ -264,7 +272,17 @@ func isLess(i, j reflect.Value) (bool, error) {
 			}
 		case string:
 			if jtype, ok := j.Interface().(string); ok {
-				return sortorder.NaturalLess(itype, jtype), nil
+				// check if it's a Quantity
+				itypeQuantity, err := resource.ParseQuantity(itype)
+				if err != nil {
+					return sortorder.NaturalLess(itype, jtype), nil
+				}
+				jtypeQuantity, _ := resource.ParseQuantity(jtype)
+				if err != nil {
+					return sortorder.NaturalLess(itype, jtype), nil
+				}
+				// Both strings are quantity
+				return itypeQuantity.Cmp(jtypeQuantity) < 0, nil
 			}
 		default:
 			return false, fmt.Errorf("unsortable type: %T", itype)

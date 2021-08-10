@@ -86,13 +86,14 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			s.SNICerts,
 			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
 		)
-		// register if possible
-		if notifier, ok := s.ClientCA.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+
+		if s.ClientCA != nil {
+			s.ClientCA.AddListener(dynamicCertificateController)
 		}
-		if notifier, ok := s.Cert.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+		if s.Cert != nil {
+			s.Cert.AddListener(dynamicCertificateController)
 		}
+
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
@@ -113,10 +114,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			go controller.Run(1, stopCh)
 		}
 		for _, sniCert := range s.SNICerts {
-			if notifier, ok := sniCert.(dynamiccertificates.Notifier); ok {
-				notifier.AddListener(dynamicCertificateController)
-			}
-
+			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
@@ -195,6 +193,67 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	secureServer.ErrorLog = tlsErrorLogger
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
+	stoppedCh, _, err := RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
+	return stoppedCh, err
+}
+
+// ServeWithListenerStopped runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
+// The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. ServeWithListenerStopped does not block.
+// It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
+// It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
+// TODO: do a follow up PR to remove this function, change 'Serve' to return listenerStoppedCh
+//  and update all components that call 'Serve'
+func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
+	if s.Listener == nil {
+		return nil, nil, fmt.Errorf("listener must not be nil")
+	}
+
+	tlsConfig, err := s.tlsConfig(stopCh)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	secureServer := &http.Server{
+		Addr:           s.Listener.Addr().String(),
+		Handler:        handler,
+		MaxHeaderBytes: 1 << 20,
+		TLSConfig:      tlsConfig,
+	}
+
+	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
+	// This should be big enough to accommodate most API POST requests in a single frame,
+	// and small enough to allow a per connection buffer of this size multiplied by `MaxConcurrentStreams`.
+	const resourceBody99Percentile = 256 * 1024
+
+	http2Options := &http2.Server{}
+
+	// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
+	http2Options.MaxUploadBufferPerStream = resourceBody99Percentile
+	http2Options.MaxReadFrameSize = resourceBody99Percentile
+
+	// use the overridden concurrent streams setting or make the default of 250 explicit so we can size MaxUploadBufferPerConnection appropriately
+	if s.HTTP2MaxStreamsPerConnection > 0 {
+		http2Options.MaxConcurrentStreams = uint32(s.HTTP2MaxStreamsPerConnection)
+	} else {
+		http2Options.MaxConcurrentStreams = 250
+	}
+
+	// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams
+	http2Options.MaxUploadBufferPerConnection = http2Options.MaxUploadBufferPerStream * int32(http2Options.MaxConcurrentStreams)
+
+	if !s.DisableHTTP2 {
+		// apply settings to the server
+		if err := http2.ConfigureServer(secureServer, http2Options); err != nil {
+			return nil, nil, fmt.Errorf("error configuring http2: %v", err)
+		}
+	}
+
+	// use tlsHandshakeErrorWriter to handle messages of tls handshake error
+	tlsErrorWriter := &tlsHandshakeErrorWriter{os.Stderr}
+	tlsErrorLogger := log.New(tlsErrorWriter, "", 0)
+	secureServer.ErrorLog = tlsErrorLogger
+
+	klog.Infof("Serving securely on %s", secureServer.Addr)
 	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
 }
 
@@ -209,15 +268,15 @@ func RunServer(
 	ln net.Listener,
 	shutDownTimeout time.Duration,
 	stopCh <-chan struct{},
-) (<-chan struct{}, error) {
+) (<-chan struct{}, <-chan struct{}, error) {
 	if ln == nil {
-		return nil, fmt.Errorf("listener must not be nil")
+		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
 
 	// Shutdown server gracefully.
-	stoppedCh := make(chan struct{})
+	serverShutdownCh, listenerStoppedCh := make(chan struct{}), make(chan struct{})
 	go func() {
-		defer close(stoppedCh)
+		defer close(serverShutdownCh)
 		<-stopCh
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
 		server.Shutdown(ctx)
@@ -226,6 +285,7 @@ func RunServer(
 
 	go func() {
 		defer utilruntime.HandleCrash()
+		defer close(listenerStoppedCh)
 
 		var listener net.Listener
 		listener = tcpKeepAliveListener{ln}
@@ -244,7 +304,7 @@ func RunServer(
 		}
 	}()
 
-	return stoppedCh, nil
+	return serverShutdownCh, listenerStoppedCh, nil
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted

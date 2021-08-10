@@ -67,7 +67,7 @@ const (
 	//    apf.kubernetes.io/autoupdate-spec: 'true'
 	//
 	// The kube-apiserver periodically checks the bootstrap configuration
-	// objects on the cluster and applies update if necessary.
+	// objects on the cluster and applies updates if necessary.
 	//
 	// kube-apiserver enforces an 'always auto-update' policy for the
 	// mandatory configuration object(s). This implies:
@@ -79,7 +79,7 @@ const (
 	// - any changes to the spec made by the cluster operator will be
 	//   stomped.
 	//
-	// The kube-apiserver will apply update on the suggested configuration if:
+	// The kube-apiserver will apply updates on the suggested configuration if:
 	// - the cluster operator has enabled auto-update by setting the annotation
 	//   (apf.kubernetes.io/autoupdate-spec: 'true') or
 	// - the annotation key is missing but the generation is 1
@@ -223,13 +223,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	// `user` matches based on username.
 	// +optional
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
+	// `group` matches based on user group name.
 	// +optional
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
+	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
 }

@@ -259,6 +259,15 @@ func TestRoundTripManagedFields(t *testing.T) {
   manager: foo
   operation: Update
 `,
+		`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:spec:
+      f:replicas: {}
+  manager: foo
+  operation: Update
+  subresource: scale
+`,
 	}
 
 	for _, test := range tests {
@@ -312,6 +321,18 @@ operation: Apply
 time: "2001-02-03T04:05:06Z"
 `,
 			expected: "{\"manager\":\"foo\",\"operation\":\"Apply\"}",
+		},
+		{
+			managedFieldsEntry: `
+apiVersion: v1
+fieldsV1:
+  f:apiVersion: {}
+manager: foo
+operation: Apply
+subresource: scale
+time: "2001-02-03T04:05:06Z"
+`,
+			expected: "{\"manager\":\"foo\",\"operation\":\"Apply\",\"subresource\":\"scale\"}",
 		},
 	}
 
@@ -460,6 +481,19 @@ func TestSortEncodedManagedFields(t *testing.T) {
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 2, time.UTC)}},
 				{Manager: "b", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 3, time.UTC)}},
 				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: &metav1.Time{time.Date(2000, time.January, 0, 0, 0, 0, 1, time.UTC)}},
+			},
+		},
+		{
+			name: "entries with subresource field",
+			managedFields: []metav1.ManagedFieldsEntry{
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Subresource: "status"},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Subresource: "scale"},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply},
+			},
+			expected: []metav1.ManagedFieldsEntry{
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Subresource: "scale"},
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Subresource: "status"},
 			},
 		},
 	}

@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -30,10 +31,10 @@ metadata:
   selfLink: "5"
   uid: "7"
 target:
-  apiVersion: "22"
-  fieldPath: "24"
-  kind: "19"
-  name: "21"
-  namespace: "20"
-  resourceVersion: "23"
+  apiVersion: "23"
+  fieldPath: "25"
+  kind: "20"
+  name: "22"
+  namespace: "21"
+  resourceVersion: "24"
   uid: īqJ枊a8衍`Ĩɘ.蘯

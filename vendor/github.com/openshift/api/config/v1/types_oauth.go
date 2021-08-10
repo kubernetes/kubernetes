@@ -11,6 +11,9 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // OAuth holds cluster-wide information about OAuth.  The canonical name is `cluster`.
 // It is used to configure the integrated OAuth server.
 // This configuration is only honored when the top level Authentication config has type set to IntegratedOAuth.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type OAuth struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -554,6 +557,8 @@ type OpenIDClaims struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type OAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

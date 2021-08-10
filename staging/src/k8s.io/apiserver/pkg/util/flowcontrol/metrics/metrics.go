@@ -144,6 +144,61 @@ var (
 		},
 		[]string{requestKind})
 
+	apiserverCurrentR = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "current_r",
+			Help:           "R(time of last change)",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel},
+	)
+
+	apiserverDispatchR = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dispatch_r",
+			Help:           "R(time of last dispatch)",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel},
+	)
+
+	apiserverLatestS = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "latest_s",
+			Help:           "S(most recently dispatched request)",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel},
+	)
+
+	apiserverNextSBounds = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "next_s_bounds",
+			Help:           "min and max, over queues, of S(oldest waiting request in queue)",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, "bound"},
+	)
+
+	apiserverNextDiscountedSBounds = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "next_discounted_s_bounds",
+			Help:           "min and max, over queues, of S(oldest waiting request in queue) - estimated work in progress",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, "bound"},
+	)
+
 	apiserverCurrentInqueueRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -185,6 +240,16 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_concurrency_in_use",
+			Help:           "Concurrency (number of seats) occupided by the currently executing requests in the API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 	apiserverRequestWaitingSeconds = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -210,9 +275,15 @@ var (
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
 		apiserverDispatchedRequestsTotal,
+		apiserverCurrentR,
+		apiserverDispatchR,
+		apiserverLatestS,
+		apiserverNextSBounds,
+		apiserverNextDiscountedSBounds,
 		apiserverCurrentInqueueRequests,
 		apiserverRequestQueueLength,
 		apiserverRequestConcurrencyLimit,
+		apiserverRequestConcurrencyInUse,
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
@@ -229,6 +300,27 @@ func AddRequestsInQueues(ctx context.Context, priorityLevel, flowSchema string, 
 // AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
 func AddRequestsExecuting(ctx context.Context, priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
+}
+
+// SetCurrentR sets the current-R (virtualTime) gauge for the given priority level
+func SetCurrentR(priorityLevel string, r float64) {
+	apiserverCurrentR.WithLabelValues(priorityLevel).Set(r)
+}
+
+// SetLatestS sets the latest-S (virtual time of dispatched request) gauge for the given priority level
+func SetDispatchMetrics(priorityLevel string, r, s, sMin, sMax, discountedSMin, discountedSMax float64) {
+	apiserverDispatchR.WithLabelValues(priorityLevel).Set(r)
+	apiserverLatestS.WithLabelValues(priorityLevel).Set(s)
+	apiserverNextSBounds.WithLabelValues(priorityLevel, "min").Set(sMin)
+	apiserverNextSBounds.WithLabelValues(priorityLevel, "max").Set(sMax)
+	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "min").Set(discountedSMin)
+	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "max").Set(discountedSMax)
+}
+
+// AddRequestConcurrencyInUse adds the given delta to the gauge of concurrency in use by
+// the currently executing requests of the given flowSchema and priorityLevel
+func AddRequestConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
+	apiserverRequestConcurrencyInUse.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
 // UpdateSharedConcurrencyLimit updates the value for the concurrency limit in flow control

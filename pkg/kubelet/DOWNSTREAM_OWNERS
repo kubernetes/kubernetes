@@ -5,7 +5,6 @@ reviewers:
   - rphillips
   - sjenning
   - mrunalp
-  - ehashman
 
 # Sub-package approvers from upstream with permission to approve downstream backports following these rules:
 # - they MUST be approvers upstream (here compare https://github.com/kubernetes/kubernetes/blob/17bb2fc050ec786b60db7d8d6d4d3ac8eeac205b/pkg/kubelet/OWNERS#L10-L11)

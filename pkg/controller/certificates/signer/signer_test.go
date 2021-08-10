@@ -32,28 +32,24 @@ import (
 	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/controller/certificates"
-
+	"k8s.io/client-go/util/certificate/csr"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
+	"k8s.io/kubernetes/pkg/controller/certificates"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestSigner(t *testing.T) {
-	clock := clock.FakeClock{}
+	fakeClock := clock.FakeClock{}
 
 	s, err := newSigner("kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	currCA, err := s.caProvider.currentCA()
-	if err != nil {
-		t.Fatal(err)
-	}
-	currCA.Now = clock.Now
-	currCA.Backdate = 0
-	s.caProvider.caValue.Store(currCA)
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
@@ -69,7 +65,11 @@ func TestSigner(t *testing.T) {
 		capi.UsageKeyEncipherment,
 		capi.UsageServerAuth,
 		capi.UsageClientAuth,
-	})
+	},
+		// requesting a duration that is greater than TTL is ignored
+		csr.DurationToExpirationSeconds(3*time.Hour),
+		fakeClock.Now,
+	)
 	if err != nil {
 		t.Fatalf("failed to sign CSR: %v", err)
 	}
@@ -94,7 +94,8 @@ func TestSigner(t *testing.T) {
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		NotAfter:              clock.Now().Add(1 * time.Hour),
+		NotBefore:             fakeClock.Now().Add(-5 * time.Minute),
+		NotAfter:              fakeClock.Now().Add(1 * time.Hour),
 		PublicKeyAlgorithm:    x509.ECDSA,
 		SignatureAlgorithm:    x509.SHA256WithRSA,
 		MaxPathLen:            -1,
@@ -350,4 +351,92 @@ func makeTestCSR(b csrBuilder) *capi.CertificateSigningRequest {
 		})
 	}
 	return csr
+}
+
+func Test_signer_duration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		certTTL           time.Duration
+		expirationSeconds *int32
+		wantGateEnabled   time.Duration
+		wantGateDisabled  time.Duration
+	}{
+		{
+			name:              "can request shorter duration than TTL",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(30 * time.Minute),
+			wantGateEnabled:   30 * time.Minute,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "cannot request longer duration than TTL",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(3 * time.Hour),
+			wantGateEnabled:   time.Hour,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "cannot request negative duration",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(-time.Minute),
+			wantGateEnabled:   10 * time.Minute,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "cannot request duration less than 10 mins",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(10*time.Minute - time.Second),
+			wantGateEnabled:   10 * time.Minute,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "can request duration of exactly 10 mins",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(10 * time.Minute),
+			wantGateEnabled:   10 * time.Minute,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "can request duration equal to the default",
+			certTTL:           time.Hour,
+			expirationSeconds: csr.DurationToExpirationSeconds(time.Hour),
+			wantGateEnabled:   time.Hour,
+			wantGateDisabled:  time.Hour,
+		},
+		{
+			name:              "can choose not to request a duration to get the default",
+			certTTL:           time.Hour,
+			expirationSeconds: nil,
+			wantGateEnabled:   time.Hour,
+			wantGateDisabled:  time.Hour,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+
+		f := func(t *testing.T, want time.Duration) {
+			s := &signer{
+				certTTL: tt.certTTL,
+			}
+			if got := s.duration(tt.expirationSeconds); got != want {
+				t.Errorf("duration() = %v, want %v", got, want)
+			}
+		}
+
+		// regular tests
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // these are safe to run in parallel but not the feature gate disabled tests
+
+			f(t, tt.wantGateEnabled)
+		})
+
+		// same tests with the feature gate disabled
+		t.Run("feature gate disabled - "+tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSRDuration, false)()
+			f(t, tt.wantGateDisabled)
+		})
+
+	}
 }

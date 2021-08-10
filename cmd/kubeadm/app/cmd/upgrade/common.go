@@ -26,14 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -47,6 +39,15 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 // isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
@@ -241,7 +242,7 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 	if err != nil {
 		return err
 	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
+	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -144,11 +144,11 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 	}
 }
 
-func newResourcePod(usage ...schedulerframework.Resource) *v1.Pod {
+func newResourcePod(containerResources ...v1.ResourceList) *v1.Pod {
 	containers := []v1.Container{}
-	for _, req := range usage {
+	for _, rl := range containerResources {
 		containers = append(containers, v1.Container{
-			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
+			Resources: v1.ResourceRequirements{Requests: rl},
 		})
 	}
 	return &v1.Pod{
@@ -187,7 +187,10 @@ func TestGeneralPredicates(t *testing.T) {
 		{
 			pod: &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(
-				newResourcePod(schedulerframework.Resource{MilliCPU: 9, Memory: 19})),
+				newResourcePod(v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
+				})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
@@ -197,9 +200,15 @@ func TestGeneralPredicates(t *testing.T) {
 			name: "no resources/port/host requested always fits",
 		},
 		{
-			pod: newResourcePod(schedulerframework.Resource{MilliCPU: 8, Memory: 10}),
+			pod: newResourcePod(v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(8, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
+			}),
 			nodeInfo: schedulerframework.NewNodeInfo(
-				newResourcePod(schedulerframework.Resource{MilliCPU: 5, Memory: 19})),
+				newResourcePod(v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
+				})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},

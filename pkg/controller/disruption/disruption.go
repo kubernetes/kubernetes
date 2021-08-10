@@ -595,10 +595,15 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 		dc.recorder.Eventf(pdb, v1.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
-	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
+	expectedCount, desiredHealthy, unmanagedPods, err := dc.getExpectedPodCount(pdb, pods)
 	if err != nil {
 		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
 		return err
+	}
+	// We have unmamanged pods, instead of erroring and hotlooping in disruption controller, log and continue.
+	if len(unmanagedPods) > 0 {
+		klog.V(4).Infof("found unmanaged pods associated with this PDB: %v",
+			strings.Join(unmanagedPods, ",'"))
 	}
 
 	currentTime := time.Now()
@@ -615,7 +620,7 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	return err
 }
 
-func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, err error) {
+func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, unmanagedPods []string, err error) {
 	err = nil
 	// TODO(davidopp): consider making the way expectedCount and rules about
 	// permitted controller configurations (specifically, considering it an error
@@ -623,7 +628,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	// handled the same way for integer and percentage minAvailable
 
 	if pdb.Spec.MaxUnavailable != nil {
-		expectedCount, err = dc.getExpectedScale(pdb, pods)
+		expectedCount, unmanagedPods, err = dc.getExpectedScale(pdb, pods)
 		if err != nil {
 			return
 		}
@@ -641,7 +646,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal
 			expectedCount = int32(len(pods))
 		} else if pdb.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, err = dc.getExpectedScale(pdb, pods)
+			expectedCount, unmanagedPods, err = dc.getExpectedScale(pdb, pods)
 			if err != nil {
 				return
 			}
@@ -657,7 +662,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	return
 }
 
-func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
+func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, unmanagedPods []string, err error) {
 	// When the user specifies a fraction of pods that must be available, we
 	// use as the fraction's denominator
 	// SUM_{all c in C} scale(c)
@@ -672,13 +677,19 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 	// A mapping from controllers to their scale.
 	controllerScale := map[types.UID]int32{}
 
-	// 1. Find the controller for each pod.  If any pod has 0 controllers,
-	// that's an error. With ControllerRef, a pod can only have 1 controller.
+	// 1. Find the controller for each pod.
+
+	// As of now, we allow PDBs to be applied to pods via selectors, so there
+	// can be unmanaged pods(pods that don't have backing controllers) but still have PDBs associated.
+	// Such pods are to be collected and PDB backing them should be enqueued instead of immediately throwing
+	// a sync error. This ensures disruption controller is not frequently updating the status subresource and thus
+	// preventing excessive and expensive writes to etcd.
+	// With ControllerRef, a pod can only have 1 controller.
 	for _, pod := range pods {
 		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
-			err = fmt.Errorf("found no controller ref for pod %q", pod.Name)
-			return
+			unmanagedPods = append(unmanagedPods, pod.Name)
+			continue
 		}
 
 		// If we already know the scale of the controller there is no need to do anything.

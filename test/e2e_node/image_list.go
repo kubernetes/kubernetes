@@ -60,7 +60,6 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Perl),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
-	getGPUDevicePluginImage(),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
 	imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
@@ -75,11 +74,20 @@ func updateImageAllowList() {
 	framework.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
 	framework.ImagePrePullList.Insert(getNodeProblemDetectorImage())
-	framework.ImagePrePullList.Insert(getSRIOVDevicePluginImage())
+	if sriovDevicePluginImage, err := getSRIOVDevicePluginImage(); err != nil {
+		klog.Errorln(err)
+	} else {
+		framework.ImagePrePullList.Insert(sriovDevicePluginImage)
+	}
+	if gpuDevicePluginImage, err := getGPUDevicePluginImage(); err != nil {
+		klog.Errorln(err)
+	} else {
+		framework.ImagePrePullList.Insert(gpuDevicePluginImage)
+	}
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "k8s.gcr.io/node-problem-detector:v0.6.2"
+	const defaultImage string = "k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage
@@ -214,42 +222,35 @@ func PrePullAllImages() error {
 }
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.
-func getGPUDevicePluginImage() string {
+func getGPUDevicePluginImage() (string, error) {
 	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
 	if err != nil {
-		klog.Errorf("Failed to parse the device plugin image: %v", err)
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
 	}
 	if ds == nil {
-		klog.Errorf("Failed to parse the device plugin image: the extracted DaemonSet is nil")
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
 	}
 	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		klog.Errorf("Failed to parse the device plugin image: cannot extract the container from YAML")
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
 	}
-	return ds.Spec.Template.Spec.Containers[0].Image
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
 // getSRIOVDevicePluginImage returns the image of SRIOV device plugin.
-func getSRIOVDevicePluginImage() string {
+func getSRIOVDevicePluginImage() (string, error) {
 	data, err := e2etestfiles.Read(SRIOVDevicePluginDSYAML)
 	if err != nil {
-		klog.Errorf("Failed to read the device plugin manifest: %v", err)
-		return ""
+		return "", fmt.Errorf("failed to read the device plugin manifest: %w", err)
 	}
 	ds, err := e2emanifest.DaemonSetFromData(data)
 	if err != nil {
-		klog.Errorf("Failed to parse the device plugin image: %v", err)
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
 	}
 	if ds == nil {
-		klog.Errorf("Failed to parse the device plugin image: the extracted DaemonSet is nil")
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
 	}
 	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		klog.Errorf("Failed to parse the device plugin image: cannot extract the container from YAML")
-		return ""
+		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
 	}
-	return ds.Spec.Template.Spec.Containers[0].Image
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }

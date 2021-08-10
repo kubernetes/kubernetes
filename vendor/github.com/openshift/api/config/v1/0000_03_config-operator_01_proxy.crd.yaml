@@ -19,7 +19,7 @@ spec:
     - name: v1
       schema:
         openAPIV3Schema:
-          description: Proxy holds cluster-wide information on how to configure default proxies for the cluster. The canonical name is `cluster`
+          description: "Proxy holds cluster-wide information on how to configure default proxies for the cluster. The canonical name is `cluster` \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
           type: object
           required:
             - spec

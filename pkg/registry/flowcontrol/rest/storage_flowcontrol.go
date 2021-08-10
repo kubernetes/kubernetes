@@ -129,7 +129,7 @@ func ensureAPFBootstrapConfiguration(hookContext genericapiserver.PostStartHookC
 	// we have successfully initialized the bootstrap configuration, now we
 	// spin up a goroutine which reconciles the bootstrap configuration periodically.
 	go func() {
-		err := wait.PollImmediateUntil(
+		wait.PollImmediateUntil(
 			time.Minute,
 			func() (bool, error) {
 				if err := ensure(clientset); err != nil {
@@ -138,9 +138,7 @@ func ensureAPFBootstrapConfiguration(hookContext genericapiserver.PostStartHookC
 				// always auto update both suggested and mandatory configuration
 				return false, nil
 			}, hookContext.StopCh)
-		if err != nil {
-			klog.ErrorS(err, "APF bootstrap ensurer is exiting")
-		}
+		klog.Info("APF bootstrap ensurer is exiting")
 	}()
 
 	return nil

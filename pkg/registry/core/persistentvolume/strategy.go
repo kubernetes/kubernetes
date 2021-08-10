@@ -71,8 +71,14 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
-	errorList := validation.ValidatePersistentVolume(persistentvolume)
+	opts := validation.ValidationOptionsForPersistentVolume(persistentvolume, nil)
+	errorList := validation.ValidatePersistentVolume(persistentvolume, opts)
 	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (persistentvolumeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -94,9 +100,16 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPv := obj.(*api.PersistentVolume)
-	errorList := validation.ValidatePersistentVolume(newPv)
+	oldPv := old.(*api.PersistentVolume)
+	opts := validation.ValidationOptionsForPersistentVolume(newPv, oldPv)
+	errorList := validation.ValidatePersistentVolume(newPv, opts)
 	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
-	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, old.(*api.PersistentVolume))...)
+	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (persistentvolumeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {
@@ -130,6 +143,11 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (persistentvolumeStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

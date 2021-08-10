@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+
+	"github.com/pkg/errors"
 )
 
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
@@ -40,7 +40,7 @@ func (bts BootstrapTokenString) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, bts.String())), nil
 }
 
-// UnmarshalJSON implements the json.Unmarshaller interface.
+// UnmarshalJSON implements the json.Unmarshaler interface.
 func (bts *BootstrapTokenString) UnmarshalJSON(b []byte) error {
 	// If the token is represented as "", just return quickly without an error
 	if len(b) == 0 {

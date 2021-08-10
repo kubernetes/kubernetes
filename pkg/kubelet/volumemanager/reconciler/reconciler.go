@@ -386,7 +386,7 @@ func (rc *reconciler) syncStates() {
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
 	if err != nil {
-		klog.ErrorS(err, "Cannot get volumes from disk")
+		klog.ErrorS(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
 	}
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
@@ -408,7 +408,7 @@ func (rc *reconciler) syncStates() {
 				continue
 			}
 			// No pod needs the volume.
-			klog.InfoS("Could not construct volume information, cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "error", err)
+			klog.InfoS("Could not construct volume information, cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			rc.cleanupMounts(volume)
 			continue
 		}
@@ -579,7 +579,8 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumeSpec: volumeSpec,
 		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
 		// for volume cleanup.
-		// TODO: in case pod is added back before reconciler starts to unmount, we can update this field from desired state information
+		// in case pod is added back to desired state, outerVolumeSpecName will be updated from dsw information.
+		// See issue #103143 and its fix for details.
 		outerVolumeSpecName: volume.volumeSpecName,
 		pod:                 pod,
 		deviceMounter:       deviceMounter,

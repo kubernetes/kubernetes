@@ -310,3 +310,89 @@ type DelegatedAuthorization struct {
 	// disabled indicates that authorization should be disabled.  By default it will use delegated authorization.
 	Disabled bool `json:"disabled,omitempty"`
 }
+type RequiredHSTSPolicy struct {
+	// namespaceSelector specifies a label selector such that the policy applies only to those routes that
+	// are in namespaces with labels that match the selector, and are in one of the DomainPatterns.
+	// Defaults to the empty LabelSelector, which matches everything.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+
+	// domainPatterns is a list of domains for which the desired HSTS annotations are required.
+	// If domainPatterns is specified and a route is created with a spec.host matching one of the domains,
+	// the route must specify the HSTS Policy components described in the matching RequiredHSTSPolicy.
+	//
+	// The use of wildcards is allowed like this: *.foo.com matches everything under foo.com.
+	// foo.com only matches foo.com, so to cover foo.com and everything under it, you must specify *both*.
+	// kubebuilder:validation:MinLength=1
+	// +required
+	DomainPatterns []string `json:"domainPatterns"`
+
+	// maxAge is the delta time range in seconds during which hosts are regarded as HSTS hosts.
+	// If set to 0, it negates the effect, and hosts are removed as HSTS hosts.
+	// If set to 0 and includeSubdomains is specified, all subdomains of the host are also removed as HSTS hosts.
+	// maxAge is a time-to-live value, and if this policy is not refreshed on a client, the HSTS
+	// policy will eventually expire on that client.
+	// +required
+	MaxAge MaxAgePolicy `json:"maxAge"`
+
+	// preloadPolicy directs the client to include hosts in its host preload list so that
+	// it never needs to do an initial load to get the HSTS header (note that this is not defined
+	// in RFC 6797 and is therefore client implementation-dependent).
+	// +optional
+	PreloadPolicy PreloadPolicy `json:"preloadPolicy,omitempty"`
+
+	// includeSubDomainsPolicy means the HSTS Policy should apply to any subdomains of the host's
+	// domain name.  Thus, for the host bar.foo.com, if includeSubDomainsPolicy was set to RequireIncludeSubDomains:
+	// - the host app.bar.foo.com would inherit the HSTS Policy of bar.foo.com
+	// - the host bar.foo.com would inherit the HSTS Policy of bar.foo.com
+	// - the host foo.com would NOT inherit the HSTS Policy of bar.foo.com
+	// - the host def.foo.com would NOT inherit the HSTS Policy of bar.foo.com
+	// +optional
+	IncludeSubDomainsPolicy IncludeSubDomainsPolicy `json:"includeSubDomainsPolicy,omitempty"`
+}
+
+// MaxAgePolicy contains a numeric range for specifying a compliant HSTS max-age for the enclosing RequiredHSTSPolicy
+type MaxAgePolicy struct {
+	// The largest allowed value (in seconds) of the RequiredHSTSPolicy max-age
+	// This value can be left unspecified, in which case no upper limit is enforced.
+	// kubebuilder:validation:minimum=0:maximum=2147483647
+	LargestMaxAge *int32 `json:"largestMaxAge,omitempty"`
+
+	// The smallest allowed value (in seconds) of the RequiredHSTSPolicy max-age
+	// Setting max-age=0 allows the deletion of an existing HSTS header from a host.  This is a necessary
+	// tool for administrators to quickly correct mistakes.
+	// This value can be left unspecified, in which case no lower limit is enforced.
+	// kubebuilder:validation:minimum=0:maximum=2147483647
+	SmallestMaxAge *int32 `json:"smallestMaxAge,omitempty"`
+}
+
+// PreloadPolicy contains a value for specifying a compliant HSTS preload policy for the enclosing RequiredHSTSPolicy
+// +kubebuilder:validation:Enum=RequirePreload;RequireNoPreload;NoOpinion
+type PreloadPolicy string
+
+const (
+	// RequirePreloadPolicy means HSTS "preload" is required by the RequiredHSTSPolicy
+	RequirePreloadPolicy PreloadPolicy = "RequirePreload"
+
+	// RequireNoPreloadPolicy means HSTS "preload" is forbidden by the RequiredHSTSPolicy
+	RequireNoPreloadPolicy PreloadPolicy = "RequireNoPreload"
+
+	// NoOpinionPreloadPolicy means HSTS "preload" doesn't matter to the RequiredHSTSPolicy
+	NoOpinionPreloadPolicy PreloadPolicy = "NoOpinion"
+)
+
+// IncludeSubDomainsPolicy contains a value for specifying a compliant HSTS includeSubdomains policy
+// for the enclosing RequiredHSTSPolicy
+// +kubebuilder:validation:Enum=RequireIncludeSubDomains;RequireNoIncludeSubDomains;NoOpinion
+type IncludeSubDomainsPolicy string
+
+const (
+	// RequireIncludeSubDomains means HSTS "includeSubDomains" is required by the RequiredHSTSPolicy
+	RequireIncludeSubDomains IncludeSubDomainsPolicy = "RequireIncludeSubDomains"
+
+	// RequireNoIncludeSubDomains means HSTS "includeSubDomains" is forbidden by the RequiredHSTSPolicy
+	RequireNoIncludeSubDomains IncludeSubDomainsPolicy = "RequireNoIncludeSubDomains"
+
+	// NoOpinionIncludeSubDomains means HSTS "includeSubDomains" doesn't matter to the RequiredHSTSPolicy
+	NoOpinionIncludeSubDomains IncludeSubDomainsPolicy = "NoOpinion"
+)

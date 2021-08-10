@@ -211,7 +211,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	// try set ip families (for missing ip families)
 	// we do it here, since we want this to be visible
 	// even when dryRun == true
-	if err := rs.tryDefaultValidateServiceClusterIPFields(service); err != nil {
+	if err := rs.tryDefaultValidateServiceClusterIPFields(nil, service); err != nil {
 		return nil, err
 	}
 
@@ -226,10 +226,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
-	// TODO: This creates nodePorts if needed. In the future nodePorts may be cleared if *never* used.
-	// But for now we stick to the KEP "don't allocate new node ports but do not deallocate existing node ports if set"
-	if service.Spec.Type == api.ServiceTypeNodePort ||
-		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
 		if err := initNodePorts(service, nodePortOp); err != nil {
 			return nil, err
 		}
@@ -334,10 +331,16 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 }
 
 func shouldAllocateNodePorts(service *api.Service) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		return *service.Spec.AllocateLoadBalancerNodePorts
+	if service.Spec.Type == api.ServiceTypeNodePort {
+		return true
 	}
-	return true
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+			return *service.Spec.AllocateLoadBalancerNodePorts
+		}
+		return true
+	}
+	return false
 }
 
 // externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
@@ -461,7 +464,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	defer nodePortOp.Finish()
 
 	// try set ip families (for missing ip families)
-	if err := rs.tryDefaultValidateServiceClusterIPFields(service); err != nil {
+	if err := rs.tryDefaultValidateServiceClusterIPFields(oldService, service); err != nil {
 		return nil, false, err
 	}
 
@@ -477,8 +480,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		releaseNodePorts(oldService, nodePortOp)
 	}
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
-	if service.Spec.Type == api.ServiceTypeNodePort ||
-		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
 		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
 			return nil, false, err
 		}
@@ -612,7 +614,7 @@ func (rs *REST) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]s
 		} else {
 			parsedIP := net.ParseIP(ip)
 			if err := allocator.Allocate(parsedIP); err != nil {
-				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocated ip:%v with error:%v", ip, err))}
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP %v: %v", ip, err))}
 				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 			allocated[family] = ip
@@ -730,6 +732,19 @@ func (rs *REST) allocServiceClusterIPs(service *api.Service) (map[api.IPFamily]s
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
 func (rs *REST) handleClusterIPsForUpdatedService(oldService *api.Service, service *api.Service) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+
+	// We don't want to upgrade (add an IP) or downgrade (remove an IP)
+	// following a cluster downgrade/upgrade to/from dual-stackness
+	// a PreferDualStack service following principle of least surprise
+	// That means: PreferDualStack service will only be upgraded
+	// if:
+	// - changes type to RequireDualStack
+	// - manually adding or removing ClusterIP (secondary)
+	// - manually adding or removing IPFamily (secondary)
+	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
+		return allocated, toRelease, nil // nothing more to do.
+	}
+
 	// use cases:
 	// A: service changing types from ExternalName TO ClusterIP types ==> allocate all new
 	// B: service changing types from ClusterIP types TO ExternalName ==> release all allocated
@@ -846,9 +861,71 @@ func (rs *REST) releaseServiceClusterIPs(service *api.Service) (released map[api
 	return rs.releaseClusterIPs(toRelease)
 }
 
+// tests if two preferred dual-stack service have matching ClusterIPFields
+// assumption: old service is a valid, default service (e.g., loaded from store)
+func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) bool {
+	if oldService == nil {
+		return false
+	}
+
+	if service.Spec.IPFamilyPolicy == nil {
+		return false
+	}
+
+	// if type mutated then it is an update
+	// that needs to run through the entire process.
+	if oldService.Spec.Type != service.Spec.Type {
+		return false
+	}
+	// both must be type that gets an IP assigned
+	if service.Spec.Type != api.ServiceTypeClusterIP &&
+		service.Spec.Type != api.ServiceTypeNodePort &&
+		service.Spec.Type != api.ServiceTypeLoadBalancer {
+		return false
+	}
+
+	// both must be of IPFamilyPolicy==PreferDualStack
+	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	if oldService.Spec.IPFamilyPolicy != nil && *(oldService.Spec.IPFamilyPolicy) != api.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	// compare ClusterIPs lengths.
+	// due to validation.
+	if len(service.Spec.ClusterIPs) != len(oldService.Spec.ClusterIPs) {
+		return false
+	}
+
+	for i, ip := range service.Spec.ClusterIPs {
+		if oldService.Spec.ClusterIPs[i] != ip {
+			return false
+		}
+	}
+
+	// compare IPFamilies
+	if len(service.Spec.IPFamilies) != len(oldService.Spec.IPFamilies) {
+		return false
+	}
+
+	for i, family := range service.Spec.IPFamilies {
+		if oldService.Spec.IPFamilies[i] != family {
+			return false
+		}
+	}
+
+	// they match on
+	// Policy: preferDualStack
+	// ClusterIPs
+	// IPFamilies
+	return true
+}
+
 // attempts to default service ip families according to cluster configuration
 // while ensuring that provided families are configured on cluster.
-func (rs *REST) tryDefaultValidateServiceClusterIPFields(service *api.Service) error {
+func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *api.Service) error {
 	// can not do anything here
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil
@@ -858,6 +935,18 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(service *api.Service) e
 	// we totally depend on existing validation in apis/validation
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil
+	}
+
+	// We don't want to upgrade (add an IP) or downgrade (remove an IP)
+	// following a cluster downgrade/upgrade to/from dual-stackness
+	// a PreferDualStack service following principle of least surprise
+	// That means: PreferDualStack service will only be upgraded
+	// if:
+	// - changes type to RequireDualStack
+	// - manually adding or removing ClusterIP (secondary)
+	// - manually adding or removing IPFamily (secondary)
+	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
+		return nil // nothing more to do.
 	}
 
 	// two families or two IPs with SingleStack
@@ -1085,6 +1174,10 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 	svcPortToNodePort := map[int]int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort == 0 && !shouldAllocateNodePorts(service) {
+			// Don't allocate new ports, but do respect specific requests.
+			continue
+		}
 		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
 		if allocatedNodePort == 0 {
 			// This will only scan forward in the service.Spec.Ports list because any matches
@@ -1137,6 +1230,10 @@ func updateNodePorts(oldService, newService *api.Service, nodePortOp *portalloca
 
 	for i := range newService.Spec.Ports {
 		servicePort := &newService.Spec.Ports[i]
+		if servicePort.NodePort == 0 && !shouldAllocateNodePorts(newService) {
+			// Don't allocate new ports, but do respect specific requests.
+			continue
+		}
 		nodePort := ServiceNodePort{Protocol: servicePort.Protocol, NodePort: servicePort.NodePort}
 		if nodePort.NodePort != 0 {
 			if !containsNumber(oldNodePortsNumbers, int(nodePort.NodePort)) && !portAllocated[int(nodePort.NodePort)] {

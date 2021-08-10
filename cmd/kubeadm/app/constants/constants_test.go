@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -167,30 +166,6 @@ func TestEtcdSupportedVersion(t *testing.T) {
 			}
 			if actualError == nil && actualVersion.String() != rt.expectedVersion.String() {
 				t.Errorf("expected version %s, got %s", rt.expectedVersion.String(), actualVersion.String())
-			}
-		})
-	}
-}
-
-func TestGetDNSVersion(t *testing.T) {
-	var tests = []struct {
-		dns      kubeadmapi.DNSAddOnType
-		expected string
-	}{
-		{
-			dns:      kubeadmapi.CoreDNS,
-			expected: CoreDNSVersion,
-		},
-	}
-	for _, rt := range tests {
-		t.Run(string(rt.dns), func(t *testing.T) {
-			actualDNSVersion := GetDNSVersion(rt.dns)
-			if actualDNSVersion != rt.expected {
-				t.Errorf(
-					"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
-					rt.expected,
-					actualDNSVersion,
-				)
 			}
 		})
 	}

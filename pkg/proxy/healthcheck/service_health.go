@@ -24,11 +24,11 @@ import (
 	"sync"
 
 	"github.com/lithammer/dedent"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -48,7 +48,7 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-func newServiceHealthServer(hostname string, recorder record.EventRecorder, listener listener, factory httpServerFactory) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory) ServiceHealthServer {
 	return &server{
 		hostname:    hostname,
 		recorder:    recorder,
@@ -59,13 +59,13 @@ func newServiceHealthServer(hostname string, recorder record.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder record.EventRecorder) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{})
 }
 
 type server struct {
 	hostname    string
-	recorder    record.EventRecorder // can be nil
+	recorder    events.EventRecorder // can be nil
 	listener    listener
 	httpFactory httpServerFactory
 
@@ -111,7 +111,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						Namespace: nsn.Namespace,
 						Name:      nsn.Name,
 						UID:       types.UID(nsn.String()),
-					}, api.EventTypeWarning, "FailedToStartServiceHealthcheck", msg)
+					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
 			klog.Error(msg)
 			continue

@@ -95,7 +95,7 @@ func FinalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
 	}
 }
 
-func createUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
+func CreateUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
 	nsFilter := regexp.MustCompile("[^[:word:]-]+") // match anything that's not a word character or hyphen
 	testFrameworks := map[string]*framework.Framework{}
 	for _, t := range tests {
@@ -110,12 +110,11 @@ func createUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
 func RunUpgradeSuite(
 	upgCtx *UpgradeContext,
 	tests []Test,
+	testFrameworks map[string]*framework.Framework,
 	testSuite *junit.TestSuite,
 	upgradeType UpgradeType,
 	upgradeFunc func(),
 ) {
-	testFrameworks := createUpgradeFrameworks(tests)
-
 	cm := chaosmonkey.New(upgradeFunc)
 	for _, t := range tests {
 		testCase := &junit.TestCase{

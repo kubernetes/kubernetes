@@ -30,6 +30,7 @@ type StatefulSetStatusApplyConfiguration struct {
 	UpdateRevision     *string                                  `json:"updateRevision,omitempty"`
 	CollisionCount     *int32                                   `json:"collisionCount,omitempty"`
 	Conditions         []StatefulSetConditionApplyConfiguration `json:"conditions,omitempty"`
+	AvailableReplicas  *int32                                   `json:"availableReplicas,omitempty"`
 }
 
 // StatefulSetStatusApplyConfiguration constructs an declarative configuration of the StatefulSetStatus type for use with
@@ -112,5 +113,13 @@ func (b *StatefulSetStatusApplyConfiguration) WithConditions(values ...*Stateful
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithAvailableReplicas sets the AvailableReplicas field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AvailableReplicas field is set to the value of the last call.
+func (b *StatefulSetStatusApplyConfiguration) WithAvailableReplicas(value int32) *StatefulSetStatusApplyConfiguration {
+	b.AvailableReplicas = &value
 	return b
 }

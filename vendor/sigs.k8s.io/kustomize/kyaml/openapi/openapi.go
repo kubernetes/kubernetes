@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi"
 	"sigs.k8s.io/kustomize/kyaml/openapi/kustomizationapi"
@@ -271,6 +271,15 @@ func IsNamespaceScoped(typeMeta yaml.TypeMeta) (bool, bool) {
 	initSchema()
 	isNamespaceScoped, found := globalSchema.namespaceabilityByResourceType[typeMeta]
 	return isNamespaceScoped, found
+}
+
+// IsCertainlyClusterScoped returns true for Node, Namespace, etc. and
+// false for Pod, Deployment, etc. and kinds that aren't recognized in the
+// openapi data. See:
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
+func IsCertainlyClusterScoped(typeMeta yaml.TypeMeta) bool {
+	nsScoped, found := IsNamespaceScoped(typeMeta)
+	return found && !nsScoped
 }
 
 // SuppressBuiltInSchemaUse can be called to prevent using the built-in Kubernetes

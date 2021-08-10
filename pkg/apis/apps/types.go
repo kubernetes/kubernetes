@@ -157,6 +157,13 @@ type StatefulSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// +optional
+	MinReadySeconds int32
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -196,6 +203,12 @@ type StatefulSetStatus struct {
 
 	// Represents the latest available observations of a statefulset's current state.
 	Conditions []StatefulSetCondition
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// Remove omitempty when graduating to beta
+	// +optional
+	AvailableReplicas int32
 }
 
 // StatefulSetConditionType describes the condition types of StatefulSets.
@@ -532,7 +545,7 @@ type RollingUpdateDaemonSet struct {
 	// The maximum number of DaemonSet pods that can be unavailable during the
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
-	// number is calculated from percentage by rounding down to a minimum of one.
+	// number is calculated from percentage by rounding up.
 	// This cannot be 0 if MaxSurge is 0
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
@@ -564,7 +577,7 @@ type RollingUpdateDaemonSet struct {
 	// daemonset on any given node can double if the readiness check fails, and
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
-	// This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
+	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
 	// +optional
 	MaxSurge intstr.IntOrString
 }

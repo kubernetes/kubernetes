@@ -21,6 +21,7 @@ func (AggregatorConfig) SwaggerDoc() map[string]string {
 }
 
 var map_KubeAPIServerConfig = map[string]string{
+	"":                             "Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
 	"authConfig":                   "authConfig configures authentication options in addition to the standard oauth token and client certificate authenticators",
 	"aggregatorConfig":             "aggregatorConfig has options for configuring the aggregator component of the API server.",
 	"kubeletClientInfo":            "kubeletClientInfo contains information about how to connect to kubelets",
@@ -56,6 +57,7 @@ func (KubeAPIServerProjectConfig) SwaggerDoc() map[string]string {
 }
 
 var map_KubeControllerManagerConfig = map[string]string{
+	"":                   "Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
 	"serviceServingCert": "serviceServingCert provides support for the old alpha service serving cert signer CA bundle",
 	"projectConfig":      "projectConfig is an optimization for the daemonset controller",
 	"extendedArguments":  "extendedArguments is used to configure the kube-controller-manager",

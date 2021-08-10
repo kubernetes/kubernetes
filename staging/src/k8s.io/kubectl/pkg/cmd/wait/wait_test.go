@@ -985,15 +985,7 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 	listMapping := map[schema.GroupVersionResource]string{
 		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
 	}
-	infos := []*resource.Info{
-		{
-			Mapping: &meta.RESTMapping{
-				Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
-			},
-			Name:      "name-foo",
-			Namespace: "ns-foo",
-		},
-	}
+	infos := []*resource.Info{}
 	fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 
 	o := &WaitOptions{

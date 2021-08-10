@@ -58,7 +58,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -248,7 +247,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	tempDir, err := ioutil.TempDir("", "")
 	if err != nil {
-		return cleanUpFunc, errors.Wrapf(err, "unable to create temp dir")
+		return cleanUpFunc, fmt.Errorf("unable to create temp dir: %w", err)
 	}
 
 	manifestsFile := path.Join(tempDir, "manifests.yml")
@@ -275,7 +274,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 	if err == nil {
 		framework.Logf("GMSA webhook successfully deployed, output:\n%s", string(output))
 	} else {
-		err = errors.Wrapf(err, "unable to deploy GMSA webhook, output:\n%s", string(output))
+		err = fmt.Errorf("unable to deploy GMSA webhook, output:\n%s: %w", string(output), err)
 	}
 
 	return cleanUpFunc, err
@@ -290,7 +289,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return cleanUpFunc, errors.Wrapf(err, "unable to create temp file")
+		return cleanUpFunc, fmt.Errorf("unable to create temp file: %w", err)
 	}
 	defer tempFile.Close()
 
@@ -301,13 +300,13 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 
 	_, err = tempFile.WriteString(crdManifestContents)
 	if err != nil {
-		err = errors.Wrapf(err, "unable to write GMSA contents to %q", tempFile.Name())
+		err = fmt.Errorf("unable to write GMSA contents to %q: %w", tempFile.Name(), err)
 		return cleanUpFunc, err
 	}
 
 	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
-		err = errors.Wrapf(err, "unable to create custom resource, output:\n%s", output)
+		err = fmt.Errorf("unable to create custom resource, output:\n%s: %w", output, err)
 	}
 
 	return cleanUpFunc, err
@@ -339,7 +338,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 
 	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 	if err != nil {
-		err = errors.Wrapf(err, "unable to create RBAC cluster role %q", roleName)
+		err = fmt.Errorf("unable to create RBAC cluster role %q: %w", roleName, err)
 	}
 
 	return roleName, cleanUpFunc, err

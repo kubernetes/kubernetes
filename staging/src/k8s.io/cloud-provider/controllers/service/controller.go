@@ -716,7 +716,7 @@ func nodeReadyConditionStatus(node *v1.Node) v1.ConditionStatus {
 func (s *Controller) nodeSyncInternal(workers int) {
 	startTime := time.Now()
 	defer func() {
-		latency := time.Now().Sub(startTime).Seconds()
+		latency := time.Since(startTime).Seconds()
 		klog.V(4).Infof("It took %v seconds to finish nodeSyncInternal", latency)
 		nodeSyncLatency.Observe(latency)
 	}()
@@ -785,7 +785,7 @@ func (s *Controller) updateLoadBalancerHosts(services []*v1.Service, workers int
 func (s *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []*v1.Node) error {
 	startTime := time.Now()
 	defer func() {
-		latency := time.Now().Sub(startTime).Seconds()
+		latency := time.Since(startTime).Seconds()
 		klog.V(4).Infof("It took %v seconds to update load balancer hosts for service %s/%s", latency, service.Namespace, service.Name)
 		updateLoadBalancerHostLatency.Observe(latency)
 	}()

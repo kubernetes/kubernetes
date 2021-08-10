@@ -264,6 +264,18 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 				break
 			}
 		}
+		// Change annotation keys for Validating's fail open to Mutating's fail open.
+		failOpenAnnotations := map[string]string{}
+		for key, value := range t.ExpectAnnotations {
+			if strings.HasPrefix(key, "failed-open.validating.webhook.admission.k8s.io/") {
+				failOpenAnnotations[key] = value
+			}
+		}
+		for key, value := range failOpenAnnotations {
+			newKey := strings.Replace(key, "failed-open.validating.webhook.admission.k8s.io/", "failed-open.mutation.webhook.admission.k8s.io/", 1)
+			t.ExpectAnnotations[newKey] = value
+			delete(t.ExpectAnnotations, key)
+		}
 		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.SkipBenchmark, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
 	}
 	return r
@@ -408,6 +420,11 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 
 			SkipBenchmark: true,
 			ExpectAllow:   true,
+			ExpectAnnotations: map[string]string{
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "internalErr A",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_1": "internalErr B",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_2": "internalErr C",
+			},
 		},
 		{
 			Name: "match & fail (but disallow because fail close on nil FailurePolicy)",
@@ -502,8 +519,9 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			SkipBenchmark: true,
-			ExpectAllow:   true,
+			SkipBenchmark:     true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "nilResponse"},
 		},
 		{
 			Name: "absent response and fail closed",

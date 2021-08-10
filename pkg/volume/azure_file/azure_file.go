@@ -397,7 +397,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
 	azure, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azure == nil {
-		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return azure, nil

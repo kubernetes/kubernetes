@@ -62,6 +62,17 @@ var (
 		},
 		VolumeBindingMode: &waitForFirstConsumer,
 	}
+
+	defaultShapePoint = []config.UtilizationShapePoint{
+		{
+			Utilization: 0,
+			Score:       0,
+		},
+		{
+			Utilization: 100,
+			Score:       int32(config.MaxCustomPriorityScore),
+		},
+	}
 )
 
 func makeNode(name string) *v1.Node {
@@ -178,6 +189,7 @@ func TestVolumeBinding(t *testing.T) {
 		pvcs                    []*v1.PersistentVolumeClaim
 		pvs                     []*v1.PersistentVolume
 		feature                 featuregate.Feature
+		args                    *config.VolumeBindingArgs
 		wantPreFilterStatus     *framework.Status
 		wantStateAfterPreFilter *stateData
 		wantFilterStatus        []*framework.Status
@@ -524,6 +536,99 @@ func TestVolumeBinding(t *testing.T) {
 				0,
 			},
 		},
+		{
+			name: "zonal volumes with close capacity are preferred (custom shape)",
+			pod:  makePod("pod-a", []string{"pvc-a"}),
+			nodes: []*v1.Node{
+				mergeNodeLabels(makeNode("zone-a-node-a"), map[string]string{
+					"topology.kubernetes.io/region": "region-a",
+					"topology.kubernetes.io/zone":   "zone-a",
+				}),
+				mergeNodeLabels(makeNode("zone-a-node-b"), map[string]string{
+					"topology.kubernetes.io/region": "region-a",
+					"topology.kubernetes.io/zone":   "zone-a",
+				}),
+				mergeNodeLabels(makeNode("zone-b-node-a"), map[string]string{
+					"topology.kubernetes.io/region": "region-b",
+					"topology.kubernetes.io/zone":   "zone-b",
+				}),
+				mergeNodeLabels(makeNode("zone-b-node-b"), map[string]string{
+					"topology.kubernetes.io/region": "region-b",
+					"topology.kubernetes.io/zone":   "zone-b",
+				}),
+				mergeNodeLabels(makeNode("zone-c-node-a"), map[string]string{
+					"topology.kubernetes.io/region": "region-c",
+					"topology.kubernetes.io/zone":   "zone-c",
+				}),
+				mergeNodeLabels(makeNode("zone-c-node-b"), map[string]string{
+					"topology.kubernetes.io/region": "region-c",
+					"topology.kubernetes.io/zone":   "zone-c",
+				}),
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				setPVCRequestStorage(makePVC("pvc-a", "", waitSC.Name), resource.MustParse("50Gi")),
+			},
+			pvs: []*v1.PersistentVolume{
+				setPVNodeAffinity(setPVCapacity(makePV("pv-a-0", waitSC.Name), resource.MustParse("200Gi")), map[string][]string{
+					"topology.kubernetes.io/region": {"region-a"},
+					"topology.kubernetes.io/zone":   {"zone-a"},
+				}),
+				setPVNodeAffinity(setPVCapacity(makePV("pv-a-1", waitSC.Name), resource.MustParse("200Gi")), map[string][]string{
+					"topology.kubernetes.io/region": {"region-a"},
+					"topology.kubernetes.io/zone":   {"zone-a"},
+				}),
+				setPVNodeAffinity(setPVCapacity(makePV("pv-b-0", waitSC.Name), resource.MustParse("100Gi")), map[string][]string{
+					"topology.kubernetes.io/region": {"region-b"},
+					"topology.kubernetes.io/zone":   {"zone-b"},
+				}),
+				setPVNodeAffinity(setPVCapacity(makePV("pv-b-1", waitSC.Name), resource.MustParse("100Gi")), map[string][]string{
+					"topology.kubernetes.io/region": {"region-b"},
+					"topology.kubernetes.io/zone":   {"zone-b"},
+				}),
+			},
+			feature: features.VolumeCapacityPriority,
+			args: &config.VolumeBindingArgs{
+				BindTimeoutSeconds: 300,
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 0,
+						Score:       0,
+					},
+					{
+						Utilization: 50,
+						Score:       3,
+					},
+					{
+						Utilization: 100,
+						Score:       5,
+					},
+				},
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				boundClaims: []*v1.PersistentVolumeClaim{},
+				claimsToBind: []*v1.PersistentVolumeClaim{
+					setPVCRequestStorage(makePVC("pvc-a", "", waitSC.Name), resource.MustParse("50Gi")),
+				},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+				nil,
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+			},
+			wantScores: []int64{
+				15,
+				15,
+				30,
+				30,
+				0,
+				0,
+			},
+		},
 	}
 
 	for _, item := range table {
@@ -543,9 +648,19 @@ func TestVolumeBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl, err := New(&config.VolumeBindingArgs{
-				BindTimeoutSeconds: 300,
-			}, fh)
+
+			args := item.args
+			if args == nil {
+				// default args if the args is not specified in test cases
+				args = &config.VolumeBindingArgs{
+					BindTimeoutSeconds: 300,
+				}
+				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+					args.Shape = defaultShapePoint
+				}
+			}
+
+			pl, err := New(args, fh)
 			if err != nil {
 				t.Fatal(err)
 			}

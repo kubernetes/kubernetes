@@ -93,6 +93,7 @@ type csiBlockMapper struct {
 	volumeID   string
 	readOnly   bool
 	spec       *volume.Spec
+	pod        *v1.Pod
 	podUID     types.UID
 	volume.MetricsProvider
 }
@@ -192,7 +193,8 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		accessMode,
 		nodeStageSecrets,
 		csiSource.VolumeAttributes,
-		nil /* MountOptions */)
+		nil, /* MountOptions */
+		nil /* fsGroup */)
 
 	if err != nil {
 		return "", err
@@ -217,8 +219,21 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishVolumeInfo = attachment.Status.AttachmentMetadata
 	}
 
+	// Inject pod information into volume_attributes
+	volAttribs := csiSource.VolumeAttributes
+	podInfoEnabled, err := m.plugin.podInfoEnabled(string(m.driverName))
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to assemble volume attributes: %v", err))
+	}
+	volumeLifecycleMode, err := m.plugin.getVolumeLifecycleMode(m.spec)
+	if err != nil {
+		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to get VolumeLifecycleMode: %v", err))
+	}
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(m.pod, volumeLifecycleMode))
+	}
+
 	nodePublishSecrets := map[string]string{}
-	var err error
 	if csiSource.NodePublishSecretRef != nil {
 		nodePublishSecrets, err = getCredentialsFromSecret(m.k8s, csiSource.NodePublishSecretRef)
 		if err != nil {
@@ -248,10 +263,11 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		publishPath,
 		accessMode,
 		publishVolumeInfo,
-		csiSource.VolumeAttributes,
+		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
-		[]string{},
+		[]string{}, /* mountOptions */
+		nil,        /* fsGroup */
 	)
 
 	if err != nil {

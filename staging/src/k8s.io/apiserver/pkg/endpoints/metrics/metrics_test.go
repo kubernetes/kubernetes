@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestCleanVerb(t *testing.T) {
@@ -105,6 +107,53 @@ func TestCleanVerb(t *testing.T) {
 			cleansedVerb := cleanVerb(tt.initialVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
+			}
+		})
+	}
+}
+
+func TestCleanScope(t *testing.T) {
+	testCases := []struct {
+		name          string
+		requestInfo   *request.RequestInfo
+		expectedScope string
+	}{
+		{
+			name:          "empty scope",
+			requestInfo:   &request.RequestInfo{},
+			expectedScope: "",
+		},
+		{
+			name: "resource scope",
+			requestInfo: &request.RequestInfo{
+				Name:              "my-resource",
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "resource",
+		},
+		{
+			name: "namespace scope",
+			requestInfo: &request.RequestInfo{
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "namespace",
+		},
+		{
+			name: "cluster scope",
+			requestInfo: &request.RequestInfo{
+				Namespace:         "",
+				IsResourceRequest: true,
+			},
+			expectedScope: "cluster",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if CleanScope(test.requestInfo) != test.expectedScope {
+				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
 	}

@@ -51,7 +51,7 @@ import (
 
 const (
 	// EndpointHTTPPort is an endpoint HTTP port for testing.
-	EndpointHTTPPort = 8080
+	EndpointHTTPPort = 8083
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
@@ -438,7 +438,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 //   (See the TODO about checking probability, which isnt implemented yet).
 // - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
 //   smaller this number is, the less 'slack' there is for declaring success.
-// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints wont be hit.
+// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
 // - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
 //   success on all endpoints).
 //   In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
@@ -900,8 +900,8 @@ func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInte
 
 // HTTPPokeParams is a struct for HTTP poke parameters.
 type HTTPPokeParams struct {
-	Timeout        time.Duration
-	ExpectCode     int // default = 200
+	Timeout        time.Duration // default = 10 secs
+	ExpectCode     int           // default = 200
 	BodyContains   string
 	RetriableCodes []int
 	EnableHTTPS    bool
@@ -979,6 +979,10 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 
 	if params.ExpectCode == 0 {
 		params.ExpectCode = http.StatusOK
+	}
+
+	if params.Timeout == 0 {
+		params.Timeout = 10 * time.Second
 	}
 
 	resp, err := httpGetNoConnectionPoolTimeout(url, params.Timeout)

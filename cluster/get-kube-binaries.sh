@@ -158,7 +158,7 @@ function download_tarball() {
   mkdir -p "${download_path}"
 
   if [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
-    gsutil cp "${url//'https://storage.googleapis.com/'/'gs://'}" "${download_path}/${file}"
+    gsutil cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""

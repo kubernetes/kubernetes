@@ -10,6 +10,9 @@ import (
 
 // Ingress holds cluster-wide information about ingress, including the default ingress domain
 // used for routes. The canonical name is `cluster`.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type Ingress struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -54,6 +57,31 @@ type IngressSpec struct {
 	// configurable routes.
 	// +optional
 	ComponentRoutes []ComponentRouteSpec `json:"componentRoutes,omitempty"`
+
+	// requiredHSTSPolicies specifies HSTS policies that are required to be set on newly created  or updated routes
+	// matching the domainPattern/s and namespaceSelector/s that are specified in the policy.
+	// Each requiredHSTSPolicy must have at least a domainPattern and a maxAge to validate a route HSTS Policy route
+	// annotation, and affect route admission.
+	//
+	// A candidate route is checked for HSTS Policies if it has the HSTS Policy route annotation:
+	// "haproxy.router.openshift.io/hsts_header"
+	// E.g. haproxy.router.openshift.io/hsts_header: max-age=31536000;preload;includeSubDomains
+	//
+	// - For each candidate route, if it matches a requiredHSTSPolicy domainPattern and optional namespaceSelector,
+	// then the maxAge, preloadPolicy, and includeSubdomainsPolicy must be valid to be admitted.  Otherwise, the route
+	// is rejected.
+	// - The first match, by domainPattern and optional namespaceSelector, in the ordering of the RequiredHSTSPolicies
+	// determines the route's admission status.
+	// - If the candidate route doesn't match any requiredHSTSPolicy domainPattern and optional namespaceSelector,
+	// then it may use any HSTS Policy annotation.
+	//
+	// The HSTS policy configuration may be changed after routes have already been created. An update to a previously
+	// admitted route may then fail if the updated route does not conform to the updated HSTS policy configuration.
+	// However, changing the HSTS policy configuration will not cause a route that is already admitted to stop working.
+	//
+	// Note that if there are no RequiredHSTSPolicies, any HSTS Policy annotation on the route is valid.
+	// +optional
+	RequiredHSTSPolicies []RequiredHSTSPolicy `json:"requiredHSTSPolicies,omitempty"`
 }
 
 // ConsumingUser is an alias for string which we add validation to. Currently only service accounts are supported.
@@ -172,7 +200,9 @@ type ComponentRouteStatus struct {
 	RelatedObjects []ObjectReference `json:"relatedObjects"`
 }
 
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +openshift:compatibility-gen:level=1
 type IngressList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

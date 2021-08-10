@@ -54,14 +54,14 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	etcdOptions.EtcdServersOverrides = []string{fmt.Sprintf("/events#%s", etcd1URL)}
 	etcdOptions.EnableWatchCache = true
 
-	opts := framework.MasterConfigOptions{EtcdOptions: etcdOptions}
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
+	opts := framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions}
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	// Switch off endpoints reconciler to avoid unnecessary operations.
-	masterConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
-	_, s, stopMaster := framework.RunAMaster(masterConfig)
+	controlPlaneConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+	_, s, stopAPIServer := framework.RunAnAPIServer(controlPlaneConfig)
 
 	closeFn := func() {
-		stopMaster()
+		stopAPIServer()
 		stopEtcd1()
 		stopEtcd0()
 	}
@@ -72,7 +72,7 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	}
 
 	// Wait for apiserver to be stabilized.
-	// Everything but default service creation is checked in RunAMaster above by
+	// Everything but default service creation is checked in RunAnAPIServer above by
 	// waiting for post start hooks, so we just wait for default service to exist.
 	// TODO(wojtek-t): Figure out less fragile way.
 	ctx := context.Background()

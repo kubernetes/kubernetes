@@ -20,6 +20,9 @@ import (
 // https://github.com/kubernetes/dns/blob/master/docs/specification.md
 //
 // More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DNS struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -62,6 +65,11 @@ type DNSSpec struct {
 	//
 	// +optional
 	NodePlacement DNSNodePlacement `json:"nodePlacement,omitempty"`
+
+	// managementState indicates whether the DNS operator should manage cluster
+	// DNS
+	// +optional
+	ManagementState ManagementState `json:"managementState,omitempty"`
 }
 
 // Server defines the schema for a server that runs per instance of CoreDNS.
@@ -175,6 +183,9 @@ type DNSStatus struct {
 // +kubebuilder:object:root=true
 
 // DNSList contains a list of DNS
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DNSList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

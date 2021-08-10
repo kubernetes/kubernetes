@@ -19,9 +19,9 @@ func (n *Notice) ToString() string {
 	} else {
 		s += fmt.Sprintf(`Option "%v" in plugin "%v" `, n.Option, n.Plugin)
 	}
-	if n.Severity == unsupported {
+	if n.Severity == SevUnsupported {
 		s += "is unsupported by this migration tool in " + n.Version + "."
-	} else if n.Severity == newdefault {
+	} else if n.Severity == SevNewDefault {
 		s += "is added as a default in " + n.Version + "."
 	} else {
 		s += "is " + n.Severity + " in " + n.Version + "."
@@ -37,12 +37,12 @@ func (n *Notice) ToString() string {
 
 const (
 	// The following statuses are used to indicate the state of support/deprecation in a given release.
-	deprecated  = "deprecated"  // deprecated, but still completely functional
-	ignored     = "ignored"     // if included in the corefile, it will be ignored by CoreDNS
-	removed     = "removed"     // completely removed from CoreDNS, and would cause CoreDNS to exit if present in the Corefile
-	newdefault  = "newdefault"  // added to the default corefile.  CoreDNS may not function properly if it is not present in the corefile.
-	unsupported = "unsupported" // the plugin/option is not supported by the migration tool
+	SevDeprecated  = "deprecated"  // deprecated, but still completely functional
+	SevIgnored     = "ignored"     // if included in the corefile, it will be ignored by CoreDNS
+	SevRemoved     = "removed"     // completely removed from CoreDNS, and would cause CoreDNS to exit if present in the Corefile
+	SevNewDefault  = "newdefault"  // added to the default corefile.  CoreDNS may not function properly if it is not present in the corefile.
+	SevUnsupported = "unsupported" // the plugin/option is not supported by the migration tool
 
 	// The following statuses are used for selecting/filtering notifications
-	all = "all" // show all statuses
+	SevAll = "all" // show all statuses
 )

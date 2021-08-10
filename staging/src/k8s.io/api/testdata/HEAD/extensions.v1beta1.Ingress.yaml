@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -32,35 +33,35 @@ metadata:
 spec:
   backend:
     resource:
-      apiGroup: "22"
-      kind: "23"
-      name: "24"
-    serviceName: "20"
-    servicePort: "21"
-  ingressClassName: "19"
+      apiGroup: "23"
+      kind: "24"
+      name: "25"
+    serviceName: "21"
+    servicePort: "22"
+  ingressClassName: "20"
   rules:
-  - host: "27"
+  - host: "28"
     http:
       paths:
       - backend:
           resource:
-            apiGroup: "30"
-            kind: "31"
-            name: "32"
-          serviceName: "29"
+            apiGroup: "31"
+            kind: "32"
+            name: "33"
+          serviceName: "30"
           servicePort: 1973774989
-        path: "28"
+        path: "29"
         pathType: )晿<o,c鮽ort昍řČ
   tls:
   - hosts:
-    - "25"
-    secretName: "26"
+    - "26"
+    secretName: "27"
 status:
   loadBalancer:
     ingress:
-    - hostname: "34"
-      ip: "33"
+    - hostname: "35"
+      ip: "34"
       ports:
-      - error: "35"
+      - error: "36"
         port: 2114329341
         protocol: Ă凗蓏Ŋ蛊ĉy

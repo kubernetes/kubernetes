@@ -22,9 +22,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -54,7 +54,7 @@ type proxierHealthServer struct {
 
 	addr          string
 	healthTimeout time.Duration
-	recorder      record.EventRecorder
+	recorder      events.EventRecorder
 	nodeRef       *v1.ObjectReference
 
 	lastUpdated atomic.Value
@@ -62,11 +62,11 @@ type proxierHealthServer struct {
 }
 
 // NewProxierHealthServer returns a proxier health http server.
-func NewProxierHealthServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) ProxierHealthUpdater {
+func NewProxierHealthServer(addr string, healthTimeout time.Duration, recorder events.EventRecorder, nodeRef *v1.ObjectReference) ProxierHealthUpdater {
 	return newProxierHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, recorder, nodeRef)
 }
 
-func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *proxierHealthServer {
+func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder events.EventRecorder, nodeRef *v1.ObjectReference) *proxierHealthServer {
 	return &proxierHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
@@ -99,7 +99,7 @@ func (hs *proxierHealthServer) Run() error {
 		msg := fmt.Sprintf("failed to start proxier healthz on %s: %v", hs.addr, err)
 		// TODO(thockin): move eventing back to caller
 		if hs.recorder != nil {
-			hs.recorder.Eventf(hs.nodeRef, api.EventTypeWarning, "FailedToStartProxierHealthcheck", msg)
+			hs.recorder.Eventf(hs.nodeRef, nil, api.EventTypeWarning, "FailedToStartProxierHealthcheck", "StartKubeProxy", msg)
 		}
 		return fmt.Errorf("%v", msg)
 	}

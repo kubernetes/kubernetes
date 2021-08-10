@@ -122,7 +122,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
@@ -323,11 +323,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Create the directory
 		var command string
-		if framework.NodeOSDistroIs("windows") {
-			command = fmt.Sprintf("mkdir -p %v; New-Item -itemtype File -path %v", l.subPathDir, probeFilePath)
-		} else {
-			command = fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
-		}
+		command = fmt.Sprintf("mkdir -p %v; touch %v", l.subPathDir, probeFilePath)
 		setInitCommand(l.pod, command)
 		testPodContainerRestart(f, l.pod)
 	})
@@ -814,10 +810,12 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	ginkgo.By("Failing liveness probe")
 	hooks.FailLivenessProbe(pod, probeFilePath)
 
-	// Check that container has restarted
+	// Check that container has restarted. The time that this
+	// might take is estimated to be lower than for "delete pod"
+	// and "start pod".
 	ginkgo.By("Waiting for container to restart")
 	restarts := int32(0)
-	err = wait.PollImmediate(10*time.Second, framework.PodStartTimeout, func() (bool, error) {
+	err = wait.PollImmediate(10*time.Second, f.Timeouts.PodDelete+f.Timeouts.PodStart, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -840,11 +838,15 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	ginkgo.By("Fix liveness probe")
 	hooks.FixLivenessProbe(pod, probeFilePath)
 
-	// Wait for container restarts to stabilize
+	// Wait for container restarts to stabilize. Estimating the
+	// time for this is harder. In practice,
+	// framework.PodStartTimeout = f.Timeouts.PodStart = 5min
+	// turned out to be too low, therefore
+	// f.Timeouts.PodStartSlow = 15min is used now.
 	ginkgo.By("Waiting for container to stop restarting")
 	stableCount := int(0)
 	stableThreshold := int(time.Minute / framework.Poll)
-	err = wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	err = wait.PollImmediate(framework.Poll, f.Timeouts.PodStartSlow, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

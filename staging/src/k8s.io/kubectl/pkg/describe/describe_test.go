@@ -284,6 +284,10 @@ func TestDescribeConfigMap(t *testing.T) {
 			"key1": "value1",
 			"key2": "value2",
 		},
+		BinaryData: map[string][]byte{
+			"binarykey1": {0xFF, 0xFE, 0xFD, 0xFC, 0xFB},
+			"binarykey2": {0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA},
+		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ConfigMapDescriber{c}
@@ -291,7 +295,13 @@ func TestDescribeConfigMap(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "foo") || !strings.Contains(out, "mycm") || !strings.Contains(out, "key1") || !strings.Contains(out, "value1") || !strings.Contains(out, "key2") || !strings.Contains(out, "value2") {
+	if !strings.Contains(out, "foo") || !strings.Contains(out, "mycm") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "key1") || !strings.Contains(out, "value1") || !strings.Contains(out, "key2") || !strings.Contains(out, "value2") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "binarykey1") || !strings.Contains(out, "5 bytes") || !strings.Contains(out, "binarykey2") || !strings.Contains(out, "6 bytes") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -4056,7 +4066,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 				corev1.ResourceName(corev1.ResourceLimitsMemory):   resource.MustParse("0G"),
 				corev1.ResourceName(corev1.ResourceMemory):         resource.MustParse("0G"),
 				corev1.ResourceName(corev1.ResourceRequestsCPU):    resource.MustParse("0"),
-				corev1.ResourceName(corev1.ResourceRequestsMemory): resource.MustParse("0G"),
+				corev1.ResourceName(corev1.ResourceRequestsMemory): resource.MustParse("1000Ki"),
 			},
 		},
 	})
@@ -4066,7 +4076,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1G"}
+	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1024k", "1G"}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

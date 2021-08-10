@@ -264,6 +264,10 @@ func (g *GenericPLEG) relist() {
 		}
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
+
+		// Map from containerId to exit code; used as a temporary cache for lookup
+		containerExitCode := make(map[string]int)
+
 		for i := range events {
 			// Filter out events that are not reliable and no other components use yet.
 			if events[i].Type == ContainerChanged {
@@ -274,6 +278,24 @@ func (g *GenericPLEG) relist() {
 			default:
 				metrics.PLEGDiscardEvents.Inc()
 				klog.ErrorS(nil, "Event channel is full, discard this relist() cycle event")
+			}
+			// Log exit code of containers when they finished in a particular event
+			if events[i].Type == ContainerDied {
+				// Fill up containerExitCode map for ContainerDied event when first time appeared
+				if len(containerExitCode) == 0 && pod != nil && g.cache != nil {
+					// Get updated podStatus
+					status, err := g.cache.Get(pod.ID)
+					if err == nil {
+						for _, containerStatus := range status.ContainerStatuses {
+							containerExitCode[containerStatus.ID.ID] = containerStatus.ExitCode
+						}
+					}
+				}
+				if containerID, ok := events[i].Data.(string); ok {
+					if exitCode, ok := containerExitCode[containerID]; ok && pod != nil {
+						klog.V(2).InfoS("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
+					}
+				}
 			}
 		}
 	}

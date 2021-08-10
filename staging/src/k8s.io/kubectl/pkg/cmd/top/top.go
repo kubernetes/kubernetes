@@ -47,7 +47,7 @@ var (
 func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
-		Short: i18n.T("Display Resource (CPU/Memory) usage."),
+		Short: i18n.T("Display resource (CPU/memory) usage"),
 		Long:  topLong,
 		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}

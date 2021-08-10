@@ -102,8 +102,8 @@ func WithLateConnectionFilter(handler http.Handler) http.Handler {
 }
 
 // WithNonReadyRequestLogging rejects the request until the process has been ready once.
-func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadyCh <-chan struct{}) http.Handler {
-	if hasBeenReadyCh == nil {
+func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadySignal lifecycleSignal) http.Handler {
+	if hasBeenReadySignal == nil {
 		return handler
 	}
 
@@ -111,7 +111,7 @@ func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadyCh <-chan stru
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
-		case <-hasBeenReadyCh:
+		case <-hasBeenReadySignal.Signaled():
 			handler.ServeHTTP(w, r)
 			return
 		default:

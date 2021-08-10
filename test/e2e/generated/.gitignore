@@ -1,2 +1,0 @@
-# Ensure that bindata is not ignored to ensure openshift/origin can vendor it.
-!bindata.go

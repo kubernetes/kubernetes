@@ -316,7 +316,12 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		})
 	})
 
-	ginkgo.Describe("Default StorageClass", func() {
+	// testsuites/multivolume tests can now run with windows nodes
+	// This test is not compatible with windows because the default StorageClass
+	// doesn't have the ntfs parameter, we can't change the status of the cluster
+	// to add a StorageClass that's compatible with windows which is also the
+	// default StorageClass
+	ginkgo.Describe("Default StorageClass [LinuxOnly]", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func() {

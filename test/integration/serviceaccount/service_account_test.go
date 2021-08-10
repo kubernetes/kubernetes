@@ -16,7 +16,7 @@ limitations under the License.
 
 package serviceaccount
 
-// This file tests authentication and (soon) authorization of HTTP requests to a master object.
+// This file tests authentication and (soon) authorization of HTTP requests to an API server object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
 // to work for any client of the HTTP interface.
 
@@ -31,7 +31,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -211,70 +210,30 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
-	// Get default token
-	defaultTokenName, _, err := getReferencedServiceAccountToken(c, ns, serviceaccountadmission.DefaultServiceAccountName, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Pod to create
 	protoPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "protopod"},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "container-1",
-					Image: "container-1-image",
-				},
-				{
-					Name:  "container-2",
-					Image: "container-2-image",
-					VolumeMounts: []v1.VolumeMount{
-						{Name: "empty-dir", MountPath: serviceaccountadmission.DefaultAPITokenMountPath},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name:         "empty-dir",
-					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					Name:  "container",
+					Image: "container-image",
 				},
 			},
 		},
 	}
-
-	// Pod we expect to get created
-	defaultMode := int32(0644)
-	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
-	expectedVolumes := append(protoPod.Spec.Volumes, v1.Volume{
-		Name: defaultTokenName,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  defaultTokenName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
-	expectedContainer1VolumeMounts := []v1.VolumeMount{
-		{Name: defaultTokenName, MountPath: serviceaccountadmission.DefaultAPITokenMountPath, ReadOnly: true},
-	}
-	expectedContainer2VolumeMounts := protoPod.Spec.Containers[1].VolumeMounts
 
 	createdPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), &protoPod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
 	if createdPod.Spec.ServiceAccountName != expectedServiceAccount {
 		t.Fatalf("Expected %s, got %s", expectedServiceAccount, createdPod.Spec.ServiceAccountName)
 	}
-	if !apiequality.Semantic.DeepEqual(&expectedVolumes, &createdPod.Spec.Volumes) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedVolumes, createdPod.Spec.Volumes)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer1VolumeMounts, &createdPod.Spec.Containers[0].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer1VolumeMounts, createdPod.Spec.Containers[0].VolumeMounts)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer2VolumeMounts, &createdPod.Spec.Containers[1].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer2VolumeMounts, createdPod.Spec.Containers[1].VolumeMounts)
+	if len(createdPod.Spec.Volumes) == 0 || createdPod.Spec.Volumes[0].Projected == nil {
+		t.Fatal("Expected projected volume for service account token inserted")
 	}
 }
 
@@ -363,7 +322,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
 	// Listener
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -395,7 +354,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		externalInformers.Core().V1().ServiceAccounts().Lister(),
 		externalInformers.Core().V1().Pods().Lister(),
 	)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),
@@ -405,7 +364,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 1. The "root" user is allowed to do anything
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 		username := ""
 		if user := attrs.GetUser(); user != nil {
 			username = user.GetName()
@@ -441,12 +400,12 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
 	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
 
-	masterConfig := framework.NewMasterConfig()
-	masterConfig.GenericConfig.EnableIndex = true
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
-	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
+	controlPlaneConfig := framework.NewControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.EnableIndex = true
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizer
+	controlPlaneConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
+	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

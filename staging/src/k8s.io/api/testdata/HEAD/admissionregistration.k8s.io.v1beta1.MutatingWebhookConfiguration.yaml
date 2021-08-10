@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -31,18 +32,18 @@ metadata:
   uid: "7"
 webhooks:
 - admissionReviewVersions:
-  - "39"
+  - "40"
   clientConfig:
     caBundle: IQ==
     service:
-      name: "22"
-      namespace: "21"
-      path: "23"
+      name: "23"
+      namespace: "22"
+      path: "24"
       port: -1971381490
-    url: "20"
+    url: "21"
   failurePolicy: VŚ(ĿȊ甞谐颋
   matchPolicy: SǡƏ
-  name: "19"
+  name: "20"
   namespaceSelector:
     matchExpressions:
     - key: 2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--n1-5
@@ -60,13 +61,13 @@ webhooks:
   reinvocationPolicy: 錯ƶ
   rules:
   - apiGroups:
-    - "24"
-    apiVersions:
     - "25"
+    apiVersions:
+    - "26"
     operations:
     - 8衍`Ĩɘ.蘯
     resources:
-    - "26"
+    - "27"
     scope: 昍řČ扷5ƗǸƢ6/
   sideEffects: Ɵ)Ù
   timeoutSeconds: 1132918207

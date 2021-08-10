@@ -41,8 +41,6 @@ const (
 	DockerConfigURLKey = metadataAttributes + "google-dockercfg-url"
 	serviceAccounts    = metadataURL + "instance/service-accounts/"
 	metadataScopes     = metadataURL + "instance/service-accounts/default/scopes"
-	metadataToken      = metadataURL + "instance/service-accounts/default/token"
-	metadataEmail      = metadataURL + "instance/service-accounts/default/email"
 	// StorageScopePrefix is the prefix checked by ContainerRegistryProvider.Enabled.
 	StorageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"

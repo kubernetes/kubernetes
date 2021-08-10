@@ -24,12 +24,16 @@ import (
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/klog/v2"
 )
 
 type requestFilterRecordKeyType int
 
 // requestFilterRecordKey is the context key for a request filter record struct.
 const requestFilterRecordKey requestFilterRecordKeyType = iota
+
+const minFilterLatencyToLog = 100 * time.Millisecond
 
 type requestFilterRecord struct {
 	name             string
@@ -57,7 +61,11 @@ func TrackStarted(handler http.Handler, name string) http.Handler {
 // it updates the corresponding metric with the filter latency duration.
 func TrackCompleted(handler http.Handler) http.Handler {
 	return trackCompleted(handler, utilclock.RealClock{}, func(ctx context.Context, fr *requestFilterRecord, completedAt time.Time) {
-		metrics.RecordFilterLatency(ctx, fr.name, completedAt.Sub(fr.startedTimestamp))
+		latency := completedAt.Sub(fr.startedTimestamp)
+		metrics.RecordFilterLatency(ctx, fr.name, latency)
+		if klog.V(3).Enabled() && latency > minFilterLatencyToLog {
+			httplog.AddInfof(ctx, "%s=%s", fr.name, latency.String())
+		}
 	})
 }
 

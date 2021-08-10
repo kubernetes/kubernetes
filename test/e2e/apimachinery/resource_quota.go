@@ -36,14 +36,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
 
 const (
 	// how long to wait for a resource quota update to occur
-	resourceQuotaTimeout = 30 * time.Second
+	resourceQuotaTimeout = time.Minute
 	podName              = "pfpod"
 )
 
@@ -111,7 +110,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Not allowing a LoadBalancer Service with NodePort to be created that exceeds remaining quota")
-		loadbalancer := newTestServiceForQuota("test-service-lb", v1.ServiceTypeLoadBalancer, false)
+		loadbalancer := newTestServiceForQuota("test-service-lb", v1.ServiceTypeLoadBalancer, true)
 		_, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), loadbalancer, metav1.CreateOptions{})
 		framework.ExpectError(err)
 
@@ -1419,7 +1418,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 })
 
-var _ = SIGDescribe("ResourceQuota [Feature:CrossNamespacePodAffinity] [alpha]", func() {
+var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
 	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func() {
 		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")
@@ -1737,6 +1736,12 @@ func newTestReplicaSetForQuota(name, image string, replicas int32) *appsv1.Repli
 
 // newTestServiceForQuota returns a simple service
 func newTestServiceForQuota(name string, serviceType v1.ServiceType, allocateLoadBalancerNodePorts bool) *v1.Service {
+	var allocateNPs *bool
+	// Only set allocateLoadBalancerNodePorts when service type is LB
+	if serviceType == v1.ServiceTypeLoadBalancer {
+		allocateNPs = &allocateLoadBalancerNodePorts
+	}
+
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -1747,7 +1752,7 @@ func newTestServiceForQuota(name string, serviceType v1.ServiceType, allocateLoa
 				Port:       80,
 				TargetPort: intstr.FromInt(80),
 			}},
-			AllocateLoadBalancerNodePorts: pointer.BoolPtr(allocateLoadBalancerNodePorts),
+			AllocateLoadBalancerNodePorts: allocateNPs,
 		},
 	}
 }
@@ -1830,7 +1835,7 @@ func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.R
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
 // for the specific resource name.
 func updateResourceQuotaUntilUsageAppears(c clientset.Interface, ns, quotaName string, resourceName v1.ResourceName) error {
-	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
+	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

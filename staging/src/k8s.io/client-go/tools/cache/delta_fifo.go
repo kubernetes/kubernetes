@@ -153,7 +153,7 @@ const (
 // change happened, and the object's state after* that change.
 //
 // [*] Unless the change is a deletion, and then you'll get the final
-//     state of the object before it was deleted.
+// state of the object before it was deleted.
 type Delta struct {
 	Type   DeltaType
 	Object interface{}
@@ -174,9 +174,10 @@ type Deltas []Delta
 // modifications.
 //
 // TODO: consider merging keyLister with this object, tracking a list of
-//       "known" keys when Pop() is called. Have to think about how that
-//       affects error retrying.
-// NOTE: It is possible to misuse this and cause a race when using an
+// "known" keys when Pop() is called. Have to think about how that
+// affects error retrying.
+//
+//       NOTE: It is possible to misuse this and cause a race when using an
 //       external known object source.
 //       Whether there is a potential race depends on how the consumer
 //       modifies knownObjects. In Pop(), process function is called under
@@ -185,8 +186,7 @@ type Deltas []Delta
 //
 //       Example:
 //       In case of sharedIndexInformer being a consumer
-//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
-//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
 //       there is no race as knownObjects (s.indexer) is modified safely
 //       under DeltaFIFO's lock. The only exceptions are GetStore() and
 //       GetIndexer() methods, which expose ways to modify the underlying
@@ -340,7 +340,7 @@ func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
 	}
-	id, err := f.KeyOf(deltas.Newest().Object)
+	id, err := f.KeyOf(deltas)
 	if err != nil {
 		return KeyError{obj, err}
 	}
@@ -373,13 +373,8 @@ func dedupDeltas(deltas Deltas) Deltas {
 	a := &deltas[n-1]
 	b := &deltas[n-2]
 	if out := isDup(a, b); out != nil {
-		// `a` and `b` are duplicates. Only keep the one returned from isDup().
-		// TODO: This extra array allocation and copy seems unnecessary if
-		// all we do to dedup is compare the new delta with the last element
-		// in `items`, which could be done by mutating `items` directly.
-		// Might be worth profiling and investigating if it is safe to optimize.
-		d := append(Deltas{}, deltas[:n-2]...)
-		return append(d, *out)
+		deltas[n-2] = *out
+		return deltas[:n-1]
 	}
 	return deltas
 }

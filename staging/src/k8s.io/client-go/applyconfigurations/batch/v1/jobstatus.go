@@ -25,13 +25,14 @@ import (
 // JobStatusApplyConfiguration represents an declarative configuration of the JobStatus type for use
 // with apply.
 type JobStatusApplyConfiguration struct {
-	Conditions       []JobConditionApplyConfiguration `json:"conditions,omitempty"`
-	StartTime        *metav1.Time                     `json:"startTime,omitempty"`
-	CompletionTime   *metav1.Time                     `json:"completionTime,omitempty"`
-	Active           *int32                           `json:"active,omitempty"`
-	Succeeded        *int32                           `json:"succeeded,omitempty"`
-	Failed           *int32                           `json:"failed,omitempty"`
-	CompletedIndexes *string                          `json:"completedIndexes,omitempty"`
+	Conditions              []JobConditionApplyConfiguration           `json:"conditions,omitempty"`
+	StartTime               *metav1.Time                               `json:"startTime,omitempty"`
+	CompletionTime          *metav1.Time                               `json:"completionTime,omitempty"`
+	Active                  *int32                                     `json:"active,omitempty"`
+	Succeeded               *int32                                     `json:"succeeded,omitempty"`
+	Failed                  *int32                                     `json:"failed,omitempty"`
+	CompletedIndexes        *string                                    `json:"completedIndexes,omitempty"`
+	UncountedTerminatedPods *UncountedTerminatedPodsApplyConfiguration `json:"uncountedTerminatedPods,omitempty"`
 }
 
 // JobStatusApplyConfiguration constructs an declarative configuration of the JobStatus type for use with
@@ -98,5 +99,13 @@ func (b *JobStatusApplyConfiguration) WithFailed(value int32) *JobStatusApplyCon
 // If called multiple times, the CompletedIndexes field is set to the value of the last call.
 func (b *JobStatusApplyConfiguration) WithCompletedIndexes(value string) *JobStatusApplyConfiguration {
 	b.CompletedIndexes = &value
+	return b
+}
+
+// WithUncountedTerminatedPods sets the UncountedTerminatedPods field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UncountedTerminatedPods field is set to the value of the last call.
+func (b *JobStatusApplyConfiguration) WithUncountedTerminatedPods(value *UncountedTerminatedPodsApplyConfiguration) *JobStatusApplyConfiguration {
+	b.UncountedTerminatedPods = value
 	return b
 }

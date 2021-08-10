@@ -45,6 +45,8 @@ run_job_tests() {
   kube::test::get_object_assert 'cronjob/pi --namespace=test-jobs' "{{$id_field}}" 'pi'
   kubectl get cronjob/pi --namespace=test-jobs
   kubectl describe cronjob/pi --namespace=test-jobs
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert cronjobs events "--namespace=test-jobs"
 
   ### Create a job in dry-run mode
   output_message=$(kubectl create job test-job --from=cronjob/pi --dry-run=true --namespace=test-jobs -o name)
@@ -65,6 +67,8 @@ run_job_tests() {
   kube::test::get_object_assert 'job/test-job --namespace=test-jobs' "{{$id_field}}" 'test-job'
   kubectl get job/test-job --namespace=test-jobs
   kubectl describe job/test-job --namespace=test-jobs
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert jobs events "--namespace=test-jobs"
   #Clean up
   kubectl delete job test-job --namespace=test-jobs
   kubectl delete cronjob pi --namespace=test-jobs

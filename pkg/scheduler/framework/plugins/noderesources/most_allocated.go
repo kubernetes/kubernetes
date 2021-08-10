@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // MostAllocated is a score plugin that favors nodes with high allocation based on requested resources.
@@ -36,7 +38,7 @@ type MostAllocated struct {
 var _ = framework.ScorePlugin(&MostAllocated{})
 
 // MostAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const MostAllocatedName = "NodeResourcesMostAllocated"
+const MostAllocatedName = names.NodeResourcesMostAllocated
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ma *MostAllocated) Name() string {
@@ -63,13 +65,12 @@ func (ma *MostAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewMostAllocated initializes a new plugin and returns it.
-func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := maArgs.(*config.NodeResourcesMostAllocatedArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesMostAllocatedArgs, got %T", args)
 	}
-
-	if err := validation.ValidateNodeResourcesMostAllocatedArgs(args); err != nil {
+	if err := validation.ValidateNodeResourcesMostAllocatedArgs(nil, args); err != nil {
 		return nil, err
 	}
 
@@ -84,19 +85,24 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plug
 			Name:                MostAllocatedName,
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
-func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
+	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
-		for resource, weight := range resToWeightMap {
+		for resource := range requested {
+			weight := resToWeightMap[resource]
 			resourceScore := mostRequestedScore(requested[resource], allocable[resource])
 			nodeScore += resourceScore * weight
 			weightSum += weight
 		}
-		return (nodeScore / weightSum)
+		if weightSum == 0 {
+			return 0
+		}
+		return nodeScore / weightSum
 	}
 }
 
@@ -110,7 +116,9 @@ func mostRequestedScore(requested, capacity int64) int64 {
 		return 0
 	}
 	if requested > capacity {
-		return 0
+		// `requested` might be greater than `capacity` because pods with no
+		// requests get minimum values.
+		requested = capacity
 	}
 
 	return (requested * framework.MaxNodeScore) / capacity

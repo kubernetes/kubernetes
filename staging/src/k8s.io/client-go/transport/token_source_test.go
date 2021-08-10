@@ -140,16 +140,23 @@ func TestCachingTokenSourceRace(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(100)
+		errc := make(chan error, 100)
 
 		for i := 0; i < 100; i++ {
 			go func() {
 				defer wg.Done()
 				if _, err := ts.Token(); err != nil {
-					t.Fatalf("err: %v", err)
+					errc <- err
 				}
 			}()
 		}
-		wg.Wait()
+		go func() {
+			wg.Wait()
+			close(errc)
+		}()
+		if err, ok := <-errc; ok {
+			t.Fatalf("err: %v", err)
+		}
 		if tts.calls != 1 {
 			t.Errorf("expected one call to Token() but saw: %d", tts.calls)
 		}

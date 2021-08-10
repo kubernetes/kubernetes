@@ -392,6 +392,16 @@ func TestQuantityParse(t *testing.T) {
 				got.AsDec()
 			}
 
+			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
+				// ensure we are not simply checking pointer equality by creating a new inf.Dec
+				var copied inf.Dec
+				copied.Add(inf.NewDec(0, inf.Scale(0)), got.AsDec())
+				q := NewDecimalQuantity(copied, format)
+				if c := q.Cmp(got); c != 0 {
+					t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
+				}
+			}
+
 			// verify that we can decompose the input and get the same result by building up from the base.
 			positive, _, num, denom, suffix, err := parseQuantityString(item.input)
 			if err != nil {

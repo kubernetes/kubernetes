@@ -200,3 +200,5 @@ coverage.txt
 
 #vendor
 vendor/
+
+.envrc

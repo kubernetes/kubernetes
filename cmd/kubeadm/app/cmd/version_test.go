@@ -19,9 +19,11 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"sigs.k8s.io/yaml"
 	"testing"
+
+	"sigs.k8s.io/yaml"
+
+	"github.com/pkg/errors"
 )
 
 func TestNewCmdVersion(t *testing.T) {

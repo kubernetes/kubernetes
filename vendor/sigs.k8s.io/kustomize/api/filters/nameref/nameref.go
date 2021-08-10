@@ -6,11 +6,11 @@ import (
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/fieldspec"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -184,7 +184,7 @@ func (f Filter) recordTheReferral(referral *resource.Resource) {
 
 // getRoleRefGvk returns a Gvk in the roleRef field. Return error
 // if the roleRef, roleRef/apiGroup or roleRef/kind is missing.
-func getRoleRefGvk(n *yaml.RNode) (*resid.Gvk, error) {
+func getRoleRefGvk(n *resource.Resource) (*resid.Gvk, error) {
 	roleRef, err := n.Pipe(yaml.Lookup("roleRef"))
 	if err != nil {
 		return nil, err
@@ -257,8 +257,7 @@ func previousIdSelectedByGvk(gvk *resid.Gvk) sieveFunc {
 
 // If the we are updating a 'roleRef/name' field, the 'apiGroup' and 'kind'
 // fields in the same 'roleRef' map must be considered.
-// If either object is cluster-scoped (!IsNamespaceableKind), there
-// can be a referral.
+// If either object is cluster-scoped, there can be a referral.
 // E.g. a RoleBinding (which exists in a namespace) can refer
 // to a ClusterRole (cluster-scoped) object.
 // https://kubernetes.io/docs/reference/access-authn-authz/rbac/#role-and-clusterrole
@@ -270,7 +269,7 @@ func (f Filter) roleRefFilter() sieveFunc {
 	if !strings.HasSuffix(f.NameFieldToUpdate.Path, "roleRef/name") {
 		return acceptAll
 	}
-	roleRefGvk, err := getRoleRefGvk(f.Referrer.AsRNode())
+	roleRefGvk, err := getRoleRefGvk(f.Referrer)
 	if err != nil {
 		return acceptAll
 	}
@@ -285,12 +284,12 @@ func prefixSuffixEquals(other resource.ResCtx) sieveFunc {
 
 func (f Filter) sameCurrentNamespaceAsReferrer() sieveFunc {
 	referrerCurId := f.Referrer.CurId()
-	if !referrerCurId.IsNamespaceableKind() {
+	if referrerCurId.IsClusterScoped() {
 		// If the referrer is cluster-scoped, let anything through.
 		return acceptAll
 	}
 	return func(r *resource.Resource) bool {
-		if !r.CurId().IsNamespaceableKind() {
+		if r.CurId().IsClusterScoped() {
 			// Allow cluster-scoped through.
 			return true
 		}

@@ -19,16 +19,17 @@ package discovery
 import (
 	"net/url"
 
-	"github.com/pkg/errors"
-
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 // TokenUser defines token user
@@ -53,7 +54,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 		return kubeconfigutil.CreateWithToken(
 			clusterinfo.Server,
-			kubeadmapiv1beta2.DefaultClusterName,
+			kubeadmapiv1.DefaultClusterName,
 			TokenUser,
 			clusterinfo.CertificateAuthorityData,
 			cfg.Discovery.TLSBootstrapToken,
@@ -75,9 +76,9 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(&cfg.Discovery)
 	default:

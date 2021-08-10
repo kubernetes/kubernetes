@@ -26,3 +26,7 @@ _testmain.go
 *.pprof
 *.out
 *.log
+
+/bin
+cover.out
+cover.html

@@ -318,7 +318,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
-		if !util.AccessModesContains(m, v1.ReadWriteOnce) {
+		if !util.ContainsAccessMode(m, v1.ReadWriteOnce) {
 			t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 		}
 	}
@@ -327,7 +327,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	if len(possibleModes) != 1 {
 		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
 	}
-	if !util.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
+	if !util.ContainsAccessMode(possibleModes[0], v1.ReadWriteMany) {
 		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
 
@@ -1504,7 +1504,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			}),
 			node: node3,
 		},
-		"fail-nonavaiable": {
+		"fail-nonavaliable": {
 			expectedMatch: "",
 			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}

@@ -35,7 +35,6 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
-  "verify-golangci-lint.sh"      # Experimental - intended to be run by hand periodically
   )
 
 # Exclude generated-files-remake in certain cases, if they're running in a separate job.
@@ -67,6 +66,7 @@ EXCLUDED_PATTERNS+=(
   "verify-external-dependencies-version.sh" # TODO(soltysh) I don't expect us needing this
   "verify-generated-files-remake.sh"        # TODO(marun) Is it worth fixing this check?
   "verify-generated-protobuf.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-golangci-lint.sh"                 # TODO(soltysh) Need golangci-lint
   "verify-golint.sh"                        # TODO(marun) Cleanup carried code
   "verify-hack-tools.sh"                    # TODO(marun) Fix inconsistent behavior between local and ci execution
   "verify-internal-modules.sh"              # TODO(soltysh) Currently fails on our ginkgo dependency

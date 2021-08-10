@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -112,6 +113,15 @@ func (ps *pdbStates) VerifyDisruptionAllowed(t *testing.T, key string, disruptio
 	if pdb.Status.DisruptionsAllowed != disruptionsAllowed {
 		debug.PrintStack()
 		t.Fatalf("PodDisruptionAllowed mismatch for PDB %q.  Expected %v but got %v.", key, disruptionsAllowed, pdb.Status.DisruptionsAllowed)
+	}
+}
+
+func (ps *pdbStates) VerifyNoStatusError(t *testing.T, key string) {
+	pdb := ps.Get(key)
+	for _, condition := range pdb.Status.Conditions {
+		if strings.Contains(condition.Message, "found no controller ref") && condition.Reason == policy.SyncFailedReason {
+			t.Fatalf("PodDisruption Controller should not error when unmanaged pods are found but it failed for %q", key)
+		}
 	}
 }
 
@@ -534,6 +544,47 @@ func TestNakedPod(t *testing.T) {
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
 }
 
+// Verify that disruption controller is not erroring when unmanaged pods are found
+func TestStatusForUnmanagedPod(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
+	add(t, dc.pdbStore, pdb)
+	dc.sync(pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "unmanaged")
+	add(t, dc.podStore, pod)
+	dc.sync(pdbName)
+
+	ps.VerifyNoStatusError(t, pdbName)
+
+}
+
+// Check if the unmanaged pods are correctly collected or not
+func TestTotalUnmanagedPods(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
+	add(t, dc.pdbStore, pdb)
+	dc.sync(pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "unmanaged")
+	add(t, dc.podStore, pod)
+	dc.sync(pdbName)
+	var pods []*v1.Pod
+	pods = append(pods, pod)
+	_, unmanagedPods, _ := dc.getExpectedScale(pdb, pods)
+	if len(unmanagedPods) != 1 {
+		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
+	}
+	ps.VerifyNoStatusError(t, pdbName)
+
+}
+
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
 func TestReplicaSet(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
@@ -752,7 +803,7 @@ func TestReplicationController(t *testing.T) {
 	rogue, _ := newPod(t, "rogue")
 	add(t, dc.podStore, rogue)
 	dc.sync(pdbName)
-	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	ps.VerifyDisruptionAllowed(t, pdbName, 2)
 }
 
 func TestStatefulSetController(t *testing.T) {

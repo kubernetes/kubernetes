@@ -81,6 +81,8 @@ const (
 	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
 	FailWithInUseVolumeName = "fail-expansion-in-use"
 
+	FailVolumeExpansion = "fail-expansion-test"
+
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
 	deviceMounted        = "deviceMounted"
@@ -380,9 +382,9 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	detacher := plugin.getFakeVolume(&plugin.Detachers)
 	attacherList := plugin.Attachers
-	if attacherList != nil && len(attacherList) > 0 {
+	if len(attacherList) > 0 {
 		detacherList := plugin.Detachers
-		if detacherList != nil && len(detacherList) > 0 {
+		if len(detacherList) > 0 {
 			detacherList[0].VolumesAttached = attacherList[0].VolumesAttached
 		}
 
@@ -466,6 +468,14 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
+	}
+	// Set up fakeVolumePlugin not support STAGE_UNSTAGE for testing the behavior
+	// so as volume can be node published before we can resize
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
+		return false, nil
+	}
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumePublished && resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
+		return false, fmt.Errorf("fail volume expansion for volume: %s", FailVolumeExpansion)
 	}
 	return true, nil
 }
@@ -959,7 +969,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 		// even if volume was previously attached to time out, we need to keep returning error
 		// so as reconciler can not confirm this volume as attached.
 		if nodeName == TimeoutAttachNode {
-			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+			return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 		}
 		if volumeNodes.Has(string(nodeName)) || volumeNodes.Has(MultiAttachNode) || nodeName == MultiAttachNode {
 			volumeNodes.Insert(string(nodeName))
@@ -970,7 +980,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 
 	fv.VolumesAttached[volumeName] = sets.NewString(string(nodeName))
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
-		return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+		return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 	}
 	return "/dev/vdb-test", nil
 }
@@ -1046,7 +1056,7 @@ func (fv *FakeVolume) mountDeviceInternal(spec *Spec, devicePath string, deviceM
 	return nil
 }
 
-func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string) error {
+func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	return fv.mountDeviceInternal(spec, devicePath, deviceMountPath)
 }
 
@@ -1070,7 +1080,7 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	node := string(nodeName)
 	volumeNodes, exist := fv.VolumesAttached[volumeName]
 	if !exist || !volumeNodes.Has(node) {
-		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, node)
+		return fmt.Errorf("trying to detach volume %q that is not attached to the node %q", volumeName, node)
 	}
 
 	volumeNodes.Delete(node)

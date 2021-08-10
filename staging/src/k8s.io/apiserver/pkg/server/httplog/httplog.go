@@ -23,8 +23,10 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
@@ -52,7 +54,7 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      string
+	addedInfo      strings.Builder
 	startTime      time.Time
 	isTerminating  bool
 
@@ -66,6 +68,9 @@ type respLogger struct {
 
 // Simple logger that logs immediately when Addf is called
 type passthroughLogger struct{}
+
+//lint:ignore SA1019 Interface implementation check to make sure we don't drop CloseNotifier again
+var _ http.CloseNotifier = &respLogger{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
@@ -81,37 +86,39 @@ func DefaultStacktracePred(status int) bool {
 func WithLogging(handler http.Handler, pred StacktracePred, isTerminatingFn func() bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		if old := respLoggerFromContext(req); old != nil {
+		if old := respLoggerFromRequest(req); old != nil {
 			panic("multiple WithLogging calls!")
 		}
-		isTerminating := false
-		if isTerminatingFn != nil {
-			isTerminating = isTerminatingFn()
-		}
-
 		startTime := time.Now()
 		if receivedTimestamp, ok := request.ReceivedTimestampFrom(ctx); ok {
 			startTime = receivedTimestamp
 		}
 
+		isTerminating := false
+		if isTerminatingFn != nil {
+			isTerminating = isTerminatingFn()
+		}
 		rl := newLoggedWithStartTime(req, w, startTime).StacktraceWhen(pred).IsTerminating(isTerminating)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
 		if klog.V(3).Enabled() || (rl.isTerminating && klog.V(1).Enabled()) {
-			defer func() { klog.InfoS("HTTP", rl.LogArgs()...) }()
+			defer rl.Log()
 		}
 		handler.ServeHTTP(rl, req)
 	})
 }
 
 // respLoggerFromContext returns the respLogger or nil.
-func respLoggerFromContext(req *http.Request) *respLogger {
-	ctx := req.Context()
+func respLoggerFromContext(ctx context.Context) *respLogger {
 	val := ctx.Value(respLoggerContextKey)
 	if rl, ok := val.(*respLogger); ok {
 		return rl
 	}
 	return nil
+}
+
+func respLoggerFromRequest(req *http.Request) *respLogger {
+	return respLoggerFromContext(req.Context())
 }
 
 func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
@@ -132,7 +139,7 @@ func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if rl := respLoggerFromContext(req); rl != nil {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl
 	}
 	return &passthroughLogger{}
@@ -140,7 +147,7 @@ func LogOf(req *http.Request, w http.ResponseWriter) logger {
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
 func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
-	if rl := respLoggerFromContext(req); rl != nil {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl.w
 	}
 	return w
@@ -148,7 +155,10 @@ func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
 
 // DisableStackTraceForRequest stops putting a stacktrace into the log.
 func DisableStackTraceForRequest(req *http.Request) {
-	rl := respLoggerFromContext(req)
+	if req == nil {
+		return
+	}
+	rl := respLoggerFromContext(req.Context())
 	if rl == nil {
 		return
 	}
@@ -183,40 +193,54 @@ func StatusIsNot(statuses ...int) StacktracePred {
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
-	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
+	rl.addedInfo.WriteString("\n")
+	rl.addedInfo.WriteString(fmt.Sprintf(format, data...))
 }
 
-func (rl *respLogger) LogArgs() []interface{} {
+func AddInfof(ctx context.Context, format string, data ...interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.Addf(format, data...)
+	}
+}
+
+// Log is intended to be called once at the end of your request handler, via defer
+func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	auditID := request.GetAuditIDTruncated(rl.req)
-	if rl.hijacked {
-		return []interface{}{
-			"verb", rl.req.Method,
-			"URI", rl.req.RequestURI,
-			"latency", latency,
-			"userAgent", rl.req.UserAgent(),
-			"audit-ID", auditID,
-			"srcIP", rl.req.RemoteAddr,
-			"hijacked", true,
-		}
+
+	verb := rl.req.Method
+	if requestInfo, ok := request.RequestInfoFrom(rl.req.Context()); ok {
+		// If we can find a requestInfo, we can get a scope, and then
+		// we can convert GETs to LISTs when needed.
+		scope := metrics.CleanScope(requestInfo)
+		verb = metrics.CanonicalVerb(strings.ToUpper(verb), scope)
 	}
-	args := []interface{}{
-		"verb", rl.req.Method,
+	// mark APPLY requests and WATCH requests correctly.
+	verb = metrics.CleanVerb(verb, rl.req)
+
+	keysAndValues := []interface{}{
+		"verb", verb,
 		"URI", rl.req.RequestURI,
 		"latency", latency,
 		"userAgent", rl.req.UserAgent(),
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
-		"resp", rl.status,
-	}
-	if len(rl.statusStack) > 0 {
-		args = append(args, "statusStack", rl.statusStack)
 	}
 
-	if len(rl.addedInfo) > 0 {
-		args = append(args, "addedInfo", rl.addedInfo)
+	if rl.hijacked {
+		keysAndValues = append(keysAndValues, "hijacked", true)
+	} else {
+		keysAndValues = append(keysAndValues, "resp", rl.status)
+		if len(rl.statusStack) > 0 {
+			keysAndValues = append(keysAndValues, "statusStack", rl.statusStack)
+		}
+		info := rl.addedInfo.String()
+		if len(info) > 0 {
+			keysAndValues = append(keysAndValues, "addedInfo", info)
+		}
 	}
-	return args
+
+	klog.InfoSDepth(1, "HTTP", keysAndValues...)
 }
 
 // Header implements http.ResponseWriter.
@@ -259,6 +283,7 @@ func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 // CloseNotify implements http.CloseNotifier
 func (rl *respLogger) CloseNotify() <-chan bool {
+	//lint:ignore SA1019 There are places in the code base requiring the CloseNotifier interface to be implemented.
 	return rl.w.(http.CloseNotifier).CloseNotify()
 }
 

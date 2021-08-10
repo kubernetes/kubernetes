@@ -21,4 +21,7 @@ package feature
 // the internal k8s features pkg.
 type Features struct {
 	EnablePodAffinityNamespaceSelector bool
+	EnablePodDisruptionBudget          bool
+	EnablePodOverhead                  bool
+	EnableReadWriteOncePod             bool
 }

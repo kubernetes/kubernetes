@@ -48,8 +48,8 @@ func (csiNodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiNode := obj.(*storage.CSINode)
 
-	// in 1.21, on create, set AllowLongNodeID=false
-	// in 1.22, on create, set AllowLongNodeID=true
+	// in 1.22, on create, set AllowLongNodeID=false
+	// in 1.23, on create, set AllowLongNodeID=true
 	validateOptions := validation.CSINodeValidationOptions{
 		AllowLongNodeID: false,
 	}
@@ -58,6 +58,9 @@ func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 
 	return errs
 }
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiNodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 // Canonicalize normalizes the object after validation.
 func (csiNodeStrategy) Canonicalize(obj runtime.Object) {
@@ -74,8 +77,8 @@ func (csiNodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSINodeObj := obj.(*storage.CSINode)
 	oldCSINodeObj := old.(*storage.CSINode)
-	// in 1.21 on update, set AllowLongNodeID to true only if the old object already has a long node ID
-	// in 1.22 on update, set AllowLongNodeID=true
+	// in 1.22 on update, set AllowLongNodeID to true only if the old object already has a long node ID
+	// in 1.23 on update, set AllowLongNodeID=true
 	allowLongNodeID := false
 	for _, nodeDriver := range oldCSINodeObj.Spec.Drivers {
 		if validation.CSINodeLongerID(nodeDriver.NodeID) {
@@ -88,6 +91,11 @@ func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 	errorList := validation.ValidateCSINode(newCSINodeObj, validateOptions)
 	return append(errorList, validation.ValidateCSINodeUpdate(newCSINodeObj, oldCSINodeObj, validateOptions)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiNodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiNodeStrategy) AllowUnconditionalUpdate() bool {

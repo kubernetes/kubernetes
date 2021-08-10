@@ -9,6 +9,9 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type OsinServerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -112,6 +115,10 @@ type IdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BasicAuthPasswordIdentityProvider provides identities for users authenticating using HTTP basic auth credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type BasicAuthPasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -122,6 +129,10 @@ type BasicAuthPasswordIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AllowAllPasswordIdentityProvider provides identities for users authenticating using non-empty passwords
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type AllowAllPasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 }
@@ -129,6 +140,10 @@ type AllowAllPasswordIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DenyAllPasswordIdentityProvider provides no identities for users
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type DenyAllPasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 }
@@ -136,6 +151,10 @@ type DenyAllPasswordIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HTPasswdPasswordIdentityProvider provides identities for users authenticating using htpasswd credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type HTPasswdPasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -146,6 +165,10 @@ type HTPasswdPasswordIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LDAPPasswordIdentityProvider provides identities for users authenticating using LDAP credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type LDAPPasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 	// url is an RFC 2255 URL which specifies the LDAP search parameters to use. The syntax of the URL is
@@ -187,6 +210,10 @@ type LDAPAttributeMapping struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KeystonePasswordIdentityProvider provides identities for users authenticating using keystone password credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type KeystonePasswordIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 	// RemoteConnectionInfo contains information about how to connect to the keystone server
@@ -200,6 +227,10 @@ type KeystonePasswordIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RequestHeaderIdentityProvider provides identities for users authenticating using request header credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type RequestHeaderIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -237,6 +268,10 @@ type RequestHeaderIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GitHubIdentityProvider provides identities for users authenticating using GitHub credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type GitHubIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -259,6 +294,10 @@ type GitHubIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GitLabIdentityProvider provides identities for users authenticating using GitLab credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type GitLabIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -284,6 +323,10 @@ type GitLabIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GoogleIdentityProvider provides identities for users authenticating using Google credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type GoogleIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -299,6 +342,10 @@ type GoogleIdentityProvider struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // OpenIDIdentityProvider provides identities for users authenticating using OpenID credentials
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type OpenIDIdentityProvider struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -416,6 +463,10 @@ type TokenConfig struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SessionSecrets list the secrets to use to sign/encrypt and authenticate/decrypt created sessions.
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type SessionSecrets struct {
 	metav1.TypeMeta `json:",inline"`
 

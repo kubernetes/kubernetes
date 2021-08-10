@@ -22,8 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-openapi/spec"
-
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
@@ -60,7 +59,7 @@ func output() error {
 	if err != nil {
 		return fmt.Errorf("error serializing api definitions: %w", err)
 	}
-	_, err = os.Stdout.Write(data)
+	os.Stdout.Write(data)
 	return nil
 }
 

@@ -23,6 +23,7 @@ import (
 )
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
+// +structType=atomic
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`

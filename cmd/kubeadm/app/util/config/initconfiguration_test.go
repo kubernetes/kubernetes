@@ -23,10 +23,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -45,23 +46,6 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 		expectErr    bool
 	}{
 		{
-			name:         "v1beta1.partial1",
-			fileContents: cfgFiles["InitConfiguration_v1beta1"],
-		},
-		{
-			name:         "v1beta1.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1beta1"],
-		},
-		{
-			name: "v1beta1.full",
-			fileContents: bytes.Join([][]byte{
-				cfgFiles["InitConfiguration_v1beta1"],
-				cfgFiles["ClusterConfiguration_v1beta1"],
-				cfgFiles["Kube-proxy_componentconfig"],
-				cfgFiles["Kubelet_componentconfig"],
-			}, []byte(constants.YAMLDocumentSeparator)),
-		},
-		{
 			name:         "v1beta2.partial1",
 			fileContents: cfgFiles["InitConfiguration_v1beta2"],
 		},
@@ -74,6 +58,23 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 			fileContents: bytes.Join([][]byte{
 				cfgFiles["InitConfiguration_v1beta2"],
 				cfgFiles["ClusterConfiguration_v1beta2"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "v1beta3.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta3"],
+		},
+		{
+			name:         "v1beta3.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta3"],
+		},
+		{
+			name: "v1beta3.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta3"],
+				cfgFiles["ClusterConfiguration_v1beta3"],
 				cfgFiles["Kube-proxy_componentconfig"],
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),
@@ -111,14 +112,14 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 func TestDefaultTaintsMarshaling(t *testing.T) {
 	tests := []struct {
 		desc             string
-		cfg              kubeadmapiv1beta2.InitConfiguration
+		cfg              kubeadmapiv1.InitConfiguration
 		expectedTaintCnt int
 	}{
 		{
 			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta2",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
 			},
@@ -126,23 +127,23 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		},
 		{
 			desc: "Uninitialized taints field produces a single taint (the master one)",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta2",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{},
 			},
 			expectedTaintCnt: 1,
 		},
 		{
 			desc: "Forsing taints to an empty slice produces no taints",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta2",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 					Taints: []v1.Taint{},
 				},
 			},
@@ -150,12 +151,12 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		},
 		{
 			desc: "Custom taints are used",
-			cfg: kubeadmapiv1beta2.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta2",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 					Taints: []v1.Taint{
 						{Key: "taint1"},
 						{Key: "taint2"},

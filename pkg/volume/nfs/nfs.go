@@ -206,15 +206,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	switch runtime.GOOS {
 	case "linux":
 		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs").CombinedOutput(); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
+			return fmt.Errorf("required binary /sbin/mount.nfs is missing")
 		}
 		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs4").CombinedOutput(); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
+			return fmt.Errorf("required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
 		if _, err := exec.Command("test", "-x", "/sbin/mount_nfs").CombinedOutput(); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
+			return fmt.Errorf("required binary /sbin/mount_nfs is missing")
 		}
 	}
 	return nil
@@ -304,10 +304,10 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.
-	forceUmounter, ok := c.mounter.(mount.MounterForceUnmounter)
+	forceUnmounter, ok := c.mounter.(mount.MounterForceUnmounter)
 	if ok {
 		klog.V(4).Infof("Using force unmounter interface")
-		return mount.CleanupMountWithForce(dir, forceUmounter, true /* extensiveMountPointCheck */, unMountTimeout)
+		return mount.CleanupMountWithForce(dir, forceUnmounter, true /* extensiveMountPointCheck */, unMountTimeout)
 	}
 	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }

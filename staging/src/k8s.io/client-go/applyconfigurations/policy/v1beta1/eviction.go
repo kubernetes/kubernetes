@@ -49,7 +49,7 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // ExtractEviction extracts the applied configuration owned by fieldManager from
 // eviction. If no managedFields are found in eviction for fieldManager, a
 // EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return extractEviction(eviction, fieldManager, "")
+}
+
+// ExtractEvictionStatus is the same as ExtractEviction except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEvictionStatus(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return extractEviction(eviction, fieldManager, "status")
+}
+
+func extractEviction(eviction *v1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
-	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b)
+	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

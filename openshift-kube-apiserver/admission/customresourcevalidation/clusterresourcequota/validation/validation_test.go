@@ -164,7 +164,8 @@ func TestValidationQuota(t *testing.T) {
 		if err := corekubev1.Convert_v1_ResourceQuota_To_core_ResourceQuota(&v.A, &internal, nil); err != nil {
 			panic(err)
 		}
-		errs := validation.ValidateResourceQuota(&internal, validation.ResourceQuotaValidationOptions{})
+		opts := validation.ResourceQuotaValidationOptions{AllowPodAffinityNamespaceSelector: true}
+		errs := validation.ValidateResourceQuota(&internal, opts)
 		if len(errs) != 0 {
 			t.Errorf("%s: %v", k, errs)
 			continue

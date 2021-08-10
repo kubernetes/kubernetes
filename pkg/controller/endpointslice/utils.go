@@ -223,7 +223,7 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	}
 
 	if !triggerTime.IsZero() {
-		endpointSlice.Annotations[corev1.EndpointsLastChangeTriggerTime] = triggerTime.Format(time.RFC3339Nano)
+		endpointSlice.Annotations[corev1.EndpointsLastChangeTriggerTime] = triggerTime.UTC().Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(endpointSlice.Annotations, corev1.EndpointsLastChangeTriggerTime)
 	}
@@ -393,4 +393,17 @@ func hintsEnabled(annotations map[string]string) bool {
 		return false
 	}
 	return val == "Auto" || val == "auto"
+}
+
+// managedByChanged returns true if one of the provided EndpointSlices is
+// managed by the EndpointSlice controller while the other is not.
+func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) bool {
+	return managedByController(endpointSlice1) != managedByController(endpointSlice2)
+}
+
+// managedByController returns true if the controller of the provided
+// EndpointSlices is the EndpointSlice controller.
+func managedByController(endpointSlice *discovery.EndpointSlice) bool {
+	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	return managedBy == controllerName
 }

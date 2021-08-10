@@ -437,7 +437,7 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #   KUBE_DOCKER_REGISTRY: Registry of released images, default to k8s.gcr.io
-#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to k8s.gcr.io
+#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to k8s.gcr.io/build-image
 #
 # Example:
 #   make release-skip-tests
@@ -527,12 +527,13 @@ define CMD_HELP_INFO
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
 EXCLUDE_TARGET=BUILD OWNERS
-.PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+CMD_TARGET = $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+.PHONY: $(CMD_TARGET)
 ifeq ($(PRINT_HELP),y)
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
+$(CMD_TARGET):
 	@echo "$$CMD_HELP_INFO"
 else
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
+$(CMD_TARGET): generated_files
 	hack/make-rules/build.sh cmd/$@
 endif
 

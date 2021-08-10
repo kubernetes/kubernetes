@@ -8,4 +8,12 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause1
-    image: k8s.gcr.io/pause:3.4.1
+    image: k8s.gcr.io/pause:3.5
+    resources: 
+      requests:
+        memory: "1G"
+        cpu: "0.5"
+      limits:
+        memory: "2G"
+        cpu: "1"
+

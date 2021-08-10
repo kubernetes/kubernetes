@@ -48,6 +48,11 @@ var (
 		// cluster and the availability of those running pods in the cluster, including kubelet and
 		// kube-proxy.
 		SuggestedPriorityLevelConfigurationSystem,
+		// "node-high" priority-level is for the node health reporting. It is separated from "system"
+		// to make sure that nodes are able to report their health even if kube-apiserver is not capable of
+		// handling load caused by pod startup (fetching secrets, events etc).
+		// NOTE: In large clusters 50% - 90% of all API calls use this priority-level.
+		SuggestedPriorityLevelConfigurationNodeHigh,
 		// "leader-election" is dedicated for controllers' leader-election, which majorly affects the
 		// availability of any controller runs in the cluster.
 		SuggestedPriorityLevelConfigurationLeaderElection,
@@ -64,6 +69,7 @@ var (
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
+		SuggestedFlowSchemaSystemNodeHigh,            // references "node-high" priority-level
 		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
 		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
@@ -171,6 +177,22 @@ var (
 				},
 			},
 		})
+	SuggestedPriorityLevelConfigurationNodeHigh = newPriorityLevelConfiguration(
+		"node-high",
+		flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				AssuredConcurrencyShares: 40,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeQueue,
+					Queuing: &flowcontrol.QueuingConfiguration{
+						Queues:           64,
+						HandSize:         6,
+						QueueLengthLimit: 50,
+					},
+				},
+			},
+		})
 	// leader-election priority-level
 	SuggestedPriorityLevelConfigurationLeaderElection = newPriorityLevelConfiguration(
 		"leader-election",
@@ -258,6 +280,27 @@ var (
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
 					[]string{flowcontrol.NonResourceAll}),
+			},
+		},
+	)
+	SuggestedFlowSchemaSystemNodeHigh = newFlowSchema(
+		"system-node-high", "node-high", 400,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{corev1.GroupName},
+					[]string{"nodes", "nodes/status"},
+					[]string{flowcontrol.NamespaceEvery},
+					true),
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{coordinationv1.GroupName},
+					[]string{"leases"},
+					[]string{flowcontrol.NamespaceEvery},
+					false),
 			},
 		},
 	)

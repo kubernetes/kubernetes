@@ -1251,6 +1251,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapExec:                true,
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
@@ -1692,6 +1693,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				storageframework.CapVolumeLimits: false,

@@ -260,6 +260,62 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
+kube::test::describe_resource_chunk_size_assert() {
+  # $1: the target resource
+  local resource=$1
+  # $2: comma-separated list of additional resources that will be listed
+  local additionalResources=${2:-}
+  # Remaining args are flags to pass to kubectl
+  local args=${3:-}
+
+  # Expect list requests for the target resource and the additional resources
+  local expectLists
+  IFS="," read -r -a expectLists <<< "${resource},${additionalResources}"
+
+  # Default chunk size
+  defaultResult=$(eval kubectl describe "${resource}" --show-events=true -v=6 "${args}" "${kube_flags[@]}" 2>&1 >/dev/null)
+  for r in "${expectLists[@]}"; do
+    if grep -q "${r}?.*limit=500" <<< "${defaultResult}"; then
+      echo "query for ${r} had limit param"
+    else
+      echo "${bold}${red}"
+      echo "FAIL!"
+      echo "Describe ${resource}"
+      echo "  Expected limit param on request for: ${r}"
+      echo "  Not found in:"
+      echo "${defaultResult}"
+      echo "${reset}${red}"
+      caller
+      echo "${reset}"
+      return 1
+    fi
+  done
+
+  # Try a non-default chunk size
+  customResult=$(eval kubectl describe "${resource}" --show-events=false --chunk-size=10 -v=6 "${args}" "${kube_flags[@]}" 2>&1 >/dev/null)
+  if grep -q "${resource}?limit=10" <<< "${customResult}"; then
+    echo "query for ${resource} had user-specified limit param"
+  else
+    echo "${bold}${red}"
+    echo "FAIL!"
+    echo "Describe ${resource}"
+    echo "  Expected limit param on request for: ${r}"
+    echo "  Not found in:"
+    echo "${customResult}"
+    echo "${reset}${red}"
+    caller
+    echo "${reset}"
+    return 1
+  fi
+
+  echo -n "${green}"
+  echo "Successful describe ${resource} verbose logs:"
+  echo "${defaultResult}"
+  echo -n "${reset}"
+
+  return 0
+}
+
 # Compare sort-by resource name output (first column, skipping first line) with expected order specify in the last parameter
 kube::test::if_sort_by_has_correct_order() {
   local var

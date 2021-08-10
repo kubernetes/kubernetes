@@ -61,7 +61,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
-	allErrors := []error{}
+	var allErrors []error
 
 	if len(o.Modes) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("at least one authorization-mode must be passed"))
@@ -72,15 +72,11 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		if !authzmodes.IsValidAuthorizationMode(mode) {
 			allErrors = append(allErrors, fmt.Errorf("authorization-mode %q is not a valid mode", mode))
 		}
-		if mode == authzmodes.ModeABAC {
-			if o.PolicyFile == "" {
-				allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
-			}
+		if mode == authzmodes.ModeABAC && o.PolicyFile == "" {
+			allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
 		}
-		if mode == authzmodes.ModeWebhook {
-			if o.WebhookConfigFile == "" {
-				allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
-			}
+		if mode == authzmodes.ModeWebhook && o.WebhookConfigFile == "" {
+			allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
 		}
 	}
 
@@ -97,7 +93,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 	}
 
 	if o.WebhookRetryBackoff != nil && o.WebhookRetryBackoff.Steps <= 0 {
-		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", o.WebhookRetryBackoff.Steps))
+		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 0, but is: %d", o.WebhookRetryBackoff.Steps))
 	}
 
 	return allErrors

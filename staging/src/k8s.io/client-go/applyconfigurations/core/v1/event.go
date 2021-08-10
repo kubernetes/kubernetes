@@ -62,7 +62,7 @@ func Event(name, namespace string) *EventApplyConfiguration {
 // ExtractEvent extracts the applied configuration owned by fieldManager from
 // event. If no managedFields are found in event for fieldManager, a
 // EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // event must be a unmodified Event API object that was retrieved from the Kubernetes API.
@@ -71,8 +71,19 @@ func Event(name, namespace string) *EventApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEvent(event *apicorev1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return extractEvent(event, fieldManager, "")
+}
+
+// ExtractEventStatus is the same as ExtractEvent except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEventStatus(event *apicorev1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return extractEvent(event, fieldManager, "status")
+}
+
+func extractEvent(event *apicorev1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
-	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.core.v1.Event"), fieldManager, b)
+	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.core.v1.Event"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

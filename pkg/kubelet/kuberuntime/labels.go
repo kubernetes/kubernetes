@@ -18,13 +18,17 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"runtime"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	sc "k8s.io/kubernetes/pkg/securitycontext"
 )
 
 const (
@@ -38,6 +42,12 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+
+	// TODO: remove this annotation when moving to beta for Windows hostprocess containers
+	// xref: https://github.com/kubernetes/kubernetes/pull/99576/commits/42fb66073214eed6fe43fa8b1586f396e30e73e3#r635392090
+	// Currently, ContainerD on Windows does not yet fully support HostProcess containers
+	// but will pass annotations to hcsshim which does have support.
+	windowsHostProcessContainer = "microsoft.com/hostprocess-container"
 )
 
 type labeledPodSandboxInfo struct {
@@ -89,7 +99,23 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 
 // newPodAnnotations creates pod annotations from v1.Pod.
 func newPodAnnotations(pod *v1.Pod) map[string]string {
-	return pod.Annotations
+	annotations := map[string]string{}
+
+	// Get annotations from v1.Pod
+	for k, v := range pod.Annotations {
+		annotations[k] = v
+	}
+
+	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+		if kubecontainer.HasWindowsHostProcessContainer(pod) {
+			// While WindowsHostProcessContainers is in alpha pass 'microsoft.com/hostprocess-container' annotation
+			// to pod sandbox creations request. ContainerD on Windows does not yet fully support HostProcess
+			// containers but will pass annotations to hcsshim which does have support.
+			annotations[windowsHostProcessContainer] = "true"
+		}
+	}
+
+	return annotations
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
@@ -140,6 +166,15 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 			klog.ErrorS(err, "Unable to marshal container ports for container", "containerName", container.Name, "pod", klog.KObj(pod))
 		} else {
 			annotations[containerPortsLabel] = string(rawContainerPorts)
+		}
+	}
+
+	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+		if sc.HasWindowsHostProcessRequest(pod, container) {
+			// While WindowsHostProcessContainers is in alpha pass 'microsoft.com/hostprocess-container' annotation
+			// to create containers request. ContainerD on Windows does not yet fully support HostProcess containers
+			// but will pass annotations to hcsshim which does have support.
+			annotations[windowsHostProcessContainer] = "true"
 		}
 	}
 

@@ -50,13 +50,13 @@ var (
 		authenticate to the registry. The email address is optional.
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the
-		nodes to pull images on your behalf, they have to have the credentials.  You can provide this information
+		nodes to pull images on your behalf, they must have the credentials.  You can provide this information
 		by creating a dockercfg secret and attaching it to your service account.`))
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
 		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
-		  
+
 		  # Create a new secret named my-secret from ~/.docker/config.json
 		  kubectl create secret docker-registry my-secret --from-file=.dockerconfigjson=path/to/.docker/config.json`))
 )

@@ -165,7 +165,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]*v1.Pod, 0)
+	pods := make([]*v1.Pod, 0, len(dirents))
 	if len(dirents) == 0 {
 		return pods, nil
 	}

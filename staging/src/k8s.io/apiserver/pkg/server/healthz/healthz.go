@@ -225,7 +225,6 @@ func getExcludedChecks(r *http.Request) sets.String {
 // handleRootHealth returns an http.HandlerFunc that serves the provided checks.
 func handleRootHealth(name string, firstTimeHealthy func(), disableStacktraceForHttpLog bool, checks ...HealthChecker) http.HandlerFunc {
 	var notifyOnce sync.Once
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		excluded := getExcludedChecks(r)
 		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
@@ -268,14 +267,13 @@ func handleRootHealth(name string, firstTimeHealthy func(), disableStacktraceFor
 			return
 		}
 
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-
 		// signal first time this is healthy
 		if firstTimeHealthy != nil {
 			notifyOnce.Do(firstTimeHealthy)
 		}
 
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if _, found := r.URL.Query()["verbose"]; !found {
 			fmt.Fprint(w, "ok")
 			return

@@ -12,7 +12,7 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClusterNetwork = map[string]string{
-	"":                 "ClusterNetwork describes the cluster network. There is normally only one object of this type, named \"default\", which is created by the SDN network plugin based on the master configuration when the cluster is brought up for the first time.",
+	"":                 "ClusterNetwork describes the cluster network. There is normally only one object of this type, named \"default\", which is created by the SDN network plugin based on the master configuration when the cluster is brought up for the first time.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"network":          "Network is a CIDR string specifying the global overlay network's L3 space",
 	"hostsubnetlength": "HostSubnetLength is the number of bits of network to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods",
 	"serviceNetwork":   "ServiceNetwork is the CIDR range that Service IP addresses are allocated from",
@@ -37,7 +37,7 @@ func (ClusterNetworkEntry) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterNetworkList = map[string]string{
-	"":      "ClusterNetworkList is a collection of ClusterNetworks",
+	"":      "ClusterNetworkList is a collection of ClusterNetworks\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"items": "Items is the list of cluster networks",
 }
 
@@ -46,7 +46,7 @@ func (ClusterNetworkList) SwaggerDoc() map[string]string {
 }
 
 var map_EgressNetworkPolicy = map[string]string{
-	"":     "EgressNetworkPolicy describes the current egress network policy for a Namespace. When using the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy is present) then the traffic will be allowed by default.",
+	"":     "EgressNetworkPolicy describes the current egress network policy for a Namespace. When using the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy is present) then the traffic will be allowed by default.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"spec": "spec is the specification of the current egress network policy",
 }
 
@@ -55,7 +55,7 @@ func (EgressNetworkPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_EgressNetworkPolicyList = map[string]string{
-	"":      "EgressNetworkPolicyList is a collection of EgressNetworkPolicy",
+	"":      "EgressNetworkPolicyList is a collection of EgressNetworkPolicy\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"items": "items is the list of policies",
 }
 
@@ -93,7 +93,7 @@ func (EgressNetworkPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_HostSubnet = map[string]string{
-	"":            "HostSubnet describes the container subnet network on a node. The HostSubnet object must have the same name as the Node object it corresponds to.",
+	"":            "HostSubnet describes the container subnet network on a node. The HostSubnet object must have the same name as the Node object it corresponds to.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"host":        "Host is the name of the node. (This is the same as the object's name, but both fields must be set.)",
 	"hostIP":      "HostIP is the IP address to be used as a VTEP by other nodes in the overlay network",
 	"subnet":      "Subnet is the CIDR range of the overlay network assigned to the node for its pods",
@@ -106,7 +106,7 @@ func (HostSubnet) SwaggerDoc() map[string]string {
 }
 
 var map_HostSubnetList = map[string]string{
-	"":      "HostSubnetList is a collection of HostSubnets",
+	"":      "HostSubnetList is a collection of HostSubnets\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"items": "Items is the list of host subnets",
 }
 
@@ -115,7 +115,7 @@ func (HostSubnetList) SwaggerDoc() map[string]string {
 }
 
 var map_NetNamespace = map[string]string{
-	"":          "NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant plugin, every Namespace will have a corresponding NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)",
+	"":          "NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant plugin, every Namespace will have a corresponding NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"netname":   "NetName is the name of the network namespace. (This is the same as the object's name, but both fields must be set.)",
 	"netid":     "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oc adm pod-network\" commands.",
 	"egressIPs": "EgressIPs is a list of reserved IPs that will be used as the source for external traffic coming from pods in this namespace. (If empty, external traffic will be masqueraded to Node IPs.)",
@@ -126,7 +126,7 @@ func (NetNamespace) SwaggerDoc() map[string]string {
 }
 
 var map_NetNamespaceList = map[string]string{
-	"":      "NetNamespaceList is a collection of NetNamespaces",
+	"":      "NetNamespaceList is a collection of NetNamespaces\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"items": "Items is the list of net namespaces",
 }
 

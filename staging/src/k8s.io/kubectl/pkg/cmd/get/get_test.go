@@ -860,7 +860,7 @@ func TestGetSortedObjects(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
-	// sorting with metedata.name
+	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 
@@ -899,7 +899,7 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
-	// sorting with metedata.name
+	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 

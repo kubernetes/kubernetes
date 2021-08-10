@@ -19,7 +19,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -54,7 +53,8 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
 	pod.Spec.Containers[0].Command = command
 	pod.Spec.Containers[0].Args = nil // otherwise 'pause` is magically an argument to nc, which causes all hell to break loose
-	pod.Spec.NodeName = nodeName
+	nodeSelection := e2epod.NodeSelection{Name: nodeName}
+	e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
@@ -80,20 +80,6 @@ var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
 
-	ginkgo.BeforeEach(func() {
-		// Assert basic external connectivity.
-		// Since this is not really a test of kubernetes in any way, we
-		// leave it as a pre-test assertion, rather than a Ginko test.
-		ginkgo.By("Executing a successful http request from the external internet")
-		resp, err := http.Get("http://google.com")
-		if err != nil {
-			framework.Failf("Unable to connect/talk to the internet: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			framework.Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
-		}
-	})
-
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
@@ -106,6 +92,12 @@ var _ = common.SIGDescribe("Networking", func() {
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
 			checkConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
+	})
+
+	ginkgo.It("should provider Internet connection for containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.By("Running container which tries to connect to google.com")
+		framework.ExpectNoError(
+			checkConnectivityToHost(f, "", "connectivity-test", "google.com", 80, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.

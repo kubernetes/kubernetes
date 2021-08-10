@@ -56,7 +56,7 @@ func (DeploymentCondition) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentConfig = map[string]string{
-	"":       "Deployment Configs define the template for a pod and manages deploying new images or configuration changes. A single deployment configuration is usually analogous to a single micro-service. Can support many different deployment patterns, including full restart, customizable rolling updates, and  fully custom behaviors, as well as pre- and post- deployment hooks. Each individual deployment is represented as a replication controller.\n\nA deployment is \"triggered\" when its configuration is changed or a tag in an Image Stream is changed. Triggers can be disabled to allow manual control over a deployment. The \"strategy\" determines how the deployment is carried out and may be changed at any time. The `latestVersion` field is updated when a new deployment is triggered by any means.",
+	"":       "Deployment Configs define the template for a pod and manages deploying new images or configuration changes. A single deployment configuration is usually analogous to a single micro-service. Can support many different deployment patterns, including full restart, customizable rolling updates, and  fully custom behaviors, as well as pre- and post- deployment hooks. Each individual deployment is represented as a replication controller.\n\nA deployment is \"triggered\" when its configuration is changed or a tag in an Image Stream is changed. Triggers can be disabled to allow manual control over a deployment. The \"strategy\" determines how the deployment is carried out and may be changed at any time. The `latestVersion` field is updated when a new deployment is triggered by any means.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"spec":   "Spec represents a desired deployment state and how to deploy to it.",
 	"status": "Status represents the current deployment state.",
 }
@@ -66,7 +66,7 @@ func (DeploymentConfig) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentConfigList = map[string]string{
-	"":      "DeploymentConfigList is a collection of deployment configs.",
+	"":      "DeploymentConfigList is a collection of deployment configs.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"items": "Items is a list of deployment configs",
 }
 
@@ -75,7 +75,7 @@ func (DeploymentConfigList) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentConfigRollback = map[string]string{
-	"":                   "DeploymentConfigRollback provides the input to rollback generation.",
+	"":                   "DeploymentConfigRollback provides the input to rollback generation.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"name":               "Name of the deployment config that will be rolled back.",
 	"updatedAnnotations": "UpdatedAnnotations is a set of new annotations that will be added in the deployment config.",
 	"spec":               "Spec defines the options to rollback generation.",
@@ -144,7 +144,7 @@ func (DeploymentDetails) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentLog = map[string]string{
-	"": "DeploymentLog represents the logs for a deployment",
+	"": "DeploymentLog represents the logs for a deployment\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 }
 
 func (DeploymentLog) SwaggerDoc() map[string]string {
@@ -152,7 +152,7 @@ func (DeploymentLog) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentLogOptions = map[string]string{
-	"":             "DeploymentLogOptions is the REST options for a deployment log",
+	"":             "DeploymentLogOptions is the REST options for a deployment log\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"container":    "The container for which to stream logs. Defaults to only container if there is one container in the pod.",
 	"follow":       "Follow if true indicates that the build log should be streamed until the build terminates.",
 	"previous":     "Return previous deployment logs. Defaults to false.",
@@ -170,7 +170,7 @@ func (DeploymentLogOptions) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentRequest = map[string]string{
-	"":                "DeploymentRequest is a request to a deployment config for a new deployment.",
+	"":                "DeploymentRequest is a request to a deployment config for a new deployment.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"name":            "Name of the deployment config for requesting a new deployment.",
 	"latest":          "Latest will update the deployment config with the latest state from all triggers.",
 	"force":           "Force will try to force a new deployment to run. If the deployment config is paused, then setting this to true will return an Invalid error.",

@@ -23,9 +23,9 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 )
 
-// This test references methods that OpenShift uses to customize the master on startup, that
-// are not referenced directly by a master.
-func TestMasterExportsSymbols(t *testing.T) {
+// This test references methods that OpenShift uses to customize the apiserver on startup, that
+// are not referenced directly by an instance.
+func TestApiserverExportsSymbols(t *testing.T) {
 	_ = &controlplane.Config{
 		GenericConfig: &genericapiserver.Config{
 			EnableMetrics: true,

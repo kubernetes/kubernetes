@@ -50,6 +50,11 @@ func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context
 	ic.Generation = 1
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (mutatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (mutatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*admissionregistration.MutatingWebhookConfiguration)
@@ -91,6 +96,11 @@ func (mutatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, 
 	}
 
 	return validation.ValidateMutatingWebhookConfigurationUpdate(obj.(*admissionregistration.MutatingWebhookConfiguration), old.(*admissionregistration.MutatingWebhookConfiguration), groupVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (mutatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for mutatingWebhookConfiguration objects. Status update should

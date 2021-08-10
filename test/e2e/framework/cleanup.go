@@ -17,6 +17,9 @@ limitations under the License.
 package framework
 
 import (
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"reflect"
+	"runtime"
 	"sync"
 )
 
@@ -70,6 +73,7 @@ func RunCleanupActions() {
 	}()
 	// Run unlocked.
 	for _, fn := range list {
+		e2elog.Logf("Running Cleanup Action: %v", runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 		fn()
 	}
 }

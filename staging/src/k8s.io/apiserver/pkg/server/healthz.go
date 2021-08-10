@@ -105,7 +105,7 @@ func (s *GenericAPIServer) installReadyz() {
 	s.readyzChecksInstalled = true
 	healthz.InstallReadyzHandlerWithHealthyFunc(s.Handler.NonGoRestfulMux, func() {
 		// note: InstallReadyzHandlerWithHealthyFunc guarantees that this is called only once
-		close(s.hasBeenReadyCh)
+		s.lifecycleSignals.HasBeenReady.Signal()
 	}, s.readyzChecks...)
 }
 

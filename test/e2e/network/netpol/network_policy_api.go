@@ -23,6 +23,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -50,37 +51,24 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ns := f.Namespace.Name
 		npVersion := "v1"
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
-		npTemplate := &networkingv1.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "e2e-example-netpol",
-				Labels: map[string]string{
-					"special-label": f.UniqueName,
-				},
-			},
-			Spec: networkingv1.NetworkPolicySpec{
-				// Apply this policy to the Server
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"pod-name": "test-pod",
-					},
-				},
-				// Allow traffic only from client-a in namespace-b
-				Ingress: []networkingv1.NetworkPolicyIngressRule{{
-					From: []networkingv1.NetworkPolicyPeer{{
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"ns-name": "pod-b",
-							},
-						},
-						PodSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"pod-name": "client-a",
-							},
-						},
-					}},
-				}},
+
+		namespaceSelector := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"ns-name": "pod-b",
 			},
 		}
+		podSelector := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"pod-name": "client-a",
+			},
+		}
+		ingressRule := networkingv1.NetworkPolicyIngressRule{}
+		ingressRule.From = append(ingressRule.From, networkingv1.NetworkPolicyPeer{PodSelector: podSelector, NamespaceSelector: namespaceSelector})
+		npTemplate := GenNetworkPolicy(SetGenerateName("e2e-example-netpol"),
+			SetObjectMetaLabel(map[string]string{"special-label": f.UniqueName}),
+			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
+			SetSpecIngressRules(ingressRule))
+
 		// Discovery
 		ginkgo.By("getting /apis")
 		{
@@ -208,5 +196,64 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
+	})
+
+	/*
+		Release: v1.21
+		Testname: NetworkPolicy support EndPort Field
+		Description:
+		- EndPort field cannot be defined if the Port field is not defined
+		- EndPort field cannot be defined if the Port field is defined as a named (string) port.
+		- EndPort field must be equal or greater than port.
+	*/
+	ginkgo.It("should support creating NetworkPolicy API with endport field [Feature:NetworkPolicyEndPort]", func() {
+		ns := f.Namespace.Name
+		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
+
+		ginkgo.By("EndPort field cannot be defined if the Port field is not defined.")
+		var endport int32 = 20000
+		egressRule := networkingv1.NetworkPolicyEgressRule{}
+		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{EndPort: &endport})
+		npTemplate := GenNetworkPolicy(SetGenerateName("e2e-example-netpol-endport-validate"),
+			SetObjectMetaLabel(map[string]string{"special-label": f.UniqueName}),
+			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
+			SetSpecEgressRules(egressRule))
+		_, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("EndPort field cannot be defined if the Port field is defined as a named (string) port.")
+		egressRule = networkingv1.NetworkPolicyEgressRule{}
+		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"}, EndPort: &endport})
+		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
+		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("EndPort field must be equal or greater than port.")
+		ginkgo.By("When EndPort field is smaller than port, it will failed")
+		egressRule = networkingv1.NetworkPolicyEgressRule{}
+		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 30000}, EndPort: &endport})
+		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
+		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("EndPort field is equal with port.")
+		egressRule.Ports[0].Port = &intstr.IntOrString{Type: intstr.Int, IntVal: 20000}
+		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
+		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("EndPort field is greater than port.")
+		egressRule = networkingv1.NetworkPolicyEgressRule{}
+		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 10000}, EndPort: &endport})
+		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
+		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("deleting all test collection")
+		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
 	})
 })

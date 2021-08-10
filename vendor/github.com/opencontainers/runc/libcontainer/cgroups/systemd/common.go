@@ -306,7 +306,7 @@ func getUnitName(c *configs.Cgroup) string {
 // isDbusError returns true if the error is a specific dbus error.
 func isDbusError(err error, name string) bool {
 	if err != nil {
-		var derr dbus.Error
+		var derr *dbus.Error
 		if errors.As(err, &derr) {
 			return strings.Contains(derr.Name, name)
 		}

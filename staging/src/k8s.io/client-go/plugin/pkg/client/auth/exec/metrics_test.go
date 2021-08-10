@@ -18,6 +18,7 @@ package exec
 
 import (
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -140,12 +141,14 @@ func TestCallsMetric(t *testing.T) {
 				{Name: "TEST_EXIT_CODE", Value: fmt.Sprintf("%d", exitCode)},
 				{Name: "TEST_OUTPUT", Value: goodOutput},
 			},
+			InteractiveMode: api.IfAvailableExecInteractiveMode,
 		}
 
-		a, err := newAuthenticator(newCache(), &c, nil)
+		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
+		a.stderr = io.Discard
 
 		// Run refresh creds twice so that our test validates that the metrics are set correctly twice
 		// in a row with the same authenticator.
@@ -171,13 +174,15 @@ func TestCallsMetric(t *testing.T) {
 	// metric values.
 	refreshCreds := func(command string) {
 		c := api.ExecConfig{
-			Command:    "does not exist",
-			APIVersion: "client.authentication.k8s.io/v1beta1",
+			Command:         command,
+			APIVersion:      "client.authentication.k8s.io/v1beta1",
+			InteractiveMode: api.IfAvailableExecInteractiveMode,
 		}
-		a, err := newAuthenticator(newCache(), &c, nil)
+		a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
+		a.stderr = io.Discard
 		if err := a.refreshCredsLocked(&clientauthentication.Response{}); err == nil {
 			t.Fatal("expected the authenticator to fail because the plugin does not exist")
 		}

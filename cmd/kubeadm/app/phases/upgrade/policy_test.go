@@ -19,8 +19,9 @@ package upgrade
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestEnforceVersionPolicies(t *testing.T) {

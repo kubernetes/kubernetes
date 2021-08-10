@@ -6,6 +6,9 @@ import (
 )
 
 // MyOperatorResource is an example operator configuration type
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:internal
 type MyOperatorResource struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -220,8 +223,12 @@ type NodeStatus struct {
 	LastFailedRevision int32 `json:"lastFailedRevision,omitempty"`
 	// lastFailedTime is the time the last failed revision failed the last time.
 	LastFailedTime *metav1.Time `json:"lastFailedTime,omitempty"`
-	// lastFailedCount is how often the last failed revision failed.
+	// lastFailedReason is a machine readable failure reason string.
+	LastFailedReason string `json:"lastFailedReason,omitempty"`
+	// lastFailedCount is how often the installer pod of the last failed revision failed.
 	LastFailedCount int `json:"lastFailedCount,omitempty"`
-	// lastFailedRevisionErrors is a list of the errors during the failed deployment referenced in lastFailedRevision
+	// lastFallbackCount is how often a fallback to a previous revision happened.
+	LastFallbackCount int `json:"lastFallbackCount,omitempty"`
+	// lastFailedRevisionErrors is a list of human readable errors during the failed deployment referenced in lastFailedRevision.
 	LastFailedRevisionErrors []string `json:"lastFailedRevisionErrors,omitempty"`
 }

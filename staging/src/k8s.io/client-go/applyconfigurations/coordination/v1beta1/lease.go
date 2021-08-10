@@ -49,7 +49,7 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // ExtractLease extracts the applied configuration owned by fieldManager from
 // lease. If no managedFields are found in lease for fieldManager, a
 // LeaseApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // lease must be a unmodified Lease API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractLease(lease *coordinationv1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+	return extractLease(lease, fieldManager, "")
+}
+
+// ExtractLeaseStatus is the same as ExtractLease except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractLeaseStatus(lease *coordinationv1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+	return extractLease(lease, fieldManager, "status")
+}
+
+func extractLease(lease *coordinationv1beta1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
-	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1beta1.Lease"), fieldManager, b)
+	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1beta1.Lease"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

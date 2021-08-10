@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/sets"
 )
 
@@ -213,7 +213,10 @@ func String(node *yaml.Node, opts ...string) (string, error) {
 	b := &bytes.Buffer{}
 	e := NewEncoder(b)
 	err := e.Encode(node)
-	e.Close()
+	errClose := e.Close()
+	if err == nil {
+		err = errClose
+	}
 	val := b.String()
 	if optsSet.Has(Trim) {
 		val = strings.TrimSpace(val)

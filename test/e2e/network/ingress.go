@@ -20,23 +20,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
-
-	compute "google.golang.org/api/compute/v1"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -53,8 +47,7 @@ import (
 )
 
 const (
-	negUpdateTimeout        = 2 * time.Minute
-	instanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
+	negUpdateTimeout = 2 * time.Minute
 )
 
 var _ = common.SIGDescribe("Loadbalancing: L7", func() {
@@ -132,77 +125,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("multicluster ingress should get instance group annotation", func() {
-			name := "echomap"
-			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{
-				e2eingress.IngressClassKey: e2eingress.MulticlusterIngressClassValue,
-			}, map[string]string{})
-
-			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
-			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
-			pollErr := wait.Poll(2*time.Second, propagationTimeout, func() (bool, error) {
-				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				annotations := ing.Annotations
-				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
-					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
-					return false, nil
-				}
-				return true, nil
-			})
-			framework.ExpectNoError(pollErr, "timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation)
-
-			// Verify that the ingress does not get other annotations like url-map, target-proxy, backends, etc.
-			// Note: All resources except the firewall rule have an annotation.
-			umKey := e2eingress.StatusPrefix + "/url-map"
-			fwKey := e2eingress.StatusPrefix + "/forwarding-rule"
-			tpKey := e2eingress.StatusPrefix + "/target-proxy"
-			fwsKey := e2eingress.StatusPrefix + "/https-forwarding-rule"
-			tpsKey := e2eingress.StatusPrefix + "/https-target-proxy"
-			scKey := e2eingress.StatusPrefix + "/ssl-cert"
-			beKey := e2eingress.StatusPrefix + "/backends"
-			wait.Poll(2*time.Second, time.Minute, func() (bool, error) {
-				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				annotations := ing.Annotations
-				if annotations != nil && (annotations[umKey] != "" || annotations[fwKey] != "" ||
-					annotations[tpKey] != "" || annotations[fwsKey] != "" || annotations[tpsKey] != "" ||
-					annotations[scKey] != "" || annotations[beKey] != "") {
-					framework.Failf("unexpected annotations. Expected to not have annotations for urlmap, forwarding rule, target proxy, ssl cert and backends, got: %v", annotations)
-					return true, nil
-				}
-				return false, nil
-			})
-
-			// Verify that the controller does not create any other resource except instance group.
-			// TODO(59778): Check GCE resources specific to this ingress instead of listing all resources.
-			if len(gceController.ListURLMaps()) != 0 {
-				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListURLMaps())
-			}
-			if len(gceController.ListGlobalForwardingRules()) != 0 {
-				framework.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
-			}
-			if len(gceController.ListTargetHTTPProxies()) != 0 {
-				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
-			}
-			if len(gceController.ListTargetHTTPSProxies()) != 0 {
-				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPSProxies())
-			}
-			if len(gceController.ListSslCertificates()) != 0 {
-				framework.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
-			}
-			if len(gceController.ListGlobalBackendServices()) != 0 {
-				framework.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
-			}
-			// Controller does not have a list command for firewall rule. We use get instead.
-			if fw, err := gceController.GetFirewallRule(); err == nil {
-				framework.Failf("unexpected nil error in getting firewall rule, expected firewall NotFound, got firewall: %v", fw)
-			}
-
-			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
-		})
-		// TODO: Implement a multizone e2e that verifies traffic reaches each
-		// zone based on pod labels.
 	})
 
 	ginkgo.Describe("GCE [Slow] [Feature:NEG] [Flaky]", func() {
@@ -552,140 +474,16 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 
-	ginkgo.Describe("GCE [Slow] [Feature:kubemci]", func() {
-		var gceController *gce.IngressController
-		var ipName, ipAddress string
-
-		// Platform specific setup
-		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-			jig.Class = e2eingress.MulticlusterIngressClassValue
-			jig.PollInterval = 5 * time.Second
-			ginkgo.By("Initializing gce controller")
-			gceController = &gce.IngressController{
-				Ns:     ns,
-				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
-			}
-			err := gceController.Init()
-			framework.ExpectNoError(err)
-
-			// TODO(https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/19):
-			// Kubemci should reserve a static ip if user has not specified one.
-			ipName = "kubemci-" + string(uuid.NewUUID())
-			// ip released when the rest of lb resources are deleted in CleanupIngressController
-			ipAddress = gceController.CreateStaticIP(ipName)
-			ginkgo.By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
-		})
-
-		// Platform specific cleanup
-		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				e2eingress.DescribeIng(ns)
-			}
-			if jig.Ingress == nil {
-				ginkgo.By("No ingress created, no cleanup necessary")
-				return
-			}
-			ginkgo.By("Deleting ingress")
-			jig.TryDeleteIngress()
-
-			ginkgo.By("Cleaning up cloud resources")
-			err := gceController.CleanupIngressController()
-			framework.ExpectNoError(err)
-		})
-
-		ginkgo.It("should conform to Ingress spec", func() {
-			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{
-				e2eingress.IngressStaticIPKey: ipName,
-			})
-			for _, t := range conformanceTests {
-				ginkgo.By(t.EntryLog)
-				t.Execute()
-				ginkgo.By(t.ExitLog)
-				jig.WaitForIngress(false /*waitForNodePort*/)
-			}
-		})
-
-		ginkgo.It("should create ingress with pre-shared certificate", func() {
-			executePresharedCertTest(f, jig, ipName)
-		})
-
-		ginkgo.It("should create ingress with backend HTTPS", func() {
-			executeBacksideBacksideHTTPSTest(f, jig, ipName)
-		})
-
-		ginkgo.It("should support https-only annotation", func() {
-			executeStaticIPHttpsOnlyTest(f, jig, ipName, ipAddress)
-		})
-
-		ginkgo.It("should remove clusters as expected", func() {
-			ingAnnotations := map[string]string{
-				e2eingress.IngressStaticIPKey: ipName,
-			}
-			ingFilePath := filepath.Join(e2eingress.IngressManifestPath, "http")
-			jig.CreateIngress(ingFilePath, ns, ingAnnotations, map[string]string{})
-			jig.WaitForIngress(false /*waitForNodePort*/)
-			name := jig.Ingress.Name
-			// Verify that the ingress is spread to 1 cluster as expected.
-			verifyKubemciStatusHas(name, "is spread across 1 cluster")
-			// Validate that removing the ingress from all clusters throws an error.
-			// Reuse the ingress file created while creating the ingress.
-			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
-			output, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath)
-			if err != nil {
-				framework.Failf("unexpected error in running kubemci remove-clusters command to remove from all clusters: %s", err)
-			}
-			if !strings.Contains(output, "You should use kubemci delete to delete the ingress completely") {
-				framework.Failf("unexpected output in removing an ingress from all clusters, expected the output to include: You should use kubemci delete to delete the ingress completely, actual output: %s", output)
-			}
-			// Verify that the ingress is still spread to 1 cluster as expected.
-			verifyKubemciStatusHas(name, "is spread across 1 cluster")
-			// remove-clusters should succeed with --force=true
-			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath, "--force=true"); err != nil {
-				framework.Failf("unexpected error in running kubemci remove-clusters to remove from all clusters with --force=true: %s", err)
-			}
-			verifyKubemciStatusHas(name, "is spread across 0 cluster")
-		})
-
-		ginkgo.It("single and multi-cluster ingresses should be able to exist together", func() {
-			ginkgo.By("Creating a single cluster ingress first")
-			jig.Class = ""
-			singleIngFilePath := filepath.Join(e2eingress.GCEIngressManifestPath, "static-ip-2")
-			jig.CreateIngress(singleIngFilePath, ns, map[string]string{}, map[string]string{})
-			jig.WaitForIngress(false /*waitForNodePort*/)
-			// jig.Ingress will be overwritten when we create MCI, so keep a reference.
-			singleIng := jig.Ingress
-
-			// Create the multi-cluster ingress next.
-			ginkgo.By("Creating a multi-cluster ingress next")
-			jig.Class = e2eingress.MulticlusterIngressClassValue
-			ingAnnotations := map[string]string{
-				e2eingress.IngressStaticIPKey: ipName,
-			}
-			multiIngFilePath := filepath.Join(e2eingress.IngressManifestPath, "http")
-			jig.CreateIngress(multiIngFilePath, ns, ingAnnotations, map[string]string{})
-			jig.WaitForIngress(false /*waitForNodePort*/)
-			mciIngress := jig.Ingress
-
-			ginkgo.By("Deleting the single cluster ingress and verifying that multi-cluster ingress continues to work")
-			jig.Ingress = singleIng
-			jig.Class = ""
-			jig.TryDeleteIngress()
-			jig.Ingress = mciIngress
-			jig.Class = e2eingress.MulticlusterIngressClassValue
-			jig.WaitForIngress(false /*waitForNodePort*/)
-
-			ginkgo.By("Cleanup: Deleting the multi-cluster ingress")
-			jig.TryDeleteIngress()
-		})
-	})
-
 	// Time: borderline 5m, slow by design
 	ginkgo.Describe("[Slow] Nginx", func() {
 		var nginxController *e2eingress.NginxIngressController
 
 		ginkgo.BeforeEach(func() {
+			// Skip until nginx-ingress controller works against kubernetes 1.22+
+			// Those versions no longer server ingress v1beta1
+			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
+			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
+
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
@@ -733,117 +531,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 })
-
-// verifyKubemciStatusHas fails if kubemci get-status output for the given mci does not have the given expectedSubStr.
-func verifyKubemciStatusHas(name, expectedSubStr string) {
-	statusStr, err := framework.RunKubemciCmd("get-status", name)
-	if err != nil {
-		framework.Failf("unexpected error in running kubemci get-status %s: %s", name, err)
-	}
-	if !strings.Contains(statusStr, expectedSubStr) {
-		framework.Failf("expected status to have sub string %s, actual status: %s", expectedSubStr, statusStr)
-	}
-}
-
-func executePresharedCertTest(f *framework.Framework, jig *e2eingress.TestJig, staticIPName string) {
-	preSharedCertName := "test-pre-shared-cert"
-	ginkgo.By(fmt.Sprintf("Creating ssl certificate %q on GCE", preSharedCertName))
-	testHostname := "test.ingress.com"
-	cert, key, err := e2eingress.GenerateRSACerts(testHostname, true)
-	framework.ExpectNoError(err)
-	gceCloud, err := gce.GetGCECloud()
-	framework.ExpectNoError(err)
-	defer func() {
-		// We would not be able to delete the cert until ingress controller
-		// cleans up the target proxy that references it.
-		ginkgo.By("Deleting ingress before deleting ssl certificate")
-		if jig.Ingress != nil {
-			jig.TryDeleteIngress()
-		}
-		ginkgo.By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
-		err := wait.Poll(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
-			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !apierrors.IsNotFound(err) {
-				framework.Logf("ginkgo.Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
-				return false, nil
-			}
-			return true, nil
-		})
-		framework.ExpectNoError(err, fmt.Sprintf("ginkgo.Failed to delete ssl certificate %q: %v", preSharedCertName, err))
-	}()
-	_, err = gceCloud.CreateSslCertificate(&compute.SslCertificate{
-		Name:        preSharedCertName,
-		Certificate: string(cert),
-		PrivateKey:  string(key),
-		Description: "pre-shared cert for ingress testing",
-	})
-	framework.ExpectNoError(err, fmt.Sprintf("ginkgo.Failed to create ssl certificate %q: %v", preSharedCertName, err))
-
-	ginkgo.By("Creating an ingress referencing the pre-shared certificate")
-	// Create an ingress referencing this cert using pre-shared-cert annotation.
-	ingAnnotations := map[string]string{
-		e2eingress.IngressPreSharedCertKey: preSharedCertName,
-		// Disallow HTTP to save resources. This is irrelevant to the
-		// pre-shared cert test.
-		e2eingress.IngressAllowHTTPKey: "false",
-	}
-	if staticIPName != "" {
-		ingAnnotations[e2eingress.IngressStaticIPKey] = staticIPName
-	}
-	jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "pre-shared-cert"), f.Namespace.Name, ingAnnotations, map[string]string{})
-
-	ginkgo.By("Test that ingress works with the pre-shared certificate")
-	err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
-	framework.ExpectNoError(err, fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-}
-
-func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *e2eingress.TestJig, ipName, ip string) {
-	jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "static-ip"), f.Namespace.Name, map[string]string{
-		e2eingress.IngressStaticIPKey:  ipName,
-		e2eingress.IngressAllowHTTPKey: "false",
-	}, map[string]string{})
-
-	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
-
-	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
-	httpClient := e2eingress.BuildInsecureClient(e2eingress.IngressReqTimeout)
-	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("https://%s/", ip), "", propagationTimeout, jig.PollInterval, httpClient, false))
-
-	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("http://%s/", ip), "", propagationTimeout, jig.PollInterval, httpClient, true))
-}
-
-func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *e2eingress.TestJig, staticIPName string) {
-	ginkgo.By("Creating a set of ingress, service and deployment that have backside re-encryption configured")
-	deployCreated, svcCreated, ingCreated, err := jig.SetUpBacksideHTTPSIngress(f.ClientSet, f.Namespace.Name, staticIPName)
-	defer func() {
-		ginkgo.By("Cleaning up re-encryption ingress, service and deployment")
-		if errs := jig.DeleteTestResource(f.ClientSet, deployCreated, svcCreated, ingCreated); len(errs) > 0 {
-			framework.Failf("ginkgo.Failed to cleanup re-encryption ingress: %v", errs)
-		}
-	}()
-	framework.ExpectNoError(err, "ginkgo.Failed to create re-encryption ingress")
-	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
-
-	ginkgo.By(fmt.Sprintf("Waiting for ingress %s to come up", ingCreated.Name))
-	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, propagationTimeout)
-	framework.ExpectNoError(err, "ginkgo.Failed to wait for ingress IP")
-
-	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
-	timeoutClient := &http.Client{Timeout: e2eingress.IngressReqTimeout}
-	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, propagationTimeout, func() (bool, error) {
-		resp, err := e2eingress.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
-		if err != nil {
-			framework.Logf("SimpleGET failed: %v", err)
-			return false, nil
-		}
-		if !strings.Contains(resp, "request_scheme=https") {
-			return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
-		}
-		framework.Logf("Poll succeeded, request was served by HTTPS")
-		return true, nil
-	})
-	framework.ExpectNoError(err, "ginkgo.Failed to verify backside re-encryption ingress")
-}
 
 func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
 	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
@@ -922,7 +609,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ingVersion := "v1"
 		ingClient := f.ClientSet.NetworkingV1().Ingresses(ns)
 
-		prefixPathType := networkingv1.PathTypePrefix
+		prefixPathType := networkingv1.PathTypeImplementationSpecific
 		serviceBackend := &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
 			Port: networkingv1.ServiceBackendPort{
@@ -972,7 +659,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			framework.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
-				if group.Name == networkingv1beta1.GroupName {
+				if group.Name == networkingv1.GroupName {
 					for _, version := range group.Versions {
 						if version.Version == ingVersion {
 							found = true

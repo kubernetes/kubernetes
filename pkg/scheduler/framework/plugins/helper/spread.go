@@ -17,16 +17,30 @@ limitations under the License.
 package helper
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 )
 
+var (
+	rcKind = v1.SchemeGroupVersion.WithKind("ReplicationController")
+	rsKind = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	ssKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+)
+
 // DefaultSelector returns a selector deduced from the Services, Replication
 // Controllers, Replica Sets, and Stateful Sets matching the given pod.
-func DefaultSelector(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.ReplicationControllerLister, rsl appslisters.ReplicaSetLister, ssl appslisters.StatefulSetLister) labels.Selector {
+func DefaultSelector(
+	pod *v1.Pod,
+	sl corelisters.ServiceLister,
+	cl corelisters.ReplicationControllerLister,
+	rsl appslisters.ReplicaSetLister,
+	ssl appslisters.StatefulSetLister,
+) labels.Selector {
 	labelSet := make(labels.Set)
 	// Since services, RCs, RSs and SSs match the pod, they won't have conflicting
 	// labels. Merging is safe.
@@ -36,36 +50,43 @@ func DefaultSelector(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.R
 			labelSet = labels.Merge(labelSet, service.Spec.Selector)
 		}
 	}
+	selector := labelSet.AsSelector()
 
-	if rcs, err := cl.GetPodControllers(pod); err == nil {
-		for _, rc := range rcs {
+	owner := metav1.GetControllerOfNoCopy(pod)
+	if owner == nil {
+		return selector
+	}
+
+	gv, err := schema.ParseGroupVersion(owner.APIVersion)
+	if err != nil {
+		return selector
+	}
+
+	gvk := gv.WithKind(owner.Kind)
+	switch gvk {
+	case rcKind:
+		if rc, err := cl.ReplicationControllers(pod.Namespace).Get(owner.Name); err == nil {
 			labelSet = labels.Merge(labelSet, rc.Spec.Selector)
+			selector = labelSet.AsSelector()
 		}
-	}
-
-	selector := labels.NewSelector()
-	if len(labelSet) != 0 {
-		selector = labelSet.AsSelector()
-	}
-
-	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
-		for _, rs := range rss {
+	case rsKind:
+		if rs, err := rsl.ReplicaSets(pod.Namespace).Get(owner.Name); err == nil {
 			if other, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
 				if r, ok := other.Requirements(); ok {
 					selector = selector.Add(r...)
 				}
 			}
 		}
-	}
-
-	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
-		for _, ss := range sss {
+	case ssKind:
+		if ss, err := ssl.StatefulSets(pod.Namespace).Get(owner.Name); err == nil {
 			if other, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
 				if r, ok := other.Requirements(); ok {
 					selector = selector.Add(r...)
 				}
 			}
 		}
+	default:
+		// Not owned by a supported controller.
 	}
 
 	return selector

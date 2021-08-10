@@ -6,13 +6,16 @@ package kio
 import (
 	"encoding/json"
 	"io"
-
+	"path/filepath"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-// Writer writes ResourceNodes to bytes.
+// ByteWriter writes ResourceNodes to bytes. Generally YAML encoding will be used but in the special
+// case of writing a single, bare yaml.RNode that has a kioutil.PathAnnotation indicating that the
+// target is a JSON file JSON encoding is used. See shouldJSONEncodeSingleBareNode below for more
+// information.
 type ByteWriter struct {
 	// Writer is where ResourceNodes are encoded.
 	Writer io.Writer
@@ -47,16 +50,18 @@ type ByteWriter struct {
 
 var _ Writer = ByteWriter{}
 
-func (w ByteWriter) Write(nodes []*yaml.RNode) error {
-	yaml.DoSerializationHacksOnNodes(nodes)
+func (w ByteWriter) Write(inputNodes []*yaml.RNode) error {
+	// Copy the nodes to prevent writer from mutating the original nodes.
+	nodes := copyRNodes(inputNodes)
 	if w.Sort {
 		if err := kioutil.SortNodes(nodes); err != nil {
 			return errors.Wrap(err)
 		}
 	}
 
-	encoder := yaml.NewEncoder(w.Writer)
-	defer encoder.Close()
+	// Even though we use the this value further down we must check this before removing annotations
+	jsonEncodeSingleBareNode := w.shouldJSONEncodeSingleBareNode(nodes)
+
 	for i := range nodes {
 		// clean resources by removing annotations set by the Reader
 		if !w.KeepReaderAnnotations {
@@ -81,10 +86,18 @@ func (w ByteWriter) Write(nodes []*yaml.RNode) error {
 		}
 	}
 
+	if jsonEncodeSingleBareNode {
+		encoder := json.NewEncoder(w.Writer)
+		encoder.SetIndent("", "  ")
+		return errors.Wrap(encoder.Encode(nodes[0]))
+	}
+
+	encoder := yaml.NewEncoder(w.Writer)
+	defer encoder.Close()
 	// don't wrap the elements
 	if w.WrappingKind == "" {
 		for i := range nodes {
-			if err := w.encode(encoder, nodes[i].Document()); err != nil {
+			if err := encoder.Encode(nodes[i].Document()); err != nil {
 				return err
 			}
 		}
@@ -118,23 +131,37 @@ func (w ByteWriter) Write(nodes []*yaml.RNode) error {
 	for i := range nodes {
 		items.Content = append(items.Content, nodes[i].YNode())
 	}
-	err := w.encode(encoder, doc)
-	yaml.UndoSerializationHacksOnNodes(nodes)
-	return err
+	return encoder.Encode(doc)
 }
 
-// encode encodes the input document node to appropriate node format
-func (w ByteWriter) encode(encoder *yaml.Encoder, doc *yaml.Node) error {
-	rNode := &yaml.RNode{}
-	rNode.SetYNode(doc)
-	str, err := rNode.String()
-	if err != nil {
-		return errors.Wrap(err)
+func copyRNodes(in []*yaml.RNode) []*yaml.RNode {
+	out := make([]*yaml.RNode, len(in))
+	for i := range in {
+		out[i] = in[i].Copy()
 	}
-	if json.Valid([]byte(str)) {
-		je := json.NewEncoder(w.Writer)
-		je.SetIndent("", "  ")
-		return errors.Wrap(je.Encode(rNode))
+	return out
+}
+
+// shouldJSONEncodeSingleBareNode determines if nodes contain a single node that should not be
+// wrapped and has a JSON file extension, which in turn means that the node should be JSON encoded.
+// Note 1: this must be checked before any annotations to avoid losing information about the target
+//         filename extension.
+// Note 2: JSON encoding should only be used for single, unwrapped nodes because multiple unwrapped
+//         nodes cannot be represented in JSON (no multi doc support). Furthermore, the typical use
+//         cases for wrapping nodes would likely not include later writing the whole wrapper to a
+//         .json file, i.e. there is no point risking any edge case information loss e.g. comments
+//         disappearing, that could come from JSON encoding the whole wrapper just to ensure that
+//         one (or all nodes) can be read as JSON.
+func (w ByteWriter) shouldJSONEncodeSingleBareNode(nodes []*yaml.RNode) bool {
+	if w.WrappingKind == "" && len(nodes) == 1 {
+		if path, _, _ := kioutil.GetFileAnnotations(nodes[0]); path != "" {
+			filename := filepath.Base(path)
+			for _, glob := range JSONMatch {
+				if match, _ := filepath.Match(glob, filename); match {
+					return true
+				}
+			}
+		}
 	}
-	return encoder.Encode(doc)
+	return false
 }

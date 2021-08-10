@@ -20,6 +20,9 @@ func AddFunctionBasicsFlags(set *pflag.FlagSet) {
 	set.StringArrayVarP(
 		&theFlags.fnOptions.Env, "env", "e", []string{},
 		"a list of environment variables to be used by functions")
+	set.BoolVar(
+		&theFlags.fnOptions.AsCurrentUser, "as-current-user", false,
+		"use the uid and gid of the command executor to run the function in the container")
 }
 
 func AddFunctionAlphaEnablementFlags(set *pflag.FlagSet) {

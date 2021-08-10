@@ -28,7 +28,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -304,6 +304,10 @@ func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
 func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
+	if err != nil {
+		return nil, err
+	}
 	endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -679,32 +683,32 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 }
 
 // CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
-func (j *TestJig) CreatePDB(rc *v1.ReplicationController) error {
+func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1.PodDisruptionBudget, error) {
 	pdb := j.newPDBTemplate(rc)
-	_, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
+	newPdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
+		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
 	}
 	if err := j.waitForPdbReady(); err != nil {
-		return fmt.Errorf("failed waiting for PDB to be ready: %v", err)
+		return nil, fmt.Errorf("failed waiting for PDB to be ready: %v", err)
 	}
 
-	return nil
+	return newPdb, nil
 }
 
 // newPDBTemplate returns the default policyv1.PodDisruptionBudget object for
 // this j, but does not actually create the PDB.  The default PDB specifies a
 // MinAvailable of N-1 and matches the pods created by the RC.
-func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
 
-	pdb := &policyv1beta1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: j.Namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector:     &metav1.LabelSelector{MatchLabels: j.Labels},
 		},
@@ -762,7 +766,7 @@ func (j *TestJig) Scale(replicas int) error {
 func (j *TestJig) waitForPdbReady() error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
+		pdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

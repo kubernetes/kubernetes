@@ -55,18 +55,18 @@ var (
 	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
 
-func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPlugin(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Provides utilities for interacting with plugins."),
+		Short:                 i18n.T("Provides utilities for interacting with plugins"),
 		Long:                  pluginLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 		},
 	}
 
-	cmd.AddCommand(NewCmdPluginList(f, streams))
+	cmd.AddCommand(NewCmdPluginList(streams))
 	return cmd
 }
 
@@ -80,14 +80,14 @@ type PluginListOptions struct {
 }
 
 // NewCmdPluginList provides a way to list all plugin executables visible to kubectl
-func NewCmdPluginList(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPluginList(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PluginListOptions{
 		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: i18n.T("list all visible plugin executables on a user's PATH"),
+		Short: i18n.T("List all visible plugin executables on a user's PATH"),
 		Long:  pluginListLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd))

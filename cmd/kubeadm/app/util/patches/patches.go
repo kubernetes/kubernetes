@@ -28,12 +28,13 @@ import (
 	"strings"
 	"sync"
 
-	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/yaml"
+
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
 )
 
 // PatchTarget defines a target to be patched, such as a control-plane static Pod.
@@ -283,7 +284,11 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		goto return_path_error
 	}
 	if !info.IsDir() {
-		err = errors.New("not a directory")
+		err = &os.PathError{
+			Op:   "getPatchSetsFromPath",
+			Path: info.Name(),
+			Err:  errors.New("not a directory"),
+		}
 		goto return_path_error
 	}
 

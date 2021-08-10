@@ -10,6 +10,10 @@ import (
 
 // DockerImage is for earlier versions of the Docker API (pre-012 to be specific). It is also the
 // version of metadata that the container image registry uses to persist metadata.
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +openshift:compatibility-gen:internal
 type DockerImage struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -24,13 +24,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	pkgversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/pkg/errors"
 )
 
 const (

@@ -24,6 +24,9 @@ option go_package = "v1";
 // An OpenShift project is an alternative representation of a Kubernetes namespace. Projects are exposed
 // as editable to end users while namespaces are not. Direct creation of a project is typically restricted
 // to administrators, while end users should use the requestproject resource.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message Project {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -36,6 +39,9 @@ message Project {
 }
 
 // ProjectList is a list of Project objects.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ProjectList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -44,6 +50,9 @@ message ProjectList {
 }
 
 // ProjectRequest is the set of options necessary to fully qualify a project request
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ProjectRequest {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 

@@ -67,7 +67,7 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 
 	if shouldTestPDBs() {
 		ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
-		err = jig.CreatePDB(rc)
+		_, err = jig.CreatePDB(rc)
 		framework.ExpectNoError(err)
 	}
 

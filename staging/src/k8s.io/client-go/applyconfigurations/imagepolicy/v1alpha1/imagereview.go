@@ -49,7 +49,7 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // ExtractImageReview extracts the applied configuration owned by fieldManager from
 // imageReview. If no managedFields are found in imageReview for fieldManager, a
 // ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return extractImageReview(imageReview, fieldManager, "")
+}
+
+// ExtractImageReviewStatus is the same as ExtractImageReview except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+	return extractImageReview(imageReview, fieldManager, "status")
+}
+
+func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
-	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b)
+	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

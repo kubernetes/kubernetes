@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -27,12 +28,16 @@ type RequestMutatorFunc func(incoming *http.Request, outgoing *http.Request) *ht
 
 // Proxy provides websocket transport upgrade to compatible endpoints.
 type Proxy struct {
-	h                   http.Handler
-	logger              Logger
-	methodOverrideParam string
-	tokenCookieName     string
-	requestMutator      RequestMutatorFunc
-	headerForwarder     func(header string) bool
+	h                      http.Handler
+	logger                 Logger
+	maxRespBodyBufferBytes int
+	methodOverrideParam    string
+	tokenCookieName        string
+	requestMutator         RequestMutatorFunc
+	headerForwarder        func(header string) bool
+	pingInterval           time.Duration
+	pingWait               time.Duration
+	pongWait               time.Duration
 }
 
 // Logger collects log messages.
@@ -51,6 +56,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Option allows customization of the proxy.
 type Option func(*Proxy)
+
+// WithMaxRespBodyBufferSize allows specification of a custom size for the
+// buffer used while reading the response body. By default, the bufio.Scanner
+// used to read the response body sets the maximum token size to MaxScanTokenSize.
+func WithMaxRespBodyBufferSize(nBytes int) Option {
+	return func(p *Proxy) {
+		p.maxRespBodyBufferBytes = nBytes
+	}
+}
 
 // WithMethodParamOverride allows specification of the special http parameter that is used in the proxied streaming request.
 func WithMethodParamOverride(param string) Option {
@@ -84,6 +98,17 @@ func WithForwardedHeaders(fn func(header string) bool) Option {
 func WithLogger(logger Logger) Option {
 	return func(p *Proxy) {
 		p.logger = logger
+	}
+}
+
+// WithPingControl allows specification of ping pong control. The interval
+// parameter specifies the pingInterval between pings. The allowed wait time
+// for a pong response is (pingInterval * 10) / 9.
+func WithPingControl(interval time.Duration) Option {
+	return func(proxy *Proxy) {
+		proxy.pingInterval = interval
+		proxy.pongWait = (interval * 10) / 9
+		proxy.pingWait = proxy.pongWait / 6
 	}
 }
 
@@ -159,7 +184,7 @@ func (p *Proxy) proxy(w http.ResponseWriter, r *http.Request) {
 	defer cancelFn()
 
 	requestBodyR, requestBodyW := io.Pipe()
-	request, err := http.NewRequest(r.Method, r.URL.String(), requestBodyR)
+	request, err := http.NewRequestWithContext(r.Context(), r.Method, r.URL.String(), requestBodyR)
 	if err != nil {
 		p.logger.Warnln("error preparing request:", err)
 		return
@@ -201,6 +226,10 @@ func (p *Proxy) proxy(w http.ResponseWriter, r *http.Request) {
 
 	// read loop -- take messages from websocket and write to http request
 	go func() {
+		if p.pingInterval > 0 && p.pingWait > 0 && p.pongWait > 0 {
+			conn.SetReadDeadline(time.Now().Add(p.pongWait))
+			conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(p.pongWait)); return nil })
+		}
 		defer func() {
 			cancelFn()
 		}()
@@ -232,8 +261,38 @@ func (p *Proxy) proxy(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+	// ping write loop
+	if p.pingInterval > 0 && p.pingWait > 0 && p.pongWait > 0 {
+		go func() {
+			ticker := time.NewTicker(p.pingInterval)
+			defer func() {
+				ticker.Stop()
+				conn.Close()
+			}()
+			for {
+				select {
+				case <-ctx.Done():
+					p.logger.Debugln("ping loop done")
+					return
+				case <-ticker.C:
+					conn.SetWriteDeadline(time.Now().Add(p.pingWait))
+					if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+						return
+					}
+				}
+			}
+		}()
+	}
 	// write loop -- take messages from response and write to websocket
 	scanner := bufio.NewScanner(responseBodyR)
+
+	// if maxRespBodyBufferSize has been specified, use custom buffer for scanner
+	var scannerBuf []byte
+	if p.maxRespBodyBufferBytes > 0 {
+		scannerBuf = make([]byte, 0, 64*1024)
+		scanner.Buffer(scannerBuf, p.maxRespBodyBufferBytes)
+	}
+
 	for scanner.Scan() {
 		if len(scanner.Bytes()) == 0 {
 			p.logger.Warnln("[write] empty scan", scanner.Err())

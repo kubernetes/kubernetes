@@ -20,8 +20,9 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: KubeScheduler provides information to configure an operator to
-          manage scheduler.
+        description: "KubeScheduler provides information to configure an operator
+          to manage scheduler. \n Compatibility level 1: Stable within a major release
+          for a minimum of 12 months or 3 minor releases (whichever is longer)."
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -183,17 +184,21 @@ spec:
                       format: int32
                       type: integer
                     lastFailedCount:
-                      description: lastFailedCount is how often the last failed revision
-                        failed.
+                      description: lastFailedCount is how often the installer pod
+                        of the last failed revision failed.
                       type: integer
+                    lastFailedReason:
+                      description: lastFailedReason is a machine readable failure
+                        reason string.
+                      type: string
                     lastFailedRevision:
                       description: lastFailedRevision is the generation of the deployment
                         we tried and failed to deploy.
                       format: int32
                       type: integer
                     lastFailedRevisionErrors:
-                      description: lastFailedRevisionErrors is a list of the errors
-                        during the failed deployment referenced in lastFailedRevision
+                      description: lastFailedRevisionErrors is a list of human readable
+                        errors during the failed deployment referenced in lastFailedRevision.
                       items:
                         type: string
                       type: array
@@ -202,6 +207,10 @@ spec:
                         failed the last time.
                       format: date-time
                       type: string
+                    lastFallbackCount:
+                      description: lastFallbackCount is how often a fallback to a
+                        previous revision happened.
+                      type: integer
                     nodeName:
                       description: nodeName is the name of the node
                       type: string

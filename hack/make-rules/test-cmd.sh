@@ -170,7 +170,8 @@ if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
   # invoke the tests
   make -C "${KUBE_ROOT}" test \
     WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
-    KUBE_TIMEOUT=--timeout=240s
+    KUBE_TIMEOUT=--timeout=240s \
+    KUBE_RACE=""
 
   # if we ONLY want to run kubeadm, then exit here.
   if [[ ${WHAT} == "kubeadm" ]]; then

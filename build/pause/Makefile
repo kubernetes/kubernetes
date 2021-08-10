@@ -17,7 +17,7 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG = 3.5
+TAG = 3.6
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -40,12 +40,8 @@ ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, 
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE.linux ?= k8s.gcr.io/build-image/kube-cross
-KUBE_CROSS_VERSION.linux ?= $(shell cat ../build-image/cross/VERSION)
-KUBE_CROSS_IMAGE.windows ?= dockcross/windows-static-x64
-KUBE_CROSS_VERSION.windows ?= latest
-KUBE_CROSS_IMAGE := ${KUBE_CROSS_IMAGE.${OS}}
-KUBE_CROSS_VERSION := ${KUBE_CROSS_VERSION.${OS}}
+KUBE_CROSS_IMAGE ?= k8s.gcr.io/build-image/kube-cross
+KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 # NOTE(claudiub): The Windows pause image also requires the wincat binary we're compiling for the
 # port-forwarding scenarios. If it's no longer necessary, it can be removed.
@@ -64,7 +60,7 @@ EXTENSION := ${EXTENSION.${OS}}
 # The manifest command is still experimental as of Docker 18.09.3
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
-TRIPLE.windows-amd64 := x86_64-w64-mingw32.static
+TRIPLE.windows-amd64 := x86_64-w64-mingw32
 TRIPLE.linux-amd64 := x86_64-linux-gnu
 TRIPLE.linux-arm := arm-linux-gnueabihf
 TRIPLE.linux-arm64 := aarch64-linux-gnu

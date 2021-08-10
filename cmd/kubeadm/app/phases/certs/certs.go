@@ -24,13 +24,14 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pkg/errors"
-	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -477,12 +478,11 @@ func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg 
 // by keeping track with a cache.
 func CheckCertificatePeriodValidity(baseName string, cert *x509.Certificate) {
 	certPeriodValidationMutex.Lock()
+	defer certPeriodValidationMutex.Unlock()
 	if _, exists := certPeriodValidation[baseName]; exists {
-		certPeriodValidationMutex.Unlock()
 		return
 	}
 	certPeriodValidation[baseName] = struct{}{}
-	certPeriodValidationMutex.Unlock()
 
 	klog.V(5).Infof("validating certificate period for %s certificate", baseName)
 	if err := pkiutil.ValidateCertPeriod(cert, 0); err != nil {

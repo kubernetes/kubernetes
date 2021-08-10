@@ -351,6 +351,13 @@ type RawSockaddrIUCV struct {
 	Name    [8]int8
 }
 
+type RawSockaddrNFC struct {
+	Sa_family    uint16
+	Dev_idx      uint32
+	Target_idx   uint32
+	Nfc_protocol uint32
+}
+
 type _Socklen uint32
 
 type Linger struct {
@@ -464,6 +471,7 @@ const (
 	SizeofSockaddrL2TPIP    = 0x10
 	SizeofSockaddrL2TPIP6   = 0x20
 	SizeofSockaddrIUCV      = 0x20
+	SizeofSockaddrNFC       = 0x10
 	SizeofLinger            = 0x8
 	SizeofIPMreq            = 0x8
 	SizeofIPMreqn           = 0xc
@@ -3741,4 +3749,159 @@ const (
 	NLMSGERR_ATTR_MSG    = 0x1
 	NLMSGERR_ATTR_OFFS   = 0x2
 	NLMSGERR_ATTR_COOKIE = 0x3
+)
+
+type (
+	EraseInfo struct {
+		Start  uint32
+		Length uint32
+	}
+	EraseInfo64 struct {
+		Start  uint64
+		Length uint64
+	}
+	MtdOobBuf struct {
+		Start  uint32
+		Length uint32
+		Ptr    *uint8
+	}
+	MtdOobBuf64 struct {
+		Start  uint64
+		Pad    uint32
+		Length uint32
+		Ptr    uint64
+	}
+	MtdWriteReq struct {
+		Start  uint64
+		Len    uint64
+		Ooblen uint64
+		Data   uint64
+		Oob    uint64
+		Mode   uint8
+		_      [7]uint8
+	}
+	MtdInfo struct {
+		Type      uint8
+		Flags     uint32
+		Size      uint32
+		Erasesize uint32
+		Writesize uint32
+		Oobsize   uint32
+		_         uint64
+	}
+	RegionInfo struct {
+		Offset      uint32
+		Erasesize   uint32
+		Numblocks   uint32
+		Regionindex uint32
+	}
+	OtpInfo struct {
+		Start  uint32
+		Length uint32
+		Locked uint32
+	}
+	NandOobinfo struct {
+		Useecc   uint32
+		Eccbytes uint32
+		Oobfree  [8][2]uint32
+		Eccpos   [32]uint32
+	}
+	NandOobfree struct {
+		Offset uint32
+		Length uint32
+	}
+	NandEcclayout struct {
+		Eccbytes uint32
+		Eccpos   [64]uint32
+		Oobavail uint32
+		Oobfree  [8]NandOobfree
+	}
+	MtdEccStats struct {
+		Corrected uint32
+		Failed    uint32
+		Badblocks uint32
+		Bbtblocks uint32
+	}
+)
+
+const (
+	MTD_OPS_PLACE_OOB = 0x0
+	MTD_OPS_AUTO_OOB  = 0x1
+	MTD_OPS_RAW       = 0x2
+)
+
+const (
+	MTD_FILE_MODE_NORMAL      = 0x0
+	MTD_FILE_MODE_OTP_FACTORY = 0x1
+	MTD_FILE_MODE_OTP_USER    = 0x2
+	MTD_FILE_MODE_RAW         = 0x3
+)
+
+const (
+	NFC_CMD_UNSPEC                    = 0x0
+	NFC_CMD_GET_DEVICE                = 0x1
+	NFC_CMD_DEV_UP                    = 0x2
+	NFC_CMD_DEV_DOWN                  = 0x3
+	NFC_CMD_DEP_LINK_UP               = 0x4
+	NFC_CMD_DEP_LINK_DOWN             = 0x5
+	NFC_CMD_START_POLL                = 0x6
+	NFC_CMD_STOP_POLL                 = 0x7
+	NFC_CMD_GET_TARGET                = 0x8
+	NFC_EVENT_TARGETS_FOUND           = 0x9
+	NFC_EVENT_DEVICE_ADDED            = 0xa
+	NFC_EVENT_DEVICE_REMOVED          = 0xb
+	NFC_EVENT_TARGET_LOST             = 0xc
+	NFC_EVENT_TM_ACTIVATED            = 0xd
+	NFC_EVENT_TM_DEACTIVATED          = 0xe
+	NFC_CMD_LLC_GET_PARAMS            = 0xf
+	NFC_CMD_LLC_SET_PARAMS            = 0x10
+	NFC_CMD_ENABLE_SE                 = 0x11
+	NFC_CMD_DISABLE_SE                = 0x12
+	NFC_CMD_LLC_SDREQ                 = 0x13
+	NFC_EVENT_LLC_SDRES               = 0x14
+	NFC_CMD_FW_DOWNLOAD               = 0x15
+	NFC_EVENT_SE_ADDED                = 0x16
+	NFC_EVENT_SE_REMOVED              = 0x17
+	NFC_EVENT_SE_CONNECTIVITY         = 0x18
+	NFC_EVENT_SE_TRANSACTION          = 0x19
+	NFC_CMD_GET_SE                    = 0x1a
+	NFC_CMD_SE_IO                     = 0x1b
+	NFC_CMD_ACTIVATE_TARGET           = 0x1c
+	NFC_CMD_VENDOR                    = 0x1d
+	NFC_CMD_DEACTIVATE_TARGET         = 0x1e
+	NFC_ATTR_UNSPEC                   = 0x0
+	NFC_ATTR_DEVICE_INDEX             = 0x1
+	NFC_ATTR_DEVICE_NAME              = 0x2
+	NFC_ATTR_PROTOCOLS                = 0x3
+	NFC_ATTR_TARGET_INDEX             = 0x4
+	NFC_ATTR_TARGET_SENS_RES          = 0x5
+	NFC_ATTR_TARGET_SEL_RES           = 0x6
+	NFC_ATTR_TARGET_NFCID1            = 0x7
+	NFC_ATTR_TARGET_SENSB_RES         = 0x8
+	NFC_ATTR_TARGET_SENSF_RES         = 0x9
+	NFC_ATTR_COMM_MODE                = 0xa
+	NFC_ATTR_RF_MODE                  = 0xb
+	NFC_ATTR_DEVICE_POWERED           = 0xc
+	NFC_ATTR_IM_PROTOCOLS             = 0xd
+	NFC_ATTR_TM_PROTOCOLS             = 0xe
+	NFC_ATTR_LLC_PARAM_LTO            = 0xf
+	NFC_ATTR_LLC_PARAM_RW             = 0x10
+	NFC_ATTR_LLC_PARAM_MIUX           = 0x11
+	NFC_ATTR_SE                       = 0x12
+	NFC_ATTR_LLC_SDP                  = 0x13
+	NFC_ATTR_FIRMWARE_NAME            = 0x14
+	NFC_ATTR_SE_INDEX                 = 0x15
+	NFC_ATTR_SE_TYPE                  = 0x16
+	NFC_ATTR_SE_AID                   = 0x17
+	NFC_ATTR_FIRMWARE_DOWNLOAD_STATUS = 0x18
+	NFC_ATTR_SE_APDU                  = 0x19
+	NFC_ATTR_TARGET_ISO15693_DSFID    = 0x1a
+	NFC_ATTR_TARGET_ISO15693_UID      = 0x1b
+	NFC_ATTR_SE_PARAMS                = 0x1c
+	NFC_ATTR_VENDOR_ID                = 0x1d
+	NFC_ATTR_VENDOR_SUBCMD            = 0x1e
+	NFC_ATTR_VENDOR_DATA              = 0x1f
+	NFC_SDP_ATTR_UNSPEC               = 0x0
+	NFC_SDP_ATTR_URI                  = 0x1
+	NFC_SDP_ATTR_SAP                  = 0x2
 )

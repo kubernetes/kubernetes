@@ -24,6 +24,9 @@ import (
 // Triggers can be disabled to allow manual control over a deployment. The "strategy" determines how the deployment
 // is carried out and may be changed at any time. The `latestVersion` field is updated when a new deployment
 // is triggered by any means.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -388,6 +391,9 @@ type DeploymentCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentConfigList is a collection of deployment configs.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -399,6 +405,9 @@ type DeploymentConfigList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentConfigRollback provides the input to rollback generation.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentConfigRollback struct {
 	metav1.TypeMeta `json:",inline"`
 	// Name of the deployment config that will be rolled back.
@@ -428,6 +437,9 @@ type DeploymentConfigRollbackSpec struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentRequest is a request to a deployment config for a new deployment.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// Name of the deployment config for requesting a new deployment.
@@ -446,6 +458,9 @@ type DeploymentRequest struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentLog represents the logs for a deployment
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentLog struct {
 	metav1.TypeMeta `json:",inline"`
 }
@@ -453,6 +468,9 @@ type DeploymentLog struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentLogOptions is the REST options for a deployment log
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type DeploymentLogOptions struct {
 	metav1.TypeMeta `json:",inline"`
 

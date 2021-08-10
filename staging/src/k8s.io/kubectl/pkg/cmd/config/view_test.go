@@ -24,7 +24,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type viewClusterTest struct {
@@ -185,7 +184,7 @@ func (test viewClusterTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdConfigView(cmdutil.NewFactory(genericclioptions.NewTestConfigFlags()), streams, pathOptions)
+	cmd := NewCmdConfigView(streams, pathOptions)
 	// "context" is a global flag, inherited from base kubectl command in the real world
 	cmd.Flags().String("context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().Parse(test.flags)

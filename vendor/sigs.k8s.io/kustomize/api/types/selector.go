@@ -4,17 +4,18 @@
 package types
 
 import (
+	"fmt"
 	"regexp"
 
-	"sigs.k8s.io/kustomize/api/resid"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // Selector specifies a set of resources.
 // Any resource that matches intersection of all conditions
 // is included in this set.
 type Selector struct {
-	// KrmId refers to a GVKN/Ns of a resource.
-	KrmId `json:",inline,omitempty" yaml:",inline,omitempty"`
+	// ResId refers to a GVKN/Ns of a resource.
+	resid.ResId `json:",inline,omitempty" yaml:",inline,omitempty"`
 
 	// AnnotationSelector is a string that follows the label selection expression
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
@@ -27,21 +28,13 @@ type Selector struct {
 	LabelSelector string `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty"`
 }
 
-// KrmId refers to a GVKN/Ns of a resource.
-type KrmId struct {
-	resid.Gvk `json:",inline,omitempty" yaml:",inline,omitempty"`
-	Name      string `json:"name,omitempty" yaml:"name,omitempty"`
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+func (s *Selector) Copy() Selector {
+	return *s
 }
 
-// Match returns true if id selects other, i.e. id's fields
-// either match other's or are empty
-func (id *KrmId) Match(other *KrmId) bool {
-	return (id.Group == "" || id.Group == other.Group) &&
-		(id.Version == "" || id.Version == other.Version) &&
-		(id.Kind == "" || id.Kind == other.Kind) &&
-		(id.Name == "" || id.Name == other.Name) &&
-		(id.Namespace == "" || id.Namespace == other.Namespace)
+func (s *Selector) String() string {
+	return fmt.Sprintf(
+		"%s:a=%s:l=%s", s.ResId, s.AnnotationSelector, s.LabelSelector)
 }
 
 // SelectorRegex is a Selector with regex in GVK

@@ -23,7 +23,7 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
-          description: "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster. \n This supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md \n More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns"
+          description: "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster. \n This supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md \n More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
           type: object
           properties:
             apiVersion:
@@ -38,6 +38,10 @@ spec:
               description: spec is the specification of the desired behavior of the DNS.
               type: object
               properties:
+                managementState:
+                  description: managementState indicates whether the DNS operator should manage cluster DNS
+                  type: string
+                  pattern: ^(Managed|Unmanaged|Force|Removed)$
                 nodePlacement:
                   description: "nodePlacement provides explicit control over the scheduling of DNS pods. \n Generally, it is useful to run a DNS pod on every node so that DNS queries are always handled by a local DNS pod instead of going over the network to a DNS pod on another node.  However, security policies may require restricting the placement of DNS pods to specific nodes. For example, if a security policy prohibits pods on arbitrary nodes from communicating with the API, a node selector can be specified to restrict DNS pods to nodes that are permitted to communicate with the API.  Conversely, if running DNS pods on nodes with a particular taint is desired, a toleration can be specified for that taint. \n If unset, defaults are used. See nodePlacement for more details."
                   type: object

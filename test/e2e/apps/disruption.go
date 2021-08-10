@@ -19,16 +19,16 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -187,6 +187,25 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
 	})
 
+	// PDB shouldn't error out when there are unmanaged pods
+	ginkgo.It("should observe that the PodDisruptionBudget status is not updated for unmanaged pods",
+		func() {
+			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
+
+			createPodsOrDie(cs, ns, 3)
+			waitForPodsOrDie(cs, ns, 3)
+
+			// Since we allow unmanaged pods to be associated with a PDB, we should not see any error
+			gomega.Consistently(func() (bool, error) {
+				pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return isPDBErroring(pdb), nil
+			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod shouldn't error for "+
+				"unmanaged pod")
+		})
+
 	evictionCases := []struct {
 		description        string
 		minAvailable       intstr.IntOrString
@@ -285,7 +304,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			pod, err := locateRunningPod(cs, ns)
 			framework.ExpectNoError(err)
 
-			e := &policyv1beta1.Eviction{
+			e := &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
@@ -293,8 +312,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			if c.shouldDeny {
-				err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+				err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+				framework.ExpectError(err, "pod eviction should fail")
+				framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -304,7 +324,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-					err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+					err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 					if err != nil {
 						return false, nil
 					}
@@ -315,7 +335,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	}
 
-	ginkgo.It("should block an eviction until the PDB is updated to allow it", func() {
+	/*
+		Release : v1.22
+		Testname: PodDisruptionBudget: block an eviction until the PDB is updated to allow it
+		Description: Eviction API must block an eviction until the PDB is updated to allow it
+	*/
+	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func() {
 		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(3), defaultLabels)
 		createReplicaSetOrDie(cs, ns, 3, false)
@@ -325,14 +350,15 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		pod, err := locateRunningPod(cs, ns)
 		framework.ExpectNoError(err)
-		e := &policyv1beta1.Eviction{
+		e := &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
@@ -344,7 +370,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
 		waitForPdbToObserveHealthyPods(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
@@ -362,21 +388,22 @@ var _ = SIGDescribe("DisruptionController", func() {
 		waitForPodsOrDie(cs, ns, 3)
 		pod, err = locateRunningPod(cs, ns) // locate a new running pod
 		framework.ExpectNoError(err)
-		e = &policyv1beta1.Eviction{
+		e = &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
 		deletePDBOrDie(cs, ns, defaultName)
 
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
+		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
@@ -670,4 +697,16 @@ func unstructuredToPDB(obj *unstructured.Unstructured) (*policyv1.PodDisruptionB
 	pdb.Kind = ""
 	pdb.APIVersion = ""
 	return pdb, err
+}
+
+// isPDBErroring checks if the PDB is erroring on when there are unmanaged pods
+func isPDBErroring(pdb *policyv1.PodDisruptionBudget) bool {
+	hasFailed := false
+	for _, condition := range pdb.Status.Conditions {
+		if strings.Contains(condition.Reason, "SyncFailed") &&
+			strings.Contains(condition.Message, "found no controller ref for pod") {
+			hasFailed = true
+		}
+	}
+	return hasFailed
 }

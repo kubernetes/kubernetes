@@ -33,8 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/features"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -106,6 +108,26 @@ func NewNoxuSubresourceInstance(namespace, name, version string) *unstructured.U
 			"spec": map[string]interface{}{
 				"num":      int64(10),
 				"replicas": int64(3),
+			},
+			"status": map[string]interface{}{
+				"replicas": int64(7),
+			},
+		},
+	}
+}
+
+func NewNoxuSubresourceInstanceWithReplicas(namespace, name, version, replicasField string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": fmt.Sprintf("mygroup.example.com/%s", version),
+			"kind":       "WishIHadChosenNoxu",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"spec": map[string]interface{}{
+				"num":         int64(10),
+				replicasField: int64(3),
 			},
 			"status": map[string]interface{}{
 				"replicas": int64(7),
@@ -370,6 +392,87 @@ func TestScaleSubresource(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+	}
+}
+
+func TestApplyScaleSubresource(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)[0]
+	subresources, err := getSubresourcesForVersion(noxuDefinition, "v1beta1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subresources.Scale.SpecReplicasPath = ".spec.replicas[0]"
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a client for it.
+	ns := "not-the-default"
+	noxuResourceClient := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1beta1")
+
+	obj := NewNoxuSubresourceInstanceWithReplicas(ns, "foo", "v1beta1", "replicas[0]")
+	obj, err = noxuResourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
+	if err != nil {
+		t.Logf("%#v", obj)
+		t.Fatalf("Failed to create CustomResource: %v", err)
+	}
+
+	noxuResourceClient = newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1")
+	patch := `{"metadata": {"name": "foo"}, "kind": "WishIHadChosenNoxu", "apiVersion": "mygroup.example.com/v1", "spec": {"replicas": 3}}`
+	obj, err = noxuResourceClient.Patch(context.TODO(), "foo", types.ApplyPatchType, []byte(patch), metav1.PatchOptions{FieldManager: "applier"})
+	if err != nil {
+		t.Logf("%#v", obj)
+		t.Fatalf("Failed to Apply CustomResource: %v", err)
+	}
+
+	if got := len(obj.GetManagedFields()); got != 2 {
+		t.Fatalf("Expected 2 managed fields, got %v: %v", got, obj.GetManagedFields())
+	}
+
+	_, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, []byte(`{"spec": {"replicas": 5}}`), metav1.PatchOptions{FieldManager: "scaler"}, "scale")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to Get CustomResource: %v", err)
+	}
+
+	// Managed fields should have 3 entries: one for scale, one for spec, and one for the rest of the fields
+	managedFields := obj.GetManagedFields()
+	if len(managedFields) != 3 {
+		t.Fatalf("Expected 3 managed fields, got %v: %v", len(managedFields), obj.GetManagedFields())
+	}
+	specEntry := managedFields[0]
+	if specEntry.Manager != "applier" || specEntry.APIVersion != "mygroup.example.com/v1" || specEntry.Operation != "Apply" || string(specEntry.FieldsV1.Raw) != `{"f:spec":{}}` || specEntry.Subresource != "" {
+		t.Fatalf("Unexpected entry: %v", specEntry)
+	}
+	scaleEntry := managedFields[1]
+	if scaleEntry.Manager != "scaler" || scaleEntry.APIVersion != "mygroup.example.com/v1" || scaleEntry.Operation != "Update" || string(scaleEntry.FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` || scaleEntry.Subresource != "scale" {
+		t.Fatalf("Unexpected entry: %v", scaleEntry)
+	}
+	restEntry := managedFields[2]
+	if restEntry.Manager != "integration.test" || restEntry.APIVersion != "mygroup.example.com/v1beta1" {
+		t.Fatalf("Unexpected entry: %v", restEntry)
 	}
 }
 

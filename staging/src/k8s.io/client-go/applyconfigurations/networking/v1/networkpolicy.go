@@ -49,7 +49,7 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // ExtractNetworkPolicy extracts the applied configuration owned by fieldManager from
 // networkPolicy. If no managedFields are found in networkPolicy for fieldManager, a
 // NetworkPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // networkPolicy must be a unmodified NetworkPolicy API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+	return extractNetworkPolicy(networkPolicy, fieldManager, "")
+}
+
+// ExtractNetworkPolicyStatus is the same as ExtractNetworkPolicy except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractNetworkPolicyStatus(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+	return extractNetworkPolicy(networkPolicy, fieldManager, "status")
+}
+
+func extractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
-	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b)
+	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

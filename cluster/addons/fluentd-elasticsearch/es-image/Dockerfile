@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.16.4 AS builder
+FROM golang:1.16.6 AS builder
 COPY elasticsearch_logging_discovery.go go.mod go.sum /
 RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -a -ldflags "-w" -o /elasticsearch_logging_discovery /elasticsearch_logging_discovery.go
 
 
-FROM docker.elastic.co/elasticsearch/elasticsearch-oss:7.4.2
+FROM docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2
 
 VOLUME ["/data"]
 EXPOSE 9200 9300

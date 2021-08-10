@@ -27,16 +27,10 @@ func (p *AnnotationsTransformerPlugin) Transform(m resmap.ResMap) error {
 	if len(p.Annotations) == 0 {
 		return nil
 	}
-	for _, r := range m.Resources() {
-		err := r.ApplyFilter(annotations.Filter{
-			Annotations: p.Annotations,
-			FsSlice:     p.FieldSpecs,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return m.ApplyFilter(annotations.Filter{
+		Annotations: p.Annotations,
+		FsSlice:     p.FieldSpecs,
+	})
 }
 
 func NewAnnotationsTransformerPlugin() resmap.TransformerPlugin {

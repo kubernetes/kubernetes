@@ -18,7 +18,7 @@ dependencies:
 
   # agnhost: bump this one first
   - name: "agnhost"
-    version: "2.31"
+    version: "2.32"
     refPaths:
     - path: test/images/agnhost/VERSION
       match: \d.\d
@@ -30,11 +30,11 @@ dependencies:
     version: "2.32"
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
+      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.7
+    version: 0.9.1
     refPaths:
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CNI_VERSION=
@@ -55,14 +55,14 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.8.0
+    version: 1.8.4
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
   # CRI Tools
   - name: "crictl"
-    version: 1.20.0
+    version: 1.21.0
     refPaths:
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
@@ -78,7 +78,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.4.13
+    version: 3.5.0
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -93,7 +93,7 @@ dependencies:
       match: const etcdImage
 
   - name: "etcd-image"
-    version: 3.4.13
+    version: 3.5.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -101,7 +101,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.16.4
+    version: 1.16.6
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
@@ -124,15 +124,13 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.16.4-1
+    version: v1.16.6-1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Makefile
-      match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: buster-v1.6.0
+    version: buster-v1.8.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
@@ -146,27 +144,27 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.0
+    version: buster-v1.6.5
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
     - path: test/utils/image/manifest.go
-      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
+      match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.16.4-buster.0
+    version: v2.3.1-go1.16.6-buster.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
 
   - name: "k8s.gcr.io/pause"
-    version: 3.5
+    version: 3.6
     refPaths:
     - path: build/pause/Makefile
       match: TAG =
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.4.1
+    version: 3.5
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
@@ -215,7 +213,13 @@ dependencies:
     - path: test/utils/runners.go
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
-      match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+.\d+"}
+      match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
+
+  - name: "k8s.gcr.io/setcap: dependents"
+    version: buster-v2.0.3
+    refPaths:
+    - path: build/common.sh
+      match: __default_setcap_version=
 
   # metadata-concealment: bump this one first
   - name: "metadata-concealment"
@@ -229,4 +233,4 @@ dependencies:
     version: "1.6"
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[CheckMetadataConcealment\] = Config{promoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
+      match: configs\[CheckMetadataConcealment\] = Config{list\.PromoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}

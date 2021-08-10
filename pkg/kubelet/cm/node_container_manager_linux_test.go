@@ -250,7 +250,7 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		for k, v := range cm.getNodeAllocatableAbsolute() {
+		for k, v := range cm.GetNodeAllocatableAbsolute() {
 			expected, exists := tc.expected[k]
 			assert.True(t, exists)
 			assert.Equal(t, expected.MilliValue(), v.MilliValue(), "test case %d failed for resource %q", idx+1, k)

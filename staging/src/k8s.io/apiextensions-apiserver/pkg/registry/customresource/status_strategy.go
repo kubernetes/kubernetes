@@ -40,7 +40,7 @@ func (a statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
 		fieldpath.APIVersion(a.customResourceStrategy.kind.GroupVersion().String()): fieldpath.NewSet(
 			// Note that if there are other top level fields unique to CRDs,
 			// those will also get removed by the apiserver prior to persisting,
-			// but wont be added to the resetFields set.
+			// but won't be added to the resetFields set.
 
 			// This isn't an issue now, but if it becomes an issue in the future
 			// we might need a mechanism that is the inverse of resetFields where
@@ -82,4 +82,9 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 // ValidateUpdate is the default update validation for an end user updating status.
 func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, obj, old, a.scale)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (statusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

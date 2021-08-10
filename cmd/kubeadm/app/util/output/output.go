@@ -21,10 +21,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+
+	"github.com/spf13/cobra"
 )
 
 // TextOutput describes the plain text output

@@ -49,7 +49,7 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 // ExtractEndpoints extracts the applied configuration owned by fieldManager from
 // endpoints. If no managedFields are found in endpoints for fieldManager, a
 // EndpointsApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // endpoints must be a unmodified Endpoints API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return extractEndpoints(endpoints, fieldManager, "")
+}
+
+// ExtractEndpointsStatus is the same as ExtractEndpoints except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEndpointsStatus(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return extractEndpoints(endpoints, fieldManager, "status")
+}
+
+func extractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
-	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b)
+	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

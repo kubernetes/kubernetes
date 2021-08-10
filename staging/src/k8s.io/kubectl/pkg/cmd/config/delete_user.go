@@ -62,7 +62,7 @@ func NewCmdConfigDeleteUser(streams genericclioptions.IOStreams, configAccess cl
 		Use:                   "delete-user NAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete the specified user from the kubeconfig"),
-		Long:                  i18n.T("Delete the specified user from the kubeconfig"),
+		Long:                  i18n.T("Delete the specified user from the kubeconfig."),
 		Example:               deleteUserExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, args))

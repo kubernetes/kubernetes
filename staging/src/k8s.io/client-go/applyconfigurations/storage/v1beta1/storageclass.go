@@ -56,7 +56,7 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 // ExtractStorageClass extracts the applied configuration owned by fieldManager from
 // storageClass. If no managedFields are found in storageClass for fieldManager, a
 // StorageClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // storageClass must be a unmodified StorageClass API object that was retrieved from the Kubernetes API.
@@ -65,8 +65,19 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageClass(storageClass *v1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+	return extractStorageClass(storageClass, fieldManager, "")
+}
+
+// ExtractStorageClassStatus is the same as ExtractStorageClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStorageClassStatus(storageClass *v1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+	return extractStorageClass(storageClass, fieldManager, "status")
+}
+
+func extractStorageClass(storageClass *v1beta1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
 	b := &StorageClassApplyConfiguration{}
-	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.StorageClass"), fieldManager, b)
+	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.StorageClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

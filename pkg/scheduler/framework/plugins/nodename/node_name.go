@@ -22,20 +22,30 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
 var _ framework.FilterPlugin = &NodeName{}
+var _ framework.EnqueueExtensions = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeName"
+	Name = names.NodeName
 
 	// ErrReason returned when node name doesn't match.
 	ErrReason = "node(s) didn't match the requested node name"
 )
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeName) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add},
+	}
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {

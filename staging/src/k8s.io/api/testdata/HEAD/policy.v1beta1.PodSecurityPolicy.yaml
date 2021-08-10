@@ -4,7 +4,7 @@ metadata:
   annotations:
     "9": "10"
   clusterName: "15"
-  creationTimestamp: null
+  creationTimestamp: "2061-09-19T18:13:36Z"
   deletionGracePeriodSeconds: -4955867275792137171
   finalizers:
   - "14"
@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -32,23 +33,23 @@ metadata:
 spec:
   allowPrivilegeEscalation: false
   allowedCSIDrivers:
-  - name: "25"
+  - name: "26"
   allowedCapabilities:
   - ɑ
   allowedFlexVolumes:
-  - driver: "24"
+  - driver: "25"
   allowedHostPaths:
-  - pathPrefix: "23"
+  - pathPrefix: "24"
     readOnly: true
   allowedProcMountTypes:
   - ǣ偐圠=l畣潁
   allowedUnsafeSysctls:
-  - "26"
+  - "27"
   defaultAddCapabilities:
   - qJ枊a8衍`Ĩ
   defaultAllowPrivilegeEscalation: false
   forbiddenSysctls:
-  - "27"
+  - "28"
   fsGroup:
     ranges:
     - max: 3058121789713366904
@@ -74,15 +75,15 @@ spec:
     rule: +½H牗洝尿彀亞螩
   runtimeClass:
     allowedRuntimeClassNames:
-    - "28"
-    defaultRuntimeClassName: "29"
+    - "29"
+    defaultRuntimeClassName: "30"
   seLinux:
     rule: S
     seLinuxOptions:
-      level: "22"
-      role: "20"
-      type: "21"
-      user: "19"
+      level: "23"
+      role: "21"
+      type: "22"
+      user: "20"
   supplementalGroups:
     ranges:
     - max: -236027028483226507

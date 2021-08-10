@@ -28,6 +28,9 @@ import (
 //
 // Whenever possible, sensible defaults for the platform are used. See each
 // field for more details.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type IngressController struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -158,13 +161,15 @@ type IngressControllerSpec struct {
 	// to release X.Y.Z+1 may cause a new profile configuration to be applied to the ingress
 	// controller, resulting in a rollout.
 	//
-	// Note that the minimum TLS version for ingress controllers is 1.1, and
-	// the maximum TLS version is 1.2.  An implication of this restriction
-	// is that the Modern TLS profile type cannot be used because it
-	// requires TLS 1.3.
-	//
 	// +optional
 	TLSSecurityProfile *configv1.TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
+
+	// clientTLS specifies settings for requesting and verifying client
+	// certificates, which can be used to enable mutual TLS for
+	// edge-terminated and reencrypt routes.
+	//
+	// +optional
+	ClientTLS ClientTLS `json:"clientTLS"`
 
 	// routeAdmission defines a policy for handling new route claims (for example,
 	// to allow or deny claims across namespaces).
@@ -188,6 +193,28 @@ type IngressControllerSpec struct {
 	//
 	// +optional
 	HTTPHeaders *IngressControllerHTTPHeaders `json:"httpHeaders,omitempty"`
+
+	// httpEmptyRequestsPolicy describes how HTTP connections should be
+	// handled if the connection times out before a request is received.
+	// Allowed values for this field are "Respond" and "Ignore".  If the
+	// field is set to "Respond", the ingress controller sends an HTTP 400
+	// or 408 response, logs the connection (if access logging is enabled),
+	// and counts the connection in the appropriate metrics.  If the field
+	// is set to "Ignore", the ingress controller closes the connection
+	// without sending a response, logging the connection, or incrementing
+	// metrics.  The default value is "Respond".
+	//
+	// Typically, these connections come from load balancers' health probes
+	// or Web browsers' speculative connections ("preconnect") and can be
+	// safely ignored.  However, these requests may also be caused by
+	// network errors, and so setting this field to "Ignore" may impede
+	// detection and diagnosis of problems.  In addition, these requests may
+	// be caused by port scans, in which case logging empty requests may aid
+	// in detecting intrusion attempts.
+	//
+	// +optional
+	// +kubebuilder:default:="Respond"
+	HTTPEmptyRequestsPolicy HTTPEmptyRequestsPolicy `json:"httpEmptyRequestsPolicy,omitempty"`
 
 	// tuningOptions defines parameters for adjusting the performance of
 	// ingress controller pods. All fields are optional and will use their
@@ -585,6 +612,57 @@ type EndpointPublishingStrategy struct {
 	NodePort *NodePortStrategy `json:"nodePort,omitempty"`
 }
 
+// ClientCertificatePolicy describes the policy for client certificates.
+// +kubebuilder:validation:Enum="";Required;Optional
+type ClientCertificatePolicy string
+
+const (
+	// ClientCertificatePolicyRequired indicates that a client certificate
+	// should be required.
+	ClientCertificatePolicyRequired ClientCertificatePolicy = "Required"
+
+	// ClientCertificatePolicyOptional indicates that a client certificate
+	// should be requested but not required.
+	ClientCertificatePolicyOptional ClientCertificatePolicy = "Optional"
+)
+
+// ClientTLS specifies TLS configuration to enable client-to-server
+// authentication, which can be used for mutual TLS.
+type ClientTLS struct {
+	// clientCertificatePolicy specifies whether the ingress controller
+	// requires clients to provide certificates.  This field accepts the
+	// values "Required" or "Optional".
+	//
+	// Note that the ingress controller only checks client certificates for
+	// edge-terminated and reencrypt TLS routes; it cannot check
+	// certificates for cleartext HTTP or passthrough TLS routes.
+	//
+	// +kubebuilder:validation:Required
+	// +required
+	ClientCertificatePolicy ClientCertificatePolicy `json:"clientCertificatePolicy"`
+
+	// clientCA specifies a configmap containing the PEM-encoded CA
+	// certificate bundle that should be used to verify a client's
+	// certificate.  The administrator must create this configmap in the
+	// openshift-config namespace.
+	//
+	// +kubebuilder:validation:Required
+	// +required
+	ClientCA configv1.ConfigMapNameReference `json:"clientCA"`
+
+	// allowedSubjectPatterns specifies a list of regular expressions that
+	// should be matched against the distinguished name on a valid client
+	// certificate to filter requests.  The regular expressions must use
+	// PCRE syntax.  If this list is empty, no filtering is performed.  If
+	// the list is nonempty, then at least one pattern must match a client
+	// certificate's distinguished name or else the ingress controller
+	// rejects the certificate and denies the connection.
+	//
+	// +listType=atomic
+	// +optional
+	AllowedSubjectPatterns []string `json:"allowedSubjectPatterns,omitempty"`
+}
+
 // RouteAdmissionPolicy is an admission policy for allowing new route claims.
 type RouteAdmissionPolicy struct {
 	// namespaceOwnership describes how host name claims across namespaces should
@@ -852,6 +930,17 @@ type IngressControllerCaptureHTTPCookieUnion struct {
 	NamePrefix string `json:"namePrefix"`
 }
 
+// LoggingPolicy indicates how an event should be logged.
+// +kubebuilder:validation:Enum=Log;Ignore
+type LoggingPolicy string
+
+const (
+	// LoggingPolicyLog indicates that an event should be logged.
+	LoggingPolicyLog LoggingPolicy = "Log"
+	// LoggingPolicyIgnore indicates that an event should not be logged.
+	LoggingPolicyIgnore LoggingPolicy = "Ignore"
+)
+
 // AccessLogging describes how client requests should be logged.
 type AccessLogging struct {
 	// destination is where access logs go.
@@ -896,6 +985,21 @@ type AccessLogging struct {
 	// +optional
 	// +kubebuilder:validation:MaxItems=1
 	HTTPCaptureCookies []IngressControllerCaptureHTTPCookie `json:"httpCaptureCookies,omitempty"`
+
+	// logEmptyRequests specifies how connections on which no request is
+	// received should be logged.  Typically, these empty requests come from
+	// load balancers' health probes or Web browsers' speculative
+	// connections ("preconnect"), in which case logging these requests may
+	// be undesirable.  However, these requests may also be caused by
+	// network errors, in which case logging empty requests may be useful
+	// for diagnosing the errors.  In addition, these requests may be caused
+	// by port scans, in which case logging empty requests may aid in
+	// detecting intrusion attempts.  Allowed values for this field are
+	// "Log" and "Ignore".  The default value is "Log".
+	//
+	// +optional
+	// +kubebuilder:default:="Log"
+	LogEmptyRequests LoggingPolicy `json:"logEmptyRequests,omitempty"`
 }
 
 // IngressControllerLogging describes what should be logged where.
@@ -1080,7 +1184,81 @@ type IngressControllerTuningOptions struct {
 	// +kubebuilder:validation:Maximum=64
 	// +optional
 	ThreadCount int32 `json:"threadCount,omitempty"`
+
+	// clientTimeout defines how long a connection will be held open while
+	// waiting for a client response.
+	//
+	// If unset, the default timeout is 30s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ClientTimeout *metav1.Duration `json:"clientTimeout,omitempty"`
+
+	// clientFinTimeout defines how long a connection will be held open while
+	// waiting for the client response to the server/backend closing the
+	// connection.
+	//
+	// If unset, the default timeout is 1s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ClientFinTimeout *metav1.Duration `json:"clientFinTimeout,omitempty"`
+
+	// serverTimeout defines how long a connection will be held open while
+	// waiting for a server/backend response.
+	//
+	// If unset, the default timeout is 30s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ServerTimeout *metav1.Duration `json:"serverTimeout,omitempty"`
+
+	// serverFinTimeout defines how long a connection will be held open while
+	// waiting for the server/backend response to the client closing the
+	// connection.
+	//
+	// If unset, the default timeout is 1s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	ServerFinTimeout *metav1.Duration `json:"serverFinTimeout,omitempty"`
+
+	// tunnelTimeout defines how long a tunnel connection (including
+	// websockets) will be held open while the tunnel is idle.
+	//
+	// If unset, the default timeout is 1h
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	TunnelTimeout *metav1.Duration `json:"tunnelTimeout,omitempty"`
+
+	// tlsInspectDelay defines how long the router can hold data to find a
+	// matching route.
+	//
+	// Setting this too short can cause the router to fall back to the default
+	// certificate for edge-terminated or reencrypt routes even when a better
+	// matching certificate could be used.
+	//
+	// If unset, the default inspect delay is 5s
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	TLSInspectDelay *metav1.Duration `json:"tlsInspectDelay,omitempty"`
 }
+
+// HTTPEmptyRequestsPolicy indicates how HTTP connections for which no request
+// is received should be handled.
+// +kubebuilder:validation:Enum=Respond;Ignore
+type HTTPEmptyRequestsPolicy string
+
+const (
+	// HTTPEmptyRequestsPolicyRespond indicates that the ingress controller
+	// should respond to empty requests.
+	HTTPEmptyRequestsPolicyRespond HTTPEmptyRequestsPolicy = "Respond"
+	// HTTPEmptyRequestsPolicyIgnore indicates that the ingress controller
+	// should ignore empty requests.
+	HTTPEmptyRequestsPolicyIgnore HTTPEmptyRequestsPolicy = "Ignore"
+)
 
 var (
 	// Available indicates the ingress controller deployment is available.
@@ -1163,6 +1341,9 @@ type IngressControllerStatus struct {
 // +kubebuilder:object:root=true
 
 // IngressControllerList contains a list of IngressControllers.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type IngressControllerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

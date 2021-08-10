@@ -258,7 +258,6 @@ func TestErrConnKilled(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
 
 	// We don't expect stack trace from the panic to be included in the log.
@@ -350,7 +349,6 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
 
 	// We don't expect stack trace from the panic to be included in the log.

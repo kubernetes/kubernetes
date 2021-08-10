@@ -28,10 +28,10 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -57,13 +57,23 @@ type CSILimits struct {
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
+var _ framework.EnqueueExtensions = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
-const CSIName = "NodeVolumeLimits"
+const CSIName = names.NodeVolumeLimits
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *CSILimits) Name() string {
 	return CSIName
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.CSINode, ActionType: framework.Add},
+		{Resource: framework.Pod, ActionType: framework.Delete},
+	}
 }
 
 // Filter invoked at the filter extension point.
@@ -75,14 +85,14 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found"))
+		return framework.NewStatus(framework.Error, "node not found")
 	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object
 	csiNode, err := pl.csiNodeLister.Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default (2 releases)
-		klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+		klog.V(5).InfoS("Could not get a CSINode object for the node", "node", node.Name, "err", err)
 	}
 
 	newVolumes := make(map[string]string)
@@ -149,13 +159,13 @@ func (pl *CSILimits) filterAttachableVolumes(
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
 
 		if err != nil {
-			klog.V(5).Infof("Unable to look up PVC info for %s/%s", namespace, pvcName)
+			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
 			continue
 		}
 
 		driverName, volumeHandle := pl.getCSIDriverInfo(csiNode, pvc)
 		if driverName == "" || volumeHandle == "" {
-			klog.V(5).Infof("Could not find a CSI driver name or volume handle, not counting volume")
+			klog.V(5).Info("Could not find a CSI driver name or volume handle, not counting volume")
 			continue
 		}
 
@@ -175,13 +185,13 @@ func (pl *CSILimits) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.Persis
 	pvcName := pvc.Name
 
 	if pvName == "" {
-		klog.V(5).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+		klog.V(5).InfoS("Persistent volume had no name for claim", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
 		return pl.getCSIDriverInfoFromSC(csiNode, pvc)
 	}
 
 	pv, err := pl.pvLister.Get(pvName)
 	if err != nil {
-		klog.V(5).Infof("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
+		klog.V(5).InfoS("Unable to look up PV info for PVC and PV", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName), "PV", pvName)
 		// If we can't fetch PV associated with PVC, may be it got deleted
 		// or PVC was prebound to a PVC that hasn't been created yet.
 		// fallback to using StorageClass for volume counting
@@ -197,23 +207,23 @@ func (pl *CSILimits) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.Persis
 
 		pluginName, err := pl.translator.GetInTreePluginNameFromSpec(pv, nil)
 		if err != nil {
-			klog.V(5).Infof("Unable to look up plugin name from PV spec: %v", err)
+			klog.V(5).InfoS("Unable to look up plugin name from PV spec", "err", err)
 			return "", ""
 		}
 
 		if !isCSIMigrationOn(csiNode, pluginName) {
-			klog.V(5).Infof("CSI Migration of plugin %s is not enabled", pluginName)
+			klog.V(5).InfoS("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
 
 		csiPV, err := pl.translator.TranslateInTreePVToCSI(pv)
 		if err != nil {
-			klog.V(5).Infof("Unable to translate in-tree volume to CSI: %v", err)
+			klog.V(5).InfoS("Unable to translate in-tree volume to CSI", "err", err)
 			return "", ""
 		}
 
 		if csiPV.Spec.PersistentVolumeSource.CSI == nil {
-			klog.V(5).Infof("Unable to get a valid volume source for translated PV %s", pvName)
+			klog.V(5).InfoS("Unable to get a valid volume source for translated PV", "PV", pvName)
 			return "", ""
 		}
 
@@ -232,13 +242,13 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 	// If StorageClass is not set or not found, then PVC must be using immediate binding mode
 	// and hence it must be bound before scheduling. So it is safe to not count it.
 	if scName == "" {
-		klog.V(5).Infof("PVC %s/%s has no StorageClass", namespace, pvcName)
+		klog.V(5).InfoS("PVC has no StorageClass", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
 		return "", ""
 	}
 
 	storageClass, err := pl.scLister.Get(scName)
 	if err != nil {
-		klog.V(5).Infof("Could not get StorageClass for PVC %s/%s: %v", namespace, pvcName, err)
+		klog.V(5).InfoS("Could not get StorageClass for PVC", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName), "err", err)
 		return "", ""
 	}
 
@@ -250,13 +260,13 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
 		if !isCSIMigrationOn(csiNode, provisioner) {
-			klog.V(5).Infof("CSI Migration of plugin %s is not enabled", provisioner)
+			klog.V(5).InfoS("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
 			return "", ""
 		}
 
 		driverName, err := pl.translator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
-			klog.V(5).Infof("Unable to look up driver name from plugin name: %v", err)
+			klog.V(5).InfoS("Unable to look up driver name from provisioner name", "provisioner", provisioner, "err", err)
 			return "", ""
 		}
 		return driverName, volumeHandle

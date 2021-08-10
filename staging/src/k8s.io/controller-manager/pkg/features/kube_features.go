@@ -27,23 +27,6 @@ const (
 	// // alpha: v1.4
 	// MyFeature() bool
 
-	// owner @smarterclayton
-	// alpha: v1.16
-	// beta:  v1.19
-	//
-	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
-	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
-	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
-
-	// owner @brendandburns
-	// alpha: v1.9
-	// beta:  v1.19
-	// ga:  v1.21
-	//
-	// Enable nodes to exclude themselves from service load balancers
-	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
-	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
-
 	// owner: @khenidak
 	// alpha: v1.15
 	//
@@ -53,8 +36,10 @@ const (
 
 	// owner: @jiahuif
 	// alpha: v1.21
+	// beta:  v1.22
 	//
 	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
+	// copied and sync'ed from k8s.io/kubernetes/pkg/features/kube_features.go
 	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
 )
 
@@ -65,8 +50,6 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	LegacyNodeRoleBehavior:           {Default: false, PreRelease: featuregate.GA, LockToDefault: true},
-	ServiceNodeExclusion:             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	IPv6DualStack:                    {Default: true, PreRelease: featuregate.Beta},
-	ControllerManagerLeaderMigration: {Default: false, PreRelease: featuregate.Alpha},
+	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.Beta},
 }

@@ -3,7 +3,7 @@
 
 package resource
 
-import "sigs.k8s.io/kustomize/api/resid"
+import "sigs.k8s.io/kustomize/kyaml/resid"
 
 type IdSet struct {
 	ids map[resid.ResId]bool

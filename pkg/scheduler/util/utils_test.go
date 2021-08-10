@@ -17,7 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"testing"
 	"time"
 
@@ -169,6 +171,83 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 
 			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
 				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
+			}
+		})
+	}
+}
+
+func TestPatchPodStatus(t *testing.T) {
+	tests := []struct {
+		name           string
+		pod            v1.Pod
+		statusToUpdate v1.PodStatus
+	}{
+		{
+			name: "Should update pod conditions successfully",
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: v1.PodSpec{
+					ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
+				},
+			},
+			statusToUpdate: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+		},
+		{
+			// ref: #101697, #94626 - ImagePullSecrets are allowed to have empty secret names
+			// which would fail the 2-way merge patch generation on Pod patches
+			// due to the mergeKey being the name field
+			name: "Should update pod conditions successfully on a pod Spec with secrets with empty name",
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod2",
+				},
+				Spec: v1.PodSpec{
+					// this will serialize to imagePullSecrets:[{}]
+					ImagePullSecrets: make([]v1.LocalObjectReference, 1),
+				},
+			},
+			statusToUpdate: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+		},
+	}
+
+	client := clientsetfake.NewSimpleClientset()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.CoreV1().Pods(tc.pod.Namespace).Create(context.TODO(), &tc.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = PatchPodStatus(client, &tc.pod, &tc.statusToUpdate)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			retrievedPod, err := client.CoreV1().Pods(tc.pod.Namespace).Get(context.TODO(), tc.pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.statusToUpdate, retrievedPod.Status); diff != "" {
+				t.Errorf("unexpected pod status (-want,+got):\n%s", diff)
 			}
 		})
 	}

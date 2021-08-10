@@ -33,6 +33,7 @@ import (
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	testclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
 
@@ -153,12 +154,12 @@ func (us uniformScenario) exercise(t *testing.T) {
 type uniformScenarioState struct {
 	t *testing.T
 	uniformScenario
-	startTime                          time.Time
-	doSplit                            bool
-	integrators                        []fq.Integrator
-	failedCount                        uint64
-	expectedInqueue, expectedExecuting string
-	executions, rejects                []int32
+	startTime                                                    time.Time
+	doSplit                                                      bool
+	integrators                                                  []fq.Integrator
+	failedCount                                                  uint64
+	expectedInqueue, expectedExecuting, expectedConcurrencyInUse string
+	executions, rejects                                          []int32
 }
 
 func (uss *uniformScenarioState) exercise() {
@@ -226,7 +227,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
-	req, idle := ust.uss.qs.StartRequest(context.Background(), ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.Width{Seats: 1}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -313,6 +314,7 @@ func (uss *uniformScenarioState) finalReview() {
 		fsName := fmt.Sprintf("client%d", i)
 		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
 			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
+			uss.expectedConcurrencyInUse = uss.expectedConcurrencyInUse + fmt.Sprintf(`				apiserver_flowcontrol_request_concurrency_in_use{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
 		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
 			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
@@ -324,6 +326,18 @@ func (uss *uniformScenarioState) finalReview() {
 				# TYPE apiserver_flowcontrol_current_executing_requests gauge
 ` + uss.expectedExecuting
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_executing_requests")
+		if err != nil {
+			uss.t.Error(err)
+		} else {
+			uss.t.Log("Success with" + e)
+		}
+	}
+	if uss.evalExecutingMetrics && len(uss.expectedConcurrencyInUse) > 0 {
+		e := `
+				# HELP apiserver_flowcontrol_request_concurrency_in_use [ALPHA] Concurrency (number of seats) occupided by the currently executing requests in the API Priority and Fairness system
+				# TYPE apiserver_flowcontrol_request_concurrency_in_use gauge
+` + uss.expectedConcurrencyInUse
+		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_request_concurrency_in_use")
 		if err != nil {
 			uss.t.Error(err)
 		} else {
@@ -658,7 +672,7 @@ func TestContextCancel(t *testing.T) {
 	ctx1 := context.Background()
 	b2i := map[bool]int{false: 0, true: 1}
 	var qnc [2][2]int32
-	req1, _ := qs.StartRequest(ctx1, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
+	req1, _ := qs.StartRequest(ctx1, &fcrequest.Width{Seats: 1}, 1, "", "fs1", "test", "one", func(inQueue bool) { atomic.AddInt32(&qnc[0][b2i[inQueue]], 1) })
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
@@ -686,7 +700,7 @@ func TestContextCancel(t *testing.T) {
 			counter.Add(1)
 			cancel2()
 		}()
-		req2, idle2a := qs.StartRequest(ctx2, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
+		req2, idle2a := qs.StartRequest(ctx2, &fcrequest.Width{Seats: 1}, 2, "", "fs2", "test", "two", func(inQueue bool) { atomic.AddInt32(&qnc[1][b2i[inQueue]], 1) })
 		if idle2a {
 			t.Error("2nd StartRequest returned idle")
 		}
@@ -745,7 +759,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	req, _ := qs.StartRequest(ctx, 1, "", "fs", "test", "one", func(inQueue bool) {})
+	req, _ := qs.StartRequest(ctx, &fcrequest.Width{Seats: 1}, 1, "", "fs", "test", "one", func(inQueue bool) {})
 	if req == nil {
 		t.Fatal("expected a Request object from StartRequest, but got nil")
 	}
@@ -774,6 +788,182 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	if queue.totRequestsExecuting != 0 {
 		t.Errorf("expected total requests currently executing of the QueueSet to be 0, but got: %d", queue.totRequestsExecuting)
 	}
+}
+
+func TestSelectQueueLocked(t *testing.T) {
+	var G float64 = 60
+	tests := []struct {
+		name                    string
+		robinIndex              int
+		concurrencyLimit        int
+		totSeatsInUse           int
+		queues                  []*queue
+		attempts                int
+		beforeSelectQueueLocked func(attempt int, qs *queueSet)
+		minQueueIndexExpected   []int
+		robinIndexExpected      []int
+	}{
+		{
+			name:             "width=1, seats are available, the queue with less virtual start time wins",
+			concurrencyLimit: 1,
+			totSeatsInUse:    0,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 1}},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 1}},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{1},
+			robinIndexExpected:    []int{1},
+		},
+		{
+			name:             "width=1, all seats are occupied, no queue is picked",
+			concurrencyLimit: 1,
+			totSeatsInUse:    1,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 1}},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{-1},
+			robinIndexExpected:    []int{0},
+		},
+		{
+			name:             "width > 1, seats are available for request with the least finish time, queue is picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    25,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 50}},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 25}},
+					),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{1},
+			robinIndexExpected:    []int{1},
+		},
+		{
+			name:             "width > 1, seats are not available for request with the least finish time, queue is not picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    26,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 10}},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 25}},
+					),
+				},
+			},
+			attempts:              3,
+			minQueueIndexExpected: []int{-1, -1, -1},
+			robinIndexExpected:    []int{1, 1, 1},
+		},
+		{
+			name:             "width > 1, seats become available before 3rd attempt, queue is picked",
+			concurrencyLimit: 50,
+			totSeatsInUse:    26,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					virtualStart: 200,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 10}},
+					),
+				},
+				{
+					virtualStart: 100,
+					requests: newFIFO(
+						&request{width: fcrequest.Width{Seats: 25}},
+					),
+				},
+			},
+			beforeSelectQueueLocked: func(attempt int, qs *queueSet) {
+				if attempt == 3 {
+					qs.totSeatsInUse = 25
+				}
+			},
+			attempts:              3,
+			minQueueIndexExpected: []int{-1, -1, 1},
+			robinIndexExpected:    []int{1, 1, 1},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			qs := &queueSet{
+				estimatedServiceTime: G,
+				robinIndex:           test.robinIndex,
+				totSeatsInUse:        test.totSeatsInUse,
+				dCfg: fq.DispatchingConfig{
+					ConcurrencyLimit: test.concurrencyLimit,
+				},
+				queues: test.queues,
+			}
+
+			t.Logf("QS: robin index=%d, seats in use=%d limit=%d", qs.robinIndex, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
+
+			for i := 0; i < test.attempts; i++ {
+				attempt := i + 1
+				if test.beforeSelectQueueLocked != nil {
+					test.beforeSelectQueueLocked(attempt, qs)
+				}
+
+				var minQueueExpected *queue
+				if queueIdx := test.minQueueIndexExpected[i]; queueIdx >= 0 {
+					minQueueExpected = test.queues[queueIdx]
+				}
+
+				minQueueGot := qs.selectQueueLocked()
+				if minQueueExpected != minQueueGot {
+					t.Errorf("Expected queue: %#v, but got: %#v", minQueueExpected, minQueueGot)
+				}
+
+				robinIndexExpected := test.robinIndexExpected[i]
+				if robinIndexExpected != qs.robinIndex {
+					t.Errorf("Expected robin index: %d for attempt: %d, but got: %d", robinIndexExpected, attempt, qs.robinIndex)
+				}
+			}
+		})
+	}
+}
+
+func newFIFO(requests ...*request) fifo {
+	l := newRequestFIFO()
+	for i := range requests {
+		l.Enqueue(requests[i])
+	}
+	return l
 }
 
 func newObserverPair(clk clock.PassiveClock) metrics.TimedObserverPair {

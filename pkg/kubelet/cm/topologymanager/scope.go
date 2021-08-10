@@ -17,12 +17,12 @@ limitations under the License.
 package topologymanager
 
 import (
-	"fmt"
-
 	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -43,7 +43,7 @@ type Scope interface {
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
 	// AddContainer adds pod to Manager for tracking
-	AddContainer(pod *v1.Pod, containerID string) error
+	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
 	RemoveContainer(containerID string) error
 	// Store is the interface for storing pod topology hints
@@ -60,8 +60,8 @@ type scope struct {
 	hintProviders []HintProvider
 	// Topology Manager Policy
 	policy Policy
-	// Mapping of PodUID to ContainerID for Adding/Removing Pods from PodTopologyHints mapping
-	podMap map[string]string
+	// Mapping of (PodUid, ContainerName) to ContainerID for Adding/Removing Pods from PodTopologyHints mapping
+	podMap containermap.ContainerMap
 }
 
 func (s *scope) Name() string {
@@ -94,12 +94,11 @@ func (s *scope) AddHintProvider(h HintProvider) {
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track mapping anymore
-func (s *scope) AddContainer(pod *v1.Pod, containerID string) error {
+func (s *scope) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.podMap[containerID] = string(pod.UID)
-	return nil
+	s.podMap.Add(string(pod.UID), container.Name, containerID)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
@@ -109,10 +108,18 @@ func (s *scope) RemoveContainer(containerID string) error {
 	defer s.mutex.Unlock()
 
 	klog.InfoS("RemoveContainer", "containerID", containerID)
-	podUIDString := s.podMap[containerID]
-	delete(s.podMap, containerID)
-	if _, exists := s.podTopologyHints[podUIDString]; exists {
-		delete(s.podTopologyHints[podUIDString], containerID)
+	// Get the podUID and containerName associated with the containerID to be removed and remove it
+	podUIDString, containerName, err := s.podMap.GetContainerRef(containerID)
+	if err != nil {
+		return nil
+	}
+	s.podMap.RemoveByContainerID(containerID)
+
+	// In cases where a container has been restarted, it's possible that the same podUID and
+	// containerName are already associated with a *different* containerID now. Only remove
+	// the TopologyHints associated with that podUID and containerName if this is not true
+	if _, err := s.podMap.GetContainerID(podUIDString, containerName); err != nil {
+		delete(s.podTopologyHints[podUIDString], containerName)
 		if len(s.podTopologyHints[podUIDString]) == 0 {
 			delete(s.podTopologyHints, podUIDString)
 		}
@@ -125,10 +132,10 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			return unexpectedAdmissionError(err)
+			return admission.GetPodAdmitResult(err)
 		}
 	}
-	return admitPod()
+	return admission.GetPodAdmitResult(nil)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
@@ -141,24 +148,4 @@ func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) e
 		}
 	}
 	return nil
-}
-
-func topologyAffinityError() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: "Resources cannot be allocated with Topology locality",
-		Reason:  "TopologyAffinityError",
-		Admit:   false,
-	}
-}
-
-func unexpectedAdmissionError(err error) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-		Reason:  "UnexpectedAdmissionError",
-		Admit:   false,
-	}
-}
-
-func admitPod() lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{Admit: true}
 }

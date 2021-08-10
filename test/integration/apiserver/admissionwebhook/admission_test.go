@@ -32,17 +32,18 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	admissionreviewv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,6 +127,8 @@ var (
 		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
 		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
 		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
+
+		gvr("", "v1", "serviceaccounts/token"): {"create": testTokenCreate},
 
 		gvr("random.numbers.com", "v1", "integers"): {"create": testPruningRandomNumbers},
 		gvr("custom.fancy.com", "v2", "pants"):      {"create": testNoPruningCustomFancy},
@@ -882,6 +885,27 @@ func getParentGVR(gvr schema.GroupVersionResource) schema.GroupVersionResource {
 	return parentGVR
 }
 
+func testTokenCreate(c *testContext) {
+	saGVR := gvr("", "v1", "serviceaccounts")
+	sa, err := createOrGetResource(c.client, saGVR, c.resources[saGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
+	if err = c.clientset.CoreV1().RESTClient().Post().Namespace(sa.GetNamespace()).Resource("serviceaccounts").Name(sa.GetName()).SubResource("token").Body(&authenticationv1.TokenRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: sa.GetName()},
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences: []string{"api"},
+		},
+	}).Do(context.TODO()).Error(); err != nil {
+		c.t.Error(err)
+		return
+	}
+	c.admissionHolder.verify(c.t)
+}
+
 func testSubresourceUpdate(c *testContext) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		parentGVR := getParentGVR(c.gvr)
@@ -1128,7 +1152,7 @@ func testPodBindingEviction(c *testContext) {
 		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/eviction"):
-		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1.Eviction{
 			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
 			DeleteOptions: &forceDelete,
 		}).Do(context.TODO()).Error()

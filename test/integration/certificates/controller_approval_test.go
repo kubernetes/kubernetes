@@ -33,10 +33,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -196,7 +196,7 @@ func grantUserNodeClientPermissions(t *testing.T, client clientset.Interface, us
 		t.Fatalf("failed to create test fixtures: %v", err)
 	}
 	rule := cr.Rules[0]
-	waitForNamedAuthorizationUpdate(t, client.AuthorizationV1(), username, "", rule.Verbs[0], "", schema.GroupResource{Group: rule.APIGroups[0], Resource: rule.Resources[0]}, true)
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(), username, "", rule.Verbs[0], "", schema.GroupResource{Group: rule.APIGroups[0], Resource: rule.Resources[0]}, true)
 }
 
 func buildNodeClientRoleForUser(name string, resourceType string) *rbacv1.ClusterRole {

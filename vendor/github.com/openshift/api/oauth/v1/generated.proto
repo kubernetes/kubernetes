@@ -24,6 +24,9 @@ message ClusterRoleScopeRestriction {
 }
 
 // OAuthAccessToken describes an OAuth access token
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthAccessToken {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -58,6 +61,9 @@ message OAuthAccessToken {
 }
 
 // OAuthAccessTokenList is a collection of OAuth access tokens
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthAccessTokenList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -66,6 +72,9 @@ message OAuthAccessTokenList {
 }
 
 // OAuthAuthorizeToken describes an OAuth authorization token
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthAuthorizeToken {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -99,6 +108,9 @@ message OAuthAuthorizeToken {
 }
 
 // OAuthAuthorizeTokenList is a collection of OAuth authorization tokens
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthAuthorizeTokenList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -107,6 +119,9 @@ message OAuthAuthorizeTokenList {
 }
 
 // OAuthClient describes an OAuth client
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthClient {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -154,6 +169,9 @@ message OAuthClient {
 }
 
 // OAuthClientAuthorization describes an authorization created by an OAuth client
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthClientAuthorization {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -172,6 +190,9 @@ message OAuthClientAuthorization {
 }
 
 // OAuthClientAuthorizationList is a collection of OAuth client authorizations
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthClientAuthorizationList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -180,6 +201,9 @@ message OAuthClientAuthorizationList {
 }
 
 // OAuthClientList is a collection of OAuth clients
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthClientList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -188,6 +212,9 @@ message OAuthClientList {
 }
 
 // OAuthRedirectReference is a reference to an OAuth redirect object.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message OAuthRedirectReference {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -218,6 +245,7 @@ message ScopeRestriction {
 
 // UserOAuthAccessToken is a virtual resource to mirror OAuthAccessTokens to
 // the user the access token was issued for
+// +openshift:compatibility-gen:level=1
 message UserOAuthAccessToken {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -253,6 +281,9 @@ message UserOAuthAccessToken {
 
 // UserOAuthAccessTokenList is a collection of access tokens issued on behalf of
 // the requesting user
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message UserOAuthAccessTokenList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

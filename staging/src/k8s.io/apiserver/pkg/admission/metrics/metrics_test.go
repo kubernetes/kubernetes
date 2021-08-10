@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -35,7 +36,8 @@ var (
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
 	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
 		t.Errorf("Unexpected error in admit: %v", err)
@@ -57,7 +59,8 @@ func TestObserveAdmissionStep(t *testing.T) {
 }
 
 func TestObserveAdmissionController(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
 	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
 		t.Errorf("Unexpected error in admit: %v", err)
@@ -78,7 +81,8 @@ func TestObserveAdmissionController(t *testing.T) {
 }
 
 func TestObserveWebhook(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	Metrics.ObserveWebhook(context.TODO(), 2*time.Second, false, attr, stepAdmit, "x")
 	wantLabels := map[string]string{
 		"name":      "x",
@@ -121,8 +125,8 @@ func TestObserveWebhookRejection(t *testing.T) {
 }
 
 func TestWithMetrics(t *testing.T) {
-	Metrics.reset()
-
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	type Test struct {
 		name            string
 		ns              string

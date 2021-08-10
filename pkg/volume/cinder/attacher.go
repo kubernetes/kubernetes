@@ -102,7 +102,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -124,7 +124,7 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to be attached within the alloted time", volumeID)
 	}
 
 	return err
@@ -268,7 +268,7 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(cinderVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -346,7 +346,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -368,7 +368,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to detach within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to detach within the alloted time", volumeID)
 	}
 
 	return err

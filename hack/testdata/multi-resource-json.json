@@ -41,7 +41,7 @@
        "spec":{
          "containers":[{
            "name": "mock-container",
-           "image": "k8s.gcr.io/pause:3.4.1",
+           "image": "k8s.gcr.io/pause:3.5",
            "ports":[{
              "containerPort":9949,
              "protocol":"TCP"

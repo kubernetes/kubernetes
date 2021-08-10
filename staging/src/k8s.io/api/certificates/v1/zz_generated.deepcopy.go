@@ -111,6 +111,11 @@ func (in *CertificateSigningRequestSpec) DeepCopyInto(out *CertificateSigningReq
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExpirationSeconds != nil {
+		in, out := &in.ExpirationSeconds, &out.ExpirationSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages
 		*out = make([]KeyUsage, len(*in))

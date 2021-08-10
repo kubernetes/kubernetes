@@ -37,7 +37,7 @@ const (
 	testSlowMultiplier = 60
 )
 
-var _ = SIGDescribe("Device Plugin", func() {
+var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
 
 	var cs clientset.Interface
@@ -68,12 +68,10 @@ var _ = SIGDescribe("Device Plugin", func() {
 				},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							"scheduler.alpha.kubernetes.io/critical-pod": "",
-						},
 						Labels: labels,
 					},
 					Spec: v1.PodSpec{
+						PriorityClassName: "system-node-critical",
 						Tolerations: []v1.Toleration{
 							{
 								Key:      "CriticalAddonsOnly",

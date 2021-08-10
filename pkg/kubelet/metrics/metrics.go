@@ -83,6 +83,20 @@ const (
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
+
+	// Metrics to keep track of total number of Pods and Containers started
+	StartedPodsTotalKey             = "started_pods_total"
+	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
+	StartedContainersTotalKey       = "started_containers_total"
+	StartedContainersErrorsTotalKey = "started_containers_errors_total"
+
+	// Metrics to track ephemeral container usage by this kubelet
+	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
+
+	// Values used in metric labels
+	Container          = "container"
+	InitContainer      = "init_container"
+	EphemeralContainer = "ephemeral_container"
 )
 
 var (
@@ -350,20 +364,22 @@ var (
 	// AssignedConfig is a Gauge that is set 1 if the Kubelet has a NodeConfig assigned.
 	AssignedConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           AssignedConfigKey,
-			Help:           "The node's understanding of intended config. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              AssignedConfigKey,
+			Help:              "The node's understanding of intended config. The count is always 1.",
+			DeprecatedVersion: "1.22.0",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
 	// ActiveConfig is a Gauge that is set to 1 if the Kubelet has an active NodeConfig.
 	ActiveConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           ActiveConfigKey,
-			Help:           "The config source the node is actively using. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              ActiveConfigKey,
+			Help:              "The config source the node is actively using. The count is always 1.",
+			DeprecatedVersion: "1.22.0",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
@@ -371,20 +387,22 @@ var (
 	// are certain errors.
 	LastKnownGoodConfig = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           LastKnownGoodConfigKey,
-			Help:           "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              LastKnownGoodConfigKey,
+			Help:              "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
+			DeprecatedVersion: "1.22.0",
+			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
 	// ConfigError is a Gauge that is set to 1 if the node is experiencing a configuration-related error.
 	ConfigError = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           ConfigErrorKey,
-			Help:           "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         KubeletSubsystem,
+			Name:              ConfigErrorKey,
+			Help:              "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
+			DeprecatedVersion: "1.22.0",
+			StabilityLevel:    metrics.ALPHA,
 		},
 	)
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
@@ -412,12 +430,13 @@ var (
 		[]string{"runtime_handler"},
 	)
 
-	// RunningPodCount is a gauge that tracks the number of Pods currently running
+	// RunningPodCount is a gauge that tracks the number of Pods currently with a running sandbox
+	// It is used to expose the kubelet internal state: how many pods have running containers in the container runtime, and mainly for debugging purpose.
 	RunningPodCount = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           RunningPodsKey,
-			Help:           "Number of pods currently running",
+			Help:           "Number of pods that have a running pod sandbox",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -430,6 +449,54 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_state"},
+	)
+	// StartedPodsTotal is a counter that tracks pod sandbox creation operations
+	StartedPodsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedPodsTotalKey,
+			Help:           "Cumulative number of pods started",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
+	StartedPodsErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedPodsErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting pods",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"message"},
+	)
+	// StartedContainersTotal is a counter that tracks the number of container creation operations
+	StartedContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedContainersTotalKey,
+			Help:           "Cumulative number of containers started",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
+	// StartedContainersTotal is a counter that tracks the number of errors creating containers
+	StartedContainersErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedContainersErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting containers",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "code"},
+	)
+	// ManagedEphemeralContainers is a gauge that indicates how many ephemeral containers are managed by this kubelet.
+	ManagedEphemeralContainers = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ManagedEphemeralContainersKey,
+			Help:           "Current number of ephemeral containers in pods managed by this kubelet. Ephemeral containers will be ignored if disabled by the EphemeralContainers feature gate, and this number will be 0.",
+			StabilityLevel: metrics.ALPHA,
+		},
 	)
 )
 
@@ -459,6 +526,11 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
+		legacyregistry.MustRegister(ManagedEphemeralContainers)
+		legacyregistry.MustRegister(StartedPodsTotal)
+		legacyregistry.MustRegister(StartedPodsErrorsTotal)
+		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {

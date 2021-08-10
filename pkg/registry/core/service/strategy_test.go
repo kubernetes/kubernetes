@@ -67,6 +67,7 @@ func TestCheckGeneratedNameError(t *testing.T) {
 
 func makeValidService() *api.Service {
 	preferDual := api.IPFamilyPolicyPreferDualStack
+	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
 	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,10 +85,11 @@ func makeValidService() *api.Service {
 				makeValidServicePort("p", "TCP", 8675),
 				makeValidServicePort("q", "TCP", 309),
 			},
-			ClusterIP:      "1.2.3.4",
-			ClusterIPs:     []string{"1.2.3.4", "5:6:7::8"},
-			IPFamilyPolicy: &preferDual,
-			IPFamilies:     []api.IPFamily{"IPv4", "IPv6"},
+			ClusterIP:             "1.2.3.4",
+			ClusterIPs:            []string{"1.2.3.4", "5:6:7::8"},
+			IPFamilyPolicy:        &preferDual,
+			IPFamilies:            []api.IPFamily{"IPv4", "IPv6"},
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
 }

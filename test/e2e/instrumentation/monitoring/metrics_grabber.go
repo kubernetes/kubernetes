@@ -17,46 +17,33 @@ limitations under the License.
 package monitoring
 
 import (
-	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	clientset "k8s.io/client-go/kubernetes"
+
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
-	var masterRegistered bool
 	ginkgo.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
-		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, node := range nodes.Items {
-			if strings.HasSuffix(node.Name, "master") {
-				masterRegistered = true
-			}
-		}
 		gomega.Eventually(func() error {
-			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
+			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, f.ClientConfig(), true, true, true, true, true, true)
 			if err != nil {
 				return fmt.Errorf("failed to create metrics grabber: %v", err)
-			}
-			if masterRegistered && !grabber.HasControlPlanePods() {
-				return fmt.Errorf("unable to get find control plane pods")
 			}
 			return nil
 		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -65,6 +52,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from API server.", func() {
 		ginkgo.By("Connecting to /metrics endpoint")
 		response, err := grabber.GrabFromAPIServer()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
@@ -72,6 +62,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from a Kubelet.", func() {
 		ginkgo.By("Proxying to Node through the API server")
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		response, err := grabber.GrabFromKubelet(node.Name)
 		framework.ExpectNoError(err)
@@ -80,22 +73,20 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from a Scheduler.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
-		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
-			return
-		}
 		response, err := grabber.GrabFromScheduler()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
 	ginkgo.It("should grab all metrics from a ControllerManager.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
-		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
-			return
-		}
 		response, err := grabber.GrabFromControllerManager()
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})

@@ -20,12 +20,6 @@ package preflight
 
 // This is a MacOS stub
 
-// Check validates if Docker is setup to use systemd as the cgroup driver.
-// No-op for Darwin (MacOS).
-func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
-	return nil, nil
-}
-
 // Check number of memory required by kubeadm
 // No-op for Darwin (MacOS).
 func (mc MemCheck) Check() (warnings, errorList []error) {

@@ -102,6 +102,9 @@ type manager struct {
 	// representation of state for the system to inspect and reconcile.
 	state state.State
 
+	// lastUpdatedstate holds state for each container from the last time it was updated.
+	lastUpdateState state.State
+
 	// containerRuntime is the container runtime service interface needed
 	// to make UpdateContainerResources() calls against the containers.
 	containerRuntime runtimeService
@@ -141,17 +144,20 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
+	var err error
 
 	switch policyName(cpuPolicyName) {
 
 	case PolicyNone:
-		policy = NewNonePolicy()
+		policy, err = NewNonePolicy(cpuPolicyOptions)
+		if err != nil {
+			return nil, fmt.Errorf("new none policy error: %w", err)
+		}
 
 	case PolicyStatic:
-		var err error
 		topo, err = topology.Discover(machineInfo)
 		if err != nil {
 			return nil, err
@@ -176,9 +182,9 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity)
+		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
 		if err != nil {
-			return nil, fmt.Errorf("new static policy error: %v", err)
+			return nil, fmt.Errorf("new static policy error: %w", err)
 		}
 
 	default:
@@ -188,6 +194,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 	manager := &manager{
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
+		lastUpdateState:            state.NewMemoryState(),
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
@@ -249,6 +256,9 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
 	defer m.Unlock()
+	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
+		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
 }
 
@@ -273,6 +283,7 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 
 	err = m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
+		m.lastUpdateState.Delete(podUID, containerName)
 		m.containerMap.RemoveByContainerID(containerID)
 	}
 
@@ -282,6 +293,7 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) error {
 	err := m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
+		m.lastUpdateState.Delete(podUID, containerName)
 		m.containerMap.RemoveByContainerRef(podUID, containerName)
 	}
 
@@ -367,7 +379,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	for _, pod := range m.activePods() {
 		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		if !ok {
-			klog.InfoS("ReconcileState: skipping pod; status not found", "pod", klog.KObj(pod))
+			klog.V(4).InfoS("ReconcileState: skipping pod; status not found", "pod", klog.KObj(pod))
 			failure = append(failure, reconciledContainer{pod.Name, "", ""})
 			continue
 		}
@@ -381,21 +393,21 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 		for _, container := range allContainers {
 			containerID, err := findContainerIDByName(&pstatus, container.Name)
 			if err != nil {
-				klog.InfoS("ReconcileState: skipping container; ID not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
+				klog.V(4).InfoS("ReconcileState: skipping container; ID not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
 
 			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
 			if err != nil {
-				klog.InfoS("ReconcileState: skipping container; container status not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
+				klog.V(4).InfoS("ReconcileState: skipping container; container status not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
 
 			if cstatus.State.Waiting != nil ||
 				(cstatus.State.Waiting == nil && cstatus.State.Running == nil && cstatus.State.Terminated == nil) {
-				klog.InfoS("ReconcileState: skipping container; container still in the waiting state", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
+				klog.V(4).InfoS("ReconcileState: skipping container; container still in the waiting state", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
@@ -409,7 +421,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				// was allocated.
 				_, _, err := m.containerMap.GetContainerRef(containerID)
 				if err == nil {
-					klog.InfoS("ReconcileState: ignoring terminated container", "pod", klog.KObj(pod), "containerID", containerID)
+					klog.V(4).InfoS("ReconcileState: ignoring terminated container", "pod", klog.KObj(pod), "containerID", containerID)
 				}
 				m.Unlock()
 				continue
@@ -424,17 +436,21 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
-				klog.InfoS("ReconcileState: skipping container; assigned cpuset is empty", "pod", klog.KObj(pod), "containerName", container.Name)
+				klog.V(4).InfoS("ReconcileState: skipping container; assigned cpuset is empty", "pod", klog.KObj(pod), "containerName", container.Name)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 				continue
 			}
 
-			klog.V(4).InfoS("ReconcileState: updating container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
-			err = m.updateContainerCPUSet(containerID, cset)
-			if err != nil {
-				klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-				continue
+			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
+			if !cset.Equals(lcset) {
+				klog.V(4).InfoS("ReconcileState: updating container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
+				err = m.updateContainerCPUSet(containerID, cset)
+				if err != nil {
+					klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
+					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+					continue
+				}
+				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
 		}

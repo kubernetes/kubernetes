@@ -263,10 +263,7 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 func (f *FIFO) IsClosed() bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	if f.closed {
-		return true
-	}
-	return false
+	return f.closed
 }
 
 // Pop waits until an item is ready and processes it. If multiple items are

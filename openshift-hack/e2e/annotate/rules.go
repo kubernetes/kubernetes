@@ -9,20 +9,9 @@ var (
 	TestMaps = map[string][]string{
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
-			// ALPHA features in 1.20, disabled by default.
-			// !!! Review their status as part of the 1.21 rebase.
-			`\[Feature:CSIServiceAccountToken\]`,
-
-			// BETA features in 1.20, enabled by default
-			// Their enablement is tracked via bz's targeted at 4.8.
-			`\[Feature:CrossNamespacePodAffinity\]`,
-
-			`\[Feature:DaemonSetUpdateSurge\]`,
-
 			`\[Feature:StorageVersionAPI\]`,
-
-			`\[Feature:IndexedJob\]`,
-			`\[Feature:SuspendJob\]`,
+			`\[Feature:StatefulSetMinReadySeconds\]`,
+			`\[Feature:PodSecurityPolicy\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -98,6 +87,28 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
 			`should drop INVALID conntrack entries`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1986306
+			`\[sig-cli\] Kubectl client kubectl wait should ignore not found error with --for=delete`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1986307
+			`\[Feature:ServiceInternalTrafficPolicy\]`,
+			`Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service`,
+			`Networking Granular Checks: Services should function for node-Service: http`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
+			`NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions`,
+			`NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions`,
+			`NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector`,
+			`NetworkPolicy between server and client should deny ingress from pods on other namespaces`,
+			`NetworkPolicy between server and client should enforce updated policy`,
+			`NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors`,
+			`NetworkPolicy between server and client should enforce policy based on any PodSelectors`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector`,
+			`NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy`,
+			`NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
+			`NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
+			`Networking IPerf2`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

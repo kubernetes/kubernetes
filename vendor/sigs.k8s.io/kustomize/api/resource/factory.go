@@ -13,15 +13,21 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/generators"
 	"sigs.k8s.io/kustomize/api/internal/kusterr"
 	"sigs.k8s.io/kustomize/api/konfig"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // Factory makes instances of Resource.
 type Factory struct {
 	hasher ifc.KustHasher
+
+	// When set to true, IncludeLocalConfigs indicates
+	// that Factory should include resources with the
+	// annotation 'config.kubernetes.io/local-config'.
+	// By default these resources are ignored.
+	IncludeLocalConfigs bool
 }
 
 // NewFactory makes an instance of Factory.
@@ -69,7 +75,7 @@ func (rf *Factory) makeOne(rn *yaml.RNode, o *types.GenArgs) *Resource {
 	if o == nil {
 		o = types.NewGenArgs(nil)
 	}
-	return &Resource{node: rn, options: o}
+	return &Resource{RNode: *rn, options: o}
 }
 
 // SliceFromPatches returns a slice of resources given a patch path
@@ -221,13 +227,15 @@ func (rf *Factory) shouldIgnore(n *yaml.RNode) (bool, error) {
 	if n.IsNilOrEmpty() {
 		return true, nil
 	}
-	md, err := n.GetValidatedMetadata()
-	if err != nil {
-		return true, err
-	}
-	_, ignore := md.ObjectMeta.Annotations[konfig.IgnoredByKustomizeAnnotation]
-	if ignore {
-		return true, nil
+	if !rf.IncludeLocalConfigs {
+		md, err := n.GetValidatedMetadata()
+		if err != nil {
+			return true, err
+		}
+		_, ignore := md.ObjectMeta.Annotations[konfig.IgnoredByKustomizeAnnotation]
+		if ignore {
+			return true, nil
+		}
 	}
 	if foundNil, path := n.HasNilEntryInList(); foundNil {
 		return true, fmt.Errorf("empty item at %v in object %v", path, n)

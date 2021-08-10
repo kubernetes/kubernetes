@@ -53,13 +53,13 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	serviceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -270,13 +270,13 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	serviceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -490,7 +490,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -503,7 +503,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -717,7 +717,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	secondaryServiceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -730,7 +730,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -947,7 +947,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -960,7 +960,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1062,7 +1062,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -1075,7 +1075,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1152,14 +1152,14 @@ func TestConvertToFromExternalName(t *testing.T) {
 func TestExistingServiceDefaulting(t *testing.T) {
 	// Create an IPv4IPv6 dual stack control-plane
 	serviceCIDR := "10.0.0.0/16"
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1235,7 +1235,7 @@ func TestPreferDualStack(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
@@ -1248,7 +1248,7 @@ func TestPreferDualStack(t *testing.T) {
 	}
 	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
 
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1320,13 +1320,13 @@ func TestServiceUpdate(t *testing.T) {
 	serviceCIDR := "10.0.0.0/16"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
 
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAMaster(cfg)
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -1478,4 +1478,191 @@ func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.
 	}
 
 	return nil
+}
+
+func TestUpgradeServicePreferToDualStack(t *testing.T) {
+	// Create an IPv4 only dual stack control-plane
+	serviceCIDR := "192.168.0.0/24"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
+	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	cfg.ExtraConfig.ServiceIPRange = *cidr
+	_, s, closeFn := framework.RunAnAPIServer(cfg)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	preferDualStack := v1.IPFamilyPolicyPreferDualStack
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "svc-prefer-dual",
+		},
+		Spec: v1.ServiceSpec{
+			Type:           v1.ServiceTypeClusterIP,
+			ClusterIPs:     nil,
+			IPFamilies:     nil,
+			IPFamilyPolicy: &preferDualStack,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "svc-port-1",
+					Port:       443,
+					TargetPort: intstr.IntOrString{IntVal: 443},
+					Protocol:   "TCP",
+				},
+			},
+		},
+	}
+
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was created correctly if it was not expected to fail
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+	if err := validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
+
+	// reconfigure the apiserver to be dual-stack
+	closeFn()
+
+	secondaryServiceCIDR := "2001:db8:1::/48"
+	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	cfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
+	_, s, closeFn = framework.RunAnAPIServer(cfg)
+	defer closeFn()
+
+	client = clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+	// validate the service was created correctly if it was not expected to fail
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+	// service should remain single stack
+	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
+}
+
+func TestDowngradeServicePreferToDualStack(t *testing.T) {
+	// Create a dual stack control-plane
+	serviceCIDR := "192.168.0.0/24"
+	secondaryServiceCIDR := "2001:db8:1::/48"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	dualStackCfg := framework.NewIntegrationTestControlPlaneConfig()
+	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	dualStackCfg.ExtraConfig.ServiceIPRange = *cidr
+	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	dualStackCfg.ExtraConfig.SecondaryServiceIPRange = *secCidr
+	_, s, closeFn := framework.RunAnAPIServer(dualStackCfg)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+	preferDualStack := v1.IPFamilyPolicyPreferDualStack
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "svc-prefer-dual01",
+		},
+		Spec: v1.ServiceSpec{
+			Type:           v1.ServiceTypeClusterIP,
+			ClusterIPs:     nil,
+			IPFamilies:     nil,
+			IPFamilyPolicy: &preferDualStack,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "svc-port-1",
+					Port:       443,
+					TargetPort: intstr.IntOrString{IntVal: 443},
+					Protocol:   "TCP",
+				},
+			},
+		},
+	}
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was created correctly if it was not expected to fail
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+	if err := validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
+	// reconfigure the apiserver to be sinlge stack
+	closeFn()
+	// reset secondary
+	var emptyCidr net.IPNet
+	dualStackCfg.ExtraConfig.SecondaryServiceIPRange = emptyCidr
+
+	_, s, closeFn = framework.RunAnAPIServer(dualStackCfg)
+	defer closeFn()
+	client = clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+	// validate the service is still there.
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+	// service should remain dual stack
+	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
 }

@@ -253,7 +253,7 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 	if written, err := fd.WriteString(scanCmd); err != nil {
 		return err
 	} else if 0 == written {
-		return fmt.Errorf("No data written to file: %s", filename)
+		return fmt.Errorf("no data written to file: %s", filename)
 	}
 
 	klog.V(3).Infof("Scanned SCSI host %d LUN %d", hostNumber, lunNumber)
@@ -404,7 +404,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 			if iscsiTransport == "" {
 				klog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
-				return "", fmt.Errorf("Could not parse iface file for %s", b.Iface)
+				return "", fmt.Errorf("could not parse iface file for %s", b.Iface)
 			}
 			if iscsiTransport == "tcp" {
 				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
@@ -524,7 +524,7 @@ func deleteDevice(deviceName string) error {
 	if written, err := fd.WriteString("1"); err != nil {
 		return err
 	} else if 0 == written {
-		return fmt.Errorf("No data written to file: %s", filename)
+		return fmt.Errorf("no data written to file: %s", filename)
 	}
 	klog.V(4).Infof("Deleted block device: %s", deviceName)
 	return nil
@@ -576,7 +576,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 // DetachDisk unmounts and detaches a volume from node
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	if pathExists, pathErr := mount.PathExists(mntPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
 		return nil
@@ -652,7 +652,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 // DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
 func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
@@ -791,7 +791,7 @@ func extractDeviceAndPrefix(mntPath string) (string, string, error) {
 
 func extractIface(mntPath string) (string, bool) {
 	reOutput := ifaceRe.FindStringSubmatch(mntPath)
-	if reOutput != nil && len(reOutput) > 1 {
+	if len(reOutput) > 1 {
 		return reOutput[1], true
 	}
 
@@ -838,7 +838,7 @@ func parseIscsiadmShow(output string) (map[string]string, error) {
 		}
 		iface := strings.Fields(line)
 		if len(iface) != 3 || iface[1] != "=" {
-			return nil, fmt.Errorf("Error: invalid iface setting: %v", iface)
+			return nil, fmt.Errorf("error: invalid iface setting: %v", iface)
 		}
 		// iscsi_ifacename is immutable once the iface is created
 		if iface[0] == "iface.iscsi_ifacename" {

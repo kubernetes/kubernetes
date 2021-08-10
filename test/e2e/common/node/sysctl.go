@@ -18,7 +18,8 @@ package node
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -209,7 +210,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 			},
 		}
 
-		ginkgo.By("Creating a pod with a greylisted, but not whitelisted sysctl on the node")
+		ginkgo.By("Creating a pod with an ignorelisted, but not allowlisted sysctl on the node")
 		pod = podClient.Create(pod)
 
 		ginkgo.By("Watching for error events or started pod")

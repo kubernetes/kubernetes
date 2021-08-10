@@ -144,6 +144,10 @@ func SurgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 	if r == nil {
 		return 0, nil
 	}
+	// If surge is not requested, we should default to 0.
+	if r.MaxSurge == nil {
+		return 0, nil
+	}
 	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxSurge, numberToSchedule, true)
 }
 

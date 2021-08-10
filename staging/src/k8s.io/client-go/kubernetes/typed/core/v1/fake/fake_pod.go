@@ -189,24 +189,13 @@ func (c *FakePods) ApplyStatus(ctx context.Context, pod *applyconfigurationscore
 	return obj.(*corev1.Pod), err
 }
 
-// GetEphemeralContainers takes name of the pod, and returns the corresponding ephemeralContainers object, and an error if there is any.
-func (c *FakePods) GetEphemeralContainers(ctx context.Context, podName string, options v1.GetOptions) (result *corev1.EphemeralContainers, err error) {
+// UpdateEphemeralContainers takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts v1.UpdateOptions) (result *corev1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(podsResource, c.ns, "ephemeralcontainers", podName), &corev1.EphemeralContainers{})
+		Invokes(testing.NewUpdateSubresourceAction(podsResource, "ephemeralcontainers", c.ns, pod), &corev1.Pod{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*corev1.EphemeralContainers), err
-}
-
-// UpdateEphemeralContainers takes the representation of a ephemeralContainers and updates it. Returns the server's representation of the ephemeralContainers, and an error, if there is any.
-func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *corev1.EphemeralContainers, opts v1.UpdateOptions) (result *corev1.EphemeralContainers, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "ephemeralcontainers", c.ns, ephemeralContainers), &corev1.EphemeralContainers{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*corev1.EphemeralContainers), err
+	return obj.(*corev1.Pod), err
 }

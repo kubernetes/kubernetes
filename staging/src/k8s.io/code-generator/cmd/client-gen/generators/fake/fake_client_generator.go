@@ -54,14 +54,14 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
-					outputPackage:       outputPackage,
-					inputPackage:        inputPackage,
-					group:               gv.Group.NonEmpty(),
-					version:             gv.Version.String(),
-					groupGoName:         groupGoName,
-					typeToMatch:         t,
-					imports:             generator.NewImportTracker(),
-					applyBuilderPackage: applyBuilderPackage,
+					outputPackage:             outputPackage,
+					inputPackage:              inputPackage,
+					group:                     gv.Group.NonEmpty(),
+					version:                   gv.Version.String(),
+					groupGoName:               groupGoName,
+					typeToMatch:               t,
+					imports:                   generator.NewImportTracker(),
+					applyConfigurationPackage: applyBuilderPackage,
 				})
 			}
 

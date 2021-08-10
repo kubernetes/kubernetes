@@ -153,7 +153,7 @@ func (shared *sharedDatastore) getNodeHosts(ctx context.Context, nodes []NodeInf
 	var vmoList []mo.VirtualMachine
 	err := pc.Retrieve(ctx, vmRefs, []string{nameProperty, runtimeHost}, &vmoList)
 	if err != nil {
-		klog.Errorf("SharedHost.getNodeHosts: unable to fetch vms from datacenter %s: %w", nodeInfo.dataCenter.String(), err)
+		klog.Errorf("SharedHost.getNodeHosts: unable to fetch vms from datacenter %s: %v", nodeInfo.dataCenter.String(), err)
 		return nil, err
 	}
 	var hostMoList []mo.HostSystem
@@ -169,7 +169,7 @@ func (shared *sharedDatastore) getNodeHosts(ctx context.Context, nodes []NodeInf
 	pc = property.DefaultCollector(nodeInfo.dataCenter.Client())
 	err = pc.Retrieve(ctx, hostRefs, []string{summary}, &hostMoList)
 	if err != nil {
-		klog.Errorf("SharedHost.getNodeHosts: unable to fetch hosts from datacenter %s: %w", nodeInfo.dataCenter.String(), err)
+		klog.Errorf("SharedHost.getNodeHosts: unable to fetch hosts from datacenter %s: %v", nodeInfo.dataCenter.String(), err)
 		return nil, err
 	}
 	var hosts []hostInfo

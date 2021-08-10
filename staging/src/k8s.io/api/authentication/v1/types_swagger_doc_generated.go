@@ -40,7 +40,10 @@ func (BoundObjectReference) SwaggerDoc() map[string]string {
 }
 
 var map_TokenRequest = map[string]string{
-	"": "TokenRequest requests a token for a given service account.",
+	"":         "TokenRequest requests a token for a given service account.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec holds information about the request being evaluated",
+	"status":   "Status is filled in by the server and indicates whether the token can be authenticated.",
 }
 
 func (TokenRequest) SwaggerDoc() map[string]string {
@@ -69,9 +72,10 @@ func (TokenRequestStatus) SwaggerDoc() map[string]string {
 }
 
 var map_TokenReview = map[string]string{
-	"":       "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
-	"spec":   "Spec holds information about the request being evaluated",
-	"status": "Status is filled in by the server and indicates whether the request can be authenticated.",
+	"":         "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec holds information about the request being evaluated",
+	"status":   "Status is filled in by the server and indicates whether the request can be authenticated.",
 }
 
 func (TokenReview) SwaggerDoc() map[string]string {

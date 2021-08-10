@@ -204,12 +204,16 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"DEPRECATED: the namespace from which the Kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
-		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+
-		"it rejects requests. Zero for no limit.")
+		"This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit "+
+		"(which must be positive) if --enable-priority-and-fairness is true. "+
+		"Otherwise, this flag limits the maximum number of non-mutating requests in flight, "+
+		"or a zero value disables the limit completely.")
 
 	fs.IntVar(&s.MaxMutatingRequestsInFlight, "max-mutating-requests-inflight", s.MaxMutatingRequestsInFlight, ""+
-		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
-		"it rejects requests. Zero for no limit.")
+		"This and --max-requests-inflight are summed to determine the server's total concurrency limit "+
+		"(which must be positive) if --enable-priority-and-fairness is true. "+
+		"Otherwise, this flag limits the maximum number of mutating requests in flight, "+
+		"or a zero value disables the limit completely.")
 
 	fs.DurationVar(&s.RequestTimeout, "request-timeout", s.RequestTimeout, ""+
 		"An optional field indicating the duration a handler must keep a request open before timing "+

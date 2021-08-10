@@ -48,6 +48,9 @@ message Action {
 }
 
 // ClusterRole is a logical grouping of PolicyRules that can be referenced as a unit by ClusterRoleBindings.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ClusterRole {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -63,6 +66,9 @@ message ClusterRole {
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference any ClusterRole in the same namespace or in the global namespace.
 // It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in.
 // ClusterRoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ClusterRoleBinding {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -94,6 +100,9 @@ message ClusterRoleBinding {
 }
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ClusterRoleBindingList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -102,6 +111,9 @@ message ClusterRoleBindingList {
 }
 
 // ClusterRoleList is a collection of ClusterRoles
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ClusterRoleList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -124,16 +136,25 @@ message GroupRestriction {
 }
 
 // IsPersonalSubjectAccessReview is a marker for PolicyRule.AttributeRestrictions that denotes that subjectaccessreviews on self should be allowed
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message IsPersonalSubjectAccessReview {
 }
 
 // LocalResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec in a particular namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message LocalResourceAccessReview {
   // Action describes the action being tested.  The Namespace element is FORCED to the current namespace.
   optional Action Action = 1;
 }
 
 // LocalSubjectAccessReview is an object for requesting information about whether a user or group can perform an action in a particular namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message LocalSubjectAccessReview {
   // Action describes the action being tested.  The Namespace element is FORCED to the current namespace.
   optional Action Action = 1;
@@ -237,12 +258,18 @@ message PolicyRule {
 
 // ResourceAccessReview is a means to request a list of which users and groups are authorized to perform the
 // action specified by spec
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ResourceAccessReview {
   // Action describes the action being tested.
   optional Action Action = 1;
 }
 
 // ResourceAccessReviewResponse describes who can perform the action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message ResourceAccessReviewResponse {
   // Namespace is the namespace used for the access review
   optional string namespace = 1;
@@ -262,6 +289,9 @@ message ResourceAccessReviewResponse {
 }
 
 // Role is a logical grouping of PolicyRules that can be referenced as a unit by RoleBindings.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message Role {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -272,6 +302,9 @@ message Role {
 // RoleBinding references a Role, but not contain it.  It can reference any Role in the same namespace or in the global namespace.
 // It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in.
 // RoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RoleBinding {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -303,6 +336,9 @@ message RoleBinding {
 }
 
 // RoleBindingList is a collection of RoleBindings
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RoleBindingList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -315,6 +351,9 @@ message RoleBindingList {
 // subject are allowed in the namespace to which the RoleBindingRestriction
 // belongs.  If any one of those RoleBindingRestriction objects matches
 // a subject, rolebindings on that subject in the namespace are allowed.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RoleBindingRestriction {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -323,6 +362,9 @@ message RoleBindingRestriction {
 }
 
 // RoleBindingRestrictionList is a collection of RoleBindingRestriction objects.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RoleBindingRestrictionList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -347,6 +389,9 @@ message RoleBindingRestrictionSpec {
 }
 
 // RoleList is a collection of Roles
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RoleList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -355,6 +400,9 @@ message RoleList {
 }
 
 // SelfSubjectRulesReview is a resource you can create to determine which actions you can perform in a namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message SelfSubjectRulesReview {
   // Spec adds information about how to conduct the check
   optional SelfSubjectRulesReviewSpec spec = 1;
@@ -396,6 +444,9 @@ message ServiceAccountRestriction {
 }
 
 // SubjectAccessReview is an object for requesting information about whether a user or group can perform an action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message SubjectAccessReview {
   // Action describes the action being tested.
   optional Action Action = 1;
@@ -415,6 +466,9 @@ message SubjectAccessReview {
 }
 
 // SubjectAccessReviewResponse describes whether or not a user or group can perform an action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message SubjectAccessReviewResponse {
   // Namespace is the namespace used for the access review
   optional string namespace = 1;
@@ -432,6 +486,9 @@ message SubjectAccessReviewResponse {
 }
 
 // SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message SubjectRulesReview {
   // Spec adds information about how to conduct the check
   optional SubjectRulesReviewSpec spec = 1;

@@ -22,7 +22,12 @@ import (
 	"io"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+)
+
+const (
+	usageFmt = "Usage:\n  %s\n"
 )
 
 // NamedFlagSets stores named flag sets in the order of calling FlagSet.
@@ -83,4 +88,18 @@ func PrintSections(w io.Writer, fss NamedFlagSets, cols int) {
 			fmt.Fprint(w, buf.String())
 		}
 	}
+}
+
+// SetUsageAndHelpFunc set both usage and help function.
+// Print the flag sets we need instead of all of them.
+func SetUsageAndHelpFunc(cmd *cobra.Command, fss NamedFlagSets, cols int) {
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
+		PrintSections(cmd.OutOrStderr(), fss, cols)
+		return nil
+	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
+		PrintSections(cmd.OutOrStdout(), fss, cols)
+	})
 }

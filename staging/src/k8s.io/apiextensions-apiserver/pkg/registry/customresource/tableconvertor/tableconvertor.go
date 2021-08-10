@@ -76,9 +76,14 @@ type column interface {
 	PrintResults(wr io.Writer, results []reflect.Value) error
 }
 
+type columnPrinter interface {
+	FindResults(data interface{}) ([][]reflect.Value, error)
+	PrintResults(w io.Writer, results []reflect.Value) error
+}
+
 type convertor struct {
 	headers           []metav1.TableColumnDefinition
-	additionalColumns []column
+	additionalColumns []columnPrinter
 }
 
 func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {

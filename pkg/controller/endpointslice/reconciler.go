@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -45,7 +46,7 @@ type reconciler struct {
 	client               clientset.Interface
 	nodeLister           corelisters.NodeLister
 	maxEndpointsPerSlice int32
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 	metricsCache         *metrics.Cache
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
@@ -113,7 +114,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	for _, sliceToDelete := range slicesToDelete {
 		err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceToDelete.Name, service.Namespace, service.Name, err))
+			errs = append(errs, fmt.Errorf("error deleting %s EndpointSlice for Service %s/%s: %w", sliceToDelete.Name, service.Namespace, service.Name, err))
 		} else {
 			r.endpointSliceTracker.ExpectDeletion(sliceToDelete)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
@@ -148,7 +149,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 	// Build data structures for desired state.
 	desiredMetaByPortMap := map[endpointutil.PortMapKey]*endpointMeta{}
-	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointSet{}
+	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointsliceutil.EndpointSet{}
 	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
@@ -160,7 +161,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 		endpointPorts := getEndpointPorts(service, pod)
 		epHash := endpointutil.NewPortMapKey(endpointPorts)
 		if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
-			desiredEndpointsByPortMap[epHash] = endpointSet{}
+			desiredEndpointsByPortMap[epHash] = endpointsliceutil.EndpointSet{}
 		}
 
 		if _, ok := desiredMetaByPortMap[epHash]; !ok {
@@ -199,15 +200,9 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
 		})
 
-		if len(pmSlicesToCreate) > 0 {
-			slicesToCreate = append(slicesToCreate, pmSlicesToCreate...)
-		}
-		if len(pmSlicesToUpdate) > 0 {
-			slicesToUpdate = append(slicesToUpdate, pmSlicesToUpdate...)
-		}
-		if len(pmSlicesToDelete) > 0 {
-			slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
-		}
+		slicesToCreate = append(slicesToCreate, pmSlicesToCreate...)
+		slicesToUpdate = append(slicesToUpdate, pmSlicesToUpdate...)
+		slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
 	}
 
 	// If there are unique sets of ports that are no longer desired, mark
@@ -355,7 +350,7 @@ func (r *reconciler) finalize(
 func (r *reconciler) reconcileByPortMapping(
 	service *corev1.Service,
 	existingSlices []*discovery.EndpointSlice,
-	desiredSet endpointSet,
+	desiredSet endpointsliceutil.EndpointSet,
 	endpointMeta *endpointMeta,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}

@@ -226,7 +226,7 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string, zon
 		term := v1.TopologySelectorTerm{
 			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 				{
-					Key:    v1.LabelFailureDomainBetaZone,
+					Key:    v1.LabelTopologyZone,
 					Values: zones,
 				},
 			},

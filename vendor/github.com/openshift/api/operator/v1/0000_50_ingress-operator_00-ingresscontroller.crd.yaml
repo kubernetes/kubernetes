@@ -27,7 +27,8 @@ spec:
           for public facing network connections as a new ingress controller revision
           may be rolled out. \n https://kubernetes.io/docs/concepts/services-networking/ingress-controllers
           \n Whenever possible, sensible defaults for the platform are used. See each
-          field for more details."
+          field for more details. \n Compatibility level 1: Stable within a major
+          release for a minimum of 12 months or 3 minor releases (whichever is longer)."
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -45,6 +46,53 @@ spec:
             description: spec is the specification of the desired behavior of the
               IngressController.
             properties:
+              clientTLS:
+                description: clientTLS specifies settings for requesting and verifying
+                  client certificates, which can be used to enable mutual TLS for
+                  edge-terminated and reencrypt routes.
+                properties:
+                  allowedSubjectPatterns:
+                    description: allowedSubjectPatterns specifies a list of regular
+                      expressions that should be matched against the distinguished
+                      name on a valid client certificate to filter requests.  The
+                      regular expressions must use PCRE syntax.  If this list is empty,
+                      no filtering is performed.  If the list is nonempty, then at
+                      least one pattern must match a client certificate's distinguished
+                      name or else the ingress controller rejects the certificate
+                      and denies the connection.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  clientCA:
+                    description: clientCA specifies a configmap containing the PEM-encoded
+                      CA certificate bundle that should be used to verify a client's
+                      certificate.  The administrator must create this configmap in
+                      the openshift-config namespace.
+                    properties:
+                      name:
+                        description: name is the metadata.name of the referenced config
+                          map
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  clientCertificatePolicy:
+                    description: "clientCertificatePolicy specifies whether the ingress
+                      controller requires clients to provide certificates.  This field
+                      accepts the values \"Required\" or \"Optional\". \n Note that
+                      the ingress controller only checks client certificates for edge-terminated
+                      and reencrypt TLS routes; it cannot check certificates for cleartext
+                      HTTP or passthrough TLS routes."
+                    enum:
+                    - ""
+                    - Required
+                    - Optional
+                    type: string
+                required:
+                - clientCA
+                - clientCertificatePolicy
+                type: object
               defaultCertificate:
                 description: "defaultCertificate is a reference to a secret containing
                   the default certificate served by the ingress controller. When Routes
@@ -280,6 +328,28 @@ spec:
                 required:
                 - type
                 type: object
+              httpEmptyRequestsPolicy:
+                default: Respond
+                description: "httpEmptyRequestsPolicy describes how HTTP connections
+                  should be handled if the connection times out before a request is
+                  received. Allowed values for this field are \"Respond\" and \"Ignore\".
+                  \ If the field is set to \"Respond\", the ingress controller sends
+                  an HTTP 400 or 408 response, logs the connection (if access logging
+                  is enabled), and counts the connection in the appropriate metrics.
+                  \ If the field is set to \"Ignore\", the ingress controller closes
+                  the connection without sending a response, logging the connection,
+                  or incrementing metrics.  The default value is \"Respond\". \n Typically,
+                  these connections come from load balancers' health probes or Web
+                  browsers' speculative connections (\"preconnect\") and can be safely
+                  ignored.  However, these requests may also be caused by network
+                  errors, and so setting this field to \"Ignore\" may impede detection
+                  and diagnosis of problems.  In addition, these requests may be caused
+                  by port scans, in which case logging empty requests may aid in detecting
+                  intrusion attempts."
+                enum:
+                - Respond
+                - Ignore
+                type: string
               httpErrorCodePages:
                 description: httpErrorCodePages specifies a configmap with custom
                   error pages. The administrator must create this configmap in the
@@ -611,6 +681,23 @@ spec:
                           or reencrypt connections).  It does not affect the log format
                           for TLS passthrough connections."
                         type: string
+                      logEmptyRequests:
+                        default: Log
+                        description: logEmptyRequests specifies how connections on
+                          which no request is received should be logged.  Typically,
+                          these empty requests come from load balancers' health probes
+                          or Web browsers' speculative connections ("preconnect"),
+                          in which case logging these requests may be undesirable.  However,
+                          these requests may also be caused by network errors, in
+                          which case logging empty requests may be useful for diagnosing
+                          the errors.  In addition, these requests may be caused by
+                          port scans, in which case logging empty requests may aid
+                          in detecting intrusion attempts.  Allowed values for this
+                          field are "Log" and "Ignore".  The default value is "Log".
+                        enum:
+                        - Log
+                        - Ignore
+                        type: string
                     required:
                     - destination
                     type: object
@@ -850,10 +937,7 @@ spec:
                   example, given a specification to use the Intermediate profile deployed
                   on release X.Y.Z, an upgrade to release X.Y.Z+1 may cause a new
                   profile configuration to be applied to the ingress controller, resulting
-                  in a rollout. \n Note that the minimum TLS version for ingress controllers
-                  is 1.1, and the maximum TLS version is 1.2.  An implication of this
-                  restriction is that the Modern TLS profile type cannot be used because
-                  it requires TLS 1.3."
+                  in a rollout."
                 properties:
                   custom:
                     description: "custom is a user-defined TLS security profile. Be
@@ -948,6 +1032,19 @@ spec:
                   is generally not recommended. The default values are suitable for
                   most configurations."
                 properties:
+                  clientFinTimeout:
+                    description: "clientFinTimeout defines how long a connection will
+                      be held open while waiting for the client response to the server/backend
+                      closing the connection. \n If unset, the default timeout is
+                      1s"
+                    format: duration
+                    type: string
+                  clientTimeout:
+                    description: "clientTimeout defines how long a connection will
+                      be held open while waiting for a client response. \n If unset,
+                      the default timeout is 30s"
+                    format: duration
+                    type: string
                   headerBufferBytes:
                     description: "headerBufferBytes describes how much memory should
                       be reserved (in bytes) for IngressController connection sessions.
@@ -978,6 +1075,19 @@ spec:
                     format: int32
                     minimum: 4096
                     type: integer
+                  serverFinTimeout:
+                    description: "serverFinTimeout defines how long a connection will
+                      be held open while waiting for the server/backend response to
+                      the client closing the connection. \n If unset, the default
+                      timeout is 1s"
+                    format: duration
+                    type: string
+                  serverTimeout:
+                    description: "serverTimeout defines how long a connection will
+                      be held open while waiting for a server/backend response. \n
+                      If unset, the default timeout is 30s"
+                    format: duration
+                    type: string
                   threadCount:
                     description: "threadCount defines the number of threads created
                       per HAProxy process. Creating more threads allows each ingress
@@ -995,6 +1105,21 @@ spec:
                     maximum: 64
                     minimum: 1
                     type: integer
+                  tlsInspectDelay:
+                    description: "tlsInspectDelay defines how long the router can
+                      hold data to find a matching route. \n Setting this too short
+                      can cause the router to fall back to the default certificate
+                      for edge-terminated or reencrypt routes even when a better matching
+                      certificate could be used. \n If unset, the default inspect
+                      delay is 5s"
+                    format: duration
+                    type: string
+                  tunnelTimeout:
+                    description: "tunnelTimeout defines how long a tunnel connection
+                      (including websockets) will be held open while the tunnel is
+                      idle. \n If unset, the default timeout is 1h"
+                    format: duration
+                    type: string
                 type: object
               unsupportedConfigOverrides:
                 description: unsupportedConfigOverrides allows specifying unsupported

@@ -150,6 +150,7 @@ var (
 		"CPUCFSQuota",
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",
+		"CPUManagerPolicyOptions[*]",
 		"CPUManagerReconcilePeriod.Duration",
 		"TopologyManagerPolicy",
 		"TopologyManagerScope",
@@ -209,6 +210,7 @@ var (
 		"MaxOpenFiles",
 		"MaxPods",
 		"MemoryManagerPolicy",
+		"MemorySwap.SwapBehavior",
 		"NodeLeaseDurationSeconds",
 		"NodeStatusMaxImages",
 		"NodeStatusUpdateFrequency.Duration",
@@ -234,6 +236,7 @@ var (
 		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
+		"SeccompDefault",
 		"SerializeImagePulls",
 		"ShowHiddenMetricsForVersion",
 		"StreamingConnectionIdleTimeout.Duration",
@@ -247,5 +250,6 @@ var (
 		"VolumePluginDir",
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
+		"MemoryThrottlingFactor",
 	)
 )

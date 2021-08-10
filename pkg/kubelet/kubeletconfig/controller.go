@@ -90,7 +90,7 @@ func NewController(dynamicConfigDir string, transform TransformFunc) *Controller
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
 		configStatus:        status.NewNodeConfigStatus(),
-		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, storeDir)),
+		checkpointStore:     store.NewFsStore(&utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, storeDir)),
 	}
 }
 

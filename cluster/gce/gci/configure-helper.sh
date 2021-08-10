@@ -28,6 +28,9 @@ set -o pipefail
 ### Hardcoded constants
 METADATA_SERVER_IP="${METADATA_SERVER_IP:-169.254.169.254}"
 
+# Standard curl flags.
+CURL_FLAGS='--fail --silent --show-error --retry 5 --retry-delay 3 --connect-timeout 10 --retry-connrefused'
+
 function convert-manifest-params {
   # A helper function to convert the manifest args from a string to a list of
   # flag arguments.
@@ -123,6 +126,9 @@ function gce-metadata-fw-helper {
   iptables -w ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
+# WARNING: DO NOT USE THE FILTER TABLE! Some implementations of network policy
+# think they own it and will stomp all over your changes. At this time, the
+# mangle table is less contentious so use that if possible.
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
@@ -173,8 +179,9 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
-    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 988
-    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 987
+    ip addr add dev lo 169.254.169.252/32
+    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:988
+    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:987
   fi
   iptables -w -t mangle -I OUTPUT -s 169.254.169.254 -j DROP
 
@@ -619,6 +626,8 @@ function append_or_replace_prefixed_line {
 function write-pki-data {
   local data="${1}"
   local path="${2}"
+  # remove the path if it exists
+  rm -f "${path}"
   if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     (umask 027; echo "${data}" | base64 --decode > "${path}")
     chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
@@ -720,23 +729,10 @@ function create-master-pki {
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.) One exception is if METADATA_CLOBBERS_CONFIG is
-# enabled. In that case the basic_auth.csv file will be rewritten to make
-# sure it matches the metadata source of truth.
+# enabled.
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
-  local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
-  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
-      # If METADATA_CLOBBERS_CONFIG is true, we want to rewrite the file
-      # completely, because if we're changing KUBE_USER and KUBE_PASSWORD, we
-      # have nothing to match on.  The file is replaced just below with
-      # append_or_replace_prefixed_line.
-      rm "${basic_auth_csv}"
-    fi
-    append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
-  fi
-
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
     rm "${known_tokens_csv}"
@@ -818,6 +814,12 @@ EOF
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 network-project-id = ${NETWORK_PROJECT_ID}
+EOF
+  fi
+  if [[ -n "${STACK_TYPE:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+stack-type = ${STACK_TYPE}
 EOF
   fi
   if [[ -n "${NODE_NETWORK:-}" ]]; then
@@ -1212,17 +1214,17 @@ rules:
     omitStages:
       - "RequestReceived"
 
-  # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
+  # Secrets, ConfigMaps, TokenRequest and TokenReviews can contain sensitive & binary data,
   # so only log at the Metadata level.
   - level: Metadata
     resources:
       - group: "" # core
-        resources: ["secrets", "configmaps"]
+        resources: ["secrets", "configmaps", "serviceaccounts/token"]
       - group: authentication.k8s.io
         resources: ["tokenreviews"]
     omitStages:
       - "RequestReceived"
-  # Get repsonses can be large; skip them.
+  # Get responses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]
     resources: ${known_apis}
@@ -1269,9 +1271,14 @@ EOF
 function create-kubeconfig {
   local component=$1
   local token=$2
-  echo "Creating kubeconfig file for component ${component}"
+  local path="/etc/srv/kubernetes/${component}/kubeconfig"
   mkdir -p "/etc/srv/kubernetes/${component}"
-  cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
+
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    gke-internal-create-kubeconfig "${component}" "${token}" "${path}"
+  else
+    echo "Creating kubeconfig file for component ${component}"
+    cat <<EOF >"${path}"
 apiVersion: v1
 kind: Config
 users:
@@ -1290,6 +1297,7 @@ contexts:
   name: ${component}
 current-context: ${component}
 EOF
+  fi
 }
 
 # Arg 1: the IP address of the API server
@@ -1768,7 +1776,7 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local -r host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+  local -r host_ip=$(python3 -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -1858,6 +1866,12 @@ function prepare-etcd-manifest {
   fi
   # Replace the volume host path.
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${temp_file}"
+  # Replace the run as user and run as group
+  container_security_context=""
+  if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
+    container_security_context="\"securityContext\": {\"runAsUser\": ${ETCD_RUNASUSER}, \"runAsGroup\": ${ETCD_RUNASGROUP}, \"allowPrivilegeEscalation\": false, \"capabilities\": {\"drop\": [\"all\"]}},"
+  fi
+  sed -i -e "s@{{security_context}}@${container_security_context}@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
@@ -1878,10 +1892,13 @@ function start-etcd-servers {
   if [[ -e /etc/init.d/etcd ]]; then
     rm -f /etc/init.d/etcd
   fi
-  prepare-log-file /var/log/etcd.log
+  if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
+    chown -R "${ETCD_RUNASUSER}":"${ETCD_RUNASGROUP}" /mnt/disks/master-pd/var/etcd
+  fi
+  prepare-log-file /var/log/etcd.log "${ETCD_RUNASUSER:-0}"
   prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
 
-  prepare-log-file /var/log/etcd-events.log
+  prepare-log-file /var/log/etcd-events.log "${ETCD_RUNASUSER:-0}"
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
 }
 
@@ -1917,6 +1934,8 @@ function prepare-konnectivity-server-manifest {
   params+=("--agent-service-account=konnectivity-agent")
   params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
   params+=("--authentication-audience=system:konnectivity-server")
+  params+=("--kubeconfig-qps=75")
+  params+=("--kubeconfig-burst=150")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
@@ -1926,6 +1945,26 @@ function prepare-konnectivity-server-manifest {
   sed -i -e "s@{{ *health_port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
+  if [[ -n "${KONNECTIVITY_SERVER_RUNASUSER:-}" && -n "${KONNECTIVITY_SERVER_RUNASGROUP:-}" && -n "${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP:-}" ]]; then
+    sed -i -e "s@{{ *run_as_user *}}@runAsUser: ${KONNECTIVITY_SERVER_RUNASUSER}@g" "${temp_file}"
+    sed -i -e "s@{{ *run_as_group *}}@runAsGroup: ${KONNECTIVITY_SERVER_RUNASGROUP}@g" "${temp_file}"
+    sed -i -e "s@{{ *supplemental_groups *}}@supplementalGroups: [${KUBE_PKI_READERS_GROUP}]@g" "${temp_file}"
+    sed -i -e "s@{{ *container_security_context *}}@securityContext:@g" "${temp_file}"
+    sed -i -e "s@{{ *capabilities *}}@capabilities:@g" "${temp_file}"
+    sed -i -e "s@{{ *drop_capabilities *}}@drop: [ ALL ]@g" "${temp_file}"
+    sed -i -e "s@{{ *disallow_privilege_escalation *}}@allowPrivilegeEscalation: false@g" "${temp_file}"
+    mkdir -p /etc/srv/kubernetes/konnectivity-server/
+    chown -R "${KONNECTIVITY_SERVER_RUNASUSER}":"${KONNECTIVITY_SERVER_RUNASGROUP}" /etc/srv/kubernetes/konnectivity-server
+    chmod g+w /etc/srv/kubernetes/konnectivity-server
+  else
+    sed -i -e "s@{{ *run_as_user *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *run_as_group *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *supplemental_groups *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *container_security_context *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *capabilities *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *drop_capabilities *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *disallow_privilege_escalation *}}@@g" "${temp_file}"
+  fi
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
@@ -1934,7 +1973,7 @@ function prepare-konnectivity-server-manifest {
 # in the manifests, and copies them to /etc/kubernetes/manifests.
 function start-konnectivity-server {
   echo "Start konnectivity server pods"
-  prepare-log-file /var/log/konnectivity-server.log
+  prepare-log-file /var/log/konnectivity-server.log "${KONNECTIVITY_SERVER_RUNASUSER:-0}"
   prepare-konnectivity-server-manifest "8132" "8133" "8134"
 }
 
@@ -2021,18 +2060,6 @@ function update-node-label() {
   done
 }
 
-# A helper function that sets file permissions for kube-controller-manager to
-# run as non root.
-# User and group should never contain characters that need to be quoted
-# shellcheck disable=SC2086
-function run-kube-controller-manager-as-non-root {
-  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER}
-  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
-  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_CERT_PATH}"
-  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_KEY_PATH}"
-}
-
-
 # Starts kubernetes controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -2051,7 +2078,7 @@ function start-kube-controller-manager {
   fi
   echo "Start kubernetes controller-manager"
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
-  prepare-log-file /var/log/kube-controller-manager.log
+  prepare-log-file /var/log/kube-controller-manager.log "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-0}"
   # Calculate variables and assemble the command line.
   local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
@@ -2101,12 +2128,6 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=("--cluster-signing-duration=$CLUSTER_SIGNING_DURATION")
   fi
-  # Disable using HPA metrics REST clients if metrics-server isn't enabled,
-  # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
-  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
-     [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
-    params+=("--horizontal-pod-autoscaler-use-rest-clients=false")
-  fi
   if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
     params+=("--pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE")
     params+=("--pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE")
@@ -2140,12 +2161,13 @@ function start-kube-controller-manager {
   sed -i -e "s@{{cpurequest}}@${KUBE_CONTROLLER_MANAGER_CPU_REQUEST}@g" "${src_file}"
 
   if [[ -n "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-}" && -n "${KUBE_CONTROLLER_MANAGER_RUNASGROUP:-}" ]]; then
-    run-kube-controller-manager-as-non-root
-    sed -i -e "s@{{runAsUser}}@${KUBE_CONTROLLER_MANAGER_RUNASUSER}@g" "${src_file}"
-    sed -i -e "s@{{runAsGroup}}@${KUBE_CONTROLLER_MANAGER_RUNASGROUP}@g" "${src_file}"
+    sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_CONTROLLER_MANAGER_RUNASUSER},@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@\"runAsGroup\":${KUBE_CONTROLLER_MANAGER_RUNASGROUP},@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${KUBE_PKI_READERS_GROUP} ],@g" "${src_file}"
   else
-    sed -i -e "s@{{runAsUser}}@0@g" "${src_file}"
-    sed -i -e "s@{{runAsGroup}}@0@g" "${src_file}"
+    sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
   fi
 
   cp "${src_file}" /etc/kubernetes/manifests
@@ -2182,9 +2204,6 @@ function start-kube-scheduler {
     params+=("--config=/etc/srv/kubernetes/kube-scheduler/config")
   else
     params+=("--kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig")
-    if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-      params+=("--algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}")
-    fi
     if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
       create-kubescheduler-policy-config
       params+=("--use-legacy-policy-config")
@@ -2265,12 +2284,6 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
-      if [[ -d "${nth_dir}" ]]; then
-          copy-manifests "${nth_dir}" "${dst_dir}"
-      fi
-  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2280,17 +2293,11 @@ function download-extra-addons {
 
   mkdir -p "${out_dir}"
 
+  # shellcheck disable=SC2206
   local curl_cmd=(
     "curl"
-    "--fail"
-    "--retry" "5"
-    "--retry-delay" "3"
-    "--silent"
-    "--show-error"
+    ${CURL_FLAGS}
   )
-  if [[ -n "${CURL_RETRY_CONNREFUSED:-}" ]]; then
-    curl_cmd+=("${CURL_RETRY_CONNREFUSED}")
-  fi
   if [[ -n "${EXTRA_ADDONS_HEADER:-}" ]]; then
     curl_cmd+=("-H" "${EXTRA_ADDONS_HEADER}")
   fi
@@ -2301,19 +2308,28 @@ function download-extra-addons {
 }
 
 # A function that fetches a GCE metadata value and echoes it out.
+# Args:
+#   $1 : URL path after /computeMetadata/v1/ (without heading slash).
+#   $2 : An optional default value to echo out if the fetch fails.
 #
-# $1: URL path after /computeMetadata/v1/ (without heading slash).
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
 function get-metadata-value {
-    # We do not want quotes for CURL_RETRY_CONNREFUSED
-    # shellcheck disable=SC2086
-    curl \
-        --retry 5 \
-        --retry-delay 3 \
-        ${CURL_RETRY_CONNREFUSED} \
-        --fail \
-        --silent \
-        -H 'Metadata-Flavor: Google' \
-        "http://metadata/computeMetadata/v1/${1}"
+  local default="${2:-}"
+
+  local status
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    -H 'Metadata-Flavor: Google' \
+    "http://metadata/computeMetadata/v1/${1}" \
+  || status="$?"
+  status="${status:-0}"
+
+  if [[ "${status}" -eq 0 || -z "${default}" ]]; then
+    return "${status}"
+  else
+    echo "${default}"
+  fi
 }
 
 # A helper function for copying manifests and setting dir/files
@@ -2675,10 +2691,6 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest ''
-  fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
@@ -2785,13 +2797,6 @@ EOF
   sed -i -e "s@{{runAsUser}}@${KUBE_ADDON_MANAGER_RUNASUSER:-2002}@g" "${src_file}"
   sed -i -e "s@{{runAsGroup}}@${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
-}
-
-function setup-node-termination-handler-manifest {
-    local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
-    if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
-        sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
-    fi
 }
 
 function setup-konnectivity-agent-manifest {
@@ -3089,10 +3094,157 @@ function detect_host_info() {
   esac
 }
 
+# Initializes variables used by the log-* functions.
+#
+# get-metadata-value must be defined before calling this function.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-init {
+  # Used by log-* functions.
+  LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
+  LOG_INSTANCE_NAME=$(hostname)
+  LOG_BOOT_ID=$(journalctl --list-boots | grep -E '^ *0' | awk '{print $2}')
+  declare -Ag LOG_START_TIMES
+  declare -ag LOG_TRAP_STACK
+
+  LOG_STATUS_STARTED='STARTED'
+  LOG_STATUS_COMPLETED='COMPLETED'
+  LOG_STATUS_ERROR='ERROR'
+}
+
+# Sets an EXIT trap.
+# Args:
+#   $1:... : the trap command.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-trap-push {
+  local t="${*:1}"
+  LOG_TRAP_STACK+=("${t}")
+  # shellcheck disable=2064
+  trap "${t}" EXIT
+}
+
+# Removes and restores an EXIT trap.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-trap-pop {
+  # Remove current trap.
+  unset 'LOG_TRAP_STACK[-1]'
+
+  # Restore previous trap.
+  if [ ${#LOG_TRAP_STACK[@]} -ne 0 ]; then
+    local t="${LOG_TRAP_STACK[-1]}"
+    # shellcheck disable=2064
+    trap "${t}" EXIT
+  else
+    # If no traps in stack, clear.
+    trap EXIT
+  fi
+}
+
+# Logs the end of a bootstrap step that errored.
+# Args:
+#  $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-error {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_ERROR}" "encountered non-zero exit code"
+}
+
+# Wraps a command with bootstrap logging.
+# Args:
+#   $1    : bootstrap step name.
+#   $2... : the command to run.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-wrap {
+  local bootstep="$1"
+  local command="${*:2}"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+  $command
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Logs a bootstrap step start. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-start {
+  local bootstep="$1"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+}
+
+# Logs a bootstrap step end. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-end {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Writes a log proto to stdout.
+# Args:
+#   $1: bootstrap step name.
+#   $2: status. Either 'STARTED', 'COMPLETED', or 'ERROR'.
+#   $3: optional status reason.
+#
+# NOTE: this function is duplicated in configure.sh, any changes here should be
+# duplicated there as well.
+function log-proto {
+  local bootstep="$1"
+  local status="$2"
+  local status_reason="${3:-}"
+
+  # Get current time.
+  local current_time
+  current_time="$(date --utc '+%s.%N')"
+  # ...formatted as UTC RFC 3339.
+  local timestamp
+  timestamp="$(date --utc --date="@${current_time}" '+%FT%T.%NZ')"
+
+  # Calculate latency.
+  local latency='null'
+  if [ "${status}" == "${LOG_STATUS_STARTED}" ]; then
+    LOG_START_TIMES["${bootstep}"]="${current_time}"
+  else
+    local start_time="${LOG_START_TIMES["${bootstep}"]}"
+    unset 'LOG_START_TIMES['"${bootstep}"']'
+
+    # Bash cannot do non-integer math, shell out to awk.
+    latency="$(echo "${current_time} ${start_time}" | awk '{print $1 - $2}')s"
+
+    # The default latency is null which cannot be wrapped as a string so we must
+    # do it here instead of the printf.
+    latency="\"${latency}\""
+  fi
+
+  printf '[cloud.kubernetes.monitoring.proto.SerialportLog] {"cluster_hash":"%s","vm_instance_name":"%s","boot_id":"%s","timestamp":"%s","bootstrap_status":{"step_name":"%s","status":"%s","status_reason":"%s","latency":%s}}\n' \
+  "${LOG_CLUSTER_ID}" "${LOG_INSTANCE_NAME}" "${LOG_BOOT_ID}" "${timestamp}" "${bootstep}" "${status}" "${status_reason}" "${latency}"
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
-  detect_host_info
+  log-wrap 'DetectHostInfo' detect_host_info
 
   readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
   readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
@@ -3103,39 +3255,18 @@ function main() {
   KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
   KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
 
-  # Use --retry-connrefused opt only if it's supported by curl.
-  CURL_RETRY_CONNREFUSED=""
-  if curl --help | grep -q -- '--retry-connrefused'; then
-    CURL_RETRY_CONNREFUSED='--retry-connrefused'
-  fi
-
   KUBE_HOME="/home/kubernetes"
   KUBE_BIN=${KUBE_HOME}/bin
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
 
-  if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
-    # found python2, just use that
-    PYTHON="python"
-  elif [[ -f "/usr/bin/python2.7" ]]; then
-    # System python not defaulted to python 2 but using 2.7 during migration
-    PYTHON="/usr/bin/python2.7"
-  else
-    # No python2 either by default, let's see if we can find python3
-    PYTHON="python3"
-    if ! command -v ${PYTHON} >/dev/null 2>&1; then
-      echo "ERROR Python not found. Aborting."
-      exit 2
-    fi
-  fi
-  echo "Version :  $(${PYTHON} -V 2>&1)"
-
+  log-start 'SourceKubeEnv'
   if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
     echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
     exit 1
   fi
-
   source "${KUBE_HOME}/kube-env"
+  log-end 'SourceKubeEnv'
 
   if [[ -f "${KUBE_HOME}/kubelet-config.yaml" ]]; then
     echo "Found Kubelet config file at ${KUBE_HOME}/kubelet-config.yaml"
@@ -3143,16 +3274,19 @@ function main() {
   fi
 
   if [[ -e "${KUBE_HOME}/kube-master-certs" ]]; then
-    source "${KUBE_HOME}/kube-master-certs"
+    log-wrap 'SourceKubeMasterCerts' source "${KUBE_HOME}/kube-master-certs"
   fi
 
+  log-start 'VerifyKubeUser'
   if [[ -n "${KUBE_USER:-}" ]]; then
     if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
       echo "Bad KUBE_USER format."
       exit 1
     fi
   fi
+  log-end 'VerifyKubeUser'
 
+  log-start 'GenerateTokens'
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
@@ -3169,35 +3303,36 @@ function main() {
   if [[ "${ENABLE_MONITORING_TOKEN:-false}" == "true" ]]; then
     MONITORING_TOKEN="$(secure_random 32)"
   fi
+  log-end 'GenerateTokens'
 
-  setup-os-params
-  config-ip-firewall
-  create-dirs
-  ensure-local-ssds
-  setup-kubelet-dir
-  setup-logrotate
+  log-wrap 'SetupOSParams' setup-os-params
+  log-wrap 'ConfigIPFirewall' config-ip-firewall
+  log-wrap 'CreateDirs' create-dirs
+  log-wrap 'EnsureLocalSSDs' ensure-local-ssds
+  log-wrap 'SetupKubeletDir' setup-kubelet-dir
+  log-wrap 'SetupLogrotate' setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-    mount-master-pd
-    create-node-pki
-    create-master-pki
-    create-master-auth
-    ensure-master-bootstrap-kubectl-auth
-    create-master-kubelet-auth
-    create-master-etcd-auth
-    create-master-etcd-apiserver-auth
-    override-pv-recycler
-    gke-master-start
+    log-wrap 'MountMasterPD' mount-master-pd
+    log-wrap 'CreateNodePKI' create-node-pki
+    log-wrap 'CreateMasterPKI' create-master-pki
+    log-wrap 'CreateMasterAuth' create-master-auth
+    log-wrap 'EnsureMasterBootstrapKubectlAuth' ensure-master-bootstrap-kubectl-auth
+    log-wrap 'CreateMasterKubeletAuth' create-master-kubelet-auth
+    log-wrap 'CreateMasterEtcdAuth' create-master-etcd-auth
+    log-wrap 'CreateMasterEtcdApiserverAuth' create-master-etcd-apiserver-auth
+    log-wrap 'OverridePVRecycler' override-pv-recycler
+    log-wrap 'GKEMasterStart' gke-master-start
   else
-    create-node-pki
-    create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
+    log-wrap 'CreateNodePKI' create-node-pki
+    log-wrap 'CreateKubeletKubeconfig' create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      create-kubeproxy-user-kubeconfig
+      log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-        create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
+        log-wrap 'CreateNodeProblemDetectorKubeconfig' create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
       elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
-        create-node-problem-detector-kubeconfig-from-kubelet
+        log-wrap 'CreateNodeProblemDetectorKubeconfigFromKubelet' create-node-problem-detector-kubeconfig-from-kubelet
       else
         echo "Either NODE_PROBLEM_DETECTOR_TOKEN or /var/lib/kubelet/kubeconfig must be set"
         exit 1
@@ -3205,60 +3340,71 @@ function main() {
     fi
   fi
 
-  override-kubectl
+  log-wrap 'OverrideKubectl' override-kubectl
   container_runtime="${CONTAINER_RUNTIME:-docker}"
   # Run the containerized mounter once to pre-cache the container image.
   if [[ "${container_runtime}" == "docker" ]]; then
-    assemble-docker-flags
+    log-wrap 'AssembleDockerFlags' assemble-docker-flags
   elif [[ "${container_runtime}" == "containerd" ]]; then
     if docker-installed; then
       # We still need to configure docker so it wouldn't reserver the 172.17.0/16 subnet
       # And if somebody will start docker to build or pull something, logging will also be set up
-      assemble-docker-flags
+      log-wrap 'AssembleDockerFlags' assemble-docker-flags
       # stop docker if it is present as we want to use just containerd
-      systemctl stop docker || echo "unable to stop docker"
+      log-wrap 'StopDocker' systemctl stop docker || echo "unable to stop docker"
     fi
-    setup-containerd
+    log-wrap 'SetupContainerd' setup-containerd
   fi
 
+  log-start 'SetupKubePodLogReadersGroupDir'
   if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
      mkdir -p /var/log/pods/
      chgrp -R "${KUBE_POD_LOG_READERS_GROUP:-}" /var/log/pods/
      chmod -R g+s /var/log/pods/
   fi
+  log-end 'SetupKubePodLogReadersGroupDir'
 
-  start-kubelet
+  log-wrap 'StartKubelet' start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-    compute-master-manifest-variables
+    log-wrap 'ComputeMasterManifestVariables' compute-master-manifest-variables
     if [[ -z "${ETCD_SERVERS:-}" ]]; then
-      start-etcd-servers
+      log-wrap 'StartEtcdServers' start-etcd-servers
     fi
-    source ${KUBE_BIN}/configure-kubeapiserver.sh
-    start-kube-apiserver
+    log-wrap 'SourceConfigureKubeApiserver' source ${KUBE_BIN}/configure-kubeapiserver.sh
+    log-wrap 'StartKubeApiserver' start-kube-apiserver
     if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
-      start-konnectivity-server
+      log-wrap 'StartKonnectivityServer' start-konnectivity-server
     fi
-    start-kube-controller-manager
-    start-kube-scheduler
-    wait-till-apiserver-ready
-    start-kube-addons
-    start-cluster-autoscaler
-    start-lb-controller
-    update-legacy-addon-node-labels &
+    log-wrap 'StartKubeControllerManager' start-kube-controller-manager
+    log-wrap 'StartKubeScheduler' start-kube-scheduler
+    log-wrap 'WaitTillApiserverReady' wait-till-apiserver-ready
+    log-wrap 'StartKubeAddons' start-kube-addons
+    log-wrap 'StartClusterAutoscaler' start-cluster-autoscaler
+    log-wrap 'StartLBController' start-lb-controller
+    log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      start-kube-proxy
+      log-wrap 'StartKubeProxy' start-kube-proxy
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      start-node-problem-detector
+      log-wrap 'StartNodeProblemDetector' start-node-problem-detector
     fi
   fi
-  reset-motd
-  prepare-mounter-rootfs
+  log-wrap 'ResetMotd' reset-motd
+  log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
+
+  # Wait for all background jobs to finish.
+  wait
   echo "Done for the configuration for kubernetes"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  main "${@}"
+  log-init
+  log-wrap 'ConfigureHelperMain' main "${@}"
+
+  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+    # Give kube-bootstrap-logs-forwarder.service some time to write all logs.
+    sleep 3
+  fi
 fi

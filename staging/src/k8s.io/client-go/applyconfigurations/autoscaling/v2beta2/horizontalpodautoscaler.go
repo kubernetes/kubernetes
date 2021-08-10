@@ -50,7 +50,7 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // ExtractHorizontalPodAutoscaler extracts the applied configuration owned by fieldManager from
 // horizontalPodAutoscaler. If no managedFields are found in horizontalPodAutoscaler for fieldManager, a
 // HorizontalPodAutoscalerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // horizontalPodAutoscaler must be a unmodified HorizontalPodAutoscaler API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "")
+}
+
+// ExtractHorizontalPodAutoscalerStatus is the same as ExtractHorizontalPodAutoscaler except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "status")
+}
+
+func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
-	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"), fieldManager, b)
+	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

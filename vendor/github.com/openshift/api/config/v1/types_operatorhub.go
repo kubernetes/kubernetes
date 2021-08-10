@@ -36,9 +36,12 @@ type OperatorHubStatus struct {
 // OperatorHub is the Schema for the operatorhubs API. It can be used to change
 // the state of the default hub sources for OperatorHub on the cluster from
 // enabled to disabled and vice versa.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:subresource:status
 // +genclient
 // +genclient:nonNamespaced
+// +openshift:compatibility-gen:level=1
 type OperatorHub struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -50,6 +53,9 @@ type OperatorHub struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // OperatorHubList contains a list of OperatorHub
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type OperatorHubList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

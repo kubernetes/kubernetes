@@ -81,6 +81,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy), opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	opts := validation.PodSecurityPolicyValidationOptions{
 		// Allowed if the feature is enabled or the old policy already had it.
@@ -89,6 +92,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 			volumeInUse(old.(*policy.PodSecurityPolicy), policy.Ephemeral),
 	}
 	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy), opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func volumeInUse(oldPSP *policy.PodSecurityPolicy, volume policy.FSType) bool {

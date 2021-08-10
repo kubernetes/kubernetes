@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -1004,6 +1005,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 		name            string
 		volumeMode      *v1.PersistentVolumeMode
 		expansionFailed bool
+		uncertainTest   bool
 		pvName          string
 		pvcSize         resource.Quantity
 		pvcStatusSize   resource.Quantity
@@ -1164,9 +1166,6 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				if !cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
 				}
-
-				// Start the reconciler again, we hope reconciler will perform the
-				// resize operation and clear the fsResizeRequired flag for volume.
 				go reconciler.Run(wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
@@ -1174,7 +1173,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 					return mounted && err == nil, nil
 				})
 				if waitErr != nil {
-					t.Fatal("Volume resize should succeeded")
+					t.Fatalf("Volume resize should succeeded %v", waitErr)
 				}
 			}
 
@@ -1371,6 +1370,8 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 		unmountVolumeCount     int
 		volumeName             string
 		supportRemount         bool
+		pvcStatusSize          resource.Quantity
+		pvSize                 resource.Quantity
 	}{
 		{
 			name:                   "timed out operations should result in volume marked as uncertain",
@@ -1409,6 +1410,16 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeName:             volumetesting.SuccessAndFailOnSetupVolumeName,
 			supportRemount:         true,
 		},
+		{
+			name:                   "mount success but fail to expand filesystem",
+			volumeState:            operationexecutor.VolumeMountUncertain,
+			unmountDeviceCallCount: 1,
+			unmountVolumeCount:     1,
+			volumeName:             volumetesting.FailVolumeExpansion,
+			supportRemount:         true,
+			pvSize:                 resource.MustParse("10G"),
+			pvcStatusSize:          resource.MustParse("2G"),
+		},
 	}
 	modes := []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem}
 
@@ -1431,6 +1442,11 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 						VolumeMode: &mode,
 					},
 				}
+				if tc.pvSize.CmpInt64(0) > 0 {
+					pv.Spec.Capacity = v1.ResourceList{
+						v1.ResourceStorage: tc.pvSize,
+					}
+				}
 				pvc := &v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pvc",
@@ -1440,6 +1456,13 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 						VolumeName: tc.volumeName,
 						VolumeMode: &mode,
 					},
+				}
+				if tc.pvcStatusSize.CmpInt64(0) > 0 {
+					pvc.Status = v1.PersistentVolumeClaimStatus{
+						Capacity: v1.ResourceList{
+							v1.ResourceStorage: tc.pvcStatusSize,
+						},
+					}
 				}
 				pod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1525,7 +1548,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				}
 
 				if tc.volumeState == operationexecutor.VolumeMountUncertain {
-					waitForUncertainPodMount(t, volumeName, asw)
+					waitForUncertainPodMount(t, volumeName, podName, asw)
 				}
 
 				if tc.volumeState == operationexecutor.VolumeMounted {
@@ -1607,11 +1630,15 @@ func waitForGlobalMount(t *testing.T, volumeName v1.UniqueVolumeName, asw cache.
 	}
 }
 
-func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, asw cache.ActualStateOfWorld) {
+func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podName types.UniquePodName, asw cache.ActualStateOfWorld) {
 	// check if volume is locally pod mounted in uncertain state
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
+			mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
+			if mounted || err != nil {
+				return false, nil
+			}
 			allMountedVolumes := asw.GetAllMountedVolumes()
 			for _, v := range allMountedVolumes {
 				if v.VolumeName == volumeName {

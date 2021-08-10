@@ -155,9 +155,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("batch", "v1", "cronjobs"): {
 			Stub:             `{"metadata": {"name": "cjv1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "` + image + `", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 			ExpectedEtcdPath: "/registry/cronjobs/" + namespace + "/cjv1",
-			// TODO (soltysh): in 1.22 this should be switched to v1. See https://github.com/kubernetes/kubernetes/pull/98965
-			// this has to stay at v1beta1 for a release, otherwise a 1.20 API server won't be able to read the data persisted in etcd and will break during a multi-server upgrade
-			ExpectedGVK: gvkP("batch", "v1beta1", "CronJob"),
 		},
 		// --
 
@@ -165,6 +162,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("batch", "v1beta1", "cronjobs"): {
 			Stub:             `{"metadata": {"name": "cjv1beta1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "` + image + `", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 			ExpectedEtcdPath: "/registry/cronjobs/" + namespace + "/cjv1beta1",
+			ExpectedGVK:      gvkP("batch", "v1", "CronJob"),
 		},
 		// --
 

@@ -24,9 +24,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
@@ -34,31 +38,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+
+	"github.com/pkg/errors"
 )
-
-// unretriableError is an error used temporarily while we are migrating from the
-// ClusterStatus struct to an annotation Pod based information. When performing
-// the upgrade of all control plane nodes with `kubeadm upgrade apply` and
-// `kubeadm upgrade node` we don't want to retry as if we were hitting connectivity
-// issues when the pod annotation is missing on the API server pods. This error will
-// be used in such scenario, for failing fast, and falling back to the ClusterStatus
-// retrieval in those cases.
-type unretriableError struct {
-	err error
-}
-
-func newUnretriableError(err error) *unretriableError {
-	return &unretriableError{err: err}
-}
-
-func (ue *unretriableError) Error() string {
-	return fmt.Sprintf("unretriable error: %s", ue.err.Error())
-}
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
 func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
@@ -87,8 +69,13 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
 
-	// InitConfiguration is composed with data from different places
+	// Take an empty versioned InitConfiguration, statically default it and convert it to the internal type
+	versionedInitcfg := &kubeadmapiv1.InitConfiguration{}
+	kubeadmscheme.Scheme.Default(versionedInitcfg)
 	initcfg := &kubeadmapi.InitConfiguration{}
+	if err := kubeadmscheme.Scheme.Convert(versionedInitcfg, initcfg, nil); err != nil {
+		return nil, errors.Wrap(err, "could not prepare a defaulted InitConfiguration")
+	}
 
 	// gets ClusterConfiguration from kubeadm-config
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
@@ -216,17 +203,6 @@ func getAPIEndpointWithBackoff(client clientset.Interface, nodeName string, apiE
 		return nil
 	}
 	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
-
-	// NB: this is a fallback when there is no annotation found in the API server pod that contains
-	//     the API endpoint, and so we fallback to reading the ClusterStatus struct present in the
-	//     kubeadm-config ConfigMap. This can happen for example, when performing the first
-	//     `kubeadm upgrade apply` and `kubeadm upgrade node` cycle on the whole cluster. This logic
-	//     will be removed when the cluster status struct is removed from the kubeadm-config ConfigMap.
-	if err = getAPIEndpointFromClusterStatus(client, nodeName, apiEndpoint); err == nil {
-		return nil
-	}
-	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using cluster status", nodeName))
-
 	return errorsutil.NewAggregate(errs)
 }
 
@@ -237,13 +213,6 @@ func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string
 	// static pods were not yet mirrored into the API server we want to wait for this propagation.
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		rawAPIEndpoint, lastErr = getRawAPIEndpointFromPodAnnotationWithoutRetry(client, nodeName)
-		// TODO (ereslibre): this logic will need tweaking once that we get rid of the ClusterStatus, since we won't have
-		// the ClusterStatus safety net, we will want to remove the UnretriableError and not make the distinction here
-		// anymore.
-		if _, ok := lastErr.(*unretriableError); ok {
-			// Fail fast scenario, to be removed once we get rid of the ClusterStatus
-			return true, errors.Wrapf(lastErr, "API server Pods exist, but no API endpoint annotations were found")
-		}
 		return lastErr == nil, nil
 	})
 	if err != nil {
@@ -274,50 +243,5 @@ func getRawAPIEndpointFromPodAnnotationWithoutRetry(client clientset.Interface, 
 	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
 		return apiServerEndpoint, nil
 	}
-	return "", newUnretriableError(errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey))
-}
-
-// TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.
-func getAPIEndpointFromClusterStatus(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
-	clusterStatus, err := GetClusterStatus(client)
-	if err != nil {
-		return errors.Wrap(err, "could not retrieve cluster status")
-	}
-	if statusAPIEndpoint, ok := clusterStatus.APIEndpoints[nodeName]; ok {
-		*apiEndpoint = statusAPIEndpoint
-		return nil
-	}
-	return errors.Errorf("could not find node %s in the cluster status", nodeName)
-}
-
-// GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap
-func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
-	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
-	if apierrors.IsNotFound(err) {
-		return &kubeadmapi.ClusterStatus{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	clusterStatus, err := UnmarshalClusterStatus(configMap.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	return clusterStatus, nil
-}
-
-// UnmarshalClusterStatus takes raw ConfigMap.Data and converts it to a ClusterStatus object
-func UnmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
-	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
-	if !ok {
-		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
-	}
-	clusterStatus := &kubeadmapi.ClusterStatus{}
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
-		return nil, err
-	}
-
-	return clusterStatus, nil
+	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
 }

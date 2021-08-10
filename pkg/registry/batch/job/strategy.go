@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -89,6 +91,8 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
+	job.Generation = 1
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
@@ -101,7 +105,34 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.Suspend = nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) {
+		// Until this feature graduates to GA and soaks in clusters, we use an
+		// annotation to mark whether jobs are tracked with it.
+		addJobTrackingAnnotation(job)
+	} else {
+		dropJobTrackingAnnotation(job)
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
+}
+
+func addJobTrackingAnnotation(job *batch.Job) {
+	if job.Annotations == nil {
+		job.Annotations = map[string]string{}
+	}
+	job.Annotations[batchv1.JobTrackingFinalizer] = ""
+}
+
+func hasJobTrackingAnnotation(job *batch.Job) bool {
+	if job.Annotations == nil {
+		return false
+	}
+	_, ok := job.Annotations[batchv1.JobTrackingFinalizer]
+	return ok
+}
+
+func dropJobTrackingAnnotation(job *batch.Job) {
+	delete(job.Annotations, batchv1.JobTrackingFinalizer)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -127,8 +158,17 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 			newJob.Spec.Suspend = oldJob.Spec.Suspend
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && !hasJobTrackingAnnotation(oldJob) {
+		dropJobTrackingAnnotation(newJob)
+	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
+
+	// Any changes to the spec increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newJob.Spec, oldJob.Spec) {
+		newJob.Generation = oldJob.Generation + 1
+	}
 }
 
 // Validate validates a new job.
@@ -138,8 +178,35 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, nil)
+	opts := validationOptionsForJob(job, nil)
 	return validation.ValidateJob(job, opts)
+}
+
+func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidationOptions {
+	var newPodTemplate, oldPodTemplate *core.PodTemplateSpec
+	if newJob != nil {
+		newPodTemplate = &newJob.Spec.Template
+	}
+	if oldJob != nil {
+		oldPodTemplate = &oldJob.Spec.Template
+	}
+	opts := validation.JobValidationOptions{
+		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
+		AllowTrackingAnnotation: utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers),
+	}
+	if oldJob != nil {
+		// Because we don't support the tracking with finalizers for already
+		// existing jobs, we allow the annotation only if the Job already had it,
+		// regardless of the feature gate.
+		opts.AllowTrackingAnnotation = hasJobTrackingAnnotation(oldJob)
+	}
+	return opts
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newJob := obj.(*batch.Job)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, nil)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -210,10 +277,21 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	job := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 
-	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, &oldJob.Spec.Template)
+	opts := validationOptionsForJob(job, oldJob)
 	validationErrorList := validation.ValidateJob(job, opts)
-	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts.PodValidationOptions)
 	return append(validationErrorList, updateErrorList...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+	if newJob.Generation != oldJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, &oldJob.Spec.Template)
+	}
+	return warnings
 }
 
 type jobStatusStrategy struct {
@@ -240,6 +318,11 @@ func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.

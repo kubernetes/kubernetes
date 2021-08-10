@@ -22,6 +22,7 @@ package zapcore
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 )
 
@@ -42,7 +43,23 @@ import (
 //      ...
 //    ],
 //  }
-func encodeError(key string, err error, enc ObjectEncoder) error {
+func encodeError(key string, err error, enc ObjectEncoder) (retErr error) {
+	// Try to capture panics (from nil references or otherwise) when calling
+	// the Error() method
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			// If it's a nil pointer, just say "<nil>". The likeliest causes are a
+			// error that fails to guard against nil or a nil pointer for a
+			// value receiver, and in either case, "<nil>" is a nice result.
+			if v := reflect.ValueOf(err); v.Kind() == reflect.Ptr && v.IsNil() {
+				enc.AddString(key, "<nil>")
+				return
+			}
+
+			retErr = fmt.Errorf("PANIC=%v", rerr)
+		}
+	}()
+
 	basic := err.Error()
 	enc.AddString(key, basic)
 
@@ -64,11 +81,6 @@ type errorGroup interface {
 	// Provides read-only access to the underlying list of errors, preferably
 	// without causing any allocs.
 	Errors() []error
-}
-
-type causer interface {
-	// Provides access to the error that caused this error.
-	Cause() error
 }
 
 // Note that errArry and errArrayElem are very similar to the version

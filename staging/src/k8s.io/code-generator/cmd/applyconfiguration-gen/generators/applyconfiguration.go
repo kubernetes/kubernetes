@@ -102,7 +102,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(clientgenTypeConstructorNamespaced, typeParams)
 		}
 		if typeParams.OpenAPIType != nil {
-			g.generateClientgenExtract(sw, typeParams)
+			g.generateClientgenExtract(sw, typeParams, !typeParams.Tags.NoStatus)
 		}
 	} else {
 		sw.Do(constructor, typeParams)
@@ -317,12 +317,12 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
 }
 `
 
-func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.SnippetWriter, typeParams TypeParams) {
+func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.SnippetWriter, typeParams TypeParams, includeStatus bool) {
 	sw.Do(`
 // Extract$.ApplyConfig.Type|public$ extracts the applied configuration owned by fieldManager from
 // $.Struct|private$. If no managedFields are found in $.Struct|private$ for fieldManager, a
 // $.ApplyConfig.ApplyConfiguration|public$ is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // $.Struct|private$ must be a unmodified $.Struct|public$ API object that was retrieved from the Kubernetes API.
@@ -330,9 +330,23 @@ func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.Sni
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$ , error) {
+func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
+	return extract$.ApplyConfig.Type|public$($.Struct|private$, fieldManager, "")
+}`, typeParams)
+	if includeStatus {
+		sw.Do(`
+// Extract$.ApplyConfig.Type|public$Status is the same as Extract$.ApplyConfig.Type|public$ except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func Extract$.ApplyConfig.Type|public$Status($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
+	return extract$.ApplyConfig.Type|public$($.Struct|private$, fieldManager, "status")
+}
+`, typeParams)
+	}
+	sw.Do(`
+func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
 	b := &$.ApplyConfig.ApplyConfiguration|public${}
-	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b)
+	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

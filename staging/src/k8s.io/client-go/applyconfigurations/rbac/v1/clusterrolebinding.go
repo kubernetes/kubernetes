@@ -49,7 +49,7 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // ExtractClusterRoleBinding extracts the applied configuration owned by fieldManager from
 // clusterRoleBinding. If no managedFields are found in clusterRoleBinding for fieldManager, a
 // ClusterRoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // clusterRoleBinding must be a unmodified ClusterRoleBinding API object that was retrieved from the Kubernetes API.
@@ -58,8 +58,19 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractClusterRoleBinding(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "")
+}
+
+// ExtractClusterRoleBindingStatus is the same as ExtractClusterRoleBinding except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractClusterRoleBindingStatus(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "status")
+}
+
+func extractClusterRoleBinding(clusterRoleBinding *apirbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
 	b := &ClusterRoleBindingApplyConfiguration{}
-	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRoleBinding"), fieldManager, b)
+	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRoleBinding"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

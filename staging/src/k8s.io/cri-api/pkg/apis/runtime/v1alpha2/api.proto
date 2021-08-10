@@ -392,6 +392,8 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // Optional configurations specific to Windows hosts.
+    WindowsPodSandboxConfig windows = 9;
 }
 
 message RunPodSandboxRequest {
@@ -401,7 +403,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
     string runtime_handler = 2;
 }
 
@@ -583,6 +585,12 @@ message LinuxContainerResources {
     string cpuset_mems = 7;
     // List of HugepageLimits to limit the HugeTLB usage of container per page size. Default: nil (not specified).
     repeated HugepageLimit hugepage_limits = 8;
+    // Unified resources for cgroup v2. Default: nil (not specified).
+    // Each key/value in the map refers to the cgroup v2.
+    // e.g. "memory.max": "6937202688" or "io.weight": "default 100".
+    map<string, string> unified = 9;
+    // Memory swap limit in bytes. Default 0 (not specified).
+    int64 memory_swap_limit_in_bytes = 10;
 }
 
 // HugepageLimit corresponds to the file`hugetlb.<hugepagesize>.limit_in_byte` in container level cgroup.
@@ -693,6 +701,29 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// applied to a sandbox.
+// These settings will only apply to the sandbox container.
+message WindowsSandboxSecurityContext {
+    // User name to run the container process as. If specified, the user MUST
+    // exist in the container image and be resolved there by the runtime;
+    // otherwise, the runtime MUST return error.
+    string run_as_username = 1;
+
+    // The contents of the GMSA credential spec to use to run this container.
+    string credential_spec = 2;
+
+    // Indicates whether the container be asked to run as a HostProcess container.
+    bool host_process = 3;
+}
+
+// WindowsPodSandboxConfig holds platform-specific configurations for Windows
+// host platforms and Windows-based containers.
+message WindowsPodSandboxConfig {
+    // WindowsSandboxSecurityContext holds sandbox security attributes.
+    WindowsSandboxSecurityContext security_context = 1;
+}
+
 // WindowsContainerSecurityContext holds windows security configuration that will be applied to a container.
 message WindowsContainerSecurityContext {
     // User name to run the container process as. If specified, the user MUST
@@ -702,6 +733,9 @@ message WindowsContainerSecurityContext {
 
     // The contents of the GMSA credential spec to use to run this container.
     string credential_spec = 2;
+
+    // Indicates whether a container is to be run as a HostProcess container.
+    bool host_process = 3;
 }
 
 // WindowsContainerConfig contains platform-specific configuration for

@@ -126,19 +126,28 @@ try {
     exit 0
   }
 
-  if (-not (Test-DockerIsInstalled)) {
-    Install-Docker
-  }
-  # For some reason the docker service may not be started automatically on the
-  # first reboot, although it seems to work fine on subsequent reboots.
-  Restart-Service docker
-  Start-Sleep 5
-  if (-not (Test-DockerIsRunning)) {
-      throw "docker service failed to start or stay running"
+  $kube_env = Fetch-KubeEnv
+  Set-EnvironmentVars
+
+  # Set the TCP/IP Parameters to keep idle connections alive.
+  Set-WindowsTCPParameters
+
+  # Install Docker if the select CRI is not containerd and docker is not already
+  # installed.
+  if (${env:CONTAINER_RUNTIME} -ne "containerd") {
+    if (-not (Test-DockerIsInstalled)) {
+      Install-Docker
+    }
+    # For some reason the docker service may not be started automatically on the
+    # first reboot, although it seems to work fine on subsequent reboots.
+    Restart-Service docker
+    Start-Sleep 5
+    if (-not (Test-DockerIsRunning)) {
+        throw "docker service failed to start or stay running"
+    }
   }
 
   Set-PrerequisiteOptions
-  $kube_env = Fetch-KubeEnv
 
   if (Test-IsTestCluster $kube_env) {
     Log-Output 'Test cluster detected, installing OpenSSH.'
@@ -147,7 +156,6 @@ try {
     StartProcess-WriteSshKeys
   }
 
-  Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
 
@@ -156,17 +164,20 @@ try {
   Setup-ContainerRuntime
   DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
+  DownloadAndInstall-NodeProblemDetector
   DownloadAndInstall-CSIProxyBinaries
   Start-CSIProxy
   Create-NodePki
   Create-KubeletKubeconfig
   Create-KubeproxyKubeconfig
+  Create-NodeProblemDetectorKubeConfig
   Set-PodCidr
   Configure-HostNetworkingService
   Prepare-CniNetworking
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
+  Configure-NodeProblemDetector
 
   # Even if Logging agent is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {

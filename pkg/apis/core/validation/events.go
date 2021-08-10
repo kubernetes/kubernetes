@@ -109,7 +109,7 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 	zeroTime := time.Time{}
 	if event.Series != nil {
 		if event.Series.Count < 2 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", fmt.Sprintf("should be at least 2")))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", "should be at least 2"))
 		}
 		if event.Series.LastObservedTime.Time == zeroTime {
 			allErrs = append(allErrs, field.Required(field.NewPath("series.lastObservedTime"), ""))

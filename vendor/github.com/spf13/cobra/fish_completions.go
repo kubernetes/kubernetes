@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func genFishComp(buf *bytes.Buffer, name string, includeDesc bool) {
+func genFishComp(buf io.StringWriter, name string, includeDesc bool) {
 	// Variables should not contain a '-' or ':' character
 	nameForVar := name
 	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
@@ -18,8 +18,8 @@ func genFishComp(buf *bytes.Buffer, name string, includeDesc bool) {
 	if !includeDesc {
 		compCmd = ShellCompNoDescRequestCmd
 	}
-	buf.WriteString(fmt.Sprintf("# fish completion for %-36s -*- shell-script -*-\n", name))
-	buf.WriteString(fmt.Sprintf(`
+	WriteStringAndCheck(buf, fmt.Sprintf("# fish completion for %-36s -*- shell-script -*-\n", name))
+	WriteStringAndCheck(buf, fmt.Sprintf(`
 function __%[1]s_debug
     set file "$BASH_COMP_DEBUG_FILE"
     if test -n "$file"

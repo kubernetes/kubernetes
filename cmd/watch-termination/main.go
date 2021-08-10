@@ -15,12 +15,13 @@ import (
 	"time"
 
 	"gopkg.in/natefinch/lumberjack.v2"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
 
@@ -31,6 +32,7 @@ func main() {
 func run() int {
 	terminationLog := flag.String("termination-log-file", "", "Write logs after SIGTERM to this file (in addition to stderr)")
 	terminationLock := flag.String("termination-touch-file", "", "Touch this file on SIGTERM and delete on termination")
+	processOverlapDetectionFile := flag.String("process-overlap-detection-file", "", "This file is present when the kube-apiserver initialization timed out while waiting for kubelet to terminate old process")
 	kubeconfigPath := flag.String("kubeconfig", "", "Optional kubeconfig used to create events")
 	gracefulTerminatioPeriod := flag.Duration("graceful-termination-duration", 105*time.Second, "The duration of the graceful termination period, e.g. 105s")
 
@@ -79,6 +81,42 @@ func run() int {
 		}
 	}
 
+	if processOverlapDetectionFile != nil && len(*processOverlapDetectionFile) > 0 {
+		var deleteDetectionFileOnce sync.Once
+
+		if _, err := os.Stat(*processOverlapDetectionFile); err != nil && !os.IsNotExist(err) {
+			klog.Errorf("failed to read process overlap detection file %q: %v", *processOverlapDetectionFile, err)
+			return 1
+		} else if err == nil {
+			ref, err := eventReference()
+			if err != nil {
+				klog.Errorf("failed to get event target: %v", err)
+				return 1
+			}
+			go func() {
+				defer deleteDetectionFileOnce.Do(func() {
+					if err := os.Remove(*processOverlapDetectionFile); err != nil {
+						klog.Warningf("Failed to remove process overlap termination file %q: %v", *processOverlapDetectionFile, err)
+					}
+				})
+				if err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+					select {
+					case <-termCh:
+						// stop retry on termination
+						return false
+					default:
+					}
+					// every error is retriable
+					return true
+				}, func() error {
+					return eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "TerminationProcessOverlapDetected", "The kube-apiserver initialization timed out while waiting for kubelet to terminate old process")
+				}); err != nil {
+					klog.Warning(err)
+				}
+			}()
+		}
+	}
+
 	// touch file early. If the file is not removed on termination, we are not
 	// terminating cleanly via SIGTERM.
 	if len(*terminationLock) > 0 {
@@ -98,19 +136,18 @@ func run() int {
 			klog.Warning(msg)
 			_, _ = terminationLogger.WriteToTerminationLog([]byte(msg + "\n"))
 
-			if client != nil {
-				go wait.PollUntil(5*time.Second, func() (bool, error) {
-					if err := eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "NonGracefulTermination", msg); err != nil {
-						return false, nil
-					}
-
-					select {
-					case <-termCh:
-					default:
-					}
-					return true, nil
-				}, termCh)
-			}
+			go retry.OnError(retry.DefaultBackoff, func(err error) bool {
+				select {
+				case <-termCh:
+					// stop retry on termination
+					return false
+				default:
+				}
+				// every error is retriable
+				return true
+			}, func() error {
+				return eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "NonGracefulTermination", msg)
+			})
 
 			klog.Infof("Deleting old termination lock file %q", *terminationLock)
 			if err := os.Remove(*terminationLock); err != nil {

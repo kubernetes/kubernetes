@@ -2,3 +2,5 @@ See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
 - dep-approvers
+reviewers:
+- dep-reviewers

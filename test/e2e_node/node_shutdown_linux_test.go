@@ -21,6 +21,8 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -57,6 +59,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 			}
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
+		})
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady()
 		})
 
 		ginkgo.AfterEach(func() {
@@ -173,6 +180,32 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				return nil
 			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 		})
+
+		ginkgo.It("after restart dbus, should be able to gracefully shutdown", func() {
+			// allows manual restart of dbus to work in Ubuntu.
+			err := overlayDbusConfig()
+			framework.ExpectNoError(err)
+			defer func() {
+				err := restoreDbusConfig()
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("Restart Dbus")
+			err = restartDbus()
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Emitting Shutdown signal")
+			err = emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(func() error {
+				isReady := getNodeReadyStatus(f)
+				if isReady {
+					return fmt.Errorf("node did not become shutdown as expected")
+				}
+				return nil
+			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
+		})
 	})
 })
 
@@ -231,4 +264,48 @@ func getNodeReadyStatus(f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	framework.ExpectEqual(len(nodeList.Items), 1)
 	return isNodeReady(&nodeList.Items[0])
+}
+
+func restartDbus() error {
+	cmd := "systemctl restart dbus"
+	_, err := runCommand("sh", "-c", cmd)
+	return err
+}
+
+func systemctlDaemonReload() error {
+	cmd := "systemctl daemon-reload"
+	_, err := runCommand("sh", "-c", cmd)
+	return err
+}
+
+var (
+	dbusConfPath = "/etc/systemd/system/dbus.service.d/k8s-graceful-node-shutdown-e2e.conf"
+	dbusConf     = `
+[Unit]
+RefuseManualStart=no
+RefuseManualStop=no
+[Service]
+KillMode=control-group
+ExecStop=
+`
+)
+
+func overlayDbusConfig() error {
+	err := os.MkdirAll(filepath.Dir(dbusConfPath), 0755)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dbusConfPath, []byte(dbusConf), 0644)
+	if err != nil {
+		return err
+	}
+	return systemctlDaemonReload()
+}
+
+func restoreDbusConfig() error {
+	err := os.Remove(dbusConfPath)
+	if err != nil {
+		return err
+	}
+	return systemctlDaemonReload()
 }

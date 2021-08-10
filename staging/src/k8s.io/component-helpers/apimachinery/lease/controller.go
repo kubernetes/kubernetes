@@ -95,7 +95,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		klog.Infof("lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
-	wait.Until(c.sync, c.renewInterval, stopCh)
+	wait.JitterUntil(c.sync, c.renewInterval, 0.04, true, stopCh)
 }
 
 func (c *controller) sync() {

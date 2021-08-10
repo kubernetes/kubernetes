@@ -760,6 +760,64 @@ func TestNegativeIndex(t *testing.T) {
 	)
 }
 
+func TestRunningPodsJSONPathOutput(t *testing.T) {
+	var input = []byte(`{
+		"kind": "List",
+		"items": [
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod1"
+				},
+				"status": {
+						"phase": "Running"
+				}
+			},
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod2"
+				},
+				"status": {
+						"phase": "Running"
+				}
+			},
+			{
+				"kind": "Pod",
+				"metadata": {
+					"name": "pod3"
+				},
+				"status": {
+						"phase": "Running"
+				}
+			},
+           		{
+				"resourceVersion": "",
+				"selfLink": ""
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"when range is used in a certain way in script, additional line is printed",
+				`{range .items[?(.status.phase=="Running")]}{.metadata.name}{" is Running\n"}`,
+				data,
+				"pod1 is Running\npod2 is Running\npod3 is Running\n",
+				false, // expect no error
+			},
+		},
+		true, // allow missing keys
+		t,
+	)
+}
+
 func TestStep(t *testing.T) {
 	var input = []byte(
 		`{

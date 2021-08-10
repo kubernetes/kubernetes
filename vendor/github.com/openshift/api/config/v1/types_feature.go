@@ -7,6 +7,9 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Feature holds cluster-wide information about feature gates.  The canonical name is `cluster`
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type FeatureGate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -76,6 +79,8 @@ type FeatureGateStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type FeatureGateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -112,6 +117,7 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		with("CSIMigrationOpenStack"). // sig-storage, jsafrane, Kubernetes feature gate
 		with("CSIMigrationGCE").       // sig-storage, fbertina, Kubernetes feature gate
 		with("CSIMigrationAzureDisk"). // sig-storage, fbertina, Kubernetes feature gate
+		with("ExternalCloudProvider"). // sig-cloud-provider, jspeed, OCP specific
 		toFeatures(),
 	LatencySensitive: newDefaultFeatures().
 		with(

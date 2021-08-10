@@ -46,7 +46,7 @@ func (s *Service) Start(args ...string) error {
 	return windows.StartService(s.Handle, uint32(len(args)), p)
 }
 
-// Control sends state change request c to the servce s.
+// Control sends state change request c to the service s.
 func (s *Service) Control(c svc.Cmd) (svc.Status, error) {
 	var t windows.SERVICE_STATUS
 	err := windows.ControlService(s.Handle, uint32(c), &t)

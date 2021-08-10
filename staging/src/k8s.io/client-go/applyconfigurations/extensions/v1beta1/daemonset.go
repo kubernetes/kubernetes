@@ -50,7 +50,7 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // ExtractDaemonSet extracts the applied configuration owned by fieldManager from
 // daemonSet. If no managedFields are found in daemonSet for fieldManager, a
 // DaemonSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // daemonSet must be a unmodified DaemonSet API object that was retrieved from the Kubernetes API.
@@ -59,8 +59,19 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return extractDaemonSet(daemonSet, fieldManager, "")
+}
+
+// ExtractDaemonSetStatus is the same as ExtractDaemonSet except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractDaemonSetStatus(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return extractDaemonSet(daemonSet, fieldManager, "status")
+}
+
+func extractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
-	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.extensions.v1beta1.DaemonSet"), fieldManager, b)
+	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.extensions.v1beta1.DaemonSet"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -32,7 +32,7 @@ type Policy interface {
 	// Allocate call is idempotent
 	Allocate(s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent
-	RemoveContainer(s state.State, podUID string, containerName string) error
+	RemoveContainer(s state.State, podUID string, containerName string)
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
@@ -41,4 +41,6 @@ type Policy interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+	GetAllocatableMemory(s state.State) []state.Block
 }

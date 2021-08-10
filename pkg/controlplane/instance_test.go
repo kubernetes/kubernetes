@@ -317,31 +317,13 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &groupList))
 	assert.Equal(groupList.APIVersion, "")
 
-	// /apis/extensions exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	group := metav1.APIGroup{}
-	assert.NoError(decodeResponse(resp, &group))
-	assert.Equal(group.APIVersion, "")
-
-	// /apis/extensions/v1beta1 exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions/v1beta1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourceList = metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &resourceList))
-	assert.Equal(resourceList.APIVersion, "")
-
 	// /apis/autoscaling doesn't exist in release-1.1, so the APIVersion field
 	// should be non-empty in the results returned by the server.
 	resp, err = http.Get(server.URL + "/apis/autoscaling")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group = metav1.APIGroup{}
+	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "v1")
 
@@ -376,8 +358,10 @@ func TestStorageVersionHashes(t *testing.T) {
 		t.Error(err)
 	}
 	var count int
+	apiResources := sets.NewString()
 	for _, g := range all {
 		for _, r := range g.APIResources {
+			apiResources.Insert(g.GroupVersion + "/" + r.Name)
 			if strings.Contains(r.Name, "/") ||
 				storageversionhashdata.NoStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
 				if r.StorageVersionHash != "" {
@@ -399,7 +383,8 @@ func TestStorageVersionHashes(t *testing.T) {
 		}
 	}
 	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash")
+		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
+		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
 	}
 }
 

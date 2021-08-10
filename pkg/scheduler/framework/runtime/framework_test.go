@@ -134,6 +134,10 @@ func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
 }
 
+func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	return &TestPlugin{name: testPlugin}, nil
+}
+
 // TestPlugin implements all Plugin interfaces.
 type TestPlugin struct {
 	name string
@@ -329,6 +333,7 @@ var registry = func() Registry {
 	r.Register(scorePlugin1, newScorePlugin1)
 	r.Register(pluginNotImplementingScore, newPluginNotImplementingScore)
 	r.Register(duplicatePluginName, newDuplicatePlugin)
+	r.Register(testPlugin, newTestPlugin)
 	return r
 }()
 
@@ -373,23 +378,13 @@ func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerPr
 	if _, ok := r[bindPlugin]; !ok {
 		r[bindPlugin] = newBindPlugin
 	}
-	plugins := &config.Plugins{}
-	plugins.Append(profile.Plugins)
-	if len(plugins.QueueSort.Enabled) == 0 {
-		plugins.Append(&config.Plugins{
-			QueueSort: config.PluginSet{
-				Enabled: []config.Plugin{{Name: queueSortPlugin}},
-			},
-		})
+
+	if len(profile.Plugins.QueueSort.Enabled) == 0 {
+		profile.Plugins.QueueSort.Enabled = append(profile.Plugins.QueueSort.Enabled, config.Plugin{Name: queueSortPlugin})
 	}
-	if len(plugins.Bind.Enabled) == 0 {
-		plugins.Append(&config.Plugins{
-			Bind: config.PluginSet{
-				Enabled: []config.Plugin{{Name: bindPlugin}},
-			},
-		})
+	if len(profile.Plugins.Bind.Enabled) == 0 {
+		profile.Plugins.Bind.Enabled = append(profile.Plugins.Bind.Enabled, config.Plugin{Name: bindPlugin})
 	}
-	profile.Plugins = plugins
 	return NewFramework(r, &profile, opts...)
 }
 
@@ -495,160 +490,6 @@ func TestNewFrameworkErrors(t *testing.T) {
 	}
 }
 
-func recordingPluginFactory(name string, result map[string]runtime.Object) PluginFactory {
-	return func(args runtime.Object, f framework.Handle) (framework.Plugin, error) {
-		result[name] = args
-		return &TestPlugin{
-			name: name,
-		}, nil
-	}
-}
-
-func TestNewFrameworkPluginDefaults(t *testing.T) {
-	// In-tree plugins that use args.
-	pluginsWithArgs := []string{
-		"InterPodAffinity",
-		"NodeLabel",
-		"NodeResourcesFit",
-		"NodeResourcesLeastAllocated",
-		"NodeResourcesMostAllocated",
-		"PodTopologySpread",
-		"RequestedToCapacityRatio",
-		"VolumeBinding",
-	}
-	plugins := config.Plugins{}
-	// Use all plugins in Filter.
-	// NOTE: This does not mean those plugins implemented `Filter` interfaces.
-	// `TestPlugin` is created in this test to fake the behavior for test purpose.
-	for _, name := range pluginsWithArgs {
-		plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: name})
-	}
-	// Set required extension points.
-	onePlugin := config.PluginSet{
-		Enabled: []config.Plugin{{Name: pluginsWithArgs[0]}},
-	}
-	plugins.QueueSort = onePlugin
-	plugins.Bind = onePlugin
-
-	tests := []struct {
-		name      string
-		pluginCfg []config.PluginConfig
-		wantCfg   map[string]runtime.Object
-	}{
-		{
-			name: "empty plugin config",
-			wantCfg: map[string]runtime.Object{
-				"InterPodAffinity": &config.InterPodAffinityArgs{
-					HardPodAffinityWeight: 1,
-				},
-				"NodeLabel":        &config.NodeLabelArgs{},
-				"NodeResourcesFit": &config.NodeResourcesFitArgs{},
-				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"NodeResourcesMostAllocated": &config.NodeResourcesMostAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
-				},
-				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.SystemDefaulting,
-				},
-				"VolumeBinding": &config.VolumeBindingArgs{
-					BindTimeoutSeconds: 600,
-				},
-			},
-		},
-		{
-			name: "some overridden plugin config",
-			pluginCfg: []config.PluginConfig{
-				{
-					Name: "InterPodAffinity",
-					Args: &config.InterPodAffinityArgs{
-						HardPodAffinityWeight: 3,
-					},
-				},
-				{
-					Name: "NodeResourcesFit",
-					Args: &config.NodeResourcesFitArgs{
-						IgnoredResources: []string{"example.com/foo"},
-					},
-				},
-				{
-					Name: "NodeResourcesLeastAllocated",
-					Args: &config.NodeResourcesLeastAllocatedArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 4}},
-					},
-				},
-				{
-					Name: "NodeResourcesMostAllocated",
-					Args: &config.NodeResourcesMostAllocatedArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 3}},
-					},
-				},
-				{
-					Name: "RequestedToCapacityRatio",
-					Args: &config.RequestedToCapacityRatioArgs{
-						Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
-					},
-				},
-				{
-					Name: "VolumeBinding",
-					Args: &config.VolumeBindingArgs{
-						BindTimeoutSeconds: 300,
-					},
-				},
-			},
-			wantCfg: map[string]runtime.Object{
-				"InterPodAffinity": &config.InterPodAffinityArgs{
-					HardPodAffinityWeight: 3,
-				},
-				"NodeLabel": &config.NodeLabelArgs{},
-				"NodeResourcesFit": &config.NodeResourcesFitArgs{
-					IgnoredResources: []string{"example.com/foo"},
-				},
-				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 4}},
-				},
-				"NodeResourcesMostAllocated": &config.NodeResourcesMostAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 3}},
-				},
-				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.SystemDefaulting,
-				},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
-					Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
-				},
-				"VolumeBinding": &config.VolumeBindingArgs{
-					BindTimeoutSeconds: 300,
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// result will hold plugin args passed to factories.
-			result := make(map[string]runtime.Object)
-			registry := make(Registry, len(pluginsWithArgs))
-			for _, name := range pluginsWithArgs {
-				registry[name] = recordingPluginFactory(name, result)
-			}
-			profile := &config.KubeSchedulerProfile{
-				Plugins:      &plugins,
-				PluginConfig: tt.pluginCfg,
-			}
-			_, err := NewFramework(registry, profile)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(tt.wantCfg, result); diff != "" {
-				t.Errorf("unexpected plugin args (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
 // fakeNoopPlugin doesn't implement interface framework.EnqueueExtensions.
 type fakeNoopPlugin struct{}
 
@@ -686,7 +527,7 @@ func (*fakePodPlugin) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Pod, ActionType: framework.All},
 		{Resource: framework.Node, ActionType: framework.Add | framework.Delete},
-		{Resource: framework.Service, ActionType: framework.Delete},
+		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete},
 	}
 }
 
@@ -718,7 +559,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.StorageClass, ActionType: framework.All}:          sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 			},
 		},
@@ -733,7 +573,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.StorageClass, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
 			},
 		},
@@ -741,15 +580,14 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			name:    "pod plugin",
 			plugins: []framework.Plugin{&fakePodPlugin{}},
 			want: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakePod", bindPlugin, queueSortPlugin),
-				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}: sets.NewString("fakePod"),
-				{Resource: framework.Node, ActionType: framework.All}:                    sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.Delete}:              sets.NewString("fakePod"),
-				{Resource: framework.Service, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.CSINode, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.PersistentVolume, ActionType: framework.All}:        sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:   sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.StorageClass, ActionType: framework.All}:            sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Pod, ActionType: framework.All}:                      sets.NewString("fakePod", bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:  sets.NewString("fakePod"),
+				{Resource: framework.Node, ActionType: framework.All}:                     sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}: sets.NewString("fakePod"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:    sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:             sets.NewString(bindPlugin, queueSortPlugin),
 			},
 		},
 		{
@@ -760,9 +598,8 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:       sets.NewString("fakePod"),
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", "fakePod", bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete}: sets.NewString("fakeNode"),
-				{Resource: framework.Service, ActionType: framework.Delete}:                    sets.NewString("fakePod"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}:      sets.NewString("fakePod"),
 				{Resource: framework.Node, ActionType: framework.All}:                          sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
@@ -775,7 +612,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			want: map[framework.ClusterEvent]sets.String{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString(bindPlugin, queueSortPlugin),
@@ -1479,7 +1315,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 
-			podNominator := internalqueue.NewPodNominator()
+			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(framework.NewPodInfo(tt.nominatedPod), nodeName)
 			}
@@ -2335,20 +2171,26 @@ func TestListPlugins(t *testing.T) {
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
-		// pluginSetCount include queue sort plugin and bind plugin.
-		pluginSetCount int
+		want    *config.Plugins
 	}{
 		{
-			name:           "Add empty plugin",
-			plugins:        &config.Plugins{},
-			pluginSetCount: 2,
+			name:    "Add empty plugin",
+			plugins: &config.Plugins{},
+			want: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+			},
 		},
 		{
 			name: "Add multiple plugins",
 			plugins: &config.Plugins{
-				Score: config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
+				Score: config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1, Weight: 3}, {Name: scoreWithNormalizePlugin1}}},
 			},
-			pluginSetCount: 3,
+			want: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+				Score:     config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1, Weight: 3}, {Name: scoreWithNormalizePlugin1, Weight: 1}}},
+			},
 		},
 	}
 
@@ -2359,9 +2201,9 @@ func TestListPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-			plugins := f.ListPlugins()
-			if len(plugins) != tt.pluginSetCount {
-				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
+			got := f.ListPlugins()
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected plugins (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -25,7 +25,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	jsoniter "github.com/json-iterator/go"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -38,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -254,7 +255,7 @@ func TestEncodePtr(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !apiequality.Semantic.DeepEqual(obj2, pod) {
-		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
+		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, cmp.Diff(obj2, pod))
 	}
 }
 
@@ -373,7 +374,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		resultSecret.Kind = "Secret"
 		resultSecret.APIVersion = "v1"
 		if !apiequality.Semantic.DeepEqual(v1secret, res) {
-			t.Fatalf("objects did not match: %s", diff.ObjectGoPrintDiff(v1secret, res))
+			t.Fatalf("objects did not match: %s", cmp.Diff(v1secret, res))
 		}
 
 		// write a watch event through the frame writer and read it back in
@@ -407,7 +408,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 
 		if !apiequality.Semantic.DeepEqual(secret, outEvent.Object.Object) {
-			t.Fatalf("%s: did not match after frame decoding: %s", info.MediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
+			t.Fatalf("%s: did not match after frame decoding: %s", info.MediaType, cmp.Diff(secret, outEvent.Object.Object))
 		}
 	}
 }

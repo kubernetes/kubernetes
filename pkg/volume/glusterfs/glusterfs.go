@@ -77,7 +77,6 @@ const (
 	volPrefix                      = "vol_"
 	dynamicEpSvcPrefix             = "glusterfs-dynamic"
 	replicaCount                   = 3
-	durabilityType                 = "replicate"
 	secretKeyName                  = "key" // key name used in secret
 	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
 	defaultGidMin                  = 2000
@@ -721,7 +720,7 @@ func filterClient(client *gcli.Client, opts *proxyutil.FilteredDialOptions) *gcl
 }
 
 func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !volutil.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+	if !volutil.ContainsAllAccessModes(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 	if p.options.PVC.Spec.Selector != nil {

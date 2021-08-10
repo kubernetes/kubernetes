@@ -38,6 +38,9 @@ option go_package = "v1";
 // connection re-use/coalescing. Routes that do not have their own
 // custom certificate will not be HTTP/2 ALPN-enabled on either the
 // frontend or the backend.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message Route {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -91,6 +94,9 @@ message RouteIngressCondition {
 }
 
 // RouteList is a collection of Routes.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 message RouteList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

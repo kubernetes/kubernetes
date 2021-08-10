@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
@@ -70,7 +70,7 @@ func (a *flexVolumeAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 }
 
 // MountDevice is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(a.plugin.GetPluginName()), deviceMountPath)
 	if err != nil {

@@ -80,6 +80,11 @@ func (ingressClassStrategy) Validate(ctx context.Context, obj runtime.Object) fi
 	return validation.ValidateIngressClass(ingressClass)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (ingressClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (ingressClassStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -96,6 +101,11 @@ func (ingressClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 	oldIngressClass := old.(*networking.IngressClass)
 
 	return validation.ValidateIngressClassUpdate(newIngressClass, oldIngressClass)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for IngressClass

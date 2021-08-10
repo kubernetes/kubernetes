@@ -67,7 +67,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 }
 
 // mustSetupScheduler starts the following components:
-// - k8s api server (a.k.a. master)
+// - k8s api server
 // - scheduler
 // It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.
@@ -99,7 +99,7 @@ func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.Shutdow
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, podInformer, schedulerShutdown := util.StartScheduler(client, config)
+	_, podInformer, schedulerShutdown := util.StartScheduler(client, cfg, config)
 	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {

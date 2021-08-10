@@ -25,12 +25,6 @@ git remote add upstream https://github.com/uber-go/zap.git
 git fetch upstream
 ```
 
-Install zap's dependencies:
-
-```
-make dependencies
-```
-
 Make sure that the tests and the linters pass:
 
 ```

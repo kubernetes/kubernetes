@@ -31,8 +31,18 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=debian:stable-slim
-TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
+# This is defined in root Makefile, but some build contexts do not refer to them
+KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
+
+ifeq ($(ARCH),amd64)
+    BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base:v2.1.3
+else
+    BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:v2.1.3
+endif
+
+RUNNERIMAGE?=gcr.io/distroless/base:latest
+
+TEMP_DIR:=$(shell mktemp -d -t conformance-XXXXXX)
 
 all: build
 
@@ -60,6 +70,7 @@ endif
 		--pull \
 		-t ${REGISTRY}/conformance-${ARCH}:${VERSION} \
 		--build-arg BASEIMAGE=$(BASEIMAGE) \
+		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
 		${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 

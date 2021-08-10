@@ -41,11 +41,11 @@ var (
 	secretForTLSLong = templates.LongDesc(i18n.T(`
 		Create a TLS secret from the given public/private key pair.
 
-		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match
+		The public/private key pair must exist beforehand. The public key certificate must be .PEM encoded and match
 		the given private key.`))
 
 	secretForTLSExample = templates.Examples(i18n.T(`
-	  # Create a new TLS secret named tls-secret with the given key pair:
+	  # Create a new TLS secret named tls-secret with the given key pair
 	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
 )
 

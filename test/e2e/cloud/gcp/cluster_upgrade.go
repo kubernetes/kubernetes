@@ -50,6 +50,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
+	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
@@ -63,10 +64,10 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				Name:      "[sig-cloud-provider-gcp] master-upgrade",
 				Classname: "upgrade_tests",
 			}
-			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
+			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
 
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -80,13 +81,14 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
 var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-downgrade")
+	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
@@ -98,7 +100,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

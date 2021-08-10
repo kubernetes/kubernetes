@@ -46,7 +46,7 @@ if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
     core/v1/Secret
     core/v1/Service
     batch/v1/Job
-    batch/v1beta1/CronJob
+    batch/v1/CronJob
     apps/v1/DaemonSet
     apps/v1/Deployment
     apps/v1/ReplicaSet

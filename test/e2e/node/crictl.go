@@ -44,6 +44,7 @@ var _ = SIGDescribe("crictl", func() {
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
+		e2eskipper.SkipUnlessAtLeast(len(hosts), 1, "Skipping test because found no SSH'able node")
 
 		testCases := []struct {
 			cmd string
@@ -53,22 +54,22 @@ var _ = SIGDescribe("crictl", func() {
 		}
 
 		for _, testCase := range testCases {
-			// Choose an arbitrary node to test.
-			host := hosts[0]
-			ginkgo.By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
+			for _, host := range hosts {
+				ginkgo.By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
-			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
-			if err != nil {
-				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
-			}
-			// Log the stdout/stderr output.
-			// TODO: Verify the output.
-			if len(stdout) > 0 {
-				framework.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
-			}
-			if len(stderr) > 0 {
-				framework.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
+				result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
+				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
+				if err != nil {
+					framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
+				}
+				// Log the stdout/stderr output.
+				// TODO: Verify the output.
+				if len(stdout) > 0 {
+					framework.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
+				}
+				if len(stderr) > 0 {
+					framework.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
+				}
 			}
 		}
 	})

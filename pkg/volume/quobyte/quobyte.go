@@ -373,7 +373,7 @@ type quobyteVolumeProvisioner struct {
 }
 
 func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
+	if !util.ContainsAllAccessModes(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
 	}
 
@@ -416,7 +416,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
@@ -493,7 +493,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	}
 
 	if len(apiServer) == 0 {
-		return nil, fmt.Errorf("Quobyte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("quobyte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
 	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.host.GetKubeClient())
@@ -507,11 +507,11 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 
 	var ok bool
 	if cfg.quobyteUser, ok = secretMap["user"]; !ok {
-		return nil, fmt.Errorf("Missing \"user\" in secret %s/%s", secretNamespace, secretName)
+		return nil, fmt.Errorf("missing \"user\" in secret %s/%s", secretNamespace, secretName)
 	}
 
 	if cfg.quobytePassword, ok = secretMap["password"]; !ok {
-		return nil, fmt.Errorf("Missing \"password\" in secret %s/%s", secretNamespace, secretName)
+		return nil, fmt.Errorf("missing \"password\" in secret %s/%s", secretNamespace, secretName)
 	}
 
 	return cfg, nil
