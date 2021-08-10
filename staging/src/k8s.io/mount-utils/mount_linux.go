@@ -139,7 +139,7 @@ func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 // systemdMountRequired is an extension of option to decide whether uses systemd mount.
 func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string, systemdMountRequired bool) error {
-	mountArgs, mountArgsLogStr := MakeMountArgsSensitive(source, target, fstype, options, sensitiveOptions, mountFlags)
+	mountArgs, mountArgsLogStr := MakeMountArgsSensitiveWithMountFlags(source, target, fstype, options, sensitiveOptions, mountFlags)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountArgsLogStr = mountCmd + " " + mountArgsLogStr
@@ -215,15 +215,23 @@ func detectSystemd() bool {
 // MakeMountArgs makes the arguments to the mount(8) command.
 // options MUST not contain sensitive material (like passwords).
 func MakeMountArgs(source, target, fstype string, options []string) (mountArgs []string) {
-	mountArgs, _ = MakeMountArgsSensitive(source, target, fstype, options, nil /* sensitiveOptions */, nil /* mountFlags */)
+	mountArgs, _ = MakeMountArgsSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
 	return mountArgs
 }
 
 // MakeMountArgsSensitive makes the arguments to the mount(8) command.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
-func MakeMountArgsSensitive(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
+func MakeMountArgsSensitive(source, target, fstype string, options []string, sensitiveOptions []string) (mountArgs []string, mountArgsLogStr string) {
+	return MakeMountArgsSensitiveWithMountFlags(source, target, fstype, options, sensitiveOptions, nil /* mountFlags */)
+}
+
+// MakeMountArgsSensitiveWithMountFlags makes the arguments to the mount(8) command.
+// sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
+// mountFlags are additional mount flags that are not related with the fstype
+// and mount options
+func MakeMountArgsSensitiveWithMountFlags(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
 	// Build mount command as follows:
-	//   mount [--$mountFlags] [-t $fstype] [-o $options] [$source] $target
+	//   mount [$mountFlags] [-t $fstype] [-o $options] [$source] $target
 	mountArgs = []string{}
 	mountArgsLogStr = ""
 
