@@ -1,3 +1,5 @@
+// +build darwin linux
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -16,14 +18,10 @@ limitations under the License.
 
 package copycerts
 
-import (
-	"testing"
+import "golang.org/x/sys/unix"
 
-	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
-)
-
-func TestMain(m *testing.M) {
-	// see: https://github.com/kubernetes/kubernetes/issues/104265
-	setNoUmask()
-	pkiutiltesting.RunWithPrivateKeyFixtureDirectory(m)
+// on unix where umask may be in effect, clear umask so tests
+// are not sensitive to the developer's system umask
+func setNoUmask() {
+	unix.Umask(0)
 }
