@@ -18,7 +18,6 @@ package rest
 
 import (
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -35,14 +34,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(certificatesapiv1beta1.SchemeGroupVersion) {
-		storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-		if err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		}
-		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version] = storageMap
-	}
-
 	if apiResourceConfigSource.VersionEnabled(certificatesapiv1.SchemeGroupVersion) {
 		storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 		if err != nil {
@@ -52,20 +43,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	}
 
 	return apiGroupInfo, true, nil
-}
-
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
-	// certificatesigningrequests
-	csrStorage, csrStatusStorage, csrApprovalStorage, err := certificatestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["certificatesigningrequests"] = csrStorage
-	storage["certificatesigningrequests/status"] = csrStatusStorage
-	storage["certificatesigningrequests/approval"] = csrApprovalStorage
-
-	return storage, err
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
