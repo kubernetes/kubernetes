@@ -57,7 +57,7 @@ func MountSensitive(source string, target string, fstype string, options []strin
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 func doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
-	mountArgs, mountArgsLogStr := makeMountArgsSensitive(source, target, fstype, options, sensitiveOptions, mountFlags)
+	mountArgs, mountArgsLogStr := makeMountArgsSensitiveWithMountFlags(source, target, fstype, options, sensitiveOptions, mountFlags)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountArgsLogStr = mountCmd + " " + mountArgsLogStr
@@ -88,7 +88,7 @@ func doMount(mounterPath string, mountCmd string, source string, target string, 
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
 		mountCmd, mountArgs, mountArgsLogStr = mountutils.AddSystemdScopeSensitive("systemd-run", target, mountCmd, mountArgs, mountArgsLogStr)
-	} else {
+		// } else {
 		// No systemd-run on the host (or we failed to check it), assume kubelet
 		// does not run as a systemd service.
 		// No code here, mountCmd and mountArgs are already populated.
@@ -131,9 +131,11 @@ func detectSystemd() bool {
 	return true
 }
 
-// makeMountArgsSensitive makes the arguments to the mount(8) command.
+// makeMountArgsSensitiveWithMountFlags makes the arguments to the mount(8) command.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
-func makeMountArgsSensitive(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
+// mountFlags are additional mount flags that are not related with the fstype
+// and mount options
+func makeMountArgsSensitiveWithMountFlags(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
 	// Build mount command as follows:
 	//   mount [--$mountFlags] [-t $fstype] [-o $options] [$source] $target
 	mountArgs = []string{}
