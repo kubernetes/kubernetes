@@ -70,7 +70,7 @@ func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) err
 }
 
 func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	newHostPath, err = doBindSubPath(sp.mounter, subPath)
+	newHostPath, err = doBindSubPath(sp.mounter, subPath, false /* mountWithMounterInstance */)
 
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
@@ -160,7 +160,7 @@ func getSubpathBindTarget(subpath Subpath) string {
 	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
 }
 
-func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, err error) {
+func doBindSubPath(mounter mount.Interface, subpath Subpath, mountWithMounterInstance bool) (hostPath string, err error) {
 	// Linux, kubelet runs on the host:
 	// - safely open the subpath
 	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
@@ -211,9 +211,18 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	options := []string{"bind"}
 	mountFlags := []string{"--no-canonicalize"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = MountSensitive(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
-		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
+
+	if mountWithMounterInstance {
+		if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
+			return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
+		}
+	} else {
+		// mount with custom subpath logic without using the mounter instance
+		if err = SubpathMountSensitive(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
+			return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
+		}
 	}
+
 	success = true
 
 	klog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)

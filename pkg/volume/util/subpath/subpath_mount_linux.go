@@ -37,12 +37,12 @@ const (
 
 var systemdDetected = detectSystemd()
 
-// MountSensitive is the same as mountutils.Mount() but this method allows
+// SubpathMountSensitive is the same as mountutils.Mount() but this method allows
 // sensitiveOptions to be passed in a separate parameter from the normal
 // mount options and ensures the sensitiveOptions are never logged. This
 // method should be used by callers that pass sensitive material (like
 // passwords) as mount options.
-func MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
+func SubpathMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
