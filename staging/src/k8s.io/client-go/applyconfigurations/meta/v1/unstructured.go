@@ -105,7 +105,7 @@ func NewUnstructuredExtractor(dc discovery.DiscoveryInterface) (UnstructuredExtr
 	}, nil
 }
 
-// Extract extracts the applied configuration owned by fiieldManager from an unstructured object.
+// Extract extracts the applied configuration owned by fieldManager from an unstructured object.
 // Note that the apply configuration itself is also an unstructured object.
 func (e *extractor) Extract(object *unstructured.Unstructured, fieldManager string) (*unstructured.Unstructured, error) {
 	return e.extractUnstructured(object, fieldManager, "")
