@@ -1,3 +1,19 @@
+/*
+Copyright 2021 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package stats
 
 import (
@@ -6,156 +22,108 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
-
-
-type fakeConatiner struct {
-	stat hcsshim.Statistics
+type fakeNetworkStatsProvider struct {
+	containers []containerStats
 }
 
-func (f fakeConatiner) Start() error {
-	return nil
+type containerStats struct {
+	container hcsshim.ContainerProperties
+	hcsStats  []hcsshim.NetworkStats
 }
 
-func (f fakeConatiner) Shutdown() error {
-	return nil
-}
-
-func (f fakeConatiner) Terminate() error {
-	return nil
-}
-
-func (f fakeConatiner) Wait() error {
-	return nil
-}
-
-func (f fakeConatiner) WaitTimeout(duration time.Duration) error {
-	return nil
-}
-
-func (f fakeConatiner) Pause() error {
-	return nil
-}
-
-func (f fakeConatiner) Resume() error {
-	return nil
-}
-
-func (f fakeConatiner) HasPendingUpdates() (bool, error) {
-	return false, nil
-}
-
-func (f fakeConatiner) Statistics() (hcsshim.Statistics, error) {
-	return f.stat, nil
-}
-
-func (f fakeConatiner) ProcessList() ([]hcsshim.ProcessListItem, error) {
-	return []hcsshim.ProcessListItem{}, nil
-}
-
-func (f fakeConatiner) MappedVirtualDisks() (map[int]hcsshim.MappedVirtualDiskController, error) {
-	return map[int]hcsshim.MappedVirtualDiskController{}, nil
-}
-
-func (f fakeConatiner) CreateProcess(c *hcsshim.ProcessConfig) (hcsshim.Process, error) {
-	return nil, nil
-}
-
-func (f fakeConatiner) OpenProcess(pid int) (hcsshim.Process, error) {
-	return nil, nil
-}
-
-func (f fakeConatiner) Close() error {
-	return nil
-}
-
-func (f fakeConatiner) Modify(config *hcsshim.ResourceModificationRequestResponse) error {
-	return nil
-}
-
-func (s fakehcsshim) GetContainers(q hcsshim.ComputeSystemQuery) ([]hcsshim.ContainerProperties, error) {
-	cp := []hcsshim.ContainerProperties{}
-	for _, c := range s.containers  {
-		cp = append(cp, c.container)
-	}
-
-	return cp, nil
-}
-
-func (s fakehcsshim) GetHNSEndpointByID(endpointID string) (*hcsshim.HNSEndpoint, error) {
-	e := hcsshim.HNSEndpoint{
-		Name: endpointID,
-	}
-	return &e, nil
-}
-
-func (s fakehcsshim) OpenContainer(id string) (hcsshim.Container, error) {
-	fc := fakeConatiner{}
+func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
+	eps := hcsshim.HNSEndpointStats{}
 	for _, c := range s.containers {
-		if c.container.ID == id {
-			for _, s := range c.hcsStats{
-				fc.stat.Network = append(fc.stat.Network, s)
+		for _, stat := range c.hcsStats {
+			if endpointName == stat.InstanceId {
+				eps = hcsshim.HNSEndpointStats{
+					EndpointID:      stat.EndpointId,
+					BytesSent:       stat.BytesSent,
+					BytesReceived:   stat.BytesReceived,
+					PacketsReceived: stat.PacketsReceived,
+					PacketsSent:     stat.PacketsSent,
+				}
 			}
 		}
 	}
 
-	return fc, nil
+	return &eps, nil
 }
 
-type fakehcsshim struct {
-	containers       []containerStats
-}
+func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
+	uniqueEndpoints := map[string]*hcsshim.HNSEndpoint{}
 
-type containerStats struct {
-	container       hcsshim.ContainerProperties
-	hcsStats         []hcsshim.NetworkStats
-}
+	for _, c := range s.containers {
+		for _, stat := range c.hcsStats {
+			e, found := uniqueEndpoints[stat.EndpointId]
+			if found {
+				// add the container
+				e.SharedContainers = append(e.SharedContainers, c.container.ID)
+				continue
+			}
 
+			uniqueEndpoints[stat.EndpointId] = &hcsshim.HNSEndpoint{
+				Name:             stat.EndpointId,
+				Id:               stat.EndpointId,
+				SharedContainers: []string{c.container.ID},
+			}
+		}
+	}
+
+	eps := []hcsshim.HNSEndpoint{}
+	for _, ep := range uniqueEndpoints {
+		eps = append(eps, *ep)
+	}
+
+	return eps, nil
+}
 
 func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Time{})
 	tests := []struct {
 		name    string
-		fields  fakehcsshim
+		fields  fakeNetworkStatsProvider
 		want    map[string]*statsapi.NetworkStats
 		wantErr bool
 	}{
 		{
 			name: "basic example",
-			fields: fakehcsshim{
+			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
 						container: hcsshim.ContainerProperties{
-						ID: "c1",
+							ID: "c1",
 						}, hcsStats: []hcsshim.NetworkStats{
-					{
-						BytesReceived: 1,
-						BytesSent:     10,
-						EndpointId:    "test",
-						InstanceId:    "test",
+							{
+								BytesReceived: 1,
+								BytesSent:     10,
+								EndpointId:    "test",
+								InstanceId:    "test",
 							},
 						},
 					},
 					{
 						container: hcsshim.ContainerProperties{
-						ID: "c2",
+							ID: "c2",
 						}, hcsStats: []hcsshim.NetworkStats{
 							{
-						BytesReceived: 2,
-						BytesSent:     20,
-						EndpointId:    "test2",
-						InstanceId:    "test2",
-					},
-				},
+								BytesReceived: 2,
+								BytesSent:     20,
+								EndpointId:    "test2",
+								InstanceId:    "test2",
+							},
+						},
 					},
 				},
 			},
 			want: map[string]*statsapi.NetworkStats{
-				"c1": &statsapi.NetworkStats{
-					Time: v1.Time{},
+				"c1": {
+					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
 						RxBytes: toP(1),
@@ -170,7 +138,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 				},
-				"c2": &statsapi.NetworkStats{
+				"c2": {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
@@ -190,49 +158,49 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 		},
 		{
 			name: "multiple containers same endpoint",
-			fields: fakehcsshim{
+			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
 						container: hcsshim.ContainerProperties{
-						ID: "c1",
+							ID: "c1",
 						}, hcsStats: []hcsshim.NetworkStats{
-					{
-						BytesReceived: 1,
-						BytesSent:     10,
-						EndpointId:    "test",
-						InstanceId:    "test",
+							{
+								BytesReceived: 1,
+								BytesSent:     10,
+								EndpointId:    "test",
+								InstanceId:    "test",
 							},
 						},
 					},
 					{
 						container: hcsshim.ContainerProperties{
-						ID: "c2",
+							ID: "c2",
 						}, hcsStats: []hcsshim.NetworkStats{
 							{
-						BytesReceived: 2,
-						BytesSent:     20,
-						EndpointId:    "test2",
-						InstanceId:    "test2",
+								BytesReceived: 2,
+								BytesSent:     20,
+								EndpointId:    "test2",
+								InstanceId:    "test2",
 							},
 						},
 					},
 					{
 						container: hcsshim.ContainerProperties{
-						ID: "c3",
+							ID: "c3",
 						}, hcsStats: []hcsshim.NetworkStats{
 							{
-						BytesReceived: 3,
-						BytesSent:     30,
-						EndpointId:    "test2",
-						InstanceId:    "test3",
-					},
-				},
+								BytesReceived: 3,
+								BytesSent:     30,
+								EndpointId:    "test2",
+								InstanceId:    "test3",
+							},
+						},
 					},
 				},
 			},
 			want: map[string]*statsapi.NetworkStats{
-				"c1": &statsapi.NetworkStats{
-					Time: v1.Time{},
+				"c1": {
+					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
 						RxBytes: toP(1),
@@ -247,7 +215,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 				},
-				"c2": &statsapi.NetworkStats{
+				"c2": {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
@@ -262,18 +230,18 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 				},
-				"c3": &statsapi.NetworkStats{
+				"c3": {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(3),
-						TxBytes: toP(30),
+						RxBytes: toP(2),
+						TxBytes: toP(20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(3),
-							TxBytes: toP(30),
+							RxBytes: toP(2),
+							TxBytes: toP(20),
 						},
 					},
 				},
@@ -282,19 +250,19 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 		},
 		{
 			name: "multiple stats instances of same interface only picks up first",
-			fields: fakehcsshim{
+			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
 						container: hcsshim.ContainerProperties{
 							ID: "c1",
 						}, hcsStats: []hcsshim.NetworkStats{
-					{
-						BytesReceived: 1,
-						BytesSent:     10,
-						EndpointId:    "test",
-						InstanceId:    "test",
-					},
-					{
+							{
+								BytesReceived: 1,
+								BytesSent:     10,
+								EndpointId:    "test",
+								InstanceId:    "test",
+							},
+							{
 								BytesReceived: 3,
 								BytesSent:     30,
 								EndpointId:    "test",
@@ -307,18 +275,18 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 							ID: "c2",
 						}, hcsStats: []hcsshim.NetworkStats{
 							{
-						BytesReceived: 2,
-						BytesSent:     20,
-						EndpointId:    "test2",
-						InstanceId:    "test2",
+								BytesReceived: 2,
+								BytesSent:     20,
+								EndpointId:    "test2",
+								InstanceId:    "test2",
+							},
+						},
 					},
-					},
-				},
 				},
 			},
 			want: map[string]*statsapi.NetworkStats{
-				"c1": &statsapi.NetworkStats{
-					Time: v1.Time{},
+				"c1": {
+					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
 						RxBytes: toP(1),
@@ -333,7 +301,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 				},
-				"c2": &statsapi.NetworkStats{
+				"c2": {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
@@ -353,19 +321,19 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 		},
 		{
 			name: "multiple endpoints per container",
-			fields: fakehcsshim{
+			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
 						container: hcsshim.ContainerProperties{
 							ID: "c1",
 						}, hcsStats: []hcsshim.NetworkStats{
-					{
-						BytesReceived: 1,
-						BytesSent:     10,
-						EndpointId:    "test",
-						InstanceId:    "test",
-					},
-												{
+							{
+								BytesReceived: 1,
+								BytesSent:     10,
+								EndpointId:    "test",
+								InstanceId:    "test",
+							},
+							{
 								BytesReceived: 3,
 								BytesSent:     30,
 								EndpointId:    "test3",
@@ -377,19 +345,19 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						container: hcsshim.ContainerProperties{
 							ID: "c2",
 						}, hcsStats: []hcsshim.NetworkStats{
-					{
-						BytesReceived: 2,
-						BytesSent:     20,
-						EndpointId:    "test2",
-						InstanceId:    "test2",
+							{
+								BytesReceived: 2,
+								BytesSent:     20,
+								EndpointId:    "test2",
+								InstanceId:    "test2",
+							},
+						},
 					},
-					},
-				},
 				},
 			},
 			want: map[string]*statsapi.NetworkStats{
-				"c1": &statsapi.NetworkStats{
-					Time: v1.Time{},
+				"c1": {
+					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
 						RxBytes: toP(1),
@@ -410,7 +378,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 				},
-				"c2": &statsapi.NetworkStats{
+				"c2": {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
@@ -432,9 +400,10 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &criStatsProvider{
-				hcsshimInterface: fakehcsshim{
-					containers:       tt.fields.containers,
+				windowsNetworkStatsProvider: fakeNetworkStatsProvider{
+					containers: tt.fields.containers,
 				},
+				clock: fakeClock,
 			}
 			got, err := p.listContainerNetworkStats()
 			if (err != nil) != tt.wantErr {

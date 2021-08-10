@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -67,7 +68,11 @@ type criStatsProvider struct {
 	imageService internalapi.ImageManagerService
 	// hostStatsProvider is used to get the status of the host filesystem consumed by pods.
 	hostStatsProvider HostStatsProvider
-	hcsshimInterface  interface{}
+	//lint:ignore U1000 We can't import hcsshim due to Build constraints in hcsshim
+	// windowsNetworkStatsProvider is used by kubelet to gather networking stats on Windows
+	windowsNetworkStatsProvider interface{}
+	// clock is used report current time
+	clock clock.Clock
 
 	// cpuUsageCache caches the cpu usage for containers.
 	cpuUsageCache                  map[string]*cpuUsageRecord
@@ -96,6 +101,7 @@ func newCRIStatsProvider(
 		cpuUsageCache:                  make(map[string]*cpuUsageRecord),
 		disableAcceleratorUsageMetrics: disableAcceleratorUsageMetrics,
 		podAndContainerStatsFromCRI:    podAndContainerStatsFromCRI,
+		clock:                          clock.RealClock{},
 	}
 }
 
