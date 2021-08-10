@@ -817,6 +817,35 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 	if updatedPod2.Name != "foo-3" {
 		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
 	}
+
+	// Third, update using a current version as the suggestion.
+	// Return an error and make sure that SimpleUpdate is NOT called a second time,
+	// since the live lookup shows the suggestion was already up to date.
+	attempts := 0
+	updatedPod3 := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, updatedPod3, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			if pod.Name != updatedPod2.Name || pod.ResourceVersion != updatedPod2.ResourceVersion {
+				t.Errorf(
+					"unexpected live object (name=%s, rv=%s), expected name=%s, rv=%s",
+					pod.Name,
+					pod.ResourceVersion,
+					updatedPod2.Name,
+					updatedPod2.ResourceVersion,
+				)
+			}
+			attempts++
+			return nil, fmt.Errorf("validation or admission error")
+		}),
+		updatedPod2,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got none")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt, got %d", attempts)
+	}
 }
 
 func TestTransformationFailure(t *testing.T) {
