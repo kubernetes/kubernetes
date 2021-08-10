@@ -37,12 +37,12 @@ const (
 
 var systemdDetected = detectSystemd()
 
-// SubpathMountSensitive is the same as mountutils.Mount() but this method allows
+// MountWithFlags is the same as mountutils.Mount() but this method allows
 // sensitiveOptions to be passed in a separate parameter from the normal
 // mount options and ensures the sensitiveOptions are never logged. This
 // method should be used by callers that pass sensitive material (like
 // passwords) as mount options.
-func SubpathMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
+func MountWithFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
@@ -137,7 +137,7 @@ func detectSystemd() bool {
 // and mount options
 func makeMountArgsSensitiveWithMountFlags(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
 	// Build mount command as follows:
-	//   mount [--$mountFlags] [-t $fstype] [-o $options] [$source] $target
+	//   mount [$mountFlags] [-t $fstype] [-o $options] [$source] $target
 	mountArgs = []string{}
 	mountArgsLogStr = ""
 

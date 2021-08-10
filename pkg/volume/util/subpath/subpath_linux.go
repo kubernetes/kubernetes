@@ -218,7 +218,7 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath, mountWithMounterIns
 		}
 	} else {
 		// mount with custom subpath logic without using the mounter instance
-		if err = SubpathMountSensitive(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
+		if err = MountWithFlags(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
 			return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 		}
 	}
