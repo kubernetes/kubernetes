@@ -6438,7 +6438,7 @@ func TestFeatureClusterIPs(t *testing.T) {
 
 func TestFeaturePorts(t *testing.T) {
 	testCases := []cudTestCase{{
-		name: "add",
+		name: "add_port",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
@@ -6453,7 +6453,39 @@ func TestFeaturePorts(t *testing.T) {
 			expectClusterIPs: true,
 		},
 	}, {
-		name: "remove",
+		name: "add_port_ClusterIP-NodePort",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "add_port_NodePort-ClusterIP",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "remove_port",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
@@ -6468,7 +6500,39 @@ func TestFeaturePorts(t *testing.T) {
 			expectClusterIPs: true,
 		},
 	}, {
-		name: "swap",
+		name: "remove_port_ClusterIP-NodePort",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+	}, {
+		name: "remove_port_NodePort-ClusterIP",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "swap_ports",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
@@ -6484,7 +6548,39 @@ func TestFeaturePorts(t *testing.T) {
 			expectClusterIPs: true,
 		},
 	}, {
-		name: "modify",
+		name: "modify_ports",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 8080, intstr.FromInt(8080), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 8443, intstr.FromInt(8443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "modify_protos",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolUDP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolUDP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "modify_ports_and_protos",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
@@ -6500,7 +6596,22 @@ func TestFeaturePorts(t *testing.T) {
 			expectClusterIPs: true,
 		},
 	}, {
-		name: "wipe",
+		name: "add_alt_proto",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP))),
+			expectClusterIPs: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+			expectClusterIPs: true,
+		},
+	}, {
+		name: "wipe_all",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
