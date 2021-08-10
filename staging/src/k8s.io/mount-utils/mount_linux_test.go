@@ -489,7 +489,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 
 	for _, v := range testcases {
 		// Act
-		mountArgs, mountArgsLogStr := MakeMountArgsSensitive(v.source, v.target, v.fstype, v.options, v.sensitiveOptions, v.mountFlags)
+		mountArgs, mountArgsLogStr := MakeMountArgsSensitiveWithMountFlags(v.source, v.target, v.fstype, v.options, v.sensitiveOptions, v.mountFlags)
 
 		// Assert
 		t.Logf("\r\nmountArgs =%q\r\nmountArgsLogStr=%q", mountArgs, mountArgsLogStr)
