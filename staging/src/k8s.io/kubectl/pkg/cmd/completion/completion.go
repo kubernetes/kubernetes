@@ -98,7 +98,17 @@ var (
 		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish`))
 
 		# Load the kubectl completion code for powershell into the current shell
-			kubectl completion powershell | Out-String | Invoke-Expression`))
+		    kubectl completion powershell | Out-String | Invoke-Expression
+		# Set kubectl completion code for powershell to run on startup
+		## Save completion code to a script and execute in the profile
+		    kubectl completion powershell > $HOME\.kube\completion.ps1
+		    Add-Content $PROFILE "$HOME\.kube\completion.ps1"
+		## Execute completion code in the profile
+		    Add-Content $PROFILE "if (Get-Command kubectl -ErrorAction SilentlyContinue) {
+		        kubectl completion powershell | Out-String | Invoke-Expression
+		    }"
+		## Add completion code directly to the $PROFILE script
+		    kubectl completion powershell >> $PROFILE`))
 )
 
 var (
