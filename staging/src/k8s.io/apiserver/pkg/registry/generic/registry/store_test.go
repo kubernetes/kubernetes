@@ -1141,6 +1141,8 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 			registry.Decorator = tc.decorator
 			ttlFailDone = false
 			registry.TTLFunc = tc.ttl
+			// force storage to use a cached object with a non-matching resourceVersion to guarantee a live lookup + retry
+			created.(*example.Pod).ResourceVersion += "0"
 			registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: created}
 			_, _, err = registry.Update(testContext, pod.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 			if err != nil && !tc.expectError {
