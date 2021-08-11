@@ -124,7 +124,6 @@ aliases:
     - cblecker
     - dims
     - justaugustus # Release Manager / SIG Chair
-    - listx
   build-image-reviewers:
     - BenTheElder
     - cblecker
@@ -132,7 +131,6 @@ aliases:
     - dims
     - hasheddan # Release Manager / SIG Technical Lead
     - justaugustus # Release Manager / SIG Chair
-    - listx
     - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
