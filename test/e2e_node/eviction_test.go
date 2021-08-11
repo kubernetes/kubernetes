@@ -167,17 +167,26 @@ var _ = SIGDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive][Node
 // Disk pressure is induced by running pods which consume disk space.
 var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	pressureTimeout := 10 * time.Minute
+	pressureTimeout := 15 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("200Mi")
 			summary := eventuallyGetSummary()
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+
+			diskConsumedByTest := resource.MustParse("4Gi")
+			availableBytesOnSystem := *(summary.Node.Fs.AvailableBytes)
+			evictionThreshold := strconv.FormatUint(availableBytesOnSystem-uint64(diskConsumedByTest.Value()), 10)
+
+			if availableBytesOnSystem <= uint64(diskConsumedByTest.Value()) {
+				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageEviction test to run")
+			}
+
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): evictionThreshold}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
+
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
@@ -201,7 +210,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeF
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("200Mi")
+			diskConsumed := resource.MustParse("4Gi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
@@ -343,14 +352,14 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
-	pressureTimeout := 10 * time.Minute
+	pressureTimeout := 15 * time.Minute
 
 	highPriorityClassName := f.BaseName + "-high-priority"
 	highPriority := int32(999999999)
 
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("350Mi")
+			diskConsumed := resource.MustParse("4Gi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
@@ -545,7 +554,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 			// In case a test fails before verifying that NodeCondition no longer exist on the node,
 			// we should wait for the NodeCondition to disappear
-			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s no longer exist on the node", expectedNodeCondition))
+			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s no longer exists on the node", expectedNodeCondition))
 			gomega.Eventually(func() error {
 				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
 					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
@@ -556,6 +565,15 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			reduceAllocatableMemoryUsage()
 			ginkgo.By("making sure we have all the required images for testing")
 			prePullImagesIfNeccecary()
+
+			// Ensure that the NodeCondition hasn't returned after pulling images
+			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s doesn't exist again after pulling images", expectedNodeCondition))
+			gomega.Eventually(func() error {
+				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
+					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
+				}
+				return nil
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			ginkgo.By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
