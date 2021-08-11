@@ -82,6 +82,9 @@ type CorrelatorOptions struct {
 	// The clock used by the EventAggregator to allow for testing
 	// If not specified (zero value), clock.RealClock{} will be used
 	Clock clock.Clock
+	// The func used by EventFilterFunc, which returns a key for given event, based on which filtering will take place
+	// If not specified (zero value), getSpamKey will be used
+	SpamKeyFunc EventSpamKeyFunc
 }
 
 // EventRecorder knows how to record events on behalf of an EventSource.
