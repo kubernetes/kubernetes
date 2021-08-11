@@ -1,3 +1,5 @@
+// +build !darwin,!linux
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -16,14 +18,6 @@ limitations under the License.
 
 package copycerts
 
-import (
-	"testing"
-
-	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
-)
-
-func TestMain(m *testing.M) {
-	// see: https://github.com/kubernetes/kubernetes/issues/104265
-	setNoUmask()
-	pkiutiltesting.RunWithPrivateKeyFixtureDirectory(m)
+func setNoUmask() {
+	// no-op on not-unix
 }
