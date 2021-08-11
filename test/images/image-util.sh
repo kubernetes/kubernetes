@@ -111,6 +111,7 @@ build() {
   fi
 
   kube::util::ensure-gnu-sed
+  kube::util::ensure-docker-buildx
 
   for os_arch in ${os_archs}; do
     splitOsArch "${image}" "${os_arch}"

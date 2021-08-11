@@ -216,6 +216,8 @@ function kube::release::package_node_tarballs() {
 
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
+  kube::util::ensure-docker-buildx
+
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
