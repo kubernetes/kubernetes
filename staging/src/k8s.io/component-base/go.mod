@@ -24,7 +24,7 @@ require (
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.uber.org/zap v1.17.0
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
+	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 	gotest.tools/v3 v3.0.3 // indirect
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
@@ -38,3 +38,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55

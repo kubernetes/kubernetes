@@ -25,8 +25,8 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
-	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	google.golang.org/api v0.46.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
@@ -55,3 +55,7 @@ replace (
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 	k8s.io/mount-utils => ../mount-utils
 )
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+
+replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
