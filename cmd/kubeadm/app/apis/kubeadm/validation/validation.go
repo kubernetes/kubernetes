@@ -570,9 +570,6 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.Patches,
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-		kubeadmcmdoptions.ExperimentalPatches,
 		"print-join-command", "rootfs", "v", "log-file")
 	if allowedFlags.Has(flagName) {
 		return true
