@@ -177,7 +177,7 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 			QuotaProjectID:                 f.QuotaProjectID,
 			Scopes:                         params.Scopes,
 		}
-		return cfg.TokenSource(ctx), nil
+		return cfg.TokenSource(ctx)
 	case "":
 		return nil, errors.New("missing 'type' field in credentials")
 	default:

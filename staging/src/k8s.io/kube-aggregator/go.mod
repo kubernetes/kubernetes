@@ -34,5 +34,3 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kube-aggregator => ../kube-aggregator
 )
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d

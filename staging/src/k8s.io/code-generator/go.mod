@@ -27,9 +27,3 @@ require (
 )
 
 replace k8s.io/code-generator => ../code-generator
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
-
-replace golang.org/x/tools => golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff

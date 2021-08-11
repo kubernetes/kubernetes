@@ -57,5 +57,3 @@ replace (
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55

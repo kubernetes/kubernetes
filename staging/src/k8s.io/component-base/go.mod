@@ -38,5 +38,3 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55

@@ -19,7 +19,3 @@ require (
 )
 
 replace k8s.io/cri-api => ../cri-api
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55

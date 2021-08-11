@@ -55,7 +55,3 @@ replace (
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 	k8s.io/mount-utils => ../mount-utils
 )
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-
-replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f

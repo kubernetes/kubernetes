@@ -228,6 +228,8 @@ const (
 	BPF_OR                                      = 0x40
 	BPF_PSEUDO_BTF_ID                           = 0x3
 	BPF_PSEUDO_CALL                             = 0x1
+	BPF_PSEUDO_FUNC                             = 0x4
+	BPF_PSEUDO_KFUNC_CALL                       = 0x2
 	BPF_PSEUDO_MAP_FD                           = 0x1
 	BPF_PSEUDO_MAP_VALUE                        = 0x2
 	BPF_RET                                     = 0x6
@@ -475,6 +477,8 @@ const (
 	DM_LIST_VERSIONS                            = 0xc138fd0d
 	DM_MAX_TYPE_NAME                            = 0x10
 	DM_NAME_LEN                                 = 0x80
+	DM_NAME_LIST_FLAG_DOESNT_HAVE_UUID          = 0x2
+	DM_NAME_LIST_FLAG_HAS_UUID                  = 0x1
 	DM_NOFLUSH_FLAG                             = 0x800
 	DM_PERSISTENT_DEV_FLAG                      = 0x8
 	DM_QUERY_INACTIVE_TABLE_FLAG                = 0x1000
@@ -494,9 +498,9 @@ const (
 	DM_UUID_FLAG                                = 0x4000
 	DM_UUID_LEN                                 = 0x81
 	DM_VERSION                                  = 0xc138fd00
-	DM_VERSION_EXTRA                            = "-ioctl (2021-02-01)"
+	DM_VERSION_EXTRA                            = "-ioctl (2021-03-22)"
 	DM_VERSION_MAJOR                            = 0x4
-	DM_VERSION_MINOR                            = 0x2c
+	DM_VERSION_MINOR                            = 0x2d
 	DM_VERSION_PATCHLEVEL                       = 0x0
 	DT_BLK                                      = 0x6
 	DT_CHR                                      = 0x2
@@ -981,12 +985,6 @@ const (
 	HPFS_SUPER_MAGIC                            = 0xf995e849
 	HUGETLBFS_MAGIC                             = 0x958458f6
 	IBSHIFT                                     = 0x10
-	ICMPV6_FILTER                               = 0x1
-	ICMPV6_FILTER_BLOCK                         = 0x1
-	ICMPV6_FILTER_BLOCKOTHERS                   = 0x3
-	ICMPV6_FILTER_PASS                          = 0x2
-	ICMPV6_FILTER_PASSONLY                      = 0x4
-	ICMP_FILTER                                 = 0x1
 	ICRNL                                       = 0x100
 	IFA_F_DADFAILED                             = 0x8
 	IFA_F_DEPRECATED                            = 0x20
@@ -1257,6 +1255,7 @@ const (
 	KEXEC_ARCH_PARISC                           = 0xf0000
 	KEXEC_ARCH_PPC                              = 0x140000
 	KEXEC_ARCH_PPC64                            = 0x150000
+	KEXEC_ARCH_RISCV                            = 0xf30000
 	KEXEC_ARCH_S390                             = 0x160000
 	KEXEC_ARCH_SH                               = 0x2a0000
 	KEXEC_ARCH_X86_64                           = 0x3e0000
@@ -1756,14 +1755,19 @@ const (
 	PERF_ATTR_SIZE_VER4                         = 0x68
 	PERF_ATTR_SIZE_VER5                         = 0x70
 	PERF_ATTR_SIZE_VER6                         = 0x78
+	PERF_ATTR_SIZE_VER7                         = 0x80
 	PERF_AUX_FLAG_COLLISION                     = 0x8
+	PERF_AUX_FLAG_CORESIGHT_FORMAT_CORESIGHT    = 0x0
+	PERF_AUX_FLAG_CORESIGHT_FORMAT_RAW          = 0x100
 	PERF_AUX_FLAG_OVERWRITE                     = 0x2
 	PERF_AUX_FLAG_PARTIAL                       = 0x4
+	PERF_AUX_FLAG_PMU_FORMAT_TYPE_MASK          = 0xff00
 	PERF_AUX_FLAG_TRUNCATED                     = 0x1
 	PERF_FLAG_FD_CLOEXEC                        = 0x8
 	PERF_FLAG_FD_NO_GROUP                       = 0x1
 	PERF_FLAG_FD_OUTPUT                         = 0x2
 	PERF_FLAG_PID_CGROUP                        = 0x4
+	PERF_HW_EVENT_MASK                          = 0xffffffff
 	PERF_MAX_CONTEXTS_PER_STACK                 = 0x8
 	PERF_MAX_STACK_DEPTH                        = 0x7f
 	PERF_MEM_BLK_ADDR                           = 0x4
@@ -1822,6 +1826,7 @@ const (
 	PERF_MEM_TLB_OS                             = 0x40
 	PERF_MEM_TLB_SHIFT                          = 0x1a
 	PERF_MEM_TLB_WK                             = 0x20
+	PERF_PMU_TYPE_SHIFT                         = 0x20
 	PERF_RECORD_KSYMBOL_FLAGS_UNREGISTER        = 0x1
 	PERF_RECORD_MISC_COMM_EXEC                  = 0x2000
 	PERF_RECORD_MISC_CPUMODE_MASK               = 0x7
@@ -1921,7 +1926,9 @@ const (
 	PR_PAC_APGAKEY                              = 0x10
 	PR_PAC_APIAKEY                              = 0x1
 	PR_PAC_APIBKEY                              = 0x2
+	PR_PAC_GET_ENABLED_KEYS                     = 0x3d
 	PR_PAC_RESET_KEYS                           = 0x36
+	PR_PAC_SET_ENABLED_KEYS                     = 0x3c
 	PR_SET_CHILD_SUBREAPER                      = 0x24
 	PR_SET_DUMPABLE                             = 0x4
 	PR_SET_ENDIAN                               = 0x14
@@ -2003,6 +2010,7 @@ const (
 	PTRACE_GETREGSET                            = 0x4204
 	PTRACE_GETSIGINFO                           = 0x4202
 	PTRACE_GETSIGMASK                           = 0x420a
+	PTRACE_GET_RSEQ_CONFIGURATION               = 0x420f
 	PTRACE_GET_SYSCALL_INFO                     = 0x420e
 	PTRACE_INTERRUPT                            = 0x4207
 	PTRACE_KILL                                 = 0x8
@@ -2163,6 +2171,7 @@ const (
 	RTM_DELNEIGH                                = 0x1d
 	RTM_DELNETCONF                              = 0x51
 	RTM_DELNEXTHOP                              = 0x69
+	RTM_DELNEXTHOPBUCKET                        = 0x75
 	RTM_DELNSID                                 = 0x59
 	RTM_DELQDISC                                = 0x25
 	RTM_DELROUTE                                = 0x19
@@ -2193,6 +2202,7 @@ const (
 	RTM_GETNEIGHTBL                             = 0x42
 	RTM_GETNETCONF                              = 0x52
 	RTM_GETNEXTHOP                              = 0x6a
+	RTM_GETNEXTHOPBUCKET                        = 0x76
 	RTM_GETNSID                                 = 0x5a
 	RTM_GETQDISC                                = 0x26
 	RTM_GETROUTE                                = 0x1a
@@ -2201,7 +2211,7 @@ const (
 	RTM_GETTCLASS                               = 0x2a
 	RTM_GETTFILTER                              = 0x2e
 	RTM_GETVLAN                                 = 0x72
-	RTM_MAX                                     = 0x73
+	RTM_MAX                                     = 0x77
 	RTM_NEWACTION                               = 0x30
 	RTM_NEWADDR                                 = 0x14
 	RTM_NEWADDRLABEL                            = 0x48
@@ -2215,6 +2225,7 @@ const (
 	RTM_NEWNEIGHTBL                             = 0x40
 	RTM_NEWNETCONF                              = 0x50
 	RTM_NEWNEXTHOP                              = 0x68
+	RTM_NEWNEXTHOPBUCKET                        = 0x74
 	RTM_NEWNSID                                 = 0x58
 	RTM_NEWNVLAN                                = 0x70
 	RTM_NEWPREFIX                               = 0x34
@@ -2224,8 +2235,8 @@ const (
 	RTM_NEWSTATS                                = 0x5c
 	RTM_NEWTCLASS                               = 0x28
 	RTM_NEWTFILTER                              = 0x2c
-	RTM_NR_FAMILIES                             = 0x19
-	RTM_NR_MSGTYPES                             = 0x64
+	RTM_NR_FAMILIES                             = 0x1a
+	RTM_NR_MSGTYPES                             = 0x68
 	RTM_SETDCB                                  = 0x4f
 	RTM_SETLINK                                 = 0x13
 	RTM_SETNEIGHTBL                             = 0x43
@@ -2253,6 +2264,7 @@ const (
 	RTPROT_MROUTED                              = 0x11
 	RTPROT_MRT                                  = 0xa
 	RTPROT_NTK                                  = 0xf
+	RTPROT_OPENR                                = 0x63
 	RTPROT_OSPF                                 = 0xbc
 	RTPROT_RA                                   = 0x9
 	RTPROT_REDIRECT                             = 0x1
@@ -2536,6 +2548,14 @@ const (
 	TCOFLUSH                                    = 0x1
 	TCOOFF                                      = 0x0
 	TCOON                                       = 0x1
+	TCPOPT_EOL                                  = 0x0
+	TCPOPT_MAXSEG                               = 0x2
+	TCPOPT_NOP                                  = 0x1
+	TCPOPT_SACK                                 = 0x5
+	TCPOPT_SACK_PERMITTED                       = 0x4
+	TCPOPT_TIMESTAMP                            = 0x8
+	TCPOPT_TSTAMP_HDR                           = 0x101080a
+	TCPOPT_WINDOW                               = 0x3
 	TCP_CC_INFO                                 = 0x1a
 	TCP_CM_INQ                                  = 0x24
 	TCP_CONGESTION                              = 0xd

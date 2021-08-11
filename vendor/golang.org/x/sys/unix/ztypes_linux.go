@@ -452,6 +452,11 @@ type CanFilter struct {
 	Mask uint32
 }
 
+type TCPRepairOpt struct {
+	Code uint32
+	Val  uint32
+}
+
 const (
 	SizeofSockaddrInet4     = 0x10
 	SizeofSockaddrInet6     = 0x1c
@@ -484,6 +489,7 @@ const (
 	SizeofUcred             = 0xc
 	SizeofTCPInfo           = 0x68
 	SizeofCanFilter         = 0x8
+	SizeofTCPRepairOpt      = 0x8
 )
 
 const (
@@ -680,6 +686,16 @@ type NdMsg struct {
 	Flags   uint8
 	Type    uint8
 }
+
+const (
+	ICMP_FILTER = 0x1
+
+	ICMPV6_FILTER             = 0x1
+	ICMPV6_FILTER_BLOCK       = 0x1
+	ICMPV6_FILTER_BLOCKOTHERS = 0x3
+	ICMPV6_FILTER_PASS        = 0x2
+	ICMPV6_FILTER_PASSONLY    = 0x4
+)
 
 const (
 	SizeofSockFilter = 0x8
@@ -1001,7 +1017,7 @@ const (
 	PERF_COUNT_SW_EMULATION_FAULTS        = 0x8
 	PERF_COUNT_SW_DUMMY                   = 0x9
 	PERF_COUNT_SW_BPF_OUTPUT              = 0xa
-	PERF_COUNT_SW_MAX                     = 0xb
+	PERF_COUNT_SW_MAX                     = 0xc
 	PERF_SAMPLE_IP                        = 0x1
 	PERF_SAMPLE_TID                       = 0x2
 	PERF_SAMPLE_TIME                      = 0x4
@@ -1772,6 +1788,8 @@ const (
 	NFPROTO_DECNET   = 0xc
 	NFPROTO_NUMPROTO = 0xd
 )
+
+const SO_ORIGINAL_DST = 0x50
 
 type Nfgenmsg struct {
 	Nfgen_family uint8
@@ -3434,7 +3452,7 @@ const (
 	ETHTOOL_MSG_CABLE_TEST_ACT                = 0x1a
 	ETHTOOL_MSG_CABLE_TEST_TDR_ACT            = 0x1b
 	ETHTOOL_MSG_TUNNEL_INFO_GET               = 0x1c
-	ETHTOOL_MSG_USER_MAX                      = 0x1c
+	ETHTOOL_MSG_USER_MAX                      = 0x20
 	ETHTOOL_MSG_KERNEL_NONE                   = 0x0
 	ETHTOOL_MSG_STRSET_GET_REPLY              = 0x1
 	ETHTOOL_MSG_LINKINFO_GET_REPLY            = 0x2
@@ -3465,7 +3483,7 @@ const (
 	ETHTOOL_MSG_CABLE_TEST_NTF                = 0x1b
 	ETHTOOL_MSG_CABLE_TEST_TDR_NTF            = 0x1c
 	ETHTOOL_MSG_TUNNEL_INFO_GET_REPLY         = 0x1d
-	ETHTOOL_MSG_KERNEL_MAX                    = 0x1d
+	ETHTOOL_MSG_KERNEL_MAX                    = 0x21
 	ETHTOOL_A_HEADER_UNSPEC                   = 0x0
 	ETHTOOL_A_HEADER_DEV_INDEX                = 0x1
 	ETHTOOL_A_HEADER_DEV_NAME                 = 0x2
