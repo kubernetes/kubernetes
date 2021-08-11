@@ -60,7 +60,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			Subsystem:      metrics.KubeletSubsystem,
 			Name:           "server_expiration_renew_errors",
 			Help:           "Counter of certificate renewal errors.",
-			StabilityLevel: compbasemetrics.STABLE,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
 	legacyregistry.MustRegister(certificateRenewFailure)
