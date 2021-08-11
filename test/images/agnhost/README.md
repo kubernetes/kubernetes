@@ -16,14 +16,6 @@ The image was created for testing purposes, reducing the need for having differe
 cases for the same tested behaviour.
 
 
-## Developer notes
-
-We've introduced versioning into the `agnhost` binary for debugging purposes (e.g.: if the
-image and binary versions do not match, see [here](https://github.com/kubernetes/kubernetes/pull/79667#discussion_r304198370)).
-
-Whenever the image `VERSION` is bumped, the `Version` in `agnhost.go` will also have to be bumped.
-
-
 ## Usage
 
 The `agnhost` binary has several subcommands which are can be used to test different

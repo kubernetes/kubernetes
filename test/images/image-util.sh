@@ -278,7 +278,7 @@ bin() {
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 

@@ -48,10 +48,12 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
+var Version = "development"
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:     "app",
-		Version: "2.32",
+		Version: Version,
 	}
 
 	rootCmd.AddCommand(auditproxy.CmdAuditProxy)
