@@ -104,8 +104,7 @@ These images are then used by the rest of the E2E test images as a cache / base 
 Make updates to the functionality of the images required for your test case and update the version number.
 
 The version can easily be bumped by modifying the file `test/images/${IMAGE_NAME}/VERSION`, which will
-be used when building the image. Additionally, for the `agnhost` image, also bump the `Version` in
-`test/images/agnhost/agnhost.go`.
+be used when building the image.
 
 Some test images (`agnhost`) are used as bases for other images (`kitten`, `nautilus`). If the parent
 image's `VERSION` has been bumped, also bump the version in the children's `BASEIMAGE` files in order

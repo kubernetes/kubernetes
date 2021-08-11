@@ -16,22 +16,6 @@ dependencies:
     - path: hack/tools/go.mod
       match: sigs.k8s.io/zeitgeist\ v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
-  # agnhost: bump this one first
-  - name: "agnhost"
-    version: "2.32"
-    refPaths:
-    - path: test/images/agnhost/VERSION
-      match: \d.\d
-    - path: test/images/agnhost/agnhost.go
-      match: "Version:"
-
-  # then after merge and successful postsubmit image push / promotion, bump this
-  - name: "agnhost: dependents"
-    version: "2.32"
-    refPaths:
-    - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
-
   # CNI plugins
   - name: "cni"
     version: 0.9.1
