@@ -1022,9 +1022,9 @@ func testIterativeDeployments(f *framework.Framework) {
 
 	// Create a webserver deployment.
 	deploymentName := "webserver"
-	thirty := int32(30)
+	fiveMinutes := int32(5 * 60)
 	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, WebserverImageName, WebserverImage, appsv1.RollingUpdateDeploymentStrategyType)
-	d.Spec.ProgressDeadlineSeconds = &thirty
+	d.Spec.ProgressDeadlineSeconds = &fiveMinutes
 	d.Spec.RevisionHistoryLimit = &two
 	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &zero
 	framework.Logf("Creating deployment %q", deploymentName)
