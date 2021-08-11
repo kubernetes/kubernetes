@@ -1070,16 +1070,16 @@ func testIterativeDeployments(f *framework.Framework) {
 		case n < 0.8:
 			// toggling the deployment
 			if deployment.Spec.Paused {
-				framework.Logf("%02d: pausing deployment %q", i, deployment.Name)
+				framework.Logf("%02d: resuming deployment %q", i, deployment.Name)
 				deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
-					update.Spec.Paused = true
+					update.Spec.Paused = false
 					randomScale(update, i)
 				})
 				framework.ExpectNoError(err)
 			} else {
-				framework.Logf("%02d: resuming deployment %q", i, deployment.Name)
+				framework.Logf("%02d: pausing deployment %q", i, deployment.Name)
 				deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
-					update.Spec.Paused = false
+					update.Spec.Paused = true
 					randomScale(update, i)
 				})
 				framework.ExpectNoError(err)
@@ -1115,6 +1115,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	deployment, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	if deployment.Spec.Paused {
+		framework.Logf("Resuming deployment %q", deployment.Name)
 		deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 			update.Spec.Paused = false
 		})
