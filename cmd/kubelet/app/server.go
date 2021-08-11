@@ -189,12 +189,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				os.Exit(1)
 			}
 
-			// validate the initial KubeletFlags
-			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
-				klog.ErrorS(err, "Failed to validate kubelet flags")
-				os.Exit(1)
-			}
-
 			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
 				klog.InfoS("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
 			}
@@ -218,6 +212,12 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 					klog.ErrorS(err, "Failed to set feature gates from initial flags-based config")
 					os.Exit(1)
 				}
+			}
+
+			// validate the initial KubeletFlags
+			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
+				klog.ErrorS(err, "Failed to validate kubelet flags")
+				os.Exit(1)
 			}
 
 			// We always validate the local configuration (command line + config file).
