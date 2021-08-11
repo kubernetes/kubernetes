@@ -248,5 +248,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
 	}
 
+	if kc.ExitOnLockContention && kc.LockFilePath == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: exitOnLockContention set to true but lockFilePath not specified"))
+	}
+
 	return utilerrors.NewAggregate(allErrors)
 }

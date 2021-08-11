@@ -445,6 +445,15 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+	// LockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes
+	// that may be running.
+	LockFilePath string
+	// ExitOnLockContention signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	ExitOnLockContention bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

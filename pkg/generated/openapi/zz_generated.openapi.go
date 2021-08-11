@@ -53458,6 +53458,20 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"lockFilePath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LockFilePath is the path that kubelet will use to as a lock file. It uses this file as a lock to synchronize with other kubelet processes that may be running. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"exitOnLockContention": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExitOnLockContention signifies to the kubelet that it is running in \"bootstrap\" mode. This requires that 'LockFilePath' has been set. This will cause the kubelet to listen to inotify events on the lock file, releasing it and exiting when another process tries to open that file. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

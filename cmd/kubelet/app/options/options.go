@@ -107,15 +107,6 @@ type KubeletFlags struct {
 	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 	// Node Labels are the node labels to add when registering the node in the cluster
 	NodeLabels map[string]string
-	// lockFilePath is the path that kubelet will use to as a lock file.
-	// It uses this file as a lock to synchronize with other kubelet processes
-	// that may be running.
-	LockFilePath string
-	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
-	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
-	// This will cause the kubelet to listen to inotify events on the lock file,
-	// releasing it and exiting when another process tries to open that file.
-	ExitOnLockContention bool
 	// DEPRECATED FLAGS
 	// minimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
@@ -305,8 +296,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	// EXPERIMENTAL FLAGS
 	bindableNodeLabels := cliflag.ConfigurationMap(f.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", fmt.Sprintf("<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','. Labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", ")))
-	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
-	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.BoolVar(&f.SeccompDefault, "seccomp-default", f.SeccompDefault, "<Warning: Alpha feature> Enable the use of `RuntimeDefault` as the default seccomp profile for all workloads. The SeccompDefault feature gate must be enabled to allow this flag, which is disabled per default.")
 
 	// DEPRECATED FLAGS
@@ -512,4 +501,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
 
 	fs.Var(&utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+	// Lock Contention flags, moving from as Kubelet flags to Kubelet configuration.
+	fs.StringVar(&c.LockFilePath, "lock-file", c.LockFilePath, "The path to file for kubelet to use as a lock file.")
+	fs.BoolVar(&c.ExitOnLockContention, "exit-on-lock-contention", c.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 }
