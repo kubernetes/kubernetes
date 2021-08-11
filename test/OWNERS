@@ -9,6 +9,7 @@ reviewers:
 approvers:
   - alejandrox1
   - andrewsykim
+  - aojea
   - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
   - caseydavenport # for test/e2e/{dns*,network}.go
