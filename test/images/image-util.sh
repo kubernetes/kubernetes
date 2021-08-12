@@ -43,7 +43,8 @@ declare -A WINDOWS_OS_VERSIONS_MAP
 initWindowsOsVersions() {
   for os_version in "${windows_os_versions[@]}"; do
     img_base="mcr.microsoft.com/windows/nanoserver:${os_version}"
-    full_version=$(docker manifest inspect "${img_base}" | grep "os.version" | head -n 1 | awk '{print $2}') || true
+    # we use awk to also trim the quotes around the OS version string.
+    full_version=$(docker manifest inspect "${img_base}" | grep "os.version" | head -n 1 | awk -F\" '{print $4}') || true
     WINDOWS_OS_VERSIONS_MAP["${os_version}"]="${full_version}"
   done
 }
@@ -193,10 +194,11 @@ build() {
 }
 
 docker_version_check() {
-  # docker buildx has been introduced in 19.03, so we need to make sure we have it.
+  # docker manifest annotate --os-version has been introduced in 20.10.0,
+  # so we need to make sure we have it.
   docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
-  if [[ ${docker_version} != 19.03.0 && ${docker_version} < 19.03.0 ]]; then
-    echo "Minimum docker version 19.03.0 is required for using docker buildx: ${docker_version}]"
+  if [[ ${docker_version} != 20.10.0 && ${docker_version} < 20.10.0 ]]; then
+    echo "Minimum docker version 20.10.0 is required for annotating the OS Version in the manifest list images: ${docker_version}]"
     exit 1
   fi
 }
@@ -229,29 +231,16 @@ push() {
   while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$os_archs" | "${SED}" "s~\/~-~g" | "${SED}" -e "s~[^ ]*~$REGISTRY\/$image:$TAG\-&~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
 
-  # We will need the full registry name in order to set the "os.version" for Windows images.
-  # If the ${REGISTRY} dcesn't have any slashes, it means that it's on dockerhub.
-  registry_prefix=""
-  if [[ ! $REGISTRY =~ .*/.* ]]; then
-    registry_prefix="docker.io/"
-  fi
-  # The images in the manifest list are stored locally. The folder / file name is almost the same,
-  # with a few changes.
-  manifest_image_folder=$(echo "${registry_prefix}${REGISTRY}/${image}:${TAG}" | sed "s|/|_|g" | sed "s/:/-/")
-
   for os_arch in ${os_archs}; do
     splitOsArch "${image}" "${os_arch}"
-    docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
 
     # For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node
     # can pull the proper image it needs.
     if [[ "$os_name" = "windows" ]]; then
       full_version="${WINDOWS_OS_VERSIONS_MAP[$os_version]}"
-
-      # At the moment, docker manifest annotate doesn't allow us to set the os.version, so we'll have to
-      # it ourselves. The manifest list can be found locally as JSONs.
-      sed -i -r "s/(\"os\"\:\"windows\")/\0,\"os.version\":$full_version/" \
-        "${HOME}/.docker/manifests/${manifest_image_folder}/${manifest_image_folder}-${suffix}"
+      docker manifest annotate --os "${os_name}" --arch "${arch}" --os-version "${full_version}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
+    else
+      docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
     fi
   done
   popd

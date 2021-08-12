@@ -81,21 +81,13 @@ push-manifest:
 	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_OS_ARCH) | sed -e "s~[^ ]*~$(IMAGE):$(TAG)\-&~g")
 	set -x; for arch in $(ALL_ARCH.linux); do docker manifest annotate --os linux --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-linux-$${arch}; done
 	# For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node can pull the proper image it needs.
-	# At the moment, docker manifest annotate doesn't allow us to set the os.version, so we'll have to it ourselves. The manifest list can be found locally as JSONs.
-	# See: https://github.com/moby/moby/issues/41417
-	# If the ${REGISTRY} is on dockerhub, the prefix "docker.io/" is optional. However, we need the full
-	# registry name for setting the os.version for Windows images below.
-	# If the registry name does not contain any slashes, we prepend "docker.io/"
-	# TODO(claudiub): Clean this up once the above issue has been fixed.
+	# we use awk to also trim the quotes around the OS version string.
 	set -x; \
-	registry_prefix=$(shell (echo ${REGISTRY} | grep -Eq ".*\/.*") && echo "" || echo "docker.io/"); \
-	manifest_image_folder=`echo "$${registry_prefix}${IMAGE}" | sed "s|/|_|g" | sed "s/:/-/"`; \
 	for arch in $(ALL_ARCH.windows);  do \
 		for osversion in ${ALL_OSVERSIONS.windows}; do \
-			docker manifest annotate --os windows --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-windows-$${arch}-$${osversion}; \
 			BASEIMAGE=${BASE.windows}:$${osversion}; \
-			full_version=`docker manifest inspect ${BASE.windows}:$${osversion} | grep "os.version" | head -n 1 | awk '{print $$2}'` || true; \
-			sed -i -r "s/(\"os\"\:\"windows\")/\0,\"os.version\":$${full_version}/" "${HOME}/.docker/manifests/$${manifest_image_folder}-${TAG}/$${manifest_image_folder}-${TAG}-windows-$${arch}-$${osversion}"; \
+			full_version=`docker manifest inspect ${BASE.windows}:$${osversion} | grep "os.version" | head -n 1 | awk -F\" '{print $$4}'` || true; \
+			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-windows-$${arch}-$${osversion}; \
 		done; \
 	done
 	docker manifest push --purge ${IMAGE}:${TAG}
