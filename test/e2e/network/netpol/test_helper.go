@@ -69,7 +69,7 @@ func UpdatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespac
 // waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
 func waitForHTTPServers(k *kubeManager, model *Model) error {
 	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
+	framework.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
 
 	testCases := map[string]*TestCase{}
 	for _, port := range model.Ports {
