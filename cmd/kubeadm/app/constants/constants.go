@@ -489,15 +489,10 @@ var (
 		Jitter:   0.1,
 	}
 
-	// defaultKubernetesVersionForTests is the default version used for unit tests.
-	// The MINOR should be at least 3 as some tests subtract 3 from the MINOR version.
-	defaultKubernetesVersionForTests = version.MustParseSemantic("v1.3.0")
+	// defaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
+	// version was not populated during build.
+	defaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
 )
-
-// isRunningInTest can be used to determine if the code in this file is being run in a test.
-func isRunningInTest() bool {
-	return strings.HasSuffix(os.Args[0], ".test")
-}
 
 // getSkewedKubernetesVersion returns the current MAJOR.(MINOR+n).0 Kubernetes version with a skew of 'n'
 // It uses the kubeadm version provided by the 'component-base/version' package. This version must be populated
@@ -505,28 +500,18 @@ func isRunningInTest() bool {
 // was either build incorrectly or this code is running in unit tests.
 func getSkewedKubernetesVersion(n int) *version.Version {
 	versionInfo := componentversion.Get()
-	ver := getSkewedKubernetesVersionImpl(&versionInfo, n, isRunningInTest)
-	if ver == nil {
-		panic("kubeadm is not build properly using 'make ...': missing component version information")
-	}
-	return ver
+	return getSkewedKubernetesVersionImpl(&versionInfo, n)
 }
 
-func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int, isRunningInTestFunc func() bool) *version.Version {
+func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int) *version.Version {
 	// TODO: update if the kubeadm version gets decoupled from the Kubernetes version.
 	// This would require keeping track of the supported skew in a table.
 	// More changes would be required if the kubelet version one day decouples from that of Kubernetes.
 	var ver *version.Version
 	if len(versionInfo.Major) == 0 {
-		if isRunningInTestFunc() {
-			ver = defaultKubernetesVersionForTests // An arbitrary version for testing purposes
-		} else {
-			// If this is not running in tests assume that the kubeadm binary is not build properly
-			return nil
-		}
-	} else {
-		ver = version.MustParseSemantic(versionInfo.GitVersion)
+		return defaultKubernetesPlaceholderVersion
 	}
+	ver = version.MustParseSemantic(versionInfo.GitVersion)
 	// Append the MINOR version skew.
 	// TODO: handle the case of Kubernetes moving to v2.0 or having MAJOR version updates in the future.
 	// This would require keeping track (in a table) of the last MINOR for a particular MAJOR.
