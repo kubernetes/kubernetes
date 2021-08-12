@@ -831,6 +831,18 @@ function install-kube-binary-config {
 }
 
 
+function install-extra-node-requirements() {
+  if [[ "${KUBERNETES_MASTER:-}" != "false" ]]; then
+    return
+  fi
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure.sh" ]]; then
+    # M4A is not relevant on ARM
+    if [[ "${HOST_ARCH}" == "amd64" ]]; then
+      install-m4a-apparmor-profile
+    fi
+  fi
+}
+
 # This function detects the platform/arch of the machine where the script runs,
 # and sets the HOST_PLATFORM and HOST_ARCH environment variables accordingly.
 # Callers can specify HOST_PLATFORM_OVERRIDE and HOST_ARCH_OVERRIDE to skip the detection.
@@ -1061,6 +1073,9 @@ log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 
 # binaries and kube-system manifests
 log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
+
+# extra node requirements
+log-wrap 'InstallExtraNodeRequirements' install-extra-node-requirements
 
 # download inplace component manifests
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
