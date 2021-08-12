@@ -658,6 +658,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 
 	ginkgo.By("checking eviction ordering and ensuring important pods don't fail")
 	done := true
+	pendingPods := []string{}
 	for _, priorityPodSpec := range testSpecs {
 		var priorityPod v1.Pod
 		for _, p := range updatedPods {
@@ -700,13 +701,14 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 
 		// If a pod that is not evictionPriority 0 has not been evicted, we are not done
 		if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
+			pendingPods = append(pendingPods, priorityPod.ObjectMeta.Name)
 			done = false
 		}
 	}
 	if done {
 		return nil
 	}
-	return fmt.Errorf("pods that should be evicted are still running")
+	return fmt.Errorf("pods that should be evicted are still running: %#v", pendingPods)
 }
 
 func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expectedStarvedResource v1.ResourceName) {
