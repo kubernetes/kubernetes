@@ -20,16 +20,18 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
 	"os"
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
+
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/waitgroup"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -72,14 +74,23 @@ func TestLogOptions(t *testing.T) {
 }
 
 func TestReadLogs(t *testing.T) {
-	file, err := ioutil.TempFile("", "TestFollowLogs")
-	if err != nil {
-		t.Fatalf("unable to create temp file")
+	prevLog := []string{
+		`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n",
+		`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n",
+		`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n",
+		`{"log":"line4 part I ","stream":"stdout","time":"2020-09-27T11:18:04.00000000Z"}` + "\n",
+		`{"log":"+ II ","stream":"stdout","time":"2020-09-27T11:18:04.00000000Z"}` + "\n",
+		`{"log":"+ III\n","stream":"stdout","time":"2020-09-27T11:18:04.00000000Z"}` + "\n",
+		`{"log":"line5\n","stream":"stdout","time":"2020-09-27T11:18:05.00000000Z"}` + "\n",
+		`{"log":"line6\n","stream":"stdout","time":"2020-09-27T11:18:06.00000000Z"}` + "\n",
 	}
-	defer os.Remove(file.Name())
-	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
-	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
-	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
+
+	realTimeLog := []string{
+		`{"log":"line7\n","stream":"stdout","time":"2020-09-27T11:18:07.00000000Z"}` + "\n",
+		`{"log":"line8 part I ","stream":"stdout","time":"2020-09-27T11:18:08.00000000Z"}` + "\n",
+		`{"log":"+ II\n","stream":"stdout","time":"2020-09-27T11:18:08.00000000Z"}` + "\n",
+		`{"log":"line9\n","stream":"stdout","time":"2020-09-27T11:18:09.00000000Z"}` + "\n",
+	}
 
 	testCases := []struct {
 		name          string
@@ -89,21 +100,28 @@ func TestReadLogs(t *testing.T) {
 		{
 			name:          "default pod log options should output all lines",
 			podLogOptions: v1.PodLogOptions{},
-			expected:      "line1\nline2\nline3\n",
+			expected:      "line1\nline2\nline3\nline4 part I + II + III\nline5\nline6\n",
 		},
 		{
 			name: "using TailLines 2 should output last 2 lines",
 			podLogOptions: v1.PodLogOptions{
 				TailLines: pointer.Int64Ptr(2),
 			},
-			expected: "line2\nline3\n",
+			expected: "line5\nline6\n",
 		},
 		{
-			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
+			name: "using TailLines 3 should output the last 3 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(4),
+				TailLines: pointer.Int64Ptr(3),
 			},
-			expected: "line1\nline2\nline3\n",
+			expected: "+ III\nline5\nline6\n",
+		},
+		{
+			name: "using TailLines 9 should output all lines when the log has <= 8 lines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: pointer.Int64Ptr(9),
+			},
+			expected: "line1\nline2\nline3\nline4 part I + II + III\nline5\nline6\n",
 		},
 		{
 			name: "using TailLines 0 should output nothing",
@@ -124,7 +142,7 @@ func TestReadLogs(t *testing.T) {
 			podLogOptions: v1.PodLogOptions{
 				LimitBytes: pointer.Int64Ptr(100),
 			},
-			expected: "line1\nline2\nline3\n",
+			expected: "line1\nline2\nline3\nline4 part I + II + III\nline5\nline6\n",
 		},
 		{
 			name: "using LimitBytes 0 should output nothing",
@@ -138,7 +156,7 @@ func TestReadLogs(t *testing.T) {
 			podLogOptions: v1.PodLogOptions{
 				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
 			},
-			expected: "line2\nline3\n",
+			expected: "line2\nline3\nline4 part I + II + III\nline5\nline6\n",
 		},
 		{
 			name: "using SinceTime now should output nothing",
@@ -152,7 +170,7 @@ func TestReadLogs(t *testing.T) {
 			podLogOptions: v1.PodLogOptions{
 				Follow: true,
 			},
-			expected: "line1\nline2\nline3\n",
+			expected: "line1\nline2\nline3\nline4 part I + II + III\nline5\nline6\nline7\nline8 part I + II\nline9\n",
 		},
 		{
 			name: "using follow combined with TailLines 2 should output the last 2 lines",
@@ -160,7 +178,15 @@ func TestReadLogs(t *testing.T) {
 				Follow:    true,
 				TailLines: pointer.Int64Ptr(2),
 			},
-			expected: "line2\nline3\n",
+			expected: "line5\nline6\nline7\nline8 part I + II\nline9\n",
+		},
+		{
+			name: "using follow combined with TailLines 3 should output the last 3 lines",
+			podLogOptions: v1.PodLogOptions{
+				Follow:    true,
+				TailLines: pointer.Int64Ptr(3),
+			},
+			expected: "+ III\nline5\nline6\nline7\nline8 part I + II\nline9\n",
 		},
 		{
 			name: "using follow combined with SinceTime should output lines with a time on or after the specified time",
@@ -168,11 +194,23 @@ func TestReadLogs(t *testing.T) {
 				Follow:    true,
 				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
 			},
-			expected: "line2\nline3\n",
+			expected: "line2\nline3\nline4 part I + II + III\nline5\nline6\nline7\nline8 part I + II\nline9\n",
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+
+			file, err := ioutil.TempFile("", "TestFollowLogs")
+			if err != nil {
+				t.Fatalf("unable to create temp file")
+			}
+			defer file.Close()
+			defer os.Remove(file.Name())
+
+			for _, log := range prevLog {
+				file.WriteString(log)
+			}
+
 			containerID := "fake-container-id"
 			fakeRuntimeService := &apitesting.FakeRuntimeService{
 				Containers: map[string]*apitesting.FakeContainer{
@@ -183,14 +221,31 @@ func TestReadLogs(t *testing.T) {
 					},
 				},
 			}
-			// If follow is specified, mark the container as exited or else ReadLogs will run indefinitely
+
+			var swg *waitgroup.SafeWaitGroup
 			if tc.podLogOptions.Follow {
-				fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
+				// Since expected results are hardcoded, we should wait until
+				// ReadLogs have read specified trailing lines, and then write real time logs.
+				swg = new(waitgroup.SafeWaitGroup)
+				swg.Add(1)
+				go func() {
+					swg.Wait()
+					for _, log := range realTimeLog {
+						time.Sleep(time.Second)
+						file.WriteString(log)
+					}
+					// mark the container as exited or else ReadLogs will run indefinitely
+					fakeRuntimeService.StopContainer(containerID, 0)
+				}()
 			}
 
 			opts := NewLogOptions(&tc.podLogOptions, time.Now())
 			stdoutBuf := bytes.NewBuffer(nil)
 			stderrBuf := bytes.NewBuffer(nil)
+			if tc.podLogOptions.Follow {
+				// Now, we can write real time logs.
+				swg.Done()
+			}
 			err = ReadLogs(context.TODO(), file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 
 			if err != nil {
@@ -320,7 +375,7 @@ func TestWriteLogs(t *testing.T) {
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
-		err := w.write(msg)
+		err := w.write(msg, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
@@ -384,13 +439,13 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = runtimeapi.Stdout
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
 			msg.stream = runtimeapi.Stderr
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
