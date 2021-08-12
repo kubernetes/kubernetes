@@ -19,6 +19,8 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	"github.com/pkg/errors"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -26,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/yaml"
-	"time"
 )
 
 const (
