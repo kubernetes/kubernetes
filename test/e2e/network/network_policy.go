@@ -17,6 +17,6 @@ limitations under the License.
 package network
 
 import (
-	// synthetic import of netpol suite, until these tests are replaced entirely, so that its included properly
+	// synthetic import of netpol suite, until these tests are replaced entirely, so that its included properly (bump1)
 	_ "k8s.io/kubernetes/test/e2e/network/netpol"
 )
