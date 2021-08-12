@@ -18,9 +18,12 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -31,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/policy"
@@ -193,12 +197,16 @@ func (t *testNamespaceGetter) GetNamespace(ctx context.Context, name string) (*c
 }
 
 type testPodLister struct {
-	called bool
-	pods   []*corev1.Pod
+	called       bool
+	listDuration time.Duration
+	pods         []*corev1.Pod
 }
 
 func (t *testPodLister) ListPods(ctx context.Context, namespace string) ([]*corev1.Pod, error) {
 	t.called = true
+	if t.listDuration != 0 {
+		time.Sleep(t.listDuration)
+	}
 	return t.pods, nil
 }
 
@@ -217,6 +225,10 @@ func TestValidateNamespace(t *testing.T) {
 		oldLabels map[string]string
 		// list of pods to return
 		pods []*corev1.Pod
+		// waiting time for list
+		listDuration time.Duration
+		// specify the number of pods
+		podsNumber int
 
 		expectAllowed  bool
 		expectError    string
@@ -365,8 +377,28 @@ func TestValidateNamespace(t *testing.T) {
 		},
 
 		// TODO: test for aggregating pods with identical warnings
-		// TODO: test for bounding evalution time with a warning
-		// TODO: test for bounding pod count with a warning
+		{
+			name:           "bounding evaluation time exceeded with a warning during update to restricted",
+			newLabels:      map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted)},
+			oldLabels:      map[string]string{},
+			expectAllowed:  true,
+			expectListPods: true,
+			listDuration:   2 * time.Second,
+			expectEvaluate: api.LevelVersion{Level: api.LevelRestricted, Version: api.LatestVersion()},
+			expectWarnings: []string{"noruntimeclasspod: message", "Timeout reached after checking 1 pods"},
+		},
+		{
+			name:           "Exceed the boundary pods count with a warning during update to restricted",
+			newLabels:      map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted)},
+			oldLabels:      map[string]string{},
+			expectAllowed:  true,
+			expectListPods: true,
+			podsNumber:     3001,
+			expectEvaluate: api.LevelVersion{Level: api.LevelRestricted, Version: api.LatestVersion()},
+			expectWarnings: []string{
+				"Large namespace: only checking the first 3000 of 3001 pods",
+			},
+		},
 		// TODO: test for prioritizing evaluating pods from unique controllers
 	}
 
@@ -425,7 +457,14 @@ func TestValidateNamespace(t *testing.T) {
 					},
 				}
 			}
+
 			podLister := &testPodLister{pods: pods}
+			if tc.listDuration != 0 {
+				podLister.listDuration = tc.listDuration
+			}
+			if tc.podsNumber != 0 {
+				podLister.pods = newTestPods(tc.podsNumber)
+			}
 			evaluator := &testEvaluator{}
 			a := &Admission{
 				PodLister: podLister,
@@ -639,4 +678,20 @@ func TestValidatePodController(t *testing.T) {
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
 		})
 	}
+}
+
+func newTestPods(count int) []*corev1.Pod {
+	pods := make([]*corev1.Pod, count)
+	for i := 0; i < count; i++ {
+		pods[i] = &corev1.Pod{
+			Spec: corev1.PodSpec{
+				HostNetwork: true,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  types.UID(strconv.Itoa(10000 + i)),
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods
 }
