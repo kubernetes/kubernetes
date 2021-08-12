@@ -111,7 +111,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 	}
 
 	cleanup := func() {
