@@ -430,7 +430,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
-		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
+		if msgs := utilvalidation.IsDNS1123Subdomain(pod.Spec.Hostname); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
 		hostname = pod.Spec.Hostname

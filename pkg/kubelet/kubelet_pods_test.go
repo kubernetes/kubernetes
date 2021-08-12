@@ -53,6 +53,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -3568,5 +3569,62 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 		go func() {
 			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false)
 		}()
+	}
+}
+
+func TestKubelet_GeneratePodHostNameAndDomain(t *testing.T) {
+	testcases := []struct {
+		name             string
+		pod              *v1.Pod
+		expectHostname   string
+		expectHostdomain string
+		expectErr        bool
+	}{
+		{
+			name:           "empty spec.Hostname",
+			pod:            podWithUIDNameNsSpec("12345", "test-pod", "test-namespace", v1.PodSpec{}),
+			expectHostname: "test-pod",
+			expectErr:      false,
+		},
+		{
+			name:           "valid spec.Hostname(dns1123label)",
+			pod:            podWithUIDNameNsSpec("12345", "test-pod", "test-namespace", v1.PodSpec{Hostname: "dns-1123-label"}),
+			expectHostname: "dns-1123-label",
+			expectErr:      false,
+		},
+		{
+			name:           "valid spec.Hostname(dns1123subdomain)",
+			pod:            podWithUIDNameNsSpec("12345", "test-pod", "test-namespace", v1.PodSpec{Hostname: "dns.1123.subdomain"}),
+			expectHostname: "dns.1123.subdomain",
+			expectErr:      false,
+		},
+		{
+			name:           "invalid spec.Hostname",
+			pod:            podWithUIDNameNsSpec("12345", "test-pod", "test-namespace", v1.PodSpec{Hostname: "dns.1123@invalid"}),
+			expectHostname: "",
+			expectErr:      true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.dnsConfigurer = dns.NewConfigurer(kl.recorder, kl.nodeRef, nil, nil, "test", "")
+
+			hostname, hostdomain, err := kl.GeneratePodHostNameAndDomain(tc.pod)
+			if tc.expectErr != (err != nil) {
+				t.Errorf("expectErr: %v, got: %s", tc.expectErr, err)
+			}
+			if err == nil {
+				if hostname != tc.expectHostname {
+					t.Errorf("expectHostname: %s, got: %s", tc.expectHostname, hostname)
+				}
+				if hostdomain != tc.expectHostdomain {
+					t.Errorf("expectHostdomain: %s, got: %s", tc.expectHostdomain, hostdomain)
+				}
+			}
+		})
 	}
 }
