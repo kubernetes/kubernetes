@@ -130,7 +130,7 @@ To build AND push an image, the following command can be used:
 make all-push WHAT=agnhost
 ```
 
-By default, the images will be tagged and pushed under the `gcr.io/kubernetes-e2e-test-images`
+By default, the images will be tagged and pushed under the `k8s.gcr.io/e2e-test-images`
 registry. That can changed by running this command instead:
 
 ```bash
@@ -141,7 +141,7 @@ REGISTRY=foo_registry make all-push WHAT=agnhost
 require the `agnhost` image to be published in an authenticated repo as well:
 
 ```bash
-REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
+REGISTRY=k8s.gcr.io/e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
@@ -163,7 +163,6 @@ export KUBE_TEST_REPO_LIST=/path/to/repo_list.yaml
 to pull the images from. Sample file:
 
 ```yaml
-e2eRegistry: your-awesome-registry
 promoterE2eRegistry: your-awesome-registry
 gcRegistry: your-awesome-registry
 sampleRegistry: your-awesome-registry

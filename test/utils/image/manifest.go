@@ -31,7 +31,6 @@ import (
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
-	E2eRegistry              string `yaml:"e2eRegistry"`
 	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry       string `yaml:"buildImageRegistry"`
 	InvalidRegistry          string `yaml:"invalidRegistry"`
@@ -89,7 +88,6 @@ func initReg() RegistryList {
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
-		E2eRegistry:              "gcr.io/kubernetes-e2e-test-images",
 		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:       "k8s.gcr.io/build-image",
 		InvalidRegistry:          "invalid.com/invalid",
@@ -379,8 +377,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 	}
 
 	switch registryAndUser {
-	case initRegistry.E2eRegistry:
-		registryAndUser = reg.E2eRegistry
 	case initRegistry.GcRegistry:
 		registryAndUser = reg.GcRegistry
 	case initRegistry.SigStorageRegistry:
