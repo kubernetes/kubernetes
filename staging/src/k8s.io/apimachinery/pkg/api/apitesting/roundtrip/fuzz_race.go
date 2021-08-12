@@ -1,3 +1,4 @@
+//go:build race
 // +build race
 
 /*
