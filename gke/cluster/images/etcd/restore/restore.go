@@ -19,12 +19,14 @@ limitations under the License.
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -196,6 +198,14 @@ func findEtcdctlBinary(version string) (string, string, error) {
 }
 
 func runEtcdctlRestore(binary, etcdctlApi, token string) error {
+	hasHash, err := hasIntegrityHash()
+	if err != nil {
+		return fmt.Errorf("error running etcdctl restore: %v", err)
+	}
+	if !hasHash {
+		klog.Info("no integrity hash in the backup file - this can happen with backups made via 'backup before start'")
+	}
+
 	cmd := exec.Command(
 		binary,
 		"snapshot", "restore",
@@ -205,8 +215,11 @@ func runEtcdctlRestore(binary, etcdctlApi, token string) error {
 		"--initial-advertise-peer-urls", peerAdvertiseUrls,
 		"--initial-cluster", initialCluster,
 		"--initial-cluster-token", token,
+		fmt.Sprintf("--skip-hash-check=%s", strconv.FormatBool(!hasHash)),
 	)
 	cmd.Env = []string{fmt.Sprintf("ETCDCTL_API=%v", etcdctlApi)}
+
+	klog.Infof("about to run %s", cmd.String())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -255,4 +268,13 @@ func parseVersionFile(path string) (string, string, error) {
 func writeVersionFile(path, version, storageVersion string) error {
 	data := []byte(fmt.Sprintf("%s/%s", version, storageVersion))
 	return ioutil.WriteFile(path, data, 0666)
+}
+
+// See https://github.com/etcd-io/etcd/blob/706f256a054b2158ba5dc2e59cbab45826063829/etcdutl/snapshot/v3_snapshot.go#L93.
+func hasIntegrityHash() (bool, error) {
+	stat, err := os.Stat(filepath.Join(backupDir, snapshotFilename))
+	if err != nil {
+		return false, fmt.Errorf("error checking if snapshot has integity hash: %v", err)
+	}
+	return (stat.Size() % 512) == sha256.Size, nil
 }
