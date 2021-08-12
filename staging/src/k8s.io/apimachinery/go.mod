@@ -36,4 +36,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/gengo => github.com/liggitt/gengo v0.0.0-20210812145509-5cf49e200430
+)

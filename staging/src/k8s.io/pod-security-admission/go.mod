@@ -25,5 +25,6 @@ replace (
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/gengo => github.com/liggitt/gengo v0.0.0-20210812145509-5cf49e200430
 	k8s.io/pod-security-admission => ../pod-security-admission
 )
