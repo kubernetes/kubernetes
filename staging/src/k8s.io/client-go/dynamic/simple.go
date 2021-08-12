@@ -110,6 +110,7 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 	result := c.client.client.
 		Post().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -145,6 +146,7 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 	result := c.client.client.
 		Put().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -181,6 +183,7 @@ func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructu
 	result := c.client.client.
 		Put().
 		AbsPath(append(c.makeURLSegments(name), "status")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do(ctx)
@@ -211,6 +214,7 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 	result := c.client.client.
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		Do(ctx)
 	return result.Error()
@@ -225,6 +229,7 @@ func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav
 	result := c.client.client.
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do(ctx)
