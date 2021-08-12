@@ -79,9 +79,8 @@ type queue struct {
 	// The requests are stored in a FIFO list.
 	requests fifo
 
-	// virtualStart is the virtual time (virtual seconds since process
-	// startup) when the oldest request in the queue (if there is any)
-	// started virtually executing
+	// virtualStart is the "virtual time" (R progress meter reading) at
+	// which the next request will be dispatched in the virtual world.
 	virtualStart float64
 
 	requestsExecuting int

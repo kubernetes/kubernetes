@@ -108,10 +108,46 @@ type uniformClient struct {
 	// causing a request to be launched a certain amount of time
 	// before the previous one finishes.
 	thinkDuration time.Duration
+	// padDuration is additional time during which this request occupies its seats.
+	// This comes at the end of execution, after the reply has been released toward
+	// the client.
+	// The evaluation code below can only handle two cases:
+	// - this padding always keeps another request out of the seats, or
+	// - this padding never keeps another request out of the seats.
+	// Set the `padConstrains` field of the scenario accordingly.
+	padDuration time.Duration
 	// When true indicates that only half the specified number of
 	// threads should run during the first half of the evaluation
 	// period
 	split bool
+	// width is the number of seats this request occupies while executing
+	width uint
+}
+
+func newUniformClient(hash uint64, nThreads, nCalls int, execDuration, thinkDuration time.Duration) uniformClient {
+	return uniformClient{
+		hash:          hash,
+		nThreads:      nThreads,
+		nCalls:        nCalls,
+		execDuration:  execDuration,
+		thinkDuration: thinkDuration,
+		width:         1,
+	}
+}
+
+func (uc uniformClient) setSplit() uniformClient {
+	uc.split = true
+	return uc
+}
+
+func (uc uniformClient) seats(width uint) uniformClient {
+	uc.width = width
+	return uc
+}
+
+func (uc uniformClient) pad(duration time.Duration) uniformClient {
+	uc.padDuration = duration
+	return uc
 }
 
 // uniformScenario describes a scenario based on the given set of uniform clients.
@@ -127,6 +163,8 @@ type uniformClient struct {
 // fair in the respective halves of a split scenario;
 // in a non-split scenario this is a singleton with one expectation.
 // expectAllRequests indicates whether all requests are expected to get dispatched.
+// padConstrains indicates whether the execution duration padding, if any,
+// is expected to hold up dispatching.
 type uniformScenario struct {
 	name                                     string
 	qs                                       fq.QueueSet
@@ -140,13 +178,14 @@ type uniformScenario struct {
 	rejectReason                             string
 	clk                                      *testeventclock.Fake
 	counter                                  counter.GoRoutineCounter
+	padConstrains                            bool
 }
 
 func (us uniformScenario) exercise(t *testing.T) {
 	uss := uniformScenarioState{
 		t:               t,
 		uniformScenario: us,
-		startTime:       time.Now(),
+		startTime:       us.clk.Now(),
 		integrators:     make([]fq.Integrator, len(us.clients)),
 		executions:      make([]int32, len(us.clients)),
 		rejects:         make([]int32, len(us.clients)),
@@ -227,7 +266,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
-	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{Seats: 1}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{Seats: ust.uc.width, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -238,20 +277,25 @@ func (ust *uniformScenarioThread) callK(k int) {
 		ust.uss.t.Error("got request but QueueSet reported idle")
 	}
 	var executed bool
+	var returnTime time.Time
 	idle2 := req.Finish(func() {
 		executed = true
 		execStart := ust.uss.clk.Now()
-		ust.uss.t.Logf("%s: %d, %d, %d executing", execStart.Format(nsTimeFmt), ust.i, ust.j, k)
 		atomic.AddInt32(&ust.uss.executions[ust.i], 1)
-		ust.igr.Add(1)
+		ust.igr.Add(float64(ust.uc.width))
+		ust.uss.t.Logf("%s: %d, %d, %d executing; seats=%d", execStart.Format(nsTimeFmt), ust.i, ust.j, k, ust.uc.width)
 		ust.uss.clk.EventAfterDuration(ust.genCallK(k+1), ust.uc.execDuration+ust.uc.thinkDuration)
 		ust.uss.clk.Sleep(ust.uc.execDuration)
-		ust.igr.Add(-1)
+		ust.igr.Add(-float64(ust.uc.width))
+		returnTime = ust.uss.clk.Now()
 	})
-	ust.uss.t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, executed, idle2)
+	now := ust.uss.clk.Now()
+	ust.uss.t.Logf("%s: %d, %d, %d got executed=%v, idle2=%v", now.Format(nsTimeFmt), ust.i, ust.j, k, executed, idle2)
 	if !executed {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
 		atomic.AddInt32(&ust.uss.rejects[ust.i], 1)
+	} else if now != returnTime {
+		ust.uss.t.Errorf("%s: %d, %d, %d returnTime=%s", now.Format(nsTimeFmt), ust.i, ust.j, k, returnTime.Format(nsTimeFmt))
 	}
 }
 
@@ -270,23 +314,28 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, ma
 		if uc.split && !last {
 			nThreads = nThreads / 2
 		}
-		demands[i] = float64(nThreads) * float64(uc.execDuration) / float64(uc.thinkDuration+uc.execDuration)
+		sep := uc.thinkDuration
+		if uss.padConstrains && uc.padDuration > sep {
+			sep = uc.padDuration
+		}
+		demands[i] = float64(nThreads) * float64(uc.width) * float64(uc.execDuration) / float64(sep+uc.execDuration)
 		averages[i] = uss.integrators[i].Reset().Average
 	}
 	fairAverages := fairAlloc(demands, float64(uss.concurrencyLimit))
 	for i := range uss.clients {
+		expectedAverage := fairAverages[i]
 		var gotFair bool
-		if fairAverages[i] > 0 {
-			relDiff := (averages[i] - fairAverages[i]) / fairAverages[i]
+		if expectedAverage > 0 {
+			relDiff := (averages[i] - expectedAverage) / expectedAverage
 			gotFair = math.Abs(relDiff) <= margin
 		} else {
 			gotFair = math.Abs(averages[i]) <= margin
 		}
 
 		if gotFair != expectFair {
-			uss.t.Errorf("%s client %d last=%v got an Average of %v but the fair average was %v", uss.name, i, last, averages[i], fairAverages[i])
+			uss.t.Errorf("%s client %d last=%v got an Average of %v but the expected average was %v", uss.name, i, last, averages[i], expectedAverage)
 		} else {
-			uss.t.Logf("%s client %d last=%v got an Average of %v and the fair average was %v", uss.name, i, last, averages[i], fairAverages[i])
+			uss.t.Logf("%s client %d last=%v got an Average of %v and the expected average was %v", uss.name, i, last, averages[i], expectedAverage)
 		}
 	}
 }
@@ -376,8 +425,8 @@ func TestNoRestraint(t *testing.T) {
 	uniformScenario{name: "NoRestraint",
 		qs: nr,
 		clients: []uniformClient{
-			{1001001001, 5, 10, time.Second, time.Second, false},
-			{2002002002, 2, 10, time.Second, time.Second / 2, false},
+			newUniformClient(1001001001, 5, 10, time.Second, time.Second),
+			newUniformClient(2002002002, 2, 10, time.Second, time.Second/2),
 		},
 		concurrencyLimit:       10,
 		evalDuration:           time.Second * 15,
@@ -387,6 +436,90 @@ func TestNoRestraint(t *testing.T) {
 		clk:                    clk,
 		counter:                counter,
 	}.exercise(t)
+}
+
+func TestBaseline(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestBaseline",
+		DesiredNumQueues: 9,
+		QueueLengthLimit: 8,
+		HandSize:         3,
+		RequestWaitLimit: 10 * time.Minute,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+
+	uniformScenario{name: qCfg.Name,
+		qs: qs,
+		clients: []uniformClient{
+			newUniformClient(1001001001, 1, 21, time.Second, 0),
+		},
+		concurrencyLimit:       1,
+		evalDuration:           time.Second * 20,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
+	}.exercise(t)
+}
+
+func TestSeparations(t *testing.T) {
+	for _, seps := range []struct{ think, pad time.Duration }{
+		{think: time.Second, pad: 0},
+		{think: 0, pad: time.Second},
+		{think: time.Second, pad: time.Second / 2},
+		{think: time.Second / 2, pad: time.Second},
+	} {
+		for conc := 1; conc <= 2; conc++ {
+			caseName := fmt.Sprintf("seps%v,%v,%v", seps.think, seps.pad, conc)
+			t.Run(caseName, func(t *testing.T) {
+				metrics.Register()
+				now := time.Now()
+
+				clk, counter := testeventclock.NewFake(now, 0, nil)
+				qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+				qCfg := fq.QueuingConfig{
+					Name:             caseName,
+					DesiredNumQueues: 9,
+					QueueLengthLimit: 8,
+					HandSize:         3,
+					RequestWaitLimit: 10 * time.Minute,
+				}
+				qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+				if err != nil {
+					t.Fatal(err)
+				}
+				qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: conc})
+				uniformScenario{name: qCfg.Name,
+					qs: qs,
+					clients: []uniformClient{
+						newUniformClient(1001001001, 1, 19, time.Second, seps.think).pad(seps.pad),
+					},
+					concurrencyLimit:       conc,
+					evalDuration:           time.Second * 18, // multiple of every period involved, so that margin can be 0 below
+					expectedFair:           []bool{true},
+					expectedFairnessMargin: []float64{0},
+					expectAllRequests:      true,
+					evalInqueueMetrics:     true,
+					evalExecutingMetrics:   true,
+					clk:                    clk,
+					counter:                counter,
+					padConstrains:          conc == 1,
+				}.exercise(t)
+			})
+		}
+	}
 }
 
 func TestUniformFlowsHandSize1(t *testing.T) {
@@ -411,8 +544,8 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 8, 20, time.Second, time.Second - 1, false},
-			{2002002002, 8, 20, time.Second, time.Second - 1, false},
+			newUniformClient(1001001001, 8, 20, time.Second, time.Second-1),
+			newUniformClient(2002002002, 8, 20, time.Second, time.Second-1),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 50,
@@ -447,8 +580,8 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 8, 30, time.Second, time.Second - 1, false},
-			{2002002002, 8, 30, time.Second, time.Second - 1, false},
+			newUniformClient(1001001001, 8, 30, time.Second, time.Second-1),
+			newUniformClient(2002002002, 8, 30, time.Second, time.Second-1),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 60,
@@ -484,8 +617,8 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 8, 20, time.Second, time.Second, false},
-			{2002002002, 7, 30, time.Second, time.Second / 2, false},
+			newUniformClient(1001001001, 8, 20, time.Second, time.Second),
+			newUniformClient(2002002002, 7, 30, time.Second, time.Second/2),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 40,
@@ -521,13 +654,88 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 4, 20, time.Second, time.Second - 1, false},
-			{2002002002, 2, 20, time.Second, time.Second - 1, false},
+			newUniformClient(1001001001, 4, 20, time.Second, time.Second-1),
+			newUniformClient(2002002002, 2, 20, time.Second, time.Second-1),
 		},
 		concurrencyLimit:       3,
 		evalDuration:           time.Second * 20,
 		expectedFair:           []bool{true},
 		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
+	}.exercise(t)
+}
+
+func TestDifferentWidths(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestDifferentWidths",
+		DesiredNumQueues: 64,
+		QueueLengthLimit: 4,
+		HandSize:         7,
+		RequestWaitLimit: 10 * time.Minute,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	uniformScenario{name: qCfg.Name,
+		qs: qs,
+		clients: []uniformClient{
+			newUniformClient(10010010010010, 13, 10, time.Second, time.Second-1),
+			newUniformClient(20020020020020, 7, 10, time.Second, time.Second-1).seats(2),
+		},
+		concurrencyLimit:       6,
+		evalDuration:           time.Second * 20,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
+	}.exercise(t)
+}
+
+func TestTooWide(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTooWide",
+		DesiredNumQueues: 64,
+		QueueLengthLimit: 7,
+		HandSize:         7,
+		RequestWaitLimit: 10 * time.Minute,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	uniformScenario{name: qCfg.Name,
+		qs: qs,
+		clients: []uniformClient{
+			newUniformClient(40040040040040, 15, 21, time.Second, time.Second-1).seats(2),
+			newUniformClient(50050050050050, 15, 21, time.Second, time.Second-1).seats(2),
+			newUniformClient(60060060060060, 15, 21, time.Second, time.Second-1).seats(2),
+			newUniformClient(70070070070070, 15, 21, time.Second, time.Second-1).seats(2),
+			newUniformClient(90090090090090, 15, 21, time.Second, time.Second-1).seats(7),
+		},
+		concurrencyLimit:       6,
+		evalDuration:           time.Second * 40,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.35},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -557,8 +765,8 @@ func TestWindup(t *testing.T) {
 
 	uniformScenario{name: qCfg.Name, qs: qs,
 		clients: []uniformClient{
-			{1001001001, 2, 40, time.Second, -1, false},
-			{2002002002, 2, 40, time.Second, -1, true},
+			newUniformClient(1001001001, 2, 40, time.Second, -1),
+			newUniformClient(2002002002, 2, 40, time.Second, -1).setSplit(),
 		},
 		concurrencyLimit:       3,
 		evalDuration:           time.Second * 40,
@@ -591,8 +799,8 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 6, 10, time.Second, 57 * time.Millisecond, false},
-			{2002002002, 4, 15, time.Second, 750 * time.Millisecond, false},
+			newUniformClient(1001001001, 6, 10, time.Second, 57*time.Millisecond),
+			newUniformClient(2002002002, 4, 15, time.Second, 750*time.Millisecond),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 13,
@@ -627,7 +835,7 @@ func TestTimeout(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			{1001001001, 5, 100, time.Second, time.Second, false},
+			newUniformClient(1001001001, 5, 100, time.Second, time.Second),
 		},
 		concurrencyLimit:       1,
 		evalDuration:           time.Second * 10,

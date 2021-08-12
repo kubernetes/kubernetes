@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -101,7 +102,8 @@ type queueSet struct {
 	// queues are still draining.
 	queues []*queue
 
-	// virtualTime is the number of virtual seconds since process startup
+	// virtualTime is the amount of seat-seconds allocated per queue since process startup.
+	// This is our generalization of the progress meter named R in the original fair queuing work.
 	virtualTime float64
 
 	// lastRealTime is what `clock.Now()` yielded when `virtualTime` was last updated
@@ -477,13 +479,15 @@ func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 inte
 		// in addition to their seats.
 		// Ideally, this should be based on projected completion time in the
 		// virtual world of the youngest request in the queue.
-		thisSeatsSum := qs.queues[queueIdx].requests.SeatsSum()
-		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of seatsSum %d", qs.qCfg.Name, descr1, descr2, queueIdx, thisSeatsSum)
+		queue := qs.queues[queueIdx]
+		waitingSeats := queue.requests.SeatsSum()
+		thisSeatsSum := waitingSeats // + queue.seatsInUse
+		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of %d seats waiting and %d executing", qs.qCfg.Name, descr1, descr2, queueIdx, waitingSeats, queue.seatsInUse)
 		if thisSeatsSum < bestQueueSeatsSum {
 			bestQueueIdx, bestQueueSeatsSum = queueIdx, thisSeatsSum
 		}
 	})
-	klog.V(6).Infof("QS(%s) at r=%s v=%.9fs: For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueSeatsSum, qs.queues[bestQueueIdx].requestsExecuting)
+	klog.V(6).Infof("QS(%s) at r=%s v=%.9fss: For request %#+v %#+v chose queue %d, had seatSum %d & %d requests executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueSeatsSum, qs.queues[bestQueueIdx].requestsExecuting)
 	return bestQueueIdx
 }
 
@@ -549,10 +553,10 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	queue := request.queue
 	now := qs.clock.Now()
 	if queue.requests.Length() == 0 && queue.requestsExecuting == 0 {
-		// the queue’s virtual start time is set to the virtual time.
+		// the queue’s start R is set to the virtual time.
 		queue.virtualStart = qs.virtualTime
 		if klog.V(6).Enabled() {
-			klog.Infof("QS(%s) at r=%s v=%.9fs: initialized queue %d virtual start time due to request %#+v %#+v", qs.qCfg.Name, now.Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
+			klog.Infof("QS(%s) at r=%s v=%.9fss: initialized queue %d start R due to request %#+v %#+v", qs.qCfg.Name, now.Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
 		}
 	}
 	queue.Enqueue(request)
@@ -598,7 +602,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.Seats())
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(5).Enabled() {
-		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
+		klog.Infof("QS(%s) at r=%s v=%.9fss: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
 	}
 	return req
 }
@@ -634,9 +638,9 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.obsPair.RequestsWaiting.Add(-1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(6).Enabled() {
-		klog.Infof("QS(%s) at r=%s v=%.9fs: dispatching request %#+v %#+v from queue %d with virtual start time %.9fs, queue will have %d waiting & %d executing",
+		klog.Infof("QS(%s) at r=%s v=%.9fss: dispatching request %#+v %#+v work %v from queue %d with start R %.9fss, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
 			qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2,
-			queue.index, queue.virtualStart, queue.requests.Length(), queue.requestsExecuting)
+			request.workEstimate, queue.index, queue.virtualStart, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G
 	queue.virtualStart += qs.estimatedServiceTime * float64(request.Seats())
@@ -659,10 +663,6 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 		}
 		// wait for all "currently" executing requests in this queueSet
 		// to finish before we can execute this request.
-		if klog.V(4).Enabled() {
-			klog.Infof("QS(%s): seats (%d) asked for exceeds concurrency limit, waiting for currently executing requests to complete, %d seats are in use (%d are executing) and the limit is %d",
-				qs.qCfg.Name, seats, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
-		}
 		return false
 	case qs.totSeatsInUse+seats > qs.dCfg.ConcurrencyLimit:
 		return false
@@ -692,8 +692,8 @@ func (qs *queueSet) selectQueueLocked() *queue {
 			estimatedWorkInProgress := qs.estimatedServiceTime * float64(queue.seatsInUse)
 			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
 			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
-			// the virtual finish time of the oldest request is:
-			//   virtual start time + G
+			// the finish R of the oldest request is:
+			//   start R + G
 			// we are not taking the width of the request into account when
 			// we calculate the virtual finish time of the request because
 			// it can starve requests with smaller wdith in other queues.
@@ -704,12 +704,12 @@ func (qs *queueSet) selectQueueLocked() *queue {
 			//  - we have two queues, q1 and q2
 			//  - q1 has an infinite supply of requests with width W=1
 			//  - q2 has one request waiting in the queue with width W=2
-			//  - virtual start time for both q1 and q2 are at t0
+			//  - start R for both q1 and q2 are at t0
 			//  - requests complete really fast, S=1ms on q1
 			// in this scenario we will execute roughly 60,000 requests
 			// from q1 before we pick the request from q2.
 			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceTime
-
+			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
 				minQueue = queue
@@ -724,9 +724,18 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		oldestReqFromMinQueue = r
 		return false
 	})
-	if oldestReqFromMinQueue == nil || !qs.canAccommodateSeatsLocked(oldestReqFromMinQueue.Seats()) {
+	if oldestReqFromMinQueue == nil {
+		// This cannot happen
+		klog.ErrorS(errors.New("selected queue is empty"), "Impossible", "queueSet", qs.qCfg.Name)
+		return nil
+	}
+	if !qs.canAccommodateSeatsLocked(oldestReqFromMinQueue.Seats()) {
 		// since we have not picked the queue with the minimum virtual finish
 		// time, we are not going to advance the round robin index here.
+		if klog.V(4).Enabled() {
+			klog.Infof("QS(%s): request %v %v seats %d cannot be dispatched from queue %d, waiting for currently executing requests to complete, %d requests are occupying %d seats and the limit is %d",
+				qs.qCfg.Name, oldestReqFromMinQueue.descr1, oldestReqFromMinQueue.descr2, oldestReqFromMinQueue.Seats(), minQueue.index, qs.totRequestsExecuting, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
+		}
 		return nil
 	}
 
@@ -743,7 +752,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 	// time.
 	//
 	// hence we're refreshing the per-queue virtual time for the chosen
-	// queue here. if the last virtual start time (excluded estimated cost)
+	// queue here. if the last start R (excluded estimated cost)
 	// falls behind the global virtual time, we update the latest virtual
 	// start by: <latest global virtual time> + <previously estimated cost>
 	previouslyEstimatedServiceTime := float64(minQueue.seatsInUse) * qs.estimatedServiceTime
@@ -790,12 +799,6 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
 		if r.queue != nil {
 			r.queue.seatsInUse -= r.Seats()
-
-			if klog.V(6).Enabled() {
-				klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing",
-					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index,
-					r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting)
-			}
 		}
 	}
 
@@ -803,34 +806,55 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		if r.workEstimate.AdditionalLatency <= 0 {
 			// release the seats allocated to this request immediately
 			releaseSeatsLocked()
+			if !klog.V(6).Enabled() {
+			} else if r.queue != nil {
+				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished all use of %d seats, adjusted queue %d start R to %.9fss due to service time %.9fs, queue will have %d requests, %d seats waiting & %d requests occupying %d seats",
+					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, r.queue.index,
+					r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requests.SeatsSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
+			} else {
+				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished all use of %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, qs.totRequestsExecuting, qs.totSeatsInUse)
+			}
 			return
 		}
 
 		additionalLatency := r.workEstimate.AdditionalLatency
+		if !klog.V(6).Enabled() {
+		} else if r.queue != nil {
+			klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished main use but lingering on %d seats for %v seconds, adjusted queue %d start R to %.9fss due to service time %.9fs, queue will have %d requests waiting & %d executing, still has %d seats waiting & %d executing",
+				qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, additionalLatency.Seconds(), r.queue.index,
+				r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting, r.queue.requests.SeatsSum(), r.queue.seatsInUse)
+		} else {
+			klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished main use but lingering on %d seats for %v seconds, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, additionalLatency.Seconds(), qs.totRequestsExecuting, qs.totSeatsInUse)
+		}
 		// EventAfterDuration will execute the event func in a new goroutine,
 		// so the seats allocated to this request will be released after
 		// AdditionalLatency elapses, this ensures that the additional
 		// latency has no impact on the user experience.
 		qs.clock.EventAfterDuration(func(_ time.Time) {
-			qs.lock.Lock()
+			qs.lockAndSyncTime()
 			defer qs.lock.Unlock()
+			now := qs.clock.Now()
 			releaseSeatsLocked()
+			if !klog.V(6).Enabled() {
+			} else if r.queue != nil {
+				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished lingering on %d seats, queue %d will have %d requests, %d seats waiting & %d requests occupying %d seats",
+					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, r.queue.index,
+					r.queue.requests.Length(), r.queue.requests.SeatsSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
+			} else {
+				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished lingering on %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.Seats, qs.totRequestsExecuting, qs.totSeatsInUse)
+			}
+			qs.dispatchAsMuchAsPossibleLocked()
 		}, additionalLatency)
 	}()
 
-	if r.queue == nil {
-		if klog.V(6).Enabled() {
-			klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, qs.totRequestsExecuting)
-		}
-		return
+	if r.queue != nil {
+		// request has finished, remove from requests executing
+		r.queue.requestsExecuting--
+
+		// When a request finishes being served, and the actual service time was S,
+		// the queue’s start R is decremented by (G - S)*width.
+		r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
 	}
-
-	// request has finished, remove from requests executing
-	r.queue.requestsExecuting--
-
-	// When a request finishes being served, and the actual service time was S,
-	// the queue’s virtual start time is decremented by (G - S)*width.
-	r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
 }
 
 func (qs *queueSet) removeQueueIfEmptyLocked(r *request) {
