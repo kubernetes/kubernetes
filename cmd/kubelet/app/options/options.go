@@ -67,10 +67,6 @@ type KubeletFlags struct {
 	// Container-runtime-specific options.
 	config.ContainerRuntimeOptions
 
-	// certDirectory is the directory where the TLS certs are located.
-	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
-	CertDirectory string
-
 	// cloudProvider is the provider for cloud services.
 	// +optional
 	CloudProvider string
@@ -168,7 +164,6 @@ func NewKubeletFlags() *KubeletFlags {
 
 	return &KubeletFlags{
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           defaultRootDir,
 		MasterServiceNamespace:  metav1.NamespaceDefault,
 		MaxContainerCount:       -1,
@@ -320,9 +315,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address (or comma-separated dual-stack IP addresses) of the node. If unset, kubelet will use the node's default IPv4 address, if any, or its default IPv6 address if it has no IPv4 addresses. You can pass '::' to make it prefer the default IPv6 address rather than the default IPv4 address.")
 
-	fs.StringVar(&f.CertDirectory, "cert-dir", f.CertDirectory, "The directory where the TLS certs are located. "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
-
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
 	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. The DynamicKubeletConfig feature gate must be enabled to pass this flag.")
@@ -430,6 +422,9 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		"The duration to cache 'authorized' responses from the webhook authorizer.")
 	fs.DurationVar(&c.Authorization.Webhook.CacheUnauthorizedTTL.Duration, "authorization-webhook-cache-unauthorized-ttl", c.Authorization.Webhook.CacheUnauthorizedTTL.Duration, ""+
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
+	fs.StringVar(&c.CertDirectory, "cert-dir", c.CertDirectory, "The directory where the TLS certs are located. "+
+		"If --tls-cert-file and --tls-private-key-file are specified or corresponding kubelet config flags set, this option will be ignored.")
 
 	fs.StringVar(&c.TLSCertFile, "tls-cert-file", c.TLSCertFile, ""+
 		"File containing x509 Certificate used for serving HTTPS (with intermediate certs, if any, concatenated after server cert). "+

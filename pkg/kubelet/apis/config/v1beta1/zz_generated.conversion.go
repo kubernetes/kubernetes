@@ -252,6 +252,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.CertDirectory = in.CertDirectory
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
@@ -430,6 +431,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.ReadOnlyPort = in.ReadOnlyPort
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
+	out.CertDirectory = in.CertDirectory
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))

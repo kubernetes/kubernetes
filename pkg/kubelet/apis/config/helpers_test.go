@@ -153,9 +153,11 @@ var (
 	kubeletConfigurationPathFieldPaths = sets.NewString(
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
+		"CertDirectory",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
 		"ResolverConfig",
+		"VolumePluginDir",
 	)
 
 	// KubeletConfiguration fields that do not contain file paths.
@@ -277,7 +279,6 @@ var (
 		"TypeMeta.APIVersion",
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
-		"VolumePluginDir",
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",

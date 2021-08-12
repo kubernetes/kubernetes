@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,9 @@ const (
 
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.8
+
+	DefaultKubeletRunDir                  = "/var/lib/kubelet"
+	DefaultCertDirRelativeToKubeletRunDir = "pki"
 )
 
 var (
@@ -260,6 +264,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor)
+	}
+	if obj.CertDirectory == "" {
+		obj.CertDirectory = filepath.Join(DefaultKubeletRunDir, DefaultCertDirRelativeToKubeletRunDir)
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = utilpointer.BoolPtr(true)

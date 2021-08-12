@@ -12,6 +12,7 @@ authorization:
   webhook:
     cacheAuthorizedTTL: 5m0s
     cacheUnauthorizedTTL: 30s
+certDirectory: /var/lib/kubelet/pki
 cgroupDriver: cgroupfs
 cgroupsPerQOS: true
 configMapAndSecretChangeDetectionStrategy: Watch
