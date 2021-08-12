@@ -62,7 +62,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.12.17
+GOLANG_VERSION?=1.16.7
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -94,10 +94,10 @@ build:
 	# Compile migrate
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
