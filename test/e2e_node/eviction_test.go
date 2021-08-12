@@ -238,6 +238,47 @@ var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeF
 	})
 })
 
+// This test validates that in-memory EmptyDir's are evicted when the Kubelet does
+// not have Sized Memory Volumes enabled. When Sized volumes are enabled, it's
+// not possible to exhaust the quota.
+var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
+	f := framework.NewDefaultFramework("localstorage-eviction-test")
+	evictionTestTimeout := 7 * time.Minute
+	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+			initialConfig.FeatureGates["SizeMemoryBackedVolumes"] = false
+		})
+
+		sizeLimit := resource.MustParse("100Mi")
+		useOverLimit := 200 /* Mb */
+		useUnderLimit := 80 /* Mb */
+		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
+
+		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 1, // Should be evicted due to disk limit
+				pod: diskConsumingPod("emptydir-memory-over-volume-sizelimit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
+				}, v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0, // Should not be evicted, as container limits do not account for memory backed volumes
+				pod: diskConsumingPod("emptydir-memory-over-container-sizelimit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory"},
+				}, v1.ResourceRequirements{Limits: containerLimit}),
+			},
+			{
+				evictionPriority: 0,
+				pod: diskConsumingPod("emptydir-memory-innocent", useUnderLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
+				}, v1.ResourceRequirements{}),
+			},
+		})
+	})
+})
+
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
@@ -260,12 +301,6 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disr
 				}, v1.ResourceRequirements{}),
 			},
 			{
-				evictionPriority: 1, // This pod should be evicted because of memory emptyDir usage violation
-				pod: diskConsumingPod("emptydir-memory-sizelimit", useOverLimit, &v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
-				}, v1.ResourceRequirements{}),
-			},
-			{
 				evictionPriority: 1, // This pod should cross the container limit by writing to its writable layer.
 				pod:              diskConsumingPod("container-disk-limit", useOverLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
 			},
@@ -273,6 +308,12 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disr
 				evictionPriority: 1, // This pod should hit the container limit by writing to an emptydir
 				pod: diskConsumingPod("container-emptydir-disk-limit", useOverLimit, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 					v1.ResourceRequirements{Limits: containerLimit}),
+			},
+			{
+				evictionPriority: 0, // This pod should not be evicted because MemoryBackedVolumes cannot use more space than is allocated to them since SizeMemoryBackedVolumes was enabled
+				pod: diskConsumingPod("emptydir-memory-sizelimit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
+				}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
