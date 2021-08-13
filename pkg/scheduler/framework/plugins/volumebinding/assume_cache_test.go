@@ -14,28 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package volumebinding
 
 import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
-
-func makePV(name, version, storageClass string) *v1.PersistentVolume {
-	return &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			ResourceVersion: version,
-		},
-		Spec: v1.PersistentVolumeSpec{
-			StorageClassName: storageClass,
-		},
-	}
-}
 
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
 	pvList := cache.ListPVs(storageClassName)
@@ -71,38 +59,38 @@ func TestAssumePV(t *testing.T) {
 		shouldSucceed bool
 	}{
 		"success-same-version": {
-			oldPV:         makePV("pv1", "5", ""),
-			newPV:         makePV("pv1", "5", ""),
+			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
 			shouldSucceed: true,
 		},
 		"success-storageclass-same-version": {
-			oldPV:         makePV("pv1", "5", "class1"),
-			newPV:         makePV("pv1", "5", "class1"),
+			oldPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
 			shouldSucceed: true,
 		},
 		"success-new-higher-version": {
-			oldPV:         makePV("pv1", "5", ""),
-			newPV:         makePV("pv1", "6", ""),
+			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("6").PersistentVolume,
 			shouldSucceed: true,
 		},
 		"fail-old-not-found": {
-			oldPV:         makePV("pv2", "5", ""),
-			newPV:         makePV("pv1", "5", ""),
+			oldPV:         makePV("pv2", "").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
 			shouldSucceed: false,
 		},
 		"fail-new-lower-version": {
-			oldPV:         makePV("pv1", "5", ""),
-			newPV:         makePV("pv1", "4", ""),
+			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("4").PersistentVolume,
 			shouldSucceed: false,
 		},
 		"fail-new-bad-version": {
-			oldPV:         makePV("pv1", "5", ""),
-			newPV:         makePV("pv1", "a", ""),
+			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
 			shouldSucceed: false,
 		},
 		"fail-old-bad-version": {
-			oldPV:         makePV("pv1", "a", ""),
-			newPV:         makePV("pv1", "5", ""),
+			oldPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
+			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
 			shouldSucceed: false,
 		},
 	}
@@ -148,8 +136,8 @@ func TestRestorePV(t *testing.T) {
 		t.Fatalf("Failed to get internal cache")
 	}
 
-	oldPV := makePV("pv1", "5", "")
-	newPV := makePV("pv1", "5", "")
+	oldPV := makePV("pv1", "").withVersion("5").PersistentVolume
+	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
 
 	// Restore PV that doesn't exist
 	cache.Restore("nothing")
@@ -200,7 +188,7 @@ func TestBasicPVCache(t *testing.T) {
 	// Add a bunch of PVs
 	pvs := map[string]*v1.PersistentVolume{}
 	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "1", "")
+		pv := makePV(fmt.Sprintf("test-pv%v", i), "").withVersion("1").PersistentVolume
 		pvs[pv.Name] = pv
 		internalCache.add(pv)
 	}
@@ -209,7 +197,7 @@ func TestBasicPVCache(t *testing.T) {
 	verifyListPVs(t, cache, pvs, "")
 
 	// Update a PV
-	updatedPV := makePV("test-pv3", "2", "")
+	updatedPV := makePV("test-pv3", "").withVersion("2").PersistentVolume
 	pvs[updatedPV.Name] = updatedPV
 	internalCache.update(nil, updatedPV)
 
@@ -235,7 +223,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Add a bunch of PVs
 	pvs1 := map[string]*v1.PersistentVolume{}
 	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "1", "class1")
+		pv := makePV(fmt.Sprintf("test-pv%v", i), "class1").withVersion("1").PersistentVolume
 		pvs1[pv.Name] = pv
 		internalCache.add(pv)
 	}
@@ -243,7 +231,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Add a bunch of PVs
 	pvs2 := map[string]*v1.PersistentVolume{}
 	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test2-pv%v", i), "1", "class2")
+		pv := makePV(fmt.Sprintf("test2-pv%v", i), "class2").withVersion("1").PersistentVolume
 		pvs2[pv.Name] = pv
 		internalCache.add(pv)
 	}
@@ -253,7 +241,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	verifyListPVs(t, cache, pvs2, "class2")
 
 	// Update a PV
-	updatedPV := makePV("test-pv3", "2", "class1")
+	updatedPV := makePV("test-pv3", "class1").withVersion("2").PersistentVolume
 	pvs1[updatedPV.Name] = updatedPV
 	internalCache.update(nil, updatedPV)
 
@@ -281,7 +269,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	pvName := "test-pv0"
 
 	// Add a PV
-	pv := makePV(pvName, "1", "")
+	pv := makePV(pvName, "").withVersion("1").PersistentVolume
 	internalCache.add(pv)
 	if err := verifyPV(cache, pvName, pv); err != nil {
 		t.Fatalf("failed to get PV: %v", err)
