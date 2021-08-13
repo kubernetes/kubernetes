@@ -181,6 +181,9 @@ type RCConfig struct {
 	ConfigMapNames []string
 
 	ServiceAccountTokenProjections int
+
+	//Additional containers to run in the pod
+	AdditionalContainers []v1.Container
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -343,6 +346,10 @@ func (config *DeploymentConfig) create() error {
 		},
 	}
 
+	if len(config.AdditionalContainers) > 0 {
+		deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, config.AdditionalContainers...)
+	}
+
 	if len(config.SecretNames) > 0 {
 		attachSecrets(&deployment.Spec.Template, config.SecretNames)
 	}
@@ -423,6 +430,10 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if len(config.AdditionalContainers) > 0 {
+		rs.Spec.Template.Spec.Containers = append(rs.Spec.Template.Spec.Containers, config.AdditionalContainers...)
 	}
 
 	if len(config.SecretNames) > 0 {
@@ -616,6 +627,10 @@ func (config *RCConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if len(config.AdditionalContainers) > 0 {
+		rc.Spec.Template.Spec.Containers = append(rc.Spec.Template.Spec.Containers, config.AdditionalContainers...)
 	}
 
 	if len(config.SecretNames) > 0 {
