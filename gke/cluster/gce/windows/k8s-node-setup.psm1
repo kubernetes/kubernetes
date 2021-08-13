@@ -1757,7 +1757,7 @@ function Configure_Containerd_CniNetworking {
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
   replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
-  replace('PROXY_POLICY_FOR_WORKLOAD_IDENTITY', ${Get_ProxyPolicyForWorkloadIdentity})
+  replace('PROXY_POLICY_FOR_WORKLOAD_IDENTITY', $(Get_ProxyPolicyForWorkloadIdentity))
 
   Log-Output "containerd CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
