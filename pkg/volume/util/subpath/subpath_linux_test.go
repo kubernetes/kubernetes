@@ -611,7 +611,7 @@ func TestCleanSubPaths(t *testing.T) {
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
-		fm := mount.NewFakeMounter(mounts)
+		fm := NewFakeMounter(mounts)
 		fm.UnmountFunc = test.unmount
 
 		err = doCleanSubPaths(fm, base, testVol)
@@ -636,12 +636,12 @@ var (
 	testSubpath   = 1
 )
 
-func setupFakeMounter(testMounts []string) *mount.FakeMounter {
+func setupFakeMounter(testMounts []string) FakeMounter {
 	mounts := []mount.MountPoint{}
 	for _, mountPoint := range testMounts {
 		mounts = append(mounts, mount.MountPoint{Device: "/foo", Path: mountPoint})
 	}
-	return mount.NewFakeMounter(mounts)
+	return NewFakeMounter(mounts)
 }
 
 func getTestPaths(base string) (string, string) {
