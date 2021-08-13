@@ -5975,6 +5975,3145 @@ func TestUpdateDryRun(t *testing.T) {
 	}
 }
 
+// Proves that updates from single-stack to dual-stack work.
+func TestUpdateSingleToDualStack(t *testing.T) {
+	prove := func(proofs ...svcTestProof) []svcTestProof {
+		return proofs
+	}
+	proveNumFamilies := func(n int) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			t.Helper()
+			if got := len(after.Spec.IPFamilies); got != n {
+				t.Errorf("wrong number of ipFamilies: expected %d, got %d", n, got)
+			}
+		}
+	}
+
+	// Single-stack cases as control.
+	testCasesV4 := []cudTestCase{{
+		name: "single-single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "single-dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_policy",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_families",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		},
+	}}
+
+	t.Run("singlestack:v4", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesV4, []api.IPFamily{api.IPv4Protocol})
+	})
+
+	// Dual-stack v4,v6 cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	//    ips={nil, single, dual}
+	testCasesV4V6 := []cudTestCase{{
+		name: "policy:nil_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "single-dual_wrong_order_families",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_wrong_order_ips",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_ip_in_use",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		beforeUpdate: func(t *testing.T, storage *GenericREST) {
+			alloc := storage.alloc.serviceIPAllocatorsByFamily[api.IPv6Protocol]
+			ip := "2000::1"
+			if err := alloc.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
+				t.Fatalf("test is incorrect, unable to preallocate IP %q: %v", ip, err)
+			}
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}}
+
+	t.Run("dualstack:v4v6", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesV4V6, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	})
+
+	// Dual-stack v6,v4 cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	//    ips={nil, single, dual}
+	testCasesV6V4 := []cudTestCase{{
+		name: "policy:nil_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:single_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "single-dual_wrong_order_families",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_wrong_order_ips",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "single-dual_ip_in_use",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+		beforeUpdate: func(t *testing.T, storage *GenericREST) {
+			alloc := storage.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol]
+			ip := "10.0.0.1"
+			if err := alloc.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
+				t.Fatalf("test is incorrect, unable to preallocate IP %q: %v", ip, err)
+			}
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}}
+
+	t.Run("dualstack:v6v4", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesV6V4, []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol})
+	})
+
+	// Headless cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	testCasesHeadless := []cudTestCase{{
+		name: "policy:nil_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies("IPv4")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}}
+
+	t.Run("headless", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesHeadless, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	})
+}
+
+// Proves that updates from dual-stack to single-stack work.
+func TestUpdateDualToSingleStack(t *testing.T) {
+	prove := func(proofs ...svcTestProof) []svcTestProof {
+		return proofs
+	}
+	proveNumFamilies := func(n int) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			t.Helper()
+			if got := len(after.Spec.IPFamilies); got != n {
+				t.Errorf("wrong number of ipFamilies: expected %d, got %d", n, got)
+			}
+		}
+	}
+
+	// Dual-stack v4,v6 cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	//    ips={nil, single, dual}
+	testCasesV4V6 := []cudTestCase{{
+		name: "policy:nil_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "dual-single_wrong_order_families",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "dual-single_wrong_order_ips",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}}
+
+	t.Run("dualstack:v4v6", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesV4V6, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	})
+
+	// Dual-stack v6,v4 cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	//    ips={nil, single, dual}
+	testCasesV6V4 := []cudTestCase{{
+		name: "policy:nil_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs:     true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:nil_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:single_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:single_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:dual_ips:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:dual_ips:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:dual_ips:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "dual-single_wrong_order_families",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectError: true,
+		},
+	}, {
+		name: "dual-single_wrong_order_ips",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+			expectClusterIPs: true,
+			prove:            prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}}
+
+	t.Run("dualstack:v6v4", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesV6V4, []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol})
+	})
+
+	// Headless cases: Covers the full matrix of:
+	//    policy={nil, single, prefer, require}
+	//    families={nil, single, dual}
+	testCasesHeadless := []cudTestCase{{
+		name: "policy:nil_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"})),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:nil_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies("IPv4")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:nil_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:single_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:single_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless:       true,
+			expectStackDowngrade: true,
+			prove:                prove(proveNumFamilies(1)),
+		},
+	}, {
+		name: "policy:prefer_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:prefer_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:prefer_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:nil",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}, {
+		name: "policy:require_families:single",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies("IPv4")),
+			expectError: true,
+		},
+	}, {
+		name: "policy:require_families:dual",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetClusterIPs(api.ClusterIPNone)),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+				svctest.SetSelector(map[string]string{"k2": "v2"}),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies("IPv4", "IPv6")),
+			expectHeadless: true,
+			prove:          prove(proveNumFamilies(2)),
+		},
+	}}
+
+	t.Run("headless", func(t *testing.T) {
+		helpTestCreateUpdateDeleteWithFamilies(t, testCasesHeadless, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	})
+}
+
 type svcTestCase struct {
 	svc         *api.Service
 	expectError bool
@@ -5983,6 +9122,7 @@ type svcTestCase struct {
 	// vector for test bugs and more importantly it makes the test cases less
 	// self-documenting.
 	expectClusterIPs          bool
+	expectStackDowngrade      bool
 	expectHeadless            bool
 	expectNodePorts           bool
 	expectHealthCheckNodePort bool
@@ -6009,10 +9149,8 @@ func callName(before, after *api.Service) string {
 func proveClusterIPsAllocated(t *testing.T, storage *GenericREST, before, after *api.Service) {
 	t.Helper()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
-			t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
-		}
+	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
+		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
 	}
 
 	clips := []string{}
@@ -6039,20 +9177,46 @@ func proveClusterIPsAllocated(t *testing.T, storage *GenericREST, before, after 
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if after.Spec.IPFamilyPolicy == nil {
+			t.Errorf("%s: expected ipFamilyPolicy to be set", callName(before, after))
+		} else {
+			pol := *after.Spec.IPFamilyPolicy
+			fams := len(after.Spec.IPFamilies)
+			clus := 1
+			if storage.secondaryIPFamily != "" {
+				clus = 2
+			}
+			if pol == api.IPFamilyPolicySingleStack && fams != 1 {
+				t.Errorf("%s: expected 1 ipFamily, got %d", callName(before, after), fams)
+			} else if pol == api.IPFamilyPolicyRequireDualStack && fams != 2 {
+				t.Errorf("%s: expected 2 ipFamilies, got %d", callName(before, after), fams)
+			} else if pol == api.IPFamilyPolicyPreferDualStack && fams != clus {
+				t.Errorf("%s: expected %d ipFamilies, got %d", callName(before, after), clus, fams)
+			}
+		}
+	}
+
 	if before != nil {
 		if before.Spec.ClusterIP != "" {
 			if want, got := before.Spec.ClusterIP, after.Spec.ClusterIP; want != got {
 				t.Errorf("%s: wrong clusterIP: wanted %q, got %q", callName(before, after), want, got)
 			}
 		}
-		for i := range before.Spec.ClusterIPs {
+		min := func(x, y int) int {
+			if x < y {
+				return x
+			}
+			return y
+		}
+		for i := 0; i < min(len(before.Spec.ClusterIPs), len(after.Spec.ClusterIPs)); i++ {
 			if want, got := before.Spec.ClusterIPs[i], after.Spec.ClusterIPs[i]; want != got {
 				t.Errorf("%s: wrong clusterIPs[%d]: wanted %q, got %q", callName(before, after), i, want, got)
 			}
 		}
-		for i := range before.Spec.IPFamilies {
+		for i := 0; i < min(len(before.Spec.IPFamilies), len(after.Spec.IPFamilies)); i++ {
 			if want, got := before.Spec.IPFamilies[i], after.Spec.IPFamilies[i]; want != got {
-				t.Errorf("%s: wrong IPFamilies[%d]: wanted %q, got %q", callName(before, after), i, want, got)
+				t.Errorf("%s: wrong ipFamilies[%d]: wanted %q, got %q", callName(before, after), i, want, got)
 			}
 		}
 	}
@@ -6266,17 +9430,22 @@ func verifyEquiv(t testingTInterface, call string, tc *svcTestCase, got *api.Ser
 			want.Spec.ClusterIP = got.Spec.ClusterIP
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			if len(got.Spec.ClusterIPs) > len(want.Spec.ClusterIPs) {
-				want.Spec.ClusterIPs = append(want.Spec.ClusterIPs, got.Spec.ClusterIPs[len(want.Spec.ClusterIPs):]...)
-			}
 			if want.Spec.IPFamilyPolicy == nil {
 				want.Spec.IPFamilyPolicy = got.Spec.IPFamilyPolicy
 			}
-			if len(got.Spec.IPFamilies) > len(want.Spec.IPFamilies) {
+			if tc.expectStackDowngrade && len(want.Spec.ClusterIPs) > len(got.Spec.ClusterIPs) {
+				want.Spec.ClusterIPs = want.Spec.ClusterIPs[0:1]
+			} else if len(got.Spec.ClusterIPs) > len(want.Spec.ClusterIPs) {
+				want.Spec.ClusterIPs = append(want.Spec.ClusterIPs, got.Spec.ClusterIPs[len(want.Spec.ClusterIPs):]...)
+			}
+			if tc.expectStackDowngrade && len(want.Spec.IPFamilies) > len(got.Spec.ClusterIPs) {
+				want.Spec.IPFamilies = want.Spec.IPFamilies[0:1]
+			} else if len(got.Spec.IPFamilies) > len(want.Spec.IPFamilies) {
 				want.Spec.IPFamilies = append(want.Spec.IPFamilies, got.Spec.IPFamilies[len(want.Spec.IPFamilies):]...)
 			}
 		}
 	}
+
 	if tc.expectNodePorts {
 		for i := range want.Spec.Ports {
 			p := &want.Spec.Ports[i]
