@@ -993,6 +993,79 @@ func TestSelectQueueLocked(t *testing.T) {
 	}
 }
 
+func TestFinishRequestLocked(t *testing.T) {
+	tests := []struct {
+		name         string
+		workEstimate fcrequest.WorkEstimate
+	}{
+		{
+			name: "request has additional latency",
+			workEstimate: fcrequest.WorkEstimate{
+				Seats:             10,
+				AdditionalLatency: time.Minute,
+			},
+		},
+		{
+			name: "request has no additional latency",
+			workEstimate: fcrequest.WorkEstimate{
+				Seats: 10,
+			},
+		},
+	}
+
+	metrics.Register()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			metrics.Reset()
+
+			now := time.Now()
+			clk, _ := testeventclock.NewFake(now, 0, nil)
+			qs := &queueSet{
+				clock:   clk,
+				obsPair: newObserverPair(clk),
+			}
+			queue := &queue{
+				requests: newRequestFIFO(),
+			}
+			r := &request{
+				qs:           qs,
+				queue:        queue,
+				workEstimate: test.workEstimate,
+			}
+
+			qs.totRequestsExecuting = 111
+			qs.totSeatsInUse = 222
+			queue.requestsExecuting = 11
+			queue.seatsInUse = 22
+
+			var (
+				queuesetTotalRequestsExecutingExpected = qs.totRequestsExecuting - 1
+				queuesetTotalSeatsInUseExpected        = qs.totSeatsInUse - int(test.workEstimate.Seats)
+				queueRequestsExecutingExpected         = queue.requestsExecuting - 1
+				queueSeatsInUseExpected                = queue.seatsInUse - int(test.workEstimate.Seats)
+			)
+
+			qs.finishRequestLocked(r)
+
+			// as soon as AdditionalLatency elapses we expect the seats to be released
+			clk.SetTime(now.Add(test.workEstimate.AdditionalLatency))
+
+			if queuesetTotalRequestsExecutingExpected != qs.totRequestsExecuting {
+				t.Errorf("Expected total requests executing: %d, but got: %d", queuesetTotalRequestsExecutingExpected, qs.totRequestsExecuting)
+			}
+			if queuesetTotalSeatsInUseExpected != qs.totSeatsInUse {
+				t.Errorf("Expected total seats in use: %d, but got: %d", queuesetTotalSeatsInUseExpected, qs.totSeatsInUse)
+			}
+			if queueRequestsExecutingExpected != queue.requestsExecuting {
+				t.Errorf("Expected requests executing for queue: %d, but got: %d", queueRequestsExecutingExpected, queue.requestsExecuting)
+			}
+			if queueSeatsInUseExpected != queue.seatsInUse {
+				t.Errorf("Expected seats in use for queue: %d, but got: %d", queueSeatsInUseExpected, queue.seatsInUse)
+			}
+		})
+	}
+}
+
 func newFIFO(requests ...*request) fifo {
 	l := newRequestFIFO()
 	for i := range requests {
