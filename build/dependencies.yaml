@@ -20,10 +20,10 @@ dependencies:
   - name: "cni"
     version: 0.9.1
     refPaths:
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CNI_VERSION=
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CNI_VERSION=
     - path: test/e2e_node/remote/utils.go
       match: cniVersion[\t\n\f\r ]*=
 
@@ -48,10 +48,10 @@ dependencies:
   - name: "crictl"
     version: 1.22.0
     refPaths:
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CRICTL_VERSION=
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CRICTL_VERSION=
 
   # Docker
   - name: "docker"
@@ -90,12 +90,12 @@ dependencies:
     - path: build/build-image/cross/VERSION
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
       match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-    - path: test/images/Makefile
-      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
-    - path: staging/publishing/rules.yaml
-      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+    - path: staging/publishing/rules.yaml
+      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+    - path: test/images/Makefile
+      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
   # Example: go1.16rc1
