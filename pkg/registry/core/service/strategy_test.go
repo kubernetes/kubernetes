@@ -930,123 +930,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 	}
 }
 
-func TestTrimFieldsForDualStackDowngrade(t *testing.T) {
-	singleStack := api.IPFamilyPolicySingleStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	testCases := []struct {
-		name          string
-		oldPolicy     *api.IPFamilyPolicyType
-		oldClusterIPs []string
-		oldFamilies   []api.IPFamily
-
-		newPolicy          *api.IPFamilyPolicyType
-		expectedClusterIPs []string
-		expectedIPFamilies []api.IPFamily
-	}{
-
-		{
-			name:               "no change single to single",
-			oldPolicy:          &singleStack,
-			oldClusterIPs:      []string{"10.10.10.10"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"10.10.10.10"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
-		},
-
-		{
-			name:               "dualstack to dualstack (preferred)",
-			oldPolicy:          &preferDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &preferDualStack,
-			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-		},
-
-		{
-			name:               "dualstack to dualstack (required)",
-			oldPolicy:          &requireDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &preferDualStack,
-			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-		},
-
-		{
-			name:               "dualstack (preferred) to single",
-			oldPolicy:          &preferDualStack,
-			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
-			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"10.10.10.10"},
-			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
-		},
-
-		{
-			name:               "dualstack (require) to single",
-			oldPolicy:          &requireDualStack,
-			oldClusterIPs:      []string{"2000::1", "10.10.10.10"},
-			oldFamilies:        []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-			newPolicy:          &singleStack,
-			expectedClusterIPs: []string{"2000::1"},
-			expectedIPFamilies: []api.IPFamily{api.IPv6Protocol},
-		},
-	}
-	// only when gate is on
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			oldService := &api.Service{
-				Spec: api.ServiceSpec{
-					IPFamilyPolicy: tc.oldPolicy,
-					ClusterIPs:     tc.oldClusterIPs,
-					IPFamilies:     tc.oldFamilies,
-				},
-			}
-
-			newService := oldService.DeepCopy()
-			newService.Spec.IPFamilyPolicy = tc.newPolicy
-
-			trimFieldsForDualStackDowngrade(newService, oldService)
-
-			if len(newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
-				t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
-			}
-
-			// compare clusterIPS
-			for i, expectedIP := range tc.expectedClusterIPs {
-				if expectedIP != newService.Spec.ClusterIPs[i] {
-					t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
-				}
-			}
-
-			// families
-			if len(newService.Spec.IPFamilies) != len(tc.expectedIPFamilies) {
-				t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
-			}
-
-			// compare clusterIPS
-			for i, expectedIPFamily := range tc.expectedIPFamilies {
-				if expectedIPFamily != newService.Spec.IPFamilies[i] {
-					t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
-				}
-			}
-
-		})
-	}
-}
-
 func TestPatchAllocatedValues(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		before               *api.Service
-		update               *api.Service
-		expectSameClusterIPs bool
-		expectSameNodePort   bool
-		expectSameHCNP       bool
+		name                    string
+		before                  *api.Service
+		update                  *api.Service
+		expectSameClusterIPs    bool
+		expectReducedClusterIPs bool
+		expectSameNodePort      bool
+		expectSameHCNP          bool
 	}{{
 		name: "all_patched",
 		before: svctest.MakeService("foo",
@@ -1120,16 +1012,28 @@ func TestPatchAllocatedValues(t *testing.T) {
 			update := tc.update.DeepCopy()
 			PatchAllocatedValues(update, tc.before)
 
-			if b, u := tc.before.Spec.ClusterIP, update.Spec.ClusterIP; tc.expectSameClusterIPs && b != u {
-				t.Errorf("expected clusterIP to be patched: %q != %q", b, u)
-			} else if !tc.expectSameClusterIPs && b == u {
-				t.Errorf("expected clusterIP to not be patched: %q == %q", b, u)
+			beforeIP := tc.before.Spec.ClusterIP
+			updateIP := update.Spec.ClusterIP
+			if tc.expectSameClusterIPs || tc.expectReducedClusterIPs {
+				if beforeIP != updateIP {
+					t.Errorf("expected clusterIP to be patched: %q != %q", beforeIP, updateIP)
+				}
+			} else if beforeIP == updateIP {
+				t.Errorf("expected clusterIP to not be patched: %q == %q", beforeIP, updateIP)
 			}
 
-			if b, u := tc.before.Spec.ClusterIPs, update.Spec.ClusterIPs; tc.expectSameClusterIPs && !cmp.Equal(b, u) {
-				t.Errorf("expected clusterIPs to be patched: %q != %q", b, u)
-			} else if !tc.expectSameClusterIPs && cmp.Equal(b, u) {
-				t.Errorf("expected clusterIPs to not be patched: %q == %q", b, u)
+			beforeIPs := tc.before.Spec.ClusterIPs
+			updateIPs := update.Spec.ClusterIPs
+			if tc.expectSameClusterIPs {
+				if !cmp.Equal(beforeIPs, updateIPs) {
+					t.Errorf("expected clusterIPs to be patched: %q != %q", beforeIPs, updateIPs)
+				}
+			} else if tc.expectReducedClusterIPs {
+				if len(updateIPs) != 1 || beforeIPs[0] != updateIPs[0] {
+					t.Errorf("expected clusterIPs to be trim-patched: %q -> %q", beforeIPs, updateIPs)
+				}
+			} else if cmp.Equal(beforeIPs, updateIPs) {
+				t.Errorf("expected clusterIPs to not be patched: %q == %q", beforeIPs, updateIPs)
 			}
 
 			if b, u := tc.before.Spec.Ports[0].NodePort, update.Spec.Ports[0].NodePort; tc.expectSameNodePort && b != u {

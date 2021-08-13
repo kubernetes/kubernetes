@@ -124,7 +124,6 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
-	trimFieldsForDualStackDowngrade(newService, oldService)
 }
 
 // Validate validates a new service.
@@ -314,7 +313,7 @@ func PatchAllocatedValues(newSvc, oldSvc *api.Service) {
 		if newSvc.Spec.ClusterIP == "" {
 			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
 		}
-		if len(newSvc.Spec.ClusterIPs) == 0 {
+		if len(newSvc.Spec.ClusterIPs) == 0 && len(oldSvc.Spec.ClusterIPs) > 0 {
 			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
 		}
 	}
@@ -619,34 +618,4 @@ func needsExternalTrafficPolicy(svc *api.Service) bool {
 
 func sameExternalTrafficPolicy(oldSvc, newSvc *api.Service) bool {
 	return oldSvc.Spec.ExternalTrafficPolicy == newSvc.Spec.ExternalTrafficPolicy
-}
-
-// this func allows user to downgrade a service by just changing
-// IPFamilyPolicy to SingleStack
-func trimFieldsForDualStackDowngrade(newService, oldService *api.Service) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return
-	}
-
-	// not an update
-	if oldService == nil {
-		return
-	}
-
-	oldIsDualStack := oldService.Spec.IPFamilyPolicy != nil &&
-		(*oldService.Spec.IPFamilyPolicy == api.IPFamilyPolicyRequireDualStack ||
-			*oldService.Spec.IPFamilyPolicy == api.IPFamilyPolicyPreferDualStack)
-
-	newIsNotDualStack := newService.Spec.IPFamilyPolicy != nil && *newService.Spec.IPFamilyPolicy == api.IPFamilyPolicySingleStack
-
-	// if user want to downgrade then we auto remove secondary ip and family
-	if oldIsDualStack && newIsNotDualStack {
-		if len(newService.Spec.ClusterIPs) > 1 {
-			newService.Spec.ClusterIPs = newService.Spec.ClusterIPs[0:1]
-		}
-
-		if len(newService.Spec.IPFamilies) > 1 {
-			newService.Spec.IPFamilies = newService.Spec.IPFamilies[0:1]
-		}
-	}
 }

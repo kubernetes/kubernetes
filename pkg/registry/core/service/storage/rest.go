@@ -721,27 +721,12 @@ func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) 
 		return false
 	}
 
-	// compare ClusterIPs lengths.
-	// due to validation.
-	if len(service.Spec.ClusterIPs) != len(oldService.Spec.ClusterIPs) {
+	if !sameClusterIPs(oldService, service) {
 		return false
 	}
 
-	for i, ip := range service.Spec.ClusterIPs {
-		if oldService.Spec.ClusterIPs[i] != ip {
-			return false
-		}
-	}
-
-	// compare IPFamilies
-	if len(service.Spec.IPFamilies) != len(oldService.Spec.IPFamilies) {
+	if !sameIPFamilies(oldService, service) {
 		return false
-	}
-
-	for i, family := range service.Spec.IPFamilies {
-		if oldService.Spec.IPFamilies[i] != family {
-			return false
-		}
 	}
 
 	// they match on
@@ -865,6 +850,7 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 			// Update: As long as ClusterIPs and IPFamilies have not changed,
 			// setting policy to single-stack is clear intent.
 			if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
+				// ClusterIPs[0] is immutable, so it is safe to keep.
 				if sameClusterIPs(oldService, service) && len(service.Spec.ClusterIPs) > 1 {
 					service.Spec.ClusterIPs = service.Spec.ClusterIPs[0:1]
 				}
