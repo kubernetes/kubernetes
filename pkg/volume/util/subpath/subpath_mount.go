@@ -26,6 +26,9 @@ import (
 // MountInterface defines the set of methods to allow for mount operations on a system.
 type MountInterface interface {
 	mount.Interface
+
+	// MountSensitiveWithFlags is the same as MountSensitive() with additional mount flags
+	MountSensitiveWithFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error
 }
 
 // Compile-time check to ensure all Mounter implementations satisfy
