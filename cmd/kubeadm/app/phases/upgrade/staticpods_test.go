@@ -464,7 +464,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpEtcdDataDir)
 
-			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			oldcfg, err := getConfig("v1.3.0", tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}

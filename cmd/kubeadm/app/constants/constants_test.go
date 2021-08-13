@@ -241,22 +241,15 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 
 func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 	tests := []struct {
-		name                string
-		versionInfo         *apimachineryversion.Info
-		n                   int
-		isRunningInTestFunc func() bool
-		expectedResult      *version.Version
+		name           string
+		versionInfo    *apimachineryversion.Info
+		n              int
+		expectedResult *version.Version
 	}{
 		{
-			name:           "invalid versionInfo; running in test",
+			name:           "invalid versionInfo; placeholder version is returned",
 			versionInfo:    &apimachineryversion.Info{},
-			expectedResult: defaultKubernetesVersionForTests,
-		},
-		{
-			name:                "invalid versionInfo; not running in test",
-			versionInfo:         &apimachineryversion.Info{},
-			isRunningInTestFunc: func() bool { return false },
-			expectedResult:      nil,
+			expectedResult: defaultKubernetesPlaceholderVersion,
 		},
 		{
 			name:           "valid skew of -1",
@@ -280,16 +273,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.isRunningInTestFunc == nil {
-				tc.isRunningInTestFunc = func() bool { return true }
-			}
-			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n, tc.isRunningInTestFunc)
-			if (tc.expectedResult == nil) != (result == nil) {
-				t.Errorf("expected result: %v, got: %v", tc.expectedResult, result)
-			}
-			if result == nil {
-				return
-			}
+			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n)
 			if cmp, _ := result.Compare(tc.expectedResult.String()); cmp != 0 {
 				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
 			}
