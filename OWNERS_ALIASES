@@ -474,9 +474,7 @@ aliases:
     - nikhita
 
   sig-docs-approvers:
-    - irvifa
     - jimangel
-    - kbarnard10
     - kbhawkey
     - onlydole
     - sftim
