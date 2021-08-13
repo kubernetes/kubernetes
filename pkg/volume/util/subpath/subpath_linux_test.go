@@ -636,7 +636,7 @@ var (
 	testSubpath   = 1
 )
 
-func setupFakeMounter(testMounts []string) FakeMounter {
+func setupFakeMounter(testMounts []string) *FakeMounter {
 	mounts := []mount.MountPoint{}
 	for _, mountPoint := range testMounts {
 		mounts = append(mounts, mount.MountPoint{Device: "/foo", Path: mountPoint})
