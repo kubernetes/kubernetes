@@ -122,7 +122,14 @@ func WithPriorityAndFairness(
 				return workEstimator(r, "", "")
 			}
 
-			return workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+			workEstimate := workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+
+			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimate.MaxSeats())
+			httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
+			httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
+			httplog.AddKeyValue(ctx, "apf_additionalLatency", workEstimate.AdditionalLatency)
+
+			return workEstimate
 		}
 
 		var served bool

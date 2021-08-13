@@ -835,13 +835,12 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
 		noteFn(selectedFlowSchema, plState.pl, "")
 		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
-		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
+		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}, ""
 	}
 	var numQueues int32
 	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
 		numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
 	}
-	var flowDistinguisher string
 	var hashValue uint64
 	if numQueues > 1 {
 		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
@@ -857,7 +856,7 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	if idle {
 		cfgCtlr.maybeReapReadLocked(plName, plState)
 	}
-	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
+	return selectedFlowSchema, plState.pl, false, req, startWaitingTime, flowDistinguisher
 }
 
 // maybeReap will remove the last internal traces of the named
