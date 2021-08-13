@@ -90,8 +90,6 @@ dependencies:
     - path: build/build-image/cross/VERSION
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
       match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-    - path: cluster/images/etcd/Makefile
-      match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: test/images/Makefile
@@ -108,6 +106,12 @@ dependencies:
     - path: build/build-image/cross/VERSION
     - path: hack/lib/golang.sh
       match: minimum_go_version=go([0-9]+\.[0-9]+)
+
+  - name: "golang: etcd release version"
+    version: 1.16.7
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
     version: v1.23.0-go1.17-buster.0
