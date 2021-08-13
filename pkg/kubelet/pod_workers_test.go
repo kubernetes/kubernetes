@@ -105,6 +105,11 @@ func (f *fakePodWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
 	defer f.statusLock.Unlock()
 	return f.removeRuntime[uid]
 }
+func (f *fakePodWorkers) ReplacePodRemoveRuntime(m map[types.UID]bool) {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	f.removeRuntime = m
+}
 func (f *fakePodWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
