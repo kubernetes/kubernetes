@@ -30,7 +30,7 @@ type Mounter struct {
 	mounterPath string
 }
 
-var errUnsupported = errors.New("utils/mount on this platform is not supported")
+var errUtilsMountUnsupported = errors.New("utils/mount on this platform is not supported")
 
 // NewMounter returns a MountInterface for the current system.
 // It provides options to override the default mounter behavior.
@@ -40,4 +40,9 @@ func NewMounter(mounter mount.Interface, mounterPath string) MountInterface {
 		Interface:   mounter,
 		mounterPath: mounterPath,
 	}
+}
+
+// MountSensitiveWithFlags is the same as MountSensitive() with additional mount flags
+func (mounter *Mounter) MountSensitiveWithFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
+	return errUtilsMountUnsupported
 }

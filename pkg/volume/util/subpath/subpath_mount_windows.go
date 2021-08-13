@@ -39,3 +39,9 @@ func NewMounter(mounter mount.Interface, mounterPath string) MountInterface {
 		mounterPath: mounterPath,
 	}
 }
+
+// MountSensitiveWithFlags is the same as MountSensitive() with additional mount flags but
+// because mountFlags are linux mount(8) flags this method is the same as MountSensitive() in Windows
+func (mounter *Mounter) MountSensitiveWithFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, sensitiveOptions)
+}

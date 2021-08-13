@@ -43,11 +43,11 @@ const (
 )
 
 type subpath struct {
-	mounter mount.Interface
+	mounter MountInterface
 }
 
 // New returns a subpath.Interface for the current system
-func New(mounter mount.Interface) Interface {
+func New(mounter MountInterface) Interface {
 	return &subpath{
 		mounter: mounter,
 	}
