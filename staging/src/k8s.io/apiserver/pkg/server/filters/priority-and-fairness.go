@@ -27,6 +27,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
@@ -54,6 +55,15 @@ var atomicMutatingWaiting, atomicReadOnlyWaiting int32
 
 // newInitializationSignal is defined for testing purposes.
 var newInitializationSignal = utilflowcontrol.NewInitializationSignal
+
+func truncateLogField(s string) string {
+	const maxFieldLogLength = 64
+
+	if len(s) > maxFieldLogLength {
+		s = s[0:maxFieldLogLength]
+	}
+	return s
+}
 
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
@@ -90,12 +100,16 @@ func WithPriorityAndFairness(
 		}
 
 		var classification *PriorityAndFairnessClassification
-		note := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration) {
+		note := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) {
 			classification = &PriorityAndFairnessClassification{
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
 				PriorityLevelName: pl.Name,
 				PriorityLevelUID:  pl.UID}
+
+			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
+			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
+			httplog.AddKeyValue(ctx, "apf_d", truncateLogField(flowDistinguisher))
 		}
 
 		var served bool
