@@ -372,7 +372,8 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	}
 
 	mounter := mount.New(s.ExperimentalMounterPath)
-	subpather := subpath.New(mounter)
+	subpatherMounter := subpath.NewMounter(mounter, s.ExperimentalMounterPath)
+	subpather := subpath.New(subpatherMounter)
 	hu := hostutil.NewHostUtil()
 	var pluginRunner = exec.New()
 

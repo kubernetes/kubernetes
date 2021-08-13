@@ -147,7 +147,7 @@ func getSubpathBindTarget(subpath Subpath) string {
 	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
 }
 
-func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, err error) {
+func doBindSubPath(mounter MountInterface, subpath Subpath) (hostPath string, err error) {
 	// Linux, kubelet runs on the host:
 	// - safely open the subpath
 	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
