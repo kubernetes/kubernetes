@@ -5826,7 +5826,12 @@ type svcTestCase struct {
 	expectHeadless            bool
 	expectNodePorts           bool
 	expectHealthCheckNodePort bool
+
+	// Additional proofs, provided by the tests which use this.
+	prove []svcTestProof
 }
+
+type svcTestProof func(t *testing.T, storage *GenericREST, before, after *api.Service)
 
 func callName(before, after *api.Service) string {
 	if before == nil && after != nil {
@@ -6286,6 +6291,10 @@ func verifyExpectations(t *testing.T, storage *GenericREST, tc svcTestCase, befo
 		proveHealthCheckNodePortAllocated(t, storage, before, after)
 	} else {
 		proveHealthCheckNodePortDeallocated(t, storage, before, after)
+	}
+
+	for _, p := range tc.prove {
+		p(t, storage, before, after)
 	}
 }
 
