@@ -39,7 +39,7 @@ packages=(
 )
 for d in staging/src/k8s.io/*/; do
   if [ -d "$d" ]; then
-    packages+=("./vendor/${d#"staging/src/"}...")
+    packages+=("${d#"staging/src/"}...")
   fi
 done
 
