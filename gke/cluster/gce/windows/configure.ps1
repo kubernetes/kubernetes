@@ -211,5 +211,8 @@ catch {
   Write-Host 'Exception caught in script:'
   Write-Host $_.InvocationInfo.PositionMessage
   Write-Host "Kubernetes Windows node setup failed: $($_.Exception.Message)"
+  # Make sure kubelet won't remain running in case any failure happened during the startup.
+  Write-Host "Cleaning up, Unregistering WorkerServices..."
+  Unregister-WorkerServices
   exit 1
 }

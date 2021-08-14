@@ -1466,6 +1466,12 @@ function Start-WorkerServices {
   Log-Output "Kubernetes components started successfully"
 }
 
+# Stop and unregister both kubelet & kube-proxy services.
+function Unregister-WorkerServices {
+  & sc.exe delete kube-proxy
+  & sc.exe delete kubelet
+}
+
 # Wait for kubelet and kube-proxy to be ready within 10s.
 function WaitFor_KubeletAndKubeProxyReady {
   $waited = 0
