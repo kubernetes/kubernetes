@@ -5998,13 +5998,18 @@ type cudTestCase struct {
 }
 
 func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
+	t.Helper()
+	helpTestCreateUpdateDeleteWithFamilies(t, testCases, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+}
+
+func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCase, ipFamilies []api.IPFamily) {
 	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
 	// attributed to lines in this function than the caller of it.
 
 	// This test is ONLY with the gate enabled.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	storage, _, server := newStorage(t, ipFamilies)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
