@@ -44,7 +44,7 @@ kube::test::find_integration_test_dirs() {
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
     find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+      | xargs -0n1 dirname | sed "s|vendor/||" \
       | LC_ALL=C sort -u
   )
 }

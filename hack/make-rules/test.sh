@@ -55,7 +55,7 @@ kube::test::find_dirs() {
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
-    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/||' | LC_ALL=C sort -u
   )
 }
 
@@ -181,27 +181,15 @@ junitFilenamePrefix() {
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
-verifyAndSuggestPackagePath() {
+verifyPackagePath() {
   local specified_package_path="$1"
-  local alternative_package_path="$2"
-  local original_package_path="$3"
-  local suggestion_package_path="$4"
 
   if [[ "${specified_package_path}" =~ '/...'$ ]]; then
     specified_package_path=${specified_package_path::-4}
   fi
 
-  if ! [ -d "${specified_package_path}" ]; then
-    # Because k8s sets a localized $GOPATH for testing, seeing the actual
-    # directory can be confusing. Instead, just show $GOPATH if it exists in the
-    # $specified_package_path.
-    local printable_package_path
-    printable_package_path=${specified_package_path//${GOPATH}/\$\{GOPATH\}}
-    kube::log::error "specified test path '${printable_package_path}' does not exist"
-
-    if [ -d "${alternative_package_path}" ]; then
-      kube::log::info "try changing \"${original_package_path}\" to \"${suggestion_package_path}\""
-    fi
+  if ! go list "${specified_package_path}" > /dev/null 2>&1; then
+    kube::log::error "specified test path '${specified_package_path}' does not exist"
     exit 1
   fi
 }
@@ -210,14 +198,7 @@ verifyPathsToPackagesUnderTest() {
   local packages_under_test=("$@")
 
   for package_path in "${packages_under_test[@]}"; do
-    local local_package_path="${package_path}"
-    local go_package_path="${GOPATH}/src/${package_path}"
-
-    if [[ "${package_path:0:2}" == "./" ]] ; then
-      verifyAndSuggestPackagePath "${local_package_path}" "${go_package_path}" "${package_path}" "${package_path:2}"
-    else
-      verifyAndSuggestPackagePath "${go_package_path}" "${local_package_path}" "${package_path}" "./${package_path}"
-    fi
+    verifyPackagePath "${package_path}"
   done
 }
 
