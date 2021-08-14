@@ -5991,9 +5991,10 @@ func proveHealthCheckNodePortDeallocated(t *testing.T, storage *GenericREST, bef
 }
 
 type cudTestCase struct {
-	name   string
-	create svcTestCase
-	update svcTestCase
+	name         string
+	create       svcTestCase
+	beforeUpdate func(t *testing.T, storage *GenericREST)
+	update       svcTestCase
 }
 
 func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
@@ -6028,6 +6029,11 @@ func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
 				return
 			}
 			verifyExpectations(t, storage, tc.create, tc.create.svc, createdSvc)
+
+			// Allow callers to do something between create and update.
+			if tc.beforeUpdate != nil {
+				tc.beforeUpdate(t, storage)
+			}
 
 			// Update the object to the new state and check the results.
 			obj, created, err := storage.Update(ctx, tc.update.svc.Name,
