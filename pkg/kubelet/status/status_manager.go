@@ -156,6 +156,8 @@ func (m *manager) Start() {
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
+
+	m.initializePodStatuses()
 	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
@@ -200,6 +202,22 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 
+func (m *manager) initializePodStatuses() {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	
+	pods, err := m.kubeClient.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.InfoS("Error while receiving all existing pods",err)
+		return
+	}
+
+	for _, pod := range pods.Items {
+		status := *pod.Status.DeepCopy()
+		m.updateStatusInternal(&pod,status,false)
+	}
+}
+
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
@@ -237,6 +255,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 	// Make sure we're not updating the cached version.
 	status := *oldStatus.status.DeepCopy()
+
 	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
 	containerStatus.Ready = ready
 
@@ -406,6 +425,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return false
 	}
+
 	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
 		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return false

@@ -236,19 +236,33 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			started = !exists
 		}
 		podStatus.ContainerStatuses[i].Started = &started
-
 		if started {
 			var ready bool
 			if c.State.Running == nil {
 				ready = false
-			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
-				ready = true
+			} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
+				if result == results.Success {
+					ready = true
+				} else {
+					ready = false
+				}
 			} else {
 				// The check whether there is a probe which hasn't run yet.
 				w, exists := m.getWorker(podUID, c.Name, readiness)
 				ready = !exists // no readinessProbe -> always ready
 				if exists {
+					// The readiness worker has not yet reported to readinessManager, instead of just returning ready=false consult status_Manager
+					podStatus, found := m.statusManager.GetPodStatus(podUID)
+					if found {
+						for _,containerStatus := range podStatus.ContainerStatuses {
+							if c.ContainerID == containerStatus.ContainerID {
+								ready = containerStatus.Ready
+								break
+							}
+						}
+					}
 					// Trigger an immediate run of the readinessProbe to update ready state
+
 					select {
 					case w.manualTriggerCh <- struct{}{}:
 					default: // Non-blocking.

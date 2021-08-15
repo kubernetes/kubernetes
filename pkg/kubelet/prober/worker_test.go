@@ -40,7 +40,7 @@ func init() {
 }
 
 func TestDoProbe(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		// Test statuses.
@@ -160,7 +160,7 @@ func TestDoProbe(t *testing.T) {
 }
 
 func TestInitialDelay(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		w := newTestWorker(m, probeType, v1.Probe{
@@ -192,7 +192,7 @@ func TestInitialDelay(t *testing.T) {
 }
 
 func TestFailureThreshold(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
@@ -226,7 +226,7 @@ func TestFailureThreshold(t *testing.T) {
 }
 
 func TestSuccessThreshold(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 3, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
@@ -260,7 +260,7 @@ func TestSuccessThreshold(t *testing.T) {
 }
 
 func TestCleanUp(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
@@ -299,7 +299,7 @@ func TestCleanUp(t *testing.T) {
 func TestHandleCrash(t *testing.T) {
 	runtime.ReallyCrash = false // Test that we *don't* really crash.
 
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, readiness, v1.Probe{})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
@@ -352,7 +352,7 @@ func (p crashingExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
 }
 
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 
 	for _, probeType := range [...]probeType{liveness, startup} {
 		w := newTestWorker(m, probeType, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
@@ -390,7 +390,7 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 }
 
 func TestResultRunOnLivenessCheckFailure(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
 
@@ -431,7 +431,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 }
 
 func TestResultRunOnStartupCheckFailure(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 
@@ -466,7 +466,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 }
 
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 	// livenessProbe fails, but is disabled
@@ -484,7 +484,7 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 }
 
 func TestStartupProbeDisabledByStarted(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 	// startupProbe fails < FailureThreshold, stays unknown

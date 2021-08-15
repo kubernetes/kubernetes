@@ -203,12 +203,16 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true // Wait for more information.
 	}
 
+
 	if w.containerID.String() != c.ContainerID {
+		klog.Infof("w.Container %+v c.ContainerID %+v",w.containerID.String(),c.ContainerID)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		if c.State.Running == nil || int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds || w.probeType == startup || w.probeType == liveness {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -228,6 +232,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}
+
 
 	// Graceful shutdown of the pod.
 	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
@@ -291,7 +296,6 @@ func (w *worker) doProbe() (keepGoing bool) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
 	}
-
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
 	if (w.probeType == liveness || w.probeType == startup) && result == results.Failure {

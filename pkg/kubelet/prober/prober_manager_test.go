@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -87,7 +88,7 @@ func TestAddRemovePods(t *testing.T) {
 		},
 	}
 
-	m := newTestManager()
+	m := newTestManager(nil)
 	defer cleanup(t, m)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
@@ -133,7 +134,7 @@ func TestAddRemovePods(t *testing.T) {
 }
 
 func TestCleanupPods(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -195,7 +196,7 @@ func TestCleanupPods(t *testing.T) {
 }
 
 func TestCleanupRepeated(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(nil)
 	defer cleanup(t, m)
 	podTemplate := v1.Pod{
 		Spec: v1.PodSpec{
@@ -277,7 +278,7 @@ func TestUpdatePodStatus(t *testing.T) {
 		},
 	}
 
-	m := newTestManager()
+	m := newTestManager(nil)
 	// no cleanup: using fake workers.
 
 	// Setup probe "workers" and cached results.
@@ -318,6 +319,103 @@ func TestUpdatePodStatus(t *testing.T) {
 	}
 }
 
+func TestUpdatePodStatusWithInitialState(t *testing.T){
+	
+	alreadyRunningPodName := "alreadyRunningPod"
+	alreadyRunningPodUID := types.UID("alreadyRunningPodUID")
+	alreadyRunningContainerName := "alreadyRunningContainer"
+	alreadyRunningContainerID := "test://already_running_container"
+
+	alreadyRunningContainerInitialReadyState := v1.ContainerStatus{
+		Name: alreadyRunningContainerName,
+		ContainerID: alreadyRunningContainerID,
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+
+	}
+	alreadyRunningContainerActualReadyState := v1.ContainerStatus{
+		Name: alreadyRunningContainerName,
+		ContainerID: alreadyRunningContainerID,
+		Ready: true,
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{
+				StartedAt: metav1.Now(),
+			},
+		},
+	}
+
+	podStatusInitialReadyStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			alreadyRunningContainerInitialReadyState,
+		},
+	}
+
+	podStatusActualReadyState := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			alreadyRunningContainerActualReadyState,
+		},
+	}
+
+	alreadyRunningPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       alreadyRunningPodUID,
+			Name:      alreadyRunningPodName,
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				v1.Container{
+					Name: alreadyRunningContainerName,
+					ReadinessProbe: &v1.Probe{
+						Handler: v1.Handler{
+							Exec: &v1.ExecAction{},
+						},
+						PeriodSeconds: 4,
+						SuccessThreshold: 1,
+						FailureThreshold: 1,
+					},
+				},
+			},
+		},
+		Status: podStatusActualReadyState,
+	}
+
+	client := fake.NewSimpleClientset(alreadyRunningPod)
+
+	m := newTestManager(client)
+
+	// We set the prober to always fail
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	m.AddPod(alreadyRunningPod)
+	m.UpdatePodStatus("alreadyRunningPodUID", &podStatusInitialReadyStatus)
+
+	//first updateStatus will just initiate the readiness check, in that case consult status_manager for last known status
+	for _, c := range podStatusInitialReadyStatus.ContainerStatuses {
+		if !c.Ready {
+			t.Errorf("Expected container to be ready")
+		}
+	}
+	m.readinessManager.Set(kubecontainer.ParseContainerID(alreadyRunningContainerID), results.Failure, &v1.Pod{})
+
+	m.UpdatePodStatus("alreadyRunningPodUID", &podStatusInitialReadyStatus)
+	
+	// in case the container is not ready anymore no state from status_manager is used
+	for _, c := range podStatusInitialReadyStatus.ContainerStatuses {
+		if c.Ready {
+			t.Errorf("Expected container to be not ready")
+		}
+	}
+
+}
+
 func (m *manager) extractedReadinessHandling() {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
@@ -328,7 +426,7 @@ func (m *manager) extractedReadinessHandling() {
 func TestUpdateReadiness(t *testing.T) {
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
-	m := newTestManager()
+	m := newTestManager(nil)
 	defer cleanup(t, m)
 
 	// Start syncing readiness without leaking goroutine.
