@@ -19,6 +19,7 @@ package testing
 import (
 	"fmt"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +41,12 @@ func GetDefaultingTestCases(t *testing.T, scheme *runtime.Scheme, codecs seriali
 		}
 		beforeDir := fmt.Sprintf("testdata/%s/before", gvk.Kind)
 		afterDir := fmt.Sprintf("testdata/%s/after", gvk.Kind)
-		filename := fmt.Sprintf("%s.yaml", gvk.Version)
+
+		suffix := ".yaml"
+		if goruntime.GOOS != "linux" {
+			suffix = "_non_linux.yaml"
+		}
+		outFilename := gvk.Version + suffix
 
 		codec, err := getCodecForGV(codecs, gvk.GroupVersion())
 		if err != nil {
@@ -49,8 +55,8 @@ func GetDefaultingTestCases(t *testing.T, scheme *runtime.Scheme, codecs seriali
 
 		cases = append(cases, TestCase{
 			name:  fmt.Sprintf("%s default_%s", gvk.Kind, gvk.Version),
-			in:    filepath.Join(beforeDir, filename),
-			out:   filepath.Join(afterDir, filename),
+			in:    filepath.Join(beforeDir, fmt.Sprintf("%s.yaml", gvk.Version)),
+			out:   filepath.Join(afterDir, outFilename),
 			codec: codec,
 		})
 	}
