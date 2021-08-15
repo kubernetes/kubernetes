@@ -111,7 +111,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubeadm-images-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-images-test")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
@@ -413,7 +413,7 @@ func TestMigrate(t *testing.T) {
 // Returns the name of the file created and a cleanup callback
 func tempConfig(t *testing.T, config []byte) (string, func()) {
 	t.Helper()
-	tmpDir, err := ioutil.TempDir("", "kubeadm-migration-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-migration-test")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}

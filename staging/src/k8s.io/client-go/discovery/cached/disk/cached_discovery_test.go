@@ -17,7 +17,6 @@ limitations under the License.
 package disk
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,7 +37,7 @@ import (
 func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
@@ -82,7 +81,7 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
@@ -100,7 +99,7 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	os.RemoveAll(d)
 	defer os.RemoveAll(d)

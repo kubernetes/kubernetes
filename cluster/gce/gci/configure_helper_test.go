@@ -56,7 +56,7 @@ func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests [
 		manifestFuncName: funcName,
 	}
 
-	d, err := ioutil.TempDir("", "configure-helper-test")
+	d, err := os.MkdirTemp("", "configure-helper-test")
 	if err != nil {
 		c.t.Fatalf("Failed to create temp directory: %v", err)
 	}

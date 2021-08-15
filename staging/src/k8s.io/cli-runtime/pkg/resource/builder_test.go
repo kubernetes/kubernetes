@@ -614,7 +614,7 @@ func TestDirectoryBuilder(t *testing.T) {
 }
 
 func setupKustomizeDirectory() (string, error) {
-	path, err := ioutil.TempDir("/tmp", "")
+	path, err := os.MkdirTemp("/tmp", "")
 	if err != nil {
 		return "", err
 	}

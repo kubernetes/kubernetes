@@ -683,7 +683,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			// Build a kubeconfig file that will make use of the injected ca and token,
 			// but point at the DNS host and the default namespace
-			tmpDir, err := ioutil.TempDir("", "icc-override")
+			tmpDir, err := os.MkdirTemp("", "icc-override")
 			overrideKubeconfigName := "icc-override.kubeconfig"
 			framework.ExpectNoError(err)
 			defer func() { os.Remove(tmpDir) }()
@@ -1640,7 +1640,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			ginkgo.By("Starting the proxy")
-			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")
+			tmpdir, err := os.MkdirTemp("", "kubectl-proxy-unix")
 			if err != nil {
 				framework.Failf("Failed to create temporary directory: %v", err)
 			}

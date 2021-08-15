@@ -19,7 +19,6 @@ package remote
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,7 +38,7 @@ const archiveName = "e2e_node_test.tar.gz"
 // CreateTestArchive creates the archive package for the node e2e test.
 func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 	klog.V(2).Infof("Building archive...")
-	tardir, err := ioutil.TempDir("", "node-e2e-archive")
+	tardir, err := os.MkdirTemp("", "node-e2e-archive")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary directory %v", err)
 	}

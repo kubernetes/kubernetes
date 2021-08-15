@@ -32,7 +32,7 @@ import (
 )
 
 func TestTar(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testtar")
+	tmp, err := os.MkdirTemp("", "testtar")
 	if err != nil {
 		t.Fatal(err)
 	}

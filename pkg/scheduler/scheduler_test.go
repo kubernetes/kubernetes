@@ -1138,7 +1138,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 }
 
 func TestInitPolicyFromFile(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "policy")
+	dir, err := os.MkdirTemp(os.TempDir(), "policy")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

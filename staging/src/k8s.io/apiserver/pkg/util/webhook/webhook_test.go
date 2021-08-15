@@ -636,7 +636,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 }
 
 func bootstrapTestDir(t *testing.T) string {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 
 	if err != nil {
 		t.Fatal(err)

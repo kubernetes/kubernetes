@@ -643,7 +643,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				},
 			})
 
-			manifestsDir, err := ioutil.TempDir("", "GetAvailableUpgrades-test-manifests")
+			manifestsDir, err := os.MkdirTemp("", "GetAvailableUpgrades-test-manifests")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}

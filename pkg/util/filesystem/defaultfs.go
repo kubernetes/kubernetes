@@ -33,7 +33,7 @@ var _ Filesystem = &DefaultFs{}
 
 // NewTempFs returns a fake Filesystem in temporary directory, useful for unit tests
 func NewTempFs() Filesystem {
-	path, _ := ioutil.TempDir(
+	path, _ := os.MkdirTemp(
 		"",
 		"tmpfs",
 	)
@@ -99,9 +99,9 @@ func (fs *DefaultFs) ReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(fs.prefix(filename))
 }
 
-// TempDir via ioutil.TempDir
+// TempDir via os.MkdirTemp
 func (fs *DefaultFs) TempDir(dir, prefix string) (string, error) {
-	return ioutil.TempDir(fs.prefix(dir), prefix)
+	return os.MkdirTemp(fs.prefix(dir), prefix)
 }
 
 // TempFile via ioutil.TempFile

@@ -32,7 +32,7 @@ import (
 // SetupTempDir is a utility function for kubeadm testing, that creates a temporary directory
 // NB. it is up to the caller to cleanup the folder at the end of the test with defer os.RemoveAll(tmpdir)
 func SetupTempDir(t *testing.T) string {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

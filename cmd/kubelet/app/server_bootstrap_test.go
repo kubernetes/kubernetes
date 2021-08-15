@@ -48,7 +48,7 @@ import (
 // manager that will use the bootstrap client until we get a valid cert, then use our
 // provided identity on subsequent requests.
 func Test_buildClientCertificateManager(t *testing.T) {
-	testDir, err := ioutil.TempDir("", "kubeletcert")
+	testDir, err := os.MkdirTemp("", "kubeletcert")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 }
 
 func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
-	testDir, err := ioutil.TempDir("", "kubeletcert")
+	testDir, err := os.MkdirTemp("", "kubeletcert")
 	if err != nil {
 		t.Fatal(err)
 	}

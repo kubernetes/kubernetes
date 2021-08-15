@@ -64,7 +64,7 @@ func TestGetSeccompSecurityOpts(t *testing.T) {
 }
 
 func TestLoadSeccompLocalhostProfiles(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "seccomp-local-profile-test")
+	tmpdir, err := os.MkdirTemp("", "seccomp-local-profile-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpdir)
 	testProfile := `{"foo": "bar"}`

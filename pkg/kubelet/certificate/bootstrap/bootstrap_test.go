@@ -184,7 +184,7 @@ users:
 	}
 	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
 
-	dir, err := ioutil.TempDir(fileDir, "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp(fileDir, "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}

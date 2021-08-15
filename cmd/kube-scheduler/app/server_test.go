@@ -36,7 +36,7 @@ import (
 
 func TestSetup(t *testing.T) {
 	// temp dir
-	tmpDir, err := ioutil.TempDir("", "scheduler-options")
+	tmpDir, err := os.MkdirTemp("", "scheduler-options")
 	if err != nil {
 		t.Fatal(err)
 	}

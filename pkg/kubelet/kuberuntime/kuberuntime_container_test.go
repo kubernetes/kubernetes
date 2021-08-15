@@ -455,7 +455,7 @@ func TestRestartCountByLogDir(t *testing.T) {
 			restartCount: 8,
 		},
 	} {
-		tempDirPath, err := ioutil.TempDir("", "test-restart-count-")
+		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
 		defer os.RemoveAll(tempDirPath)
 		for _, filename := range tc.filenames {

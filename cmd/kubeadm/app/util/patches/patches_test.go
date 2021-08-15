@@ -233,7 +233,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", testDirPattern)
+			tempDir, err := os.MkdirTemp("", testDirPattern)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -361,7 +361,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", testDirPattern)
+			tempDir, err := os.MkdirTemp("", testDirPattern)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -396,7 +396,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 }
 
 func TestGetPatchManagerForPathCache(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", testDirPattern)
+	tempDir, err := os.MkdirTemp("", testDirPattern)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -63,7 +63,7 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 // StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource
 func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
-	certDir, err := ioutil.TempDir("", t.Name())
+	certDir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

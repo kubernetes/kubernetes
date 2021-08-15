@@ -173,7 +173,7 @@ func (e *transformTest) getEncryptionOptions() []string {
 }
 
 func (e *transformTest) createEncryptionConfig() (string, error) {
-	tempDir, err := ioutil.TempDir("", "secrets-encryption-test")
+	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}

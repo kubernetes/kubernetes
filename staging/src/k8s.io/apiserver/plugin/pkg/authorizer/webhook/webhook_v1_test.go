@@ -51,7 +51,7 @@ var testRetryBackoff = wait.Backoff{
 }
 
 func TestV1NewFromConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}

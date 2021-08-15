@@ -57,7 +57,7 @@ type TestServerSetup struct {
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
 func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup) (client.Interface, *rest.Config) {
-	certDir, _ := ioutil.TempDir("", "test-integration-"+t.Name())
+	certDir, _ := os.MkdirTemp("", "test-integration-"+t.Name())
 	go func() {
 		<-stopCh
 		os.RemoveAll(certDir)

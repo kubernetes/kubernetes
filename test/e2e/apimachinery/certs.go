@@ -36,7 +36,7 @@ type certContext struct {
 // Setup the server cert. For example, user apiservers and admission webhooks
 // can use the cert to prove their identify to the kube-apiserver
 func setupServerCert(namespaceName, serviceName string) *certContext {
-	certDir, err := ioutil.TempDir("", "test-e2e-server-cert")
+	certDir, err := os.MkdirTemp("", "test-e2e-server-cert")
 	if err != nil {
 		framework.Failf("Failed to create a temp dir for cert generation %v", err)
 	}

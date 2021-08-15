@@ -490,7 +490,7 @@ func setupEnvFile(lines [][]string) func(*testing.T, *ConfigMapOptions) func() {
 
 func setupBinaryFile(data []byte) func(*testing.T, *ConfigMapOptions) func() {
 	return func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-		tmp, _ := ioutil.TempDir("", "")
+		tmp, _ := os.MkdirTemp("", "")
 		files := configMapOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file

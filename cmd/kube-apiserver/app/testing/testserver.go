@@ -127,7 +127,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
+	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}

@@ -256,7 +256,7 @@ func TestSafeMakeDir(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
+			base, err := os.MkdirTemp("", "safe-make-dir-"+test.name+"-")
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
@@ -382,7 +382,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "remove-empty-dirs-"+test.name+"-")
+		base, err := os.MkdirTemp("", "remove-empty-dirs-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -612,7 +612,7 @@ func TestCleanSubPaths(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "clean-subpaths-"+test.name+"-")
+		base, err := os.MkdirTemp("", "clean-subpaths-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -869,7 +869,7 @@ func TestBindSubPath(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
+		base, err := os.MkdirTemp("", "bind-subpath-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -1080,7 +1080,7 @@ func TestSafeOpen(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "safe-open-"+test.name+"-")
+		base, err := os.MkdirTemp("", "safe-open-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -1227,7 +1227,7 @@ func TestFindExistingPrefix(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "find-prefix-"+test.name+"-")
+		base, err := os.MkdirTemp("", "find-prefix-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
 		}

@@ -36,7 +36,7 @@ import (
 )
 
 func TestGetAllLogs(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-get-all-logs")
+	dir, err := os.MkdirTemp("", "test-get-all-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 	testLogs := []string{
@@ -75,7 +75,7 @@ func TestGetAllLogs(t *testing.T) {
 }
 
 func TestRotateLogs(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-rotate-logs")
+	dir, err := os.MkdirTemp("", "test-rotate-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -162,7 +162,7 @@ func TestRotateLogs(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-clean")
+	dir, err := os.MkdirTemp("", "test-clean")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -233,7 +233,7 @@ func TestClean(t *testing.T) {
 }
 
 func TestCleanupUnusedLog(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-cleanup-unused-log")
+	dir, err := os.MkdirTemp("", "test-cleanup-unused-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -285,7 +285,7 @@ func TestRemoveExcessLog(t *testing.T) {
 		},
 	} {
 		t.Logf("TestCase %q", desc)
-		dir, err := ioutil.TempDir("", "test-remove-excess-log")
+		dir, err := os.MkdirTemp("", "test-remove-excess-log")
 		require.NoError(t, err)
 		defer os.RemoveAll(dir)
 
@@ -319,7 +319,7 @@ func TestRemoveExcessLog(t *testing.T) {
 }
 
 func TestCompressLog(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-compress-log")
+	dir, err := os.MkdirTemp("", "test-compress-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -350,7 +350,7 @@ func TestCompressLog(t *testing.T) {
 }
 
 func TestRotateLatestLog(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-rotate-latest-log")
+	dir, err := os.MkdirTemp("", "test-rotate-latest-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 

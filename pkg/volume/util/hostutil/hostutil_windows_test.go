@@ -36,7 +36,7 @@ func TestGetFileType(t *testing.T) {
 			"Directory Test",
 			FileTypeDirectory,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				return tempDir, tempDir, err
 			},
 		},

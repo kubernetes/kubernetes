@@ -154,7 +154,7 @@ type fakeStaticPodPathManager struct {
 }
 
 func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (StaticPodPathManager, error) {
-	kubernetesDir, err := ioutil.TempDir("", "kubeadm-pathmanager-")
+	kubernetesDir, err := os.MkdirTemp("", "kubeadm-pathmanager-")
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a temporary directory for the upgrade")
 	}
@@ -453,12 +453,12 @@ func TestStaticPodControlPlane(t *testing.T) {
 			defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
 			tmpKubernetesDir := pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
-			tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
+			tempCertsDir, err := os.MkdirTemp("", "kubeadm-certs")
 			if err != nil {
 				t.Fatalf("couldn't create temporary certificates directory: %v", err)
 			}
 			defer os.RemoveAll(tempCertsDir)
-			tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
+			tmpEtcdDataDir, err := os.MkdirTemp("", "kubeadm-etcd-data")
 			if err != nil {
 				t.Fatalf("couldn't create temporary etcd data directory: %v", err)
 			}
@@ -589,7 +589,7 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfigura
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {
-	dir, err := ioutil.TempDir(os.TempDir(), name)
+	dir, err := os.MkdirTemp(os.TempDir(), name)
 	if err != nil {
 		t.Fatalf("couldn't make temporary directory: %v", err)
 	}
@@ -942,7 +942,7 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Use a temporary directory
-			tmpdir, err := ioutil.TempDir("", "TestGetPathManagerForUpgrade")
+			tmpdir, err := os.MkdirTemp("", "TestGetPathManagerForUpgrade")
 			if err != nil {
 				t.Fatalf("unexpected error making temporary directory: %v", err)
 			}
@@ -1000,7 +1000,7 @@ spec:
   - name: etcd
     image: k8s.gcr.io/etcd:` + expectedEtcdVersion
 
-	manifestsDir, err := ioutil.TempDir("", "GetEtcdImageTagFromStaticPod-test-manifests")
+	manifestsDir, err := os.MkdirTemp("", "GetEtcdImageTagFromStaticPod-test-manifests")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}

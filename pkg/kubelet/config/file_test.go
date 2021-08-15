@@ -74,7 +74,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 }
 
 func mkTempDir(prefix string) (string, error) {
-	return ioutil.TempDir(os.TempDir(), prefix)
+	return os.MkdirTemp(os.TempDir(), prefix)
 }
 
 func removeAll(dir string, t *testing.T) {

@@ -91,7 +91,7 @@ func TestTLSConnection(t *testing.T) {
 
 func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 	baseDir := os.TempDir()
-	tempDir, err := ioutil.TempDir(baseDir, "etcd_certificates")
+	tempDir, err := os.MkdirTemp(baseDir, "etcd_certificates")
 	if err != nil {
 		t.Fatal(err)
 	}

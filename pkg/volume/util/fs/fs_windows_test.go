@@ -28,7 +28,7 @@ import (
 
 func TestDiskUsage(t *testing.T) {
 
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
@@ -38,7 +38,7 @@ func TestDiskUsage(t *testing.T) {
 	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	dir2, err := ioutil.TempDir(dir1, "dir_2")
+	dir2, err := os.MkdirTemp(dir1, "dir_2")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
@@ -86,7 +86,7 @@ func TestDiskUsage(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestInfo failed: %s", err.Error())
 	}

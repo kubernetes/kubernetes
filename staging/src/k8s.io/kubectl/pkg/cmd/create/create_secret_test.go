@@ -515,7 +515,7 @@ func setupSecretEnvFile(lines ...string) func(*testing.T, *CreateSecretOptions) 
 
 func setupSecretBinaryFile(data []byte, files ...string) func(*testing.T, *CreateSecretOptions) func() {
 	return func(t *testing.T, secretOptions *CreateSecretOptions) func() {
-		tmp, _ := ioutil.TempDir("", "")
+		tmp, _ := os.MkdirTemp("", "")
 		for i, file := range files {
 			f := tmp + "/" + file
 			ioutil.WriteFile(f, data, 0644)

@@ -344,7 +344,7 @@ func createPodDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	path, err := ioutil.TempDir(cwd, "static-pods")
+	path, err := os.MkdirTemp(cwd, "static-pods")
 	if err != nil {
 		return "", fmt.Errorf("failed to create static pod directory: %v", err)
 	}

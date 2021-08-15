@@ -199,7 +199,7 @@ G+2/lm8TaVjoU7Fi5Ka5G5HY2GLaR7P+IxYcrMHCl62Y7Rqcrnc=
 }
 
 func TestGetNodeNameFromKubeletConfig(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -278,7 +278,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 }
 
 func TestGetNodeRegistration(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -491,7 +491,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 }
 
 func TestGetInitConfigurationFromCluster(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

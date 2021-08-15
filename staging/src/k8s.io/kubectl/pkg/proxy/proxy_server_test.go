@@ -361,7 +361,7 @@ func TestFileServing(t *testing.T) {
 		fname = "test.txt"
 		data  = "This is test data"
 	)
-	dir, err := ioutil.TempDir("", "data")
+	dir, err := os.MkdirTemp("", "data")
 	if err != nil {
 		t.Fatalf("error creating tmp dir: %v", err)
 	}

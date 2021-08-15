@@ -42,7 +42,7 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 func TestCacheRoundTripper(t *testing.T) {
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	defer os.RemoveAll(cacheDir)
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	assert := assert.New(t)
 
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	os.RemoveAll(cacheDir)
 	defer os.RemoveAll(cacheDir)
 

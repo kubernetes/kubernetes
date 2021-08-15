@@ -217,7 +217,7 @@ func TestGetFileType(t *testing.T) {
 			"Directory Test",
 			FileTypeDirectory,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				return tempDir, tempDir, err
 			},
 		},
@@ -237,7 +237,7 @@ func TestGetFileType(t *testing.T) {
 			"Socket Test",
 			FileTypeSocket,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				if err != nil {
 					return "", "", err
 				}
@@ -249,7 +249,7 @@ func TestGetFileType(t *testing.T) {
 			"Block Device Test",
 			FileTypeBlockDev,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				if err != nil {
 					return "", "", err
 				}
@@ -266,7 +266,7 @@ func TestGetFileType(t *testing.T) {
 			"Character Device Test",
 			FileTypeCharDev,
 			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 				if err != nil {
 					return "", "", err
 				}
@@ -308,7 +308,7 @@ func isOperationNotPermittedError(err error) bool {
 }
 
 func writeFile(content string) (string, string, error) {
-	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+	tempDir, err := os.MkdirTemp("", "mounter_shared_test")
 	if err != nil {
 		return "", "", err
 	}

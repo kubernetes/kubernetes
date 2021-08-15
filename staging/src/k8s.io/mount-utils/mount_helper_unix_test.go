@@ -27,7 +27,7 @@ import (
 )
 
 func writeFile(content string) (string, string, error) {
-	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+	tempDir, err := os.MkdirTemp("", "mounter_shared_test")
 	if err != nil {
 		return "", "", err
 	}

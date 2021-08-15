@@ -258,11 +258,11 @@ func checkErr(t *testing.T, err error) {
 }
 
 func TestTarUntar(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := os.MkdirTemp("", "input")
 	checkErr(t, err)
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := os.MkdirTemp("", "output")
 	checkErr(t, err)
-	dir3, err := ioutil.TempDir("", "dir")
+	dir3, err := os.MkdirTemp("", "dir")
 	checkErr(t, err)
 
 	dir = dir + "/"
@@ -396,9 +396,9 @@ func TestTarUntar(t *testing.T) {
 }
 
 func TestTarUntarWrongPrefix(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := os.MkdirTemp("", "input")
 	checkErr(t, err)
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := os.MkdirTemp("", "output")
 	checkErr(t, err)
 
 	dir = dir + "/"
@@ -428,8 +428,8 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 }
 
 func TestTarDestinationName(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "input")
-	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
+	dir, err := os.MkdirTemp(os.TempDir(), "input")
+	dir2, err2 := os.MkdirTemp(os.TempDir(), "output")
 	if err != nil || err2 != nil {
 		t.Errorf("unexpected error: %v | %v", err, err2)
 		t.FailNow()
@@ -499,7 +499,7 @@ func TestTarDestinationName(t *testing.T) {
 }
 
 func TestBadTar(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "dest")
+	dir, err := os.MkdirTemp(os.TempDir(), "dest")
 	if err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
@@ -568,7 +568,7 @@ func TestCopyToPod(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := os.MkdirTemp("", "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -647,7 +647,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := os.MkdirTemp("", "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -723,7 +723,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestUntar(t *testing.T) {
-	testdir, err := ioutil.TempDir("", "test-untar")
+	testdir, err := os.MkdirTemp("", "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
 	t.Logf("Test base: %s", testdir)
@@ -883,7 +883,7 @@ func TestUntar(t *testing.T) {
 }
 
 func TestUntar_SingleFile(t *testing.T) {
-	testdir, err := ioutil.TempDir("", "test-untar")
+	testdir, err := os.MkdirTemp("", "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
 

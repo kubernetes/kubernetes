@@ -103,7 +103,7 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 	klog.Infof("starting etcd on %s", customURL)
 
-	etcdDataDir, err := ioutil.TempDir(os.TempDir(), dataDir)
+	etcdDataDir, err := os.MkdirTemp(os.TempDir(), dataDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
 	}

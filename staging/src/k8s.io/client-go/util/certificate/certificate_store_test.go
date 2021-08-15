@@ -25,7 +25,7 @@ import (
 )
 
 func TestUpdateSymlinkExistingFileError(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-update-symlink")
+	dir, err := os.MkdirTemp("", "k8s-test-update-symlink")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -49,7 +49,7 @@ func TestUpdateSymlinkExistingFileError(t *testing.T) {
 }
 
 func TestUpdateSymlinkNewFileNotExist(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-update-symlink")
+	dir, err := os.MkdirTemp("", "k8s-test-update-symlink")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -89,7 +89,7 @@ func TestUpdateSymlinkNewFileNotExist(t *testing.T) {
 }
 
 func TestUpdateSymlinkNoSymlink(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-update-symlink")
+	dir, err := os.MkdirTemp("", "k8s-test-update-symlink")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -124,7 +124,7 @@ func TestUpdateSymlinkNoSymlink(t *testing.T) {
 
 func TestUpdateSymlinkReplaceExistingSymlink(t *testing.T) {
 	prefix := "kubelet"
-	dir, err := ioutil.TempDir("", "k8s-test-update-symlink")
+	dir, err := os.MkdirTemp("", "k8s-test-update-symlink")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -178,7 +178,7 @@ func TestUpdateSymlinkReplaceExistingSymlink(t *testing.T) {
 }
 
 func TestLoadFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
+	dir, err := os.MkdirTemp("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -218,7 +218,7 @@ func TestLoadFile(t *testing.T) {
 
 func TestUpdateNoRotation(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -252,7 +252,7 @@ func TestUpdateNoRotation(t *testing.T) {
 
 func TestUpdateRotation(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -286,7 +286,7 @@ func TestUpdateRotation(t *testing.T) {
 
 func TestUpdateTwoCerts(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -323,7 +323,7 @@ func TestUpdateTwoCerts(t *testing.T) {
 
 func TestUpdateWithBadCertKeyData(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -357,7 +357,7 @@ func TestUpdateWithBadCertKeyData(t *testing.T) {
 
 func TestCurrentPairFile(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -396,7 +396,7 @@ func TestCurrentPairFile(t *testing.T) {
 
 func TestCurrentCertKeyFiles(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -433,7 +433,7 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 
 func TestCurrentTwoCerts(t *testing.T) {
 	prefix := "kubelet-server"
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -472,7 +472,7 @@ func TestCurrentTwoCerts(t *testing.T) {
 }
 
 func TestCurrentNoFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp("", "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}

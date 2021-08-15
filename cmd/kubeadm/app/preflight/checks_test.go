@@ -335,7 +335,7 @@ func TestFileContentCheck(t *testing.T) {
 }
 
 func TestDirAvailableCheck(t *testing.T) {
-	fileDir, err := ioutil.TempDir("", "dir-avail-check")
+	fileDir, err := os.MkdirTemp("", "dir-avail-check")
 	if err != nil {
 		t.Fatalf("failed creating directory: %v", err)
 	}

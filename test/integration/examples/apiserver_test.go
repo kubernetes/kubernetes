@@ -71,7 +71,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// start the wardle server to prove we can aggregate it
 	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeClientConfig))
 	defer os.Remove(wardleToKASKubeConfigFile)
-	wardleCertDir, _ := ioutil.TempDir("", "test-integration-wardle-server")
+	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {

@@ -43,7 +43,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 func TestSetupOutputWriterFile(t *testing.T) {
 	file := "output"
 	extension := ".json"
-	dir, err := ioutil.TempDir(os.TempDir(), "out")
+	dir, err := os.MkdirTemp(os.TempDir(), "out")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

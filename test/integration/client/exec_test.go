@@ -806,7 +806,7 @@ func TestExecPluginRotationViaInformer(t *testing.T) {
 }
 
 func startTestServer(t *testing.T) (result *kubeapiservertesting.TestServer, clientAuthorizedToken string, clientCertFileName string, clientKeyFileName string) {
-	certDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-cert-dir-*")
+	certDir, err := os.MkdirTemp("", "kubernetes-client-exec-test-cert-dir-*")
 	if err != nil {
 		t.Fatal(err)
 	}

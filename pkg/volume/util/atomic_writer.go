@@ -355,7 +355,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 
 // newTimestampDir creates a new timestamp directory
 func (w *AtomicWriter) newTimestampDir() (string, error) {
-	tsDir, err := ioutil.TempDir(w.targetDir, time.Now().UTC().Format("..2006_01_02_15_04_05."))
+	tsDir, err := os.MkdirTemp(w.targetDir, time.Now().UTC().Format("..2006_01_02_15_04_05."))
 	if err != nil {
 		klog.Errorf("%s: unable to create new temp directory: %v", w.logContext, err)
 		return "", err

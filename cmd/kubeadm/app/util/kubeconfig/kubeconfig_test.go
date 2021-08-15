@@ -143,7 +143,7 @@ func TestCreateWithToken(t *testing.T) {
 }
 
 func TestWriteKubeconfigToDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

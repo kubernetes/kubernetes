@@ -810,7 +810,7 @@ func TestProxyCertReload(t *testing.T) {
 }
 
 func getCertAndKeyPaths(t *testing.T) (string, string, string) {
-	dir, err := ioutil.TempDir(os.TempDir(), "k8s-test-handler-proxy-cert")
+	dir, err := os.MkdirTemp(os.TempDir(), "k8s-test-handler-proxy-cert")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}

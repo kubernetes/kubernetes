@@ -30,7 +30,7 @@ import (
 
 func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}

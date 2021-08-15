@@ -27,11 +27,11 @@ import (
 )
 
 func TestPluginPathsAreUnaltered(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	tempDir2, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins2")
+	tempDir2, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestPluginPathsAreUnaltered(t *testing.T) {
 }
 
 func TestPluginPathsAreValid(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

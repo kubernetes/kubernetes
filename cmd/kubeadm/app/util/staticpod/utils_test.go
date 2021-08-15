@@ -812,7 +812,7 @@ func TestPatchStaticPod(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", "patch-files")
+			tempDir, err := os.MkdirTemp("", "patch-files")
 			if err != nil {
 				t.Fatal(err)
 			}

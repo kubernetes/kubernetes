@@ -67,7 +67,7 @@ imagePolicy:
 `
 
 func TestNewFromConfig(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
+	dir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}

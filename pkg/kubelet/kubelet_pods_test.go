@@ -241,7 +241,7 @@ fe00::2	ip6-allrouters
 // writeHostsFile will write a hosts file into a temporary dir, and return that dir.
 // Caller is responsible for deleting the dir and its contents.
 func writeHostsFile(filename string, cfg string) (string, error) {
-	tmpdir, err := ioutil.TempDir("", "kubelet=kubelet_pods_test.go=")
+	tmpdir, err := os.MkdirTemp("", "kubelet=kubelet_pods_test.go=")
 	if err != nil {
 		return "", err
 	}

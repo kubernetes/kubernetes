@@ -874,7 +874,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 }
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "projected_volume_test.")
+	tempDir, err := os.MkdirTemp("/tmp", "projected_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}

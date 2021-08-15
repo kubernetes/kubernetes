@@ -17,7 +17,6 @@ limitations under the License.
 package state
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -200,7 +199,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 	}
 
 	// create temp dir
-	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +263,7 @@ func TestCheckpointStateStore(t *testing.T) {
 	}
 
 	// create temp dir
-	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +336,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	}
 
 	// create temp dir
-	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +395,7 @@ func TestCheckpointStateClear(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// create temp dir
-			testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+			testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 			if err != nil {
 				t.Fatal(err)
 			}
