@@ -447,6 +447,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 		fstype           string
 		options          []string
 		sensitiveOptions []string
+		mountFlags       []string
 	}{
 		{
 
@@ -455,6 +456,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			fstype:           "myFS",
 			options:          []string{"o1", "o2"},
 			sensitiveOptions: []string{"s1", "s2"},
+			mountFlags:       []string{},
 		},
 		{
 
@@ -463,6 +465,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			fstype:           "myFS",
 			options:          []string{},
 			sensitiveOptions: []string{"s1", "s2"},
+			mountFlags:       []string{},
 		},
 		{
 
@@ -471,26 +474,44 @@ func TestSensitiveMountOptions(t *testing.T) {
 			fstype:           "myFS",
 			options:          []string{"o1", "o2"},
 			sensitiveOptions: []string{},
+			mountFlags:       []string{},
+		},
+		{
+
+			source:           "mySrc",
+			target:           "myTarget",
+			fstype:           "myFS",
+			options:          []string{"o1", "o2"},
+			sensitiveOptions: []string{"s1", "s2"},
+			mountFlags:       []string{"--no-canonicalize"},
 		},
 	}
 
 	for _, v := range testcases {
 		// Act
-		mountArgs, mountArgsLogStr := MakeMountArgsSensitive(v.source, v.target, v.fstype, v.options, v.sensitiveOptions)
+		mountArgs, mountArgsLogStr := MakeMountArgsSensitiveWithMountFlags(v.source, v.target, v.fstype, v.options, v.sensitiveOptions, v.mountFlags)
 
 		// Assert
 		t.Logf("\r\nmountArgs =%q\r\nmountArgsLogStr=%q", mountArgs, mountArgsLogStr)
+		for _, mountFlag := range v.mountFlags {
+			if found := mountArgsContainString(t, mountArgs, mountFlag); !found {
+				t.Errorf("Expected mountFlag (%q) to exist in returned mountArgs (%q), but it does not", mountFlag, mountArgs)
+			}
+			if !strings.Contains(mountArgsLogStr, mountFlag) {
+				t.Errorf("Expected mountFlag (%q) to exist in returned mountArgsLogStr (%q), but it does", mountFlag, mountArgsLogStr)
+			}
+		}
 		for _, option := range v.options {
-			if found := contains(mountArgs, option, t); !found {
-				t.Errorf("Expected option (%q) to exist in returned mountArts (%q), but it does not", option, mountArgs)
+			if found := mountArgsContainOption(t, mountArgs, option); !found {
+				t.Errorf("Expected option (%q) to exist in returned mountArgs (%q), but it does not", option, mountArgs)
 			}
 			if !strings.Contains(mountArgsLogStr, option) {
 				t.Errorf("Expected option (%q) to exist in returned mountArgsLogStr (%q), but it does", option, mountArgsLogStr)
 			}
 		}
 		for _, sensitiveOption := range v.sensitiveOptions {
-			if found := contains(mountArgs, sensitiveOption, t); !found {
-				t.Errorf("Expected sensitiveOption (%q) to exist in returned mountArts (%q), but it does not", sensitiveOption, mountArgs)
+			if found := mountArgsContainOption(t, mountArgs, sensitiveOption); !found {
+				t.Errorf("Expected sensitiveOption (%q) to exist in returned mountArgs (%q), but it does not", sensitiveOption, mountArgs)
 			}
 			if strings.Contains(mountArgsLogStr, sensitiveOption) {
 				t.Errorf("Expected sensitiveOption (%q) to not exist in returned mountArgsLogStr (%q), but it does", sensitiveOption, mountArgsLogStr)
@@ -499,18 +520,27 @@ func TestSensitiveMountOptions(t *testing.T) {
 	}
 }
 
-func contains(slice []string, str string, t *testing.T) bool {
+func mountArgsContainString(t *testing.T, mountArgs []string, wanted string) bool {
+	for _, mountArg := range mountArgs {
+		if mountArg == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func mountArgsContainOption(t *testing.T, mountArgs []string, option string) bool {
 	optionsIndex := -1
-	for i, s := range slice {
+	for i, s := range mountArgs {
 		if s == "-o" {
 			optionsIndex = i + 1
 			break
 		}
 	}
 
-	if optionsIndex < 0 || optionsIndex >= len(slice) {
+	if optionsIndex < 0 || optionsIndex >= len(mountArgs) {
 		return false
 	}
 
-	return strings.Contains(slice[optionsIndex], str)
+	return strings.Contains(mountArgs[optionsIndex], option)
 }
