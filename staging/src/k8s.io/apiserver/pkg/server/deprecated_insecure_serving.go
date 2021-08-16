@@ -45,6 +45,9 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
+
+		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
 	if len(s.Name) > 0 {
