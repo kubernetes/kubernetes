@@ -424,14 +424,6 @@ func buildGenericConfig(
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
-	genericConfig.IsTerminating = func() bool {
-		select {
-		case <-stopCh:
-			return true
-		default:
-			return false
-		}
-	}
 	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
