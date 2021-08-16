@@ -20,11 +20,14 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 	"testing"
 
-	"k8s.io/utils/pointer"
-
+	"github.com/google/go-cmp/cmp"
 	dto "github.com/prometheus/client_model/go"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/utils/pointer"
 )
 
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
@@ -508,6 +511,84 @@ func TestHistogramVec_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.vec.Validate(); fmt.Sprintf("%v", got) != fmt.Sprintf("%v", tt.want) {
 				t.Errorf("Validate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetHistogramVecFromGatherer(t *testing.T) {
+	var registerMetrics sync.Once
+	tests := []struct {
+		name    string
+		lvMap   map[string]string
+		wantVec HistogramVec
+	}{
+		{
+			name:  "filter with one label",
+			lvMap: map[string]string{"label1": "value1-0"},
+			wantVec: HistogramVec{
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(1.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(2.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+			},
+		},
+		{
+			name:  "filter with two labels",
+			lvMap: map[string]string{"label1": "value1-0", "label2": "value2-1"},
+			wantVec: HistogramVec{
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(2.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buckets := []float64{.5, 2, 5}
+			// HistogramVec has two labels defined.
+			labels := []string{"label1", "label2"}
+			HistogramOpts := &metrics.HistogramOpts{
+				Namespace: "namespace",
+				Name:      "metric_test_name",
+				Subsystem: "subsystem",
+				Help:      "histogram help message",
+				Buckets:   buckets,
+			}
+			vec := metrics.NewHistogramVec(HistogramOpts, labels)
+			registerMetrics.Do(func() {
+				legacyregistry.MustRegister(vec)
+			})
+			// Observe two metrics with same value for label1 but different value of label2.
+			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
+			vec.WithLabelValues("value1-0", "value2-1").Observe(2.5)
+			vec.WithLabelValues("value1-1", "value2-0").Observe(3.5)
+			vec.WithLabelValues("value1-1", "value2-1").Observe(4.5)
+			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
+			metricFamily, _ := GetMetricFamilyFromGatherer(legacyregistry.DefaultGatherer, metricName)
+			histogramVec := GetHistogramVec(metricFamily, tt.lvMap)
+			if diff := cmp.Diff(tt.wantVec, histogramVec); diff != "" {
+				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
 		})
 	}
