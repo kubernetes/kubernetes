@@ -3223,7 +3223,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("getting the state of the sctp module on nodes")
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
 		framework.ExpectNoError(err)
 		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
 
@@ -3338,7 +3338,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("getting the state of the sctp module on nodes")
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
 		framework.ExpectNoError(err)
 		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
 
@@ -3357,8 +3357,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
 		hostExec := utils.NewHostExec(f)
 		defer hostExec.Cleanup()
-		node, err := e2enode.GetRandomReadySchedulableNode(cs)
-		framework.ExpectNoError(err)
+		node := &nodes.Items[0]
 		cmd := "iptables-save"
 		if framework.TestContext.ClusterIsIPv6() {
 			cmd = "ip6tables-save"
