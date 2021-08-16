@@ -1315,6 +1315,31 @@ function Get_ProxyPolicyForWorkloadIdentity {
        replace('GCE_METADATA_SERVER', $GCE_METADATA_SERVER)
 }
 
+# When workload identity is enabled, gke-metadata-server will listen on POD_GATEWAY:988
+# This L4Proxy policy will be in the Containerd CNI config and  will be applied to every pod on this node.
+# The request to 169.254.169.254:80 (GCE Metadata) will be redirected to gke-metadata-server.
+function Get_L4ProxyPolicyForWorkloadIdentity {
+  if (-not (Test-EnableWorkloadIdentity ${kube_env})) {
+    Log-Output "Workload identity is not enabled. No L4Proxy policy is needed"
+    return ""
+  }
+
+  $pod_gateway = Get_Endpoint_Gateway_From_CIDR ${env:POD_CIDR}
+
+  return '{
+      "Name":  "EndpointPolicy",
+      "Value":  {
+         "Type": "L4Proxy",
+	       "Settings": {
+           "IP": "GCE_METADATA_SERVER",
+           "Port": "80",
+           "Destination": "POD_GATEWAY:988"
+	      }
+      }
+    },'.replace('POD_GATEWAY', ${pod_gateway}).`
+       replace('GCE_METADATA_SERVER', $GCE_METADATA_SERVER)
+}
+
 # Obtain the host dns conf and save it to a file so that kubelet/CNI
 # can use it to configure dns suffix search list for pods.
 # The value of DNS server is ignored right now because the pod will
@@ -1763,7 +1788,7 @@ function Configure_Containerd_CniNetworking {
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
   replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
-  replace('PROXY_POLICY_FOR_WORKLOAD_IDENTITY', $(Get_ProxyPolicyForWorkloadIdentity))
+  replace('PROXY_POLICY_FOR_WORKLOAD_IDENTITY', $(Get_L4ProxyPolicyForWorkloadIdentity))
 
   Log-Output "containerd CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
