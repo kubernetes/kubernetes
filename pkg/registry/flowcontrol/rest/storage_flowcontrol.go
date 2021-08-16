@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
 	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/ensurer"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
@@ -64,6 +65,14 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			return genericapiserver.APIGroupInfo{}, false, err
 		}
 		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta1.SchemeGroupVersion.Version] = flowControlStorage
+	}
+
+	if apiResourceConfigSource.VersionEnabled(flowcontrolapisv1beta2.SchemeGroupVersion) {
+		flowControlStorage, err := p.storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		}
+		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta2.SchemeGroupVersion.Version] = flowControlStorage
 	}
 
 	return apiGroupInfo, true, nil
