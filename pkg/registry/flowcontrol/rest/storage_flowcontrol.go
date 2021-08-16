@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -153,7 +153,7 @@ func ensureAPFBootstrapConfiguration(hookContext genericapiserver.PostStartHookC
 	return nil
 }
 
-func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func ensure(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	if err := ensureSuggestedConfiguration(clientset); err != nil {
 		// We should not attempt creation of mandatory objects if ensuring the suggested
 		// configuration resulted in an error.
@@ -172,7 +172,7 @@ func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
 	return nil
 }
 
-func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	fsEnsurer := ensurer.NewSuggestedFlowSchemaEnsurer(clientset.FlowSchemas())
 	if err := fsEnsurer.Ensure(flowcontrolbootstrap.SuggestedFlowSchemas); err != nil {
 		return err
@@ -182,7 +182,7 @@ func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1
 	return plEnsurer.Ensure(flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
 }
 
-func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	fsEnsurer := ensurer.NewMandatoryFlowSchemaEnsurer(clientset.FlowSchemas())
 	if err := fsEnsurer.Ensure(flowcontrolbootstrap.MandatoryFlowSchemas); err != nil {
 		return err
@@ -192,7 +192,7 @@ func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1
 	return plEnsurer.Ensure(flowcontrolbootstrap.MandatoryPriorityLevelConfigurations)
 }
 
-func removeConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func removeConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	if err := removeFlowSchema(clientset.FlowSchemas()); err != nil {
 		return err
 	}

@@ -52,9 +52,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
-	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
+	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta2"
 )
 
 const timeFmt = "2006-01-02T15:04:05.999"
@@ -123,7 +123,7 @@ type configController struct {
 	fsLister         flowcontrollister.FlowSchemaLister
 	fsInformerSynced cache.InformerSynced
 
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface
 
 	// serverConcurrencyLimit is the limit on the server's total
 	// number of non-exempt requests being served at once.  This comes
@@ -217,7 +217,7 @@ func newTestableController(config TestableConfig) *configController {
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
-	fci := config.InformerFactory.Flowcontrol().V1beta1()
+	fci := config.InformerFactory.Flowcontrol().V1beta2()
 	pli := fci.PriorityLevelConfigurations()
 	fsi := fci.FlowSchemas()
 	cfgCtlr.plLister = pli.Lister()

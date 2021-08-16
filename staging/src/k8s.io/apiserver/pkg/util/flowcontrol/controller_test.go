@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,7 +39,7 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/klog/v2"
 )
 
@@ -70,7 +70,7 @@ func (cfgCtlr *configController) hasPriorityLevelState(plName string) bool {
 type ctlrTestState struct {
 	t               *testing.T
 	cfgCtlr         *configController
-	fcIfc           fcclient.FlowcontrolV1beta1Interface
+	fcIfc           fcclient.FlowcontrolV1beta2Interface
 	existingPLs     map[string]*flowcontrol.PriorityLevelConfiguration
 	existingFSs     map[string]*flowcontrol.FlowSchema
 	heldRequestsMap map[string][]heldRequest
@@ -244,7 +244,7 @@ func TestConfigConsumer(t *testing.T) {
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
-			flowcontrolClient := clientset.FlowcontrolV1beta1()
+			flowcontrolClient := clientset.FlowcontrolV1beta2()
 			cts := &ctlrTestState{t: t,
 				fcIfc:           flowcontrolClient,
 				existingFSs:     map[string]*flowcontrol.FlowSchema{},
@@ -375,7 +375,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 
 	clientset := clientsetfake.NewSimpleClientset(fs, pl)
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-	flowcontrolClient := clientset.FlowcontrolV1beta1()
+	flowcontrolClient := clientset.FlowcontrolV1beta2()
 	cts := &ctlrTestState{t: t,
 		fcIfc:           flowcontrolClient,
 		existingFSs:     map[string]*flowcontrol.FlowSchema{},
