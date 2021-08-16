@@ -29,6 +29,10 @@ import (
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
 func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	// The pod is during the admission phase. We need to save the pod to avoid it
+	// being cleaned before the admission ended
+	m.setPodPendingAdmission(pod)
+
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 
@@ -83,6 +87,10 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
 func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	// The pod is during the admission phase. We need to save the pod to avoid it
+	// being cleaned before the admission ended
+	m.setPodPendingAdmission(pod)
+
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 
