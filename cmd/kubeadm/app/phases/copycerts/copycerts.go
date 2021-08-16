@@ -40,7 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
@@ -55,7 +55,7 @@ const (
 // createShortLivedBootstrapToken creates the token used to manager kubeadm-certs
 // and return the tokenID
 func createShortLivedBootstrapToken(client clientset.Interface) (string, error) {
-	tokenStr, err := bootstraputil.GenerateBootstrapToken()
+	tokenStr, err := tokenutil.GenerateBootstrapToken()
 	if err != nil {
 		return "", errors.Wrap(err, "error generating token to upload certs")
 	}
@@ -161,7 +161,7 @@ func createRBAC(client clientset.Interface) error {
 }
 
 func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.OwnerReference, error) {
-	secretName := bootstraputil.BootstrapTokenSecretName(tokenID)
+	secretName := tokenutil.BootstrapTokenSecretName(tokenID)
 	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get token reference")

@@ -48,7 +48,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 	"k8s.io/klog/v2"
 
 	"github.com/lithammer/dedent"
@@ -291,7 +291,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
 	klog.V(1).Infoln("[token] generating random token")
-	token, err := bootstraputil.GenerateBootstrapToken()
+	token, err := tokenutil.GenerateBootstrapToken()
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
 		klog.V(1).Info("[token] parsing token")
-		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
+		if !tokenutil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := bootstraptokenv1.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
@@ -425,7 +425,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 			tokenID = bts.ID
 		}
 
-		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
+		tokenSecretName := tokenutil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
 		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)

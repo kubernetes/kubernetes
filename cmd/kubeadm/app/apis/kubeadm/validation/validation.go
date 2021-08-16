@@ -38,7 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	secretutil "k8s.io/cluster-bootstrap/util/secrets"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 
@@ -225,7 +226,7 @@ func ValidateBootstrapTokens(bts []bootstraptokenv1.BootstrapToken, fldPath *fie
 func ValidateToken(token string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !bootstraputil.IsValidBootstrapToken(token) {
+	if !tokenutil.IsValidBootstrapToken(token) {
 		allErrs = append(allErrs, field.Invalid(fldPath, token, "the bootstrap token is invalid"))
 	}
 
@@ -245,7 +246,7 @@ func ValidateTokenGroups(usages []string, groups []string, fldPath *field.Path) 
 
 	// validate any extra group names
 	for _, group := range groups {
-		if err := bootstraputil.ValidateBootstrapGroupName(group); err != nil {
+		if err := secretutil.ValidateBootstrapGroupName(group); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, groups, err.Error()))
 		}
 	}
@@ -258,7 +259,7 @@ func ValidateTokenUsages(usages []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// validate usages
-	if err := bootstraputil.ValidateUsages(usages); err != nil {
+	if err := tokenutil.ValidateUsages(usages); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, usages, err.Error()))
 	}
 

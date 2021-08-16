@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
@@ -80,7 +80,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]bootstraptokenv1.BootstrapToken) e
 			continue
 		}
 
-		tokenStr, err := bootstraputil.GenerateBootstrapToken()
+		tokenStr, err := tokenutil.GenerateBootstrapToken()
 		if err != nil {
 			return errors.Wrap(err, "couldn't generate random token")
 		}

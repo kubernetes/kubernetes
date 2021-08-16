@@ -27,8 +27,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 )
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -58,7 +58,7 @@ func (bts *BootstrapTokenString) UnmarshalJSON(b []byte) error {
 // String returns the string representation of the BootstrapTokenString
 func (bts BootstrapTokenString) String() string {
 	if len(bts.ID) > 0 && len(bts.Secret) > 0 {
-		return bootstraputil.TokenFromIDAndSecret(bts.ID, bts.Secret)
+		return tokenutil.TokenFromIDAndSecret(bts.ID, bts.Secret)
 	}
 	return ""
 }
@@ -68,7 +68,7 @@ func (bts BootstrapTokenString) String() string {
 // and internal usage. It also automatically validates that the given token
 // is of the right format
 func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
-	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
+	substrs := tokenutil.BootstrapTokenRegexp.FindStringSubmatch(token)
 	// TODO: Add a constant for the 3 value here, and explain better why it's needed (other than because how the regexp parsin works)
 	if len(substrs) != 3 {
 		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
@@ -80,7 +80,7 @@ func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 // NewBootstrapTokenStringFromIDAndSecret is a wrapper around NewBootstrapTokenString
 // that allows the caller to specify the ID and Secret separately
 func NewBootstrapTokenStringFromIDAndSecret(id, secret string) (*BootstrapTokenString, error) {
-	return NewBootstrapTokenString(bootstraputil.TokenFromIDAndSecret(id, secret))
+	return NewBootstrapTokenString(tokenutil.TokenFromIDAndSecret(id, secret))
 }
 
 // BootstrapTokenToSecret converts the given BootstrapToken object to its Secret representation that
@@ -88,7 +88,7 @@ func NewBootstrapTokenStringFromIDAndSecret(id, secret string) (*BootstrapTokenS
 func BootstrapTokenToSecret(bt *BootstrapToken) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      bootstraputil.BootstrapTokenSecretName(bt.Token.ID),
+			Name:      tokenutil.BootstrapTokenSecretName(bt.Token.ID),
 			Namespace: metav1.NamespaceSystem,
 		},
 		Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
@@ -143,9 +143,9 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	}
 
 	// Enforce the right naming convention
-	if secret.Name != bootstraputil.BootstrapTokenSecretName(tokenID) {
+	if secret.Name != tokenutil.BootstrapTokenSecretName(tokenID) {
 		return nil, errors.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
-			bootstrapapi.BootstrapTokenSecretPrefix, secret.Name, bootstraputil.BootstrapTokenSecretName(tokenID))
+			bootstrapapi.BootstrapTokenSecretPrefix, secret.Name, tokenutil.BootstrapTokenSecretName(tokenID))
 	}
 
 	tokenSecret := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenSecretKey)

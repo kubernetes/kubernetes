@@ -17,6 +17,7 @@ limitations under the License.
 package secrets
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -24,12 +25,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cluster-bootstrap/token/api"
-	legacyutil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
 )
 
 var (
 	secretNameRe = regexp.MustCompile(`^` + regexp.QuoteMeta(api.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`)
+
+	// BootstrapGroupRegexp is a compiled regular expression of BootstrapGroupPattern
+	BootstrapGroupRegexp = regexp.MustCompile(api.BootstrapGroupPattern)
 )
 
 // GetData returns the string value for the given key in the specified Secret
@@ -101,7 +104,7 @@ func GetGroups(secret *v1.Secret) ([]string, error) {
 
 	// validate the names of the extra groups
 	for _, group := range strings.Split(extraGroupsString, ",") {
-		if err := legacyutil.ValidateBootstrapGroupName(group); err != nil {
+		if err := ValidateBootstrapGroupName(group); err != nil {
 			return nil, err
 		}
 		groups.Insert(group)
@@ -109,4 +112,13 @@ func GetGroups(secret *v1.Secret) ([]string, error) {
 
 	// return the result as a deduplicated, sorted list
 	return groups.List(), nil
+}
+
+// ValidateBootstrapGroupName checks if the provided group name is a valid
+// bootstrap group name. Returns nil if valid or a validation error if invalid.
+func ValidateBootstrapGroupName(name string) error {
+	if BootstrapGroupRegexp.Match([]byte(name)) {
+		return nil
+	}
+	return fmt.Errorf("bootstrap group %q is invalid (must match %s)", name, api.BootstrapGroupPattern)
 }

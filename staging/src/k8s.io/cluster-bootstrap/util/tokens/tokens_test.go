@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package tokens
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -154,36 +153,6 @@ func TestBootstrapTokenSecretName(t *testing.T) {
 				rt.expected,
 				actual,
 			)
-		}
-	}
-}
-
-func TestValidateBootstrapGroupName(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		valid bool
-	}{
-		{"valid", "system:bootstrappers:foo", true},
-		{"valid nested", "system:bootstrappers:foo:bar:baz", true},
-		{"valid with dashes and number", "system:bootstrappers:foo-bar-42", true},
-		{"invalid uppercase", "system:bootstrappers:Foo", false},
-		{"missing prefix", "foo", false},
-		{"prefix with no body", "system:bootstrappers:", false},
-		{"invalid spaces", "system:bootstrappers: ", false},
-		{"invalid asterisk", "system:bootstrappers:*", false},
-		{"trailing colon", "system:bootstrappers:foo:", false},
-		{"trailing dash", "system:bootstrappers:foo-", false},
-		{"script tags", "system:bootstrappers:<script> alert(\"scary?!\") </script>", false},
-		{"too long", "system:bootstrappers:" + strings.Repeat("x", 300), false},
-	}
-	for _, test := range tests {
-		err := ValidateBootstrapGroupName(test.input)
-		if err != nil && test.valid {
-			t.Errorf("test %q: ValidateBootstrapGroupName(%q) returned unexpected error: %v", test.name, test.input, err)
-		}
-		if err == nil && !test.valid {
-			t.Errorf("test %q: ValidateBootstrapGroupName(%q) was supposed to return an error but didn't", test.name, test.input)
 		}
 	}
 }

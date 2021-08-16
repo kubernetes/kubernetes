@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	tokenutil "k8s.io/cluster-bootstrap/util/tokens"
 
 	"github.com/pkg/errors"
 )
@@ -62,7 +62,7 @@ func (bts *BootstrapTokenString) UnmarshalJSON(b []byte) error {
 // String returns the string representation of the BootstrapTokenString
 func (bts BootstrapTokenString) String() string {
 	if len(bts.ID) > 0 && len(bts.Secret) > 0 {
-		return bootstraputil.TokenFromIDAndSecret(bts.ID, bts.Secret)
+		return tokenutil.TokenFromIDAndSecret(bts.ID, bts.Secret)
 	}
 	return ""
 }
@@ -72,7 +72,7 @@ func (bts BootstrapTokenString) String() string {
 // and internal usage. It also automatically validates that the given token
 // is of the right format
 func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
-	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
+	substrs := tokenutil.BootstrapTokenRegexp.FindStringSubmatch(token)
 	// TODO: Add a constant for the 3 value here, and explain better why it's needed (other than because how the regexp parsin works)
 	if len(substrs) != 3 {
 		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
@@ -84,5 +84,5 @@ func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 // NewBootstrapTokenStringFromIDAndSecret is a wrapper around NewBootstrapTokenString
 // that allows the caller to specify the ID and Secret separately
 func NewBootstrapTokenStringFromIDAndSecret(id, secret string) (*BootstrapTokenString, error) {
-	return NewBootstrapTokenString(bootstraputil.TokenFromIDAndSecret(id, secret))
+	return NewBootstrapTokenString(tokenutil.TokenFromIDAndSecret(id, secret))
 }
