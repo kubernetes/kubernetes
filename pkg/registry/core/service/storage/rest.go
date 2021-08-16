@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 
@@ -36,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -751,6 +751,68 @@ func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) 
 	return true
 }
 
+func sameClusterIPs(lhs, rhs *api.Service) bool {
+	if len(rhs.Spec.ClusterIPs) != len(lhs.Spec.ClusterIPs) {
+		return false
+	}
+
+	for i, ip := range rhs.Spec.ClusterIPs {
+		if lhs.Spec.ClusterIPs[i] != ip {
+			return false
+		}
+	}
+
+	return true
+}
+
+func reducedClusterIPs(before, after *api.Service) bool {
+	if len(after.Spec.ClusterIPs) == 0 { // Not specified
+		return false
+	}
+	return len(after.Spec.ClusterIPs) < len(before.Spec.ClusterIPs)
+}
+
+func sameIPFamilies(lhs, rhs *api.Service) bool {
+	if len(rhs.Spec.IPFamilies) != len(lhs.Spec.IPFamilies) {
+		return false
+	}
+
+	for i, family := range rhs.Spec.IPFamilies {
+		if lhs.Spec.IPFamilies[i] != family {
+			return false
+		}
+	}
+
+	return true
+}
+
+func reducedIPFamilies(before, after *api.Service) bool {
+	if len(after.Spec.IPFamilies) == 0 { // Not specified
+		return false
+	}
+	return len(after.Spec.IPFamilies) < len(before.Spec.IPFamilies)
+}
+
+// Helper to get the IP family of a given IP.
+func familyOf(ip string) api.IPFamily {
+	if netutils.IsIPv4String(ip) {
+		return api.IPv4Protocol
+	}
+	if netutils.IsIPv6String(ip) {
+		return api.IPv6Protocol
+	}
+	return api.IPFamily("unknown")
+}
+
+// Helper to avoid nil-checks all over.  Callers of this need to be checking
+// for an exact value.
+func getIPFamilyPolicy(svc *api.Service) api.IPFamilyPolicyType {
+	if svc.Spec.IPFamilyPolicy == nil {
+		return "" // callers need to handle this
+	}
+	return *svc.Spec.IPFamilyPolicy
+}
+
 // attempts to default service ip families according to cluster configuration
 // while ensuring that provided families are configured on cluster.
 func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) error {
@@ -777,20 +839,63 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		return nil // nothing more to do.
 	}
 
-	// two families or two IPs with SingleStack
-	if service.Spec.IPFamilyPolicy != nil {
-		el := make(field.ErrorList, 0)
-		if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
-			if len(service.Spec.ClusterIPs) == 2 {
-				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack or PreferDualStack when multiple 'clusterIPs' are specified"))
+	// Update-only prep work.
+	if oldService != nil {
+		np := service.Spec.IPFamilyPolicy
+
+		// If they didn't specify policy, or specified anything but
+		// single-stack AND they reduced these fields, it's an error.  They
+		// need to specify policy.
+		if np == nil || *np != api.IPFamilyPolicySingleStack {
+			el := make(field.ErrorList, 0)
+
+			if reducedClusterIPs(oldService, service) {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+					"must be 'SingleStack' to release the secondary cluster IP"))
 			}
-			if len(service.Spec.IPFamilies) == 2 {
-				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack or PreferDualStack when multiple 'ipFamilies' are specified"))
+			if reducedIPFamilies(oldService, service) {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+					"must be 'SingleStack' to release the secondary IP family"))
+			}
+
+			if len(el) > 0 {
+				return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+			}
+		} else { // policy must be SingleStack
+			// Update: As long as ClusterIPs and IPFamilies have not changed,
+			// setting policy to single-stack is clear intent.
+			if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
+				if sameClusterIPs(oldService, service) && len(service.Spec.ClusterIPs) > 1 {
+					service.Spec.ClusterIPs = service.Spec.ClusterIPs[0:1]
+				}
+				if sameIPFamilies(oldService, service) && len(service.Spec.IPFamilies) > 1 {
+					service.Spec.IPFamilies = service.Spec.IPFamilies[0:1]
+				}
 			}
 		}
+	}
 
-		if len(el) > 0 {
-			return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+	// Do some loose pre-validation of the input.  This makes it easier in the
+	// rest of allocation code to not have to consider corner cases.
+	// TODO(thockin): when we tighten validation (e.g. to require IPs) we will
+	// need a "strict" and a "loose" form of this.
+	if el := validation.ValidateServiceClusterIPsRelatedFields(service); len(el) != 0 {
+		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+	}
+
+	//TODO(thockin): Move this logic to validation?
+	el := make(field.ErrorList, 0)
+
+	// Make sure ipFamilyPolicy makes sense for the provided ipFamilies and
+	// clusterIPs.  Further checks happen below - after the special cases.
+	if getIPFamilyPolicy(service) == api.IPFamilyPolicySingleStack {
+		if len(service.Spec.ClusterIPs) == 2 {
+			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+				"must be 'RequireDualStack' or 'PreferDualStack' when multiple cluster IPs are specified"))
+		}
+		if len(service.Spec.IPFamilies) == 2 {
+			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+				"must be 'RequireDualStack' or 'PreferDualStack' when multiple IP families are specified"))
 		}
 	}
 
@@ -801,28 +906,28 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 			break
 		}
 
-		// we have previously validated for ip correctness and if family exist it will match ip family
-		// so the following is safe to do
-		isIPv6 := netutils.IsIPv6String(ip)
+		// We previously validated that IPs are well-formed and that if an
+		// ipFamilies[] entry exists it matches the IP.
+		fam := familyOf(ip)
 
 		// If the corresponding family is not specified, add it.
 		if i >= len(service.Spec.IPFamilies) {
-			if isIPv6 {
-				// first make sure that family(ip) is configured
-				if _, found := al.serviceIPAllocatorsByFamily[api.IPv6Protocol]; !found {
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not use IPv6 on a cluster which is not configured for it")}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
+			// Families are checked more later, but this is a better error in
+			// this specific case (indicating the user-provided IP, rather
+			// than than the auto-assigned family).
+			if _, found := al.serviceIPAllocatorsByFamily[fam]; !found {
+				el = append(el, field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs,
+					fmt.Sprintf("%s is not configured on this cluster", fam)))
 			} else {
-				// first make sure that family(ip) is configured
-				if _, found := al.serviceIPAllocatorsByFamily[api.IPv4Protocol]; !found {
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not use IPv4 on a cluster which is not configured for it")}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
+				// OK to infer.
+				service.Spec.IPFamilies = append(service.Spec.IPFamilies, fam)
 			}
 		}
+	}
+
+	// If we have validation errors, bail out now so we don't make them worse.
+	if len(el) > 0 {
+		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
 	// Infer IPFamilyPolicy from IPFamilies[].  This block does not handle the
@@ -870,19 +975,18 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 	// Everything below this MUST happen *after* the above special cases.
 	//
 
-	// ipfamily check
-	// the following applies on all type of services including headless w/ selector
-	el := make(field.ErrorList, 0)
-
 	// Demanding dual-stack on a non dual-stack cluster.
-	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicyRequireDualStack && len(al.serviceIPAllocatorsByFamily) < 2 {
-		el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "Cluster is not configured for dual stack services"))
+	if getIPFamilyPolicy(service) == api.IPFamilyPolicyRequireDualStack {
+		if len(al.serviceIPAllocatorsByFamily) < 2 {
+			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+				"this cluster is not configured for dual-stack services"))
+		}
 	}
 
 	// If there is a family requested then it has to be configured on cluster.
 	for i, ipFamily := range service.Spec.IPFamilies {
 		if _, found := al.serviceIPAllocatorsByFamily[ipFamily]; !found {
-			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilies").Index(i), service.Spec.ClusterIPs, fmt.Sprintf("ipfamily %v is not configured on cluster", ipFamily)))
+			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilies").Index(i), ipFamily, "not configured on this cluster"))
 		}
 	}
 
@@ -911,9 +1015,7 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 
 		if service.Spec.IPFamilies[0] == api.IPv4Protocol {
 			service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
-		}
-
-		if service.Spec.IPFamilies[0] == api.IPv6Protocol {
+		} else if service.Spec.IPFamilies[0] == api.IPv6Protocol {
 			service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
 		}
 	}

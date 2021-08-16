@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -374,16 +375,6 @@ func fmtIPFamilies(fams []api.IPFamily) string {
 		return "[]"
 	}
 	return fmt.Sprintf("%v", fams)
-}
-
-func familyOf(ip string) api.IPFamily {
-	if netutils.IsIPv4String(ip) {
-		return api.IPv4Protocol
-	}
-	if netutils.IsIPv6String(ip) {
-		return api.IPv6Protocol
-	}
-	return api.IPFamily("unknown")
 }
 
 // Prove that create ignores IP and IPFamily stuff when type is ExternalName.
@@ -4765,6 +4756,141 @@ func TestCreateInitIPFields(t *testing.T) {
 	}
 }
 
+// There are enough corner-cases that it's useful to have a test that asserts
+// the errors.  Some of these are in other tests, but this is clearer.
+func TestCreateInvalidClusterIPInputs(t *testing.T) {
+	testCases := []struct {
+		name     string
+		families []api.IPFamily
+		svc      *api.Service
+		expect   []string
+	}{{
+		name:     "bad_ipFamilyPolicy",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyType("garbage"))),
+		expect: []string{"Unsupported value"},
+	}, {
+		name:     "requiredual_ipFamilyPolicy_on_singlestack",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+		expect: []string{"cluster is not configured for dual-stack"},
+	}, {
+		name:     "bad_ipFamilies_0_value",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPFamily("garbage"))),
+		expect: []string{"Unsupported value"},
+	}, {
+		name:     "bad_ipFamilies_1_value",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPFamily("garbage"))),
+		expect: []string{"Unsupported value"},
+	}, {
+		name:     "bad_ipFamilies_2_value",
+		families: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol, api.IPFamily("garbage"))),
+		expect: []string{"Unsupported value"},
+	}, {
+		name:     "wrong_ipFamily",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv6Protocol)),
+		expect: []string{"not configured on this cluster"},
+	}, {
+		name:     "too_many_ipFamilies_on_singlestack",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+		expect: []string{"not configured on this cluster"},
+	}, {
+		name:     "dup_ipFamily_singlestack",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv4Protocol)),
+		expect: []string{"Duplicate value"},
+	}, {
+		name:     "dup_ipFamily_dualstack",
+		families: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol, api.IPv6Protocol)),
+		expect: []string{"Duplicate value"},
+	}, {
+		name:     "bad_IP",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("garbage")),
+		expect: []string{"must be a valid IP"},
+	}, {
+		name:     "IP_wrong_family",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("2000::1")),
+		expect: []string{"not configured on this cluster"},
+	}, {
+		name:     "IP_doesnt_match_family",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetIPFamilies(api.IPv4Protocol),
+			svctest.SetClusterIPs("2000::1")),
+		expect: []string{"expected an IPv4 value as indicated"},
+	}, {
+		name:     "too_many_IPs_singlestack",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("10.0.0.1", "10.0.0.2")),
+		expect: []string{"no more than one IP for each IP family"},
+	}, {
+		name:     "too_many_IPs_dualstack",
+		families: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("10.0.0.1", "2000::1", "10.0.0.2")),
+		expect: []string{"only hold up to 2 values"},
+	}, {
+		name:     "dup_IPs",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("10.0.0.1", "10.0.0.1")),
+		expect: []string{"no more than one IP for each IP family"},
+	}, {
+		name:     "empty_IP",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("")),
+		expect: []string{"must be empty when", "must be a valid IP"},
+	}, {
+		name:     "None_IP_1",
+		families: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIPs("10.0.0.1", "None")),
+		expect: []string{"must be a valid IP"},
+	}}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage, _, server := newStorage(t, tc.families)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			t.Logf("INFO: errstr:\n  %v", err)
+			for _, s := range tc.expect {
+				if !strings.Contains(err.Error(), s) {
+					t.Errorf("expected to find %q in the error:\n  %s", s, err.Error())
+				}
+			}
+		})
+	}
+}
 func TestCreateDeleteReuse(t *testing.T) {
 	testCases := []struct {
 		name string

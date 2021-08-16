@@ -4358,7 +4358,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	}
 
 	// dualstack <-> ClusterIPs <-> ipfamilies
-	allErrs = append(allErrs, validateServiceClusterIPsRelatedFields(service)...)
+	allErrs = append(allErrs, ValidateServiceClusterIPsRelatedFields(service)...)
 
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
@@ -6305,8 +6305,10 @@ func ValidateSpreadConstraintNotRepeat(fldPath *field.Path, constraint core.Topo
 	return nil
 }
 
-// validateServiceClusterIPsRelatedFields validates .spec.ClusterIPs,, .spec.IPFamilies, .spec.ipFamilyPolicy
-func validateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorList {
+// ValidateServiceClusterIPsRelatedFields validates .spec.ClusterIPs,,
+// .spec.IPFamilies, .spec.ipFamilyPolicy.  This is exported because it is used
+// during IP init and allocation.
+func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorList {
 	// ClusterIP, ClusterIPs, IPFamilyPolicy and IPFamilies are validated prior (all must be unset) for ExternalName service
 	if service.Spec.Type == core.ServiceTypeExternalName {
 		return field.ErrorList{}
@@ -6328,12 +6330,12 @@ func validateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		if len(service.Spec.ClusterIPs) == 0 {
 			allErrs = append(allErrs, field.Required(clusterIPsField, ""))
 		} else if service.Spec.ClusterIPs[0] != service.Spec.ClusterIP {
-			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "element [0] must match clusterIP"))
+			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "first value must match `clusterIP`"))
 		}
 	} else { // ClusterIP == ""
 		// If ClusterIP is not set, ClusterIPs must also be unset.
 		if len(service.Spec.ClusterIPs) != 0 {
-			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "must be empty when clusterIP is empty"))
+			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "must be empty when `clusterIP` is not specified"))
 		}
 	}
 
