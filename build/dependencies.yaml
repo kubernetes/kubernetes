@@ -110,7 +110,7 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.16.7-1
+    version: v1.16.7-canary-1
     refPaths:
     - path: build/build-image/cross/VERSION
 
