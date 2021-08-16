@@ -177,9 +177,15 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	return ioutil.WriteFile(destFile, b, 0644)
 }
 
+type labelValues struct {
+	label  string
+	values []string
+}
+
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
+// NOTE: The mapping here means only one filter is supported, either value in the list of `values` is able to be collected.
 type metricsCollectorConfig struct {
-	Metrics []string
+	Metrics map[string]*labelValues
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -202,22 +208,38 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for _, metric := range pc.Metrics {
-		dataItem := collectHistogramVec(metric, pc.labels)
-		if dataItem != nil {
-			dataItems = append(dataItems, *dataItem)
+	for name, labelVals := range pc.Metrics {
+		metricFamily, err := testutil.GetMetricFamilyFromGatherer(legacyregistry.DefaultGatherer, name)
+		if err != nil {
+			klog.Error(err)
+			return dataItems
+		}
+		// no filter is specified, aggregate all the metrics within the same metricFamily.
+		if labelVals == nil {
+			vec := testutil.GetHistogramVec(metricFamily, nil)
+			dataItem := collectHistogramData(vec, pc.labels, nil, name)
+			if dataItem != nil {
+				dataItems = append(dataItems, *dataItem)
+			}
+		} else {
+			// fetch the metric from metricFamily which match each of the lvMap.
+			for _, value := range labelVals.values {
+				lvMap := map[string]string{labelVals.label: value}
+				vec := testutil.GetHistogramVec(metricFamily, lvMap)
+				dataItem := collectHistogramData(vec, pc.labels, lvMap, name)
+				if dataItem != nil {
+					dataItems = append(dataItems, *dataItem)
+				}
+			}
 		}
 	}
 	return dataItems
 }
 
-func collectHistogramVec(metric string, labels map[string]string) *DataItem {
-	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, nil)
-	if err != nil {
-		klog.Error(err)
+func collectHistogramData(vec testutil.HistogramVec, labels, lvMap map[string]string, metric string) *DataItem {
+	if len(vec) == 0 {
 		return nil
 	}
-
 	if err := vec.Validate(); err != nil {
 		klog.Error(err)
 		return nil
@@ -234,6 +256,9 @@ func collectHistogramVec(metric string, labels map[string]string) *DataItem {
 	// Copy labels and add "Metric" label for this metric.
 	labelMap := map[string]string{"Metric": metric}
 	for k, v := range labels {
+		labelMap[k] = v
+	}
+	for k, v := range lvMap {
 		labelMap[k] = v
 	}
 	return &DataItem{
