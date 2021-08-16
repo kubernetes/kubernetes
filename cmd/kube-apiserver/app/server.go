@@ -507,7 +507,7 @@ func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgocli
 	}
 	return utilflowcontrol.New(
 		versionedInformer,
-		extclient.FlowcontrolV1beta1(),
+		extclient.FlowcontrolV1beta2(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
 	), nil

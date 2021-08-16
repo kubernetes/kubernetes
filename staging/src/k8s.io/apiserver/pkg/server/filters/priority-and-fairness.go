@@ -23,7 +23,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
