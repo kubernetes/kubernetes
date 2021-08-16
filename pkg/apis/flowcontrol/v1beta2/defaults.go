@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
-	"k8s.io/api/flowcontrol/v1beta1"
+	"k8s.io/api/flowcontrol/v1beta2"
 )
 
 // Default settings for flow-schema
@@ -34,20 +34,20 @@ const (
 )
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_FlowSchemaSpec(spec *v1beta1.FlowSchemaSpec) {
+func SetDefaults_FlowSchemaSpec(spec *v1beta2.FlowSchemaSpec) {
 	if spec.MatchingPrecedence == 0 {
 		spec.MatchingPrecedence = FlowSchemaDefaultMatchingPrecedence
 	}
 }
 
-func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta1.LimitedPriorityLevelConfiguration) {
+func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta2.LimitedPriorityLevelConfiguration) {
 	if lplc.AssuredConcurrencyShares == 0 {
 		lplc.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
 	}
 }
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_QueuingConfiguration(cfg *v1beta1.QueuingConfiguration) {
+func SetDefaults_QueuingConfiguration(cfg *v1beta2.QueuingConfiguration) {
 	if cfg.HandSize == 0 {
 		cfg.HandSize = PriorityLevelConfigurationDefaultHandSize
 	}

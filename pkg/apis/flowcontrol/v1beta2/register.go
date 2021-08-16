@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -25,7 +25,7 @@ import (
 const GroupName = "flowcontrol.apiserver.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta2"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -33,7 +33,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	localSchemeBuilder = &flowcontrolv1beta1.SchemeBuilder
+	localSchemeBuilder = &flowcontrolv1beta2.SchemeBuilder
 	// AddToScheme adds api to a scheme
 	AddToScheme = localSchemeBuilder.AddToScheme
 )
