@@ -69,14 +69,14 @@ func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.O
 
 func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRelated *v1.ObjectReference, timestamp metav1.MicroTime, eventtype, reason, message string, reportingController string, reportingInstance string, action string) *eventsv1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
-	namespace := refRegarding.Namespace
-	if namespace == "" {
-		namespace = metav1.NamespaceDefault
+	regarding := refRegarding.DeepCopy()
+	if regarding.Namespace == "" {
+		regarding.Namespace = metav1.NamespaceDefault
 	}
 	return &eventsv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", refRegarding.Name, t.UnixNano()),
-			Namespace: namespace,
+			Namespace: regarding.Namespace,
 		},
 		EventTime:           timestamp,
 		Series:              nil,
@@ -84,7 +84,7 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 		ReportingInstance:   reportingInstance,
 		Action:              action,
 		Reason:              reason,
-		Regarding:           *refRegarding,
+		Regarding:           *regarding,
 		Related:             refRelated,
 		Note:                message,
 		Type:                eventtype,
