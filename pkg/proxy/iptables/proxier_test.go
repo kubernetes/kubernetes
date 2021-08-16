@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -2703,6 +2704,12 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	// Delete ClusterIP entries
 	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
 	fexec.CommandScript = append(fexec.CommandScript, execFunc)
+	// Delete ExternalIP entries
+	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+	fexec.CommandScript = append(fexec.CommandScript, execFunc)
+	// Delete LoadBalancerIP entries
+	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+	fexec.CommandScript = append(fexec.CommandScript, execFunc)
 	// Delete NodePort entries
 	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
 	fexec.CommandScript = append(fexec.CommandScript, execFunc)
@@ -2712,6 +2719,8 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	fp.exec = &fexec
 
 	svcIP := "10.20.30.41"
+	extIP := "1.1.1.1"
+	lbIngressIP := "2.2.2.2"
 	svcPort := 80
 	nodePort := 31201
 	svcPortName := proxy.ServicePortName{
@@ -2723,11 +2732,16 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = []string{extIP}
+			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),
 				Protocol: v1.ProtocolUDP,
 				NodePort: int32(nodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: lbIngressIP,
 			}}
 		}),
 	)
@@ -2755,21 +2769,33 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	)
 
 	fp.syncProxyRules()
-	if fexec.CommandCalls != 2 {
-		t.Fatalf("Updated UDP service with new endpoints must clear UDP entries")
+
+	if fexec.CommandCalls != 4 {
+		t.Fatalf("Updated UDP service with new endpoints must clear UDP entries 4 times: ClusterIP, NodePort, ExternalIP and LB")
 	}
 
-	// Delete ClusterIP Conntrack entries
-	expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP))))
-	actualCommand := strings.Join(fcmd.CombinedOutputLog[0], " ")
-	if actualCommand != expectCommand {
-		t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
+	// the order is not guaranteed so we have to compare the strings in any order
+	expectedCommands := []string{
+		// Delete ClusterIP Conntrack entries
+		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		// Delete ExternalIP Conntrack entries
+		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", extIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		// Delete LoadBalancerIP Conntrack entries
+		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", lbIngressIP, strings.ToLower(string((v1.ProtocolUDP)))),
+		// Delete NodePort Conntrack entrie
+		fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort),
 	}
-	// Delete NodePort Conntrack entrie
-	expectCommand = fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort)
-	actualCommand = strings.Join(fcmd.CombinedOutputLog[1], " ")
-	if actualCommand != expectCommand {
-		t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
+	actualCommands := []string{
+		strings.Join(fcmd.CombinedOutputLog[0], " "),
+		strings.Join(fcmd.CombinedOutputLog[1], " "),
+		strings.Join(fcmd.CombinedOutputLog[2], " "),
+		strings.Join(fcmd.CombinedOutputLog[3], " "),
+	}
+	sort.Strings(expectedCommands)
+	sort.Strings(actualCommands)
+
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("Expected commands: %v, but executed %v", expectedCommands, actualCommands)
 	}
 }
 
