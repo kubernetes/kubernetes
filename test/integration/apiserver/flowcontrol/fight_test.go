@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	"k8s.io/apimachinery/pkg/util/clock"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -95,7 +95,7 @@ func (ft *fightTest) createMainInformer() {
 	myConfig = rest.AddUserAgent(myConfig, "audience")
 	myClientset := clientset.NewForConfigOrDie(myConfig)
 	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
-	inf := informerFactory.Flowcontrol().V1beta1().FlowSchemas().Informer()
+	inf := informerFactory.Flowcontrol().V1beta2().FlowSchemas().Informer()
 	inf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			fs := obj.(*flowcontrol.FlowSchema)
@@ -123,7 +123,7 @@ func (ft *fightTest) createController(invert bool, i int) {
 	myConfig := rest.CopyConfig(ft.loopbackConfig)
 	myConfig = rest.AddUserAgent(myConfig, fieldMgr)
 	myClientset := clientset.NewForConfigOrDie(myConfig)
-	fcIfc := myClientset.FlowcontrolV1beta1()
+	fcIfc := myClientset.FlowcontrolV1beta2()
 	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
 	foundToDangling := func(found bool) bool { return !found }
 	if invert {

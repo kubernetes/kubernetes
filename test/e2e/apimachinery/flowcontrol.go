@@ -31,7 +31,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -255,7 +255,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 // createPriorityLevel creates a priority level with the provided assured
 // concurrency share.
 func createPriorityLevel(f *framework.Framework, priorityLevelName string, assuredConcurrencyShares int32) (*flowcontrol.PriorityLevelConfiguration, func()) {
-	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(
+	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Create(
 		context.TODO(),
 		&flowcontrol.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -274,7 +274,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return createdPriorityLevel, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
 	}
 }
 
@@ -322,7 +322,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 		})
 	}
 
-	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Create(
+	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Create(
 		context.TODO(),
 		&flowcontrol.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{
@@ -352,7 +352,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 		metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return createdFlowSchema, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
 	}
 }
 
@@ -362,7 +362,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 // schema status, and (2) metrics. The function times out after 30 seconds.
 func waitForSteadyState(f *framework.Framework, flowSchemaName string, priorityLevelName string) {
 	framework.ExpectNoError(wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		fs, err := f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Get(context.TODO(), flowSchemaName, metav1.GetOptions{})
+		fs, err := f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Get(context.TODO(), flowSchemaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
