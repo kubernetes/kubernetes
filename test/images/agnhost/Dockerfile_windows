@@ -21,7 +21,7 @@ FROM --platform=linux/amd64 alpine:3.6 as prep
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 ADD https://iperf.fr/download/windows/iperf-2.0.9-win64.zip /iperf.zip
-ADD http://download.savannah.nongnu.org/releases/coreutils/windows-64bit-unsupported/coreutils-8.31-28-windows-64bit.zip /coreutils.zip
+ADD https://download.savannah.nongnu.org/releases/coreutils/windows-64bit-unsupported/coreutils-8.31-28-windows-64bit.zip /coreutils.zip
 
 # we're also creating an empty /uploads folder, which we're copying over to Windows  because
 # we can't RUN commands on a Windows image.
