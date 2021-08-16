@@ -112,7 +112,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 		}
 		return outConn, nil
 	}
-	return nil, fmt.Errorf("failed to connect to an endpoint.")
+	return nil, fmt.Errorf("failed to connect to an endpoint")
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
