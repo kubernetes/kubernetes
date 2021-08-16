@@ -75,6 +75,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -654,6 +655,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta2.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
