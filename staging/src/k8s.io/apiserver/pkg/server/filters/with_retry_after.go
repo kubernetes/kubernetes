@@ -36,8 +36,8 @@ var (
 // with a Retry-After response, otherwise it returns false.
 type isRequestExemptFunc func(*http.Request) bool
 
-// retryAfterParams dictates how the Retry-After response is constructed
-type retryAfterParams struct {
+// RetryAfterParams dictates how the Retry-After response is constructed
+type RetryAfterParams struct {
 	// TearDownConnection is true when we should send a 'Connection: close'
 	// header in the response so net/http can tear down the TCP connection.
 	TearDownConnection bool
@@ -46,11 +46,11 @@ type retryAfterParams struct {
 	Message string
 }
 
-// shouldRespondWithRetryAfterFunc returns true if the requests should
+// ShouldRespondWithRetryAfterFunc returns true if the requests should
 // be rejected with a Retry-After response once certain conditions are met.
-// The retryAfterParams returned contains instructions on how to
+// The RetryAfterParams returned contains instructions on how to
 // construct the Retry-After response.
-type shouldRespondWithRetryAfterFunc func() (*retryAfterParams, bool)
+type ShouldRespondWithRetryAfterFunc func() (*RetryAfterParams, bool)
 
 // WithRetryAfter rejects any incoming new request(s) with a 429
 // if the specified shutdownDelayDurationElapsedFn channel is closed
@@ -62,25 +62,13 @@ type shouldRespondWithRetryAfterFunc func() (*retryAfterParams, bool)
 //   - 'Connection: close': tear down the TCP connection
 //
 // TODO: is there a way to merge WithWaitGroup and this filter?
-func WithRetryAfter(handler http.Handler, shutdownDelayDurationElapsedCh <-chan struct{}) http.Handler {
-	shutdownRetryAfterParams := &retryAfterParams{
-		TearDownConnection: true,
-		Message:            "The apiserver is shutting down, please try again later.",
-	}
-
+func WithRetryAfter(handler http.Handler, when ShouldRespondWithRetryAfterFunc) http.Handler {
 	// NOTE: both WithRetryAfter and WithWaitGroup must use the same exact isRequestExemptFunc 'isRequestExemptFromRetryAfter,
 	// otherwise SafeWaitGroup might wait indefinitely and will prevent the server from shutting down gracefully.
-	return withRetryAfter(handler, isRequestExemptFromRetryAfter, func() (*retryAfterParams, bool) {
-		select {
-		case <-shutdownDelayDurationElapsedCh:
-			return shutdownRetryAfterParams, true
-		default:
-			return nil, false
-		}
-	})
+	return withRetryAfter(handler, isRequestExemptFromRetryAfter, when)
 }
 
-func withRetryAfter(handler http.Handler, isRequestExemptFn isRequestExemptFunc, shouldRespondWithRetryAfterFn shouldRespondWithRetryAfterFunc) http.Handler {
+func withRetryAfter(handler http.Handler, isRequestExemptFn isRequestExemptFunc, shouldRespondWithRetryAfterFn ShouldRespondWithRetryAfterFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		params, send := shouldRespondWithRetryAfterFn()
 		if !send || isRequestExemptFn(req) {
