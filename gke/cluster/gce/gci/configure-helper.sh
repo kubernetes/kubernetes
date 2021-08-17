@@ -1090,15 +1090,20 @@ EOF
     fi
 
     # If GKE exec auth for webhooks has been requested, then
-    # ValidatingAdmissionWebhook should use it.  Otherwise, run with the default
-    # config.
+    # ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks should use it.
+    # Otherwise, run with the default config.
     if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-      1>&2 echo "ValidatingAdmissionWebhook requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring ValidatingAdmissionWebhook to use gke-exec-auth-plugin."
+      1>&2 echo "Admission control requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring {Validating,Mutating}AdmissionWebhook to use gke-exec-auth-plugin."
 
-      # Append config for ValidatingAdmissionWebhook to the shared admission
+      # Append config for ValidatingAdmissionWebhook and MutatingAdmissionWebhook to the shared admission
       # controller configuration file.
       cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
 - name: ValidatingAdmissionWebhook
+  configuration:
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kind: WebhookAdmission
+    kubeConfigFile: /etc/srv/kubernetes/webhook.kubeconfig
+- name: MutatingAdmissionWebhook
   configuration:
     apiVersion: apiserver.config.k8s.io/v1alpha1
     kind: WebhookAdmission
