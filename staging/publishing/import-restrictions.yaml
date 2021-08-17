@@ -168,10 +168,10 @@
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
-  - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/gengo
   - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/sample-cli-plugin/"
   allowedImports:
