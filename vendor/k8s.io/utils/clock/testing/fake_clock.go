@@ -25,7 +25,7 @@ import (
 
 var (
 	_ = clock.PassiveClock(&FakePassiveClock{})
-	_ = clock.Clock(&FakeClock{})
+	_ = clock.WithTicker(&FakeClock{})
 	_ = clock.Clock(&IntervalClock{})
 )
 
@@ -135,6 +135,24 @@ func (f *FakeClock) Tick(d time.Duration) <-chan time.Time {
 	return ch
 }
 
+// NewTicker returns a new Ticker.
+func (f *FakeClock) NewTicker(d time.Duration) clock.Ticker {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	tickTime := f.time.Add(d)
+	ch := make(chan time.Time, 1) // hold one tick
+	f.waiters = append(f.waiters, &fakeClockWaiter{
+		targetTime:    tickTime,
+		stepInterval:  d,
+		skipIfBlocked: true,
+		destChan:      ch,
+	})
+
+	return &fakeTicker{
+		c: ch,
+	}
+}
+
 // Step moves the clock by Duration and notifies anyone that's called After,
 // Tick, or NewTimer.
 func (f *FakeClock) Step(d time.Duration) {
@@ -196,7 +214,9 @@ func (f *FakeClock) Sleep(d time.Duration) {
 	f.Step(d)
 }
 
-// IntervalClock implements clock.Clock, but each invocation of Now steps the clock forward the specified duration
+// IntervalClock implements clock.PassiveClock, but each invocation of Now steps the clock forward the specified duration.
+// IntervalClock technically implements the other methods of clock.Clock, but each implementation is just a panic.
+// See SimpleIntervalClock for an alternative that only has the methods of PassiveClock.
 type IntervalClock struct {
 	Time     time.Time
 	Duration time.Duration
@@ -230,6 +250,12 @@ func (*IntervalClock) NewTimer(d time.Duration) clock.Timer {
 func (*IntervalClock) Tick(d time.Duration) <-chan time.Time {
 	panic("IntervalClock doesn't implement Tick")
 }
+
+// NewTicker has no implementation yet and is omitted.
+// TODO: make interval clock use FakeClock so this can be implemented.
+//func (*IntervalClock) NewTicker(d time.Duration) clock.Ticker {
+//	panic("IntervalClock doesn't implement NewTicker")
+//}
 
 // Sleep is unimplemented, will panic.
 func (*IntervalClock) Sleep(d time.Duration) {
@@ -291,4 +317,15 @@ func (f *fakeTimer) Reset(d time.Duration) bool {
 	}
 
 	return active
+}
+
+type fakeTicker struct {
+	c <-chan time.Time
+}
+
+func (t *fakeTicker) C() <-chan time.Time {
+	return t.c
+}
+
+func (t *fakeTicker) Stop() {
 }
