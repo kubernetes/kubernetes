@@ -27,20 +27,20 @@ import (
 
 func TestWithRetryAfter(t *testing.T) {
 	tests := []struct {
-		name                           string
-		shutdownDelayDurationElapsedFn func() <-chan struct{}
-		requestURL                     string
-		userAgent                      string
-		safeWaitGroupIsWaiting         bool
-		handlerInvoked                 int
-		closeExpected                  string
-		retryAfterExpected             string
-		statusCodeExpected             int
+		name                   string
+		when                   ShouldRespondWithRetryAfterFunc
+		requestURL             string
+		userAgent              string
+		safeWaitGroupIsWaiting bool
+		handlerInvoked         int
+		closeExpected          string
+		retryAfterExpected     string
+		statusCodeExpected     int
 	}{
 		{
 			name: "retry-after disabled",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(false)
+			when: func() (*RetryAfterParams, bool) {
+				return nil, false
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "foo",
@@ -51,8 +51,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is not exempt",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "foo",
@@ -62,9 +65,27 @@ func TestWithRetryAfter(t *testing.T) {
 			statusCodeExpected: http.StatusTooManyRequests,
 		},
 		{
+			name: "retry-after enabled, request is not exempt, no connection tear down",
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: false,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
+			},
+			requestURL:         "/api/v1/namespaces",
+			userAgent:          "foo",
+			handlerInvoked:     0,
+			closeExpected:      "",
+			retryAfterExpected: "5",
+			statusCodeExpected: http.StatusTooManyRequests,
+		},
+		{
 			name: "retry-after enabled, request is exempt(/metrics)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/metrics?foo=bar",
 			userAgent:          "foo",
@@ -75,8 +96,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/livez)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/livez?verbose",
 			userAgent:          "foo",
@@ -87,8 +111,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/readyz)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/readyz?verbose",
 			userAgent:          "foo",
@@ -99,8 +126,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(/healthz)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/healthz?verbose",
 			userAgent:          "foo",
@@ -111,8 +141,11 @@ func TestWithRetryAfter(t *testing.T) {
 		},
 		{
 			name: "retry-after enabled, request is exempt(local loopback)",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:         "/api/v1/namespaces",
 			userAgent:          "kube-apiserver/",
@@ -122,21 +155,12 @@ func TestWithRetryAfter(t *testing.T) {
 			statusCodeExpected: http.StatusOK,
 		},
 		{
-			name: "nil channel",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return nil
-			},
-			requestURL:         "/api/v1/namespaces",
-			userAgent:          "foo",
-			handlerInvoked:     1,
-			closeExpected:      "",
-			retryAfterExpected: "",
-			statusCodeExpected: http.StatusOK,
-		},
-		{
 			name: "retry-after enabled, request is exempt(/readyz), SafeWaitGroup is in waiting mode",
-			shutdownDelayDurationElapsedFn: func() <-chan struct{} {
-				return newChannel(true)
+			when: func() (*RetryAfterParams, bool) {
+				return &RetryAfterParams{
+					TearDownConnection: true,
+					Message:            "The apiserver is shutting down, please try again later.",
+				}, true
 			},
 			requestURL:             "/readyz?verbose",
 			userAgent:              "foo",
@@ -165,7 +189,7 @@ func TestWithRetryAfter(t *testing.T) {
 			wrapped := WithWaitGroup(handler, func(*http.Request, *apirequest.RequestInfo) bool {
 				return false
 			}, safeWG)
-			wrapped = WithRetryAfter(wrapped, test.shutdownDelayDurationElapsedFn())
+			wrapped = WithRetryAfter(wrapped, test.when)
 
 			req, err := http.NewRequest(http.MethodGet, test.requestURL, nil)
 			if err != nil {
@@ -196,12 +220,4 @@ func TestWithRetryAfter(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newChannel(closed bool) <-chan struct{} {
-	ch := make(chan struct{})
-	if closed {
-		close(ch)
-	}
-	return ch
 }
