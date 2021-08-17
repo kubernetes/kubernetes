@@ -606,6 +606,22 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"basic scheduled job with timezone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "CRON_TZ=UTC * * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 		"non-standard scheduled": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",

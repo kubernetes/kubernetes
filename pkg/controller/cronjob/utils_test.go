@@ -25,7 +25,7 @@ import (
 
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -313,14 +313,30 @@ func TestGetNextScheduleTime(t *testing.T) {
 		}
 		return sched
 	}
+
+	// location is UTC+08:00
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+
 	recorder := record.NewFakeRecorder(50)
 	// T1 is a scheduled start time of that schedule
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {
 		t.Errorf("test setup error: %v", err)
 	}
+
 	// T2 is a scheduled start time of that schedule after T1
 	T2, err := time.Parse(time.RFC3339, "2016-05-19T11:00:00Z")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+
+	// T1loc is 2016-05-19T18:00:00+08:00
+	T1loc := T1.In(location)
+	// T3loc is a scheduled start time of that schedule after T1loc
+	T3loc, err := time.Parse(time.RFC3339, "2016-05-20T00:00:00+08:00")
 	if err != nil {
 		t.Errorf("test setup error: %v", err)
 	}
@@ -423,6 +439,19 @@ func TestGetNextScheduleTime(t *testing.T) {
 		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
+		}
+	}
+	{
+		// Case 8: known LastScheduleTime, a start needed, and there is in UTC+08:00
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1loc.Add(-10 * time.Minute)}
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1loc}
+		// Current time is after T1loc and after T3loc
+		now := T3loc.Add(5 * time.Minute)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule("CRON_TZ=Asia/Shanghai 0 0 * * *"), recorder)
+		if schedule == nil {
+			t.Errorf("expected 1 start times, got nil")
+		} else if !schedule.Equal(T3loc) {
+			t.Errorf("expected: %v, got: %v", T3loc, schedule)
 		}
 	}
 }
