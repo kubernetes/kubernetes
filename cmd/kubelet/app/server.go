@@ -892,7 +892,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 			},
 			func() float64 {
 				if c := clientCertificateManager.Current(); c != nil && c.Leaf != nil {
-					return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+					return math.Trunc(time.Until(c.Leaf.NotAfter).Seconds())
 				}
 				return math.Inf(1)
 			},
