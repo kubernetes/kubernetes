@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
@@ -498,7 +497,14 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
 	return func(pod *v1.Pod) bool {
 		nonResources, insufficientResources := GeneralFilter(pod, nodeInfo, false)
-		return len(nonResources) == 0 && len(insufficientResources) == 0
+		if len(nonResources) != 0 || len(insufficientResources) != 0 {
+			return false
+		}
+		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+			return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+		})
+		return !isUntolerated
 	}
 }
 
@@ -528,16 +534,6 @@ func GeneralFilter(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures
 
 	if !nodeports.Fits(pod, nodeInfo) {
 		nonResources = append(nonResources, framework.NonResource{Name: nodeports.Name, Reason: nodeports.ErrReason})
-		if !includeAllFailures {
-			return nonResources, insufficientResources
-		}
-	}
-	_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
-		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
-	})
-	if isUntolerated {
-		nonResources = append(nonResources, framework.NonResource{Name: tainttoleration.Name, Reason: tainttoleration.ErrReasonNotMatch})
 		if !includeAllFailures {
 			return nonResources, insufficientResources
 		}

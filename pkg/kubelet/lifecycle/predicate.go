@@ -89,16 +89,6 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// node-level extended resource it requires is not found, then kubelet will
 	// not fail admission while it should. This issue will be addressed with
 	// the Resource Class API in the future.
-	if nodeInfo.Node() == nil {
-		message := "Failed to admit pod, node not found"
-		klog.InfoS(message, "pod", klog.KObj(admitPod))
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "UnexpectedAdmissionError",
-			Message: message,
-		}
-	}
-
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 	reasons := generalPredicates(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0

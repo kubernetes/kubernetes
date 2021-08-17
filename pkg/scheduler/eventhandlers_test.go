@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -346,10 +345,8 @@ func TestGeneralFilter(t *testing.T) {
 	nodeaffinityError := framework.NonResource{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod}
 	nodenameError := framework.NonResource{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := framework.NonResource{Name: nodeports.Name, Reason: nodeports.ErrReason}
-	tainttolerationError := framework.NonResource{Name: tainttoleration.Name, Reason: tainttoleration.ErrReasonNotMatch}
 	podOverheadError := framework.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}
 	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
-	taints := []v1.Taint{{Key: "foo", Value: "bar", Effect: v1.TaintEffectNoSchedule}}
 	tests := []struct {
 		name                     string
 		nodeFunc                 func() *v1.Node
@@ -396,19 +393,6 @@ func TestGeneralFilter(t *testing.T) {
 			},
 			flags:                    []bool{true, false},
 			wantNonResource:          [][]framework.NonResource{{nodenameError, nodeportsError}, {nodenameError}},
-			wantInsufficientResource: [][]framework.InsufficientResource{{}, {}},
-		},
-		{
-			name: "check nodeports and tainttoleration, nodeports need fail quickly if includeAllFailures is false",
-			nodeFunc: func() *v1.Node {
-				return st.MakeNode().Name("fake-node").Taints(taints).Obj()
-			},
-			pod: st.MakePod().Name("pod2").HostPort(80).Label("foo", "bar").Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
-			},
-			flags:                    []bool{true, false},
-			wantNonResource:          [][]framework.NonResource{{nodeportsError, tainttolerationError}, {nodeportsError}},
 			wantInsufficientResource: [][]framework.InsufficientResource{{}, {}},
 		},
 	}
