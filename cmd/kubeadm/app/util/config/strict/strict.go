@@ -17,14 +17,14 @@ limitations under the License.
 package strict
 
 import (
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"sigs.k8s.io/yaml"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 )
 
 // VerifyUnmarshalStrict takes a YAML byte slice and a GroupVersionKind and verifies if the YAML

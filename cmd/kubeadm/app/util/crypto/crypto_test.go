@@ -19,9 +19,9 @@ package crypto
 import (
 	"testing"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
 	"github.com/lithammer/dedent"
+
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestEncryptAndDecryptData(t *testing.T) {

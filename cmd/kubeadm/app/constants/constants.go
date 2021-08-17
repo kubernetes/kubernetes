@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,8 +35,6 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	componentversion "k8s.io/component-base/version"
 	utilnet "k8s.io/utils/net"
-
-	"github.com/pkg/errors"
 )
 
 const (

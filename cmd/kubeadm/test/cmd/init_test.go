@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/version"
-
 	"github.com/lithammer/dedent"
+
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {

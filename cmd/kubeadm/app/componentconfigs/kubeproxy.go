@@ -19,13 +19,13 @@ package componentconfigs
 import (
 	"net"
 
+	clientset "k8s.io/client-go/kubernetes"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
-	clientset "k8s.io/client-go/kubernetes"
-	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 )
 
 const (
