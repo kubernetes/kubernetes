@@ -238,6 +238,15 @@ type Config struct {
 	// EventSink receives events about the life cycle of the API server, e.g. readiness, serving, signals and termination.
 	EventSink EventSink
 
+	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
+	// Server during the graceful termination of the apiserver. If true, we wait
+	// for non longrunning requests in flight to be drained and then initiate a
+	// shutdown of the HTTP Server. If false, we initiate a shutdown of the HTTP
+	// Server as soon as ShutdownDelayDuration has elapsed.
+	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
+	// rejected with a 429 status code and a 'Retry-After' response.
+	ShutdownSendRetryAfter bool
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -674,7 +683,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
 
-		lifecycleSignals: c.lifecycleSignals,
+		lifecycleSignals:       c.lifecycleSignals,
+		ShutdownSendRetryAfter: c.ShutdownSendRetryAfter,
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
@@ -862,6 +872,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
+	if c.ShutdownSendRetryAfter {
+		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.AfterShutdownDelayDuration.Signaled())
+	}
 	handler = genericfilters.WithHTTPLogging(handler, c.newIsTerminatingFunc())
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
