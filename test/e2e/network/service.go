@@ -2134,14 +2134,14 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
-		servicePort := 80
+		servicePort := 8000
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(8000)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
@@ -2214,14 +2214,14 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
-		servicePort := 80
+		servicePort := 8000
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(8000)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
