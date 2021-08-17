@@ -22,16 +22,16 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
 var (

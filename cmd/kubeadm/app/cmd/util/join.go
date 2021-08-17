@@ -22,13 +22,13 @@ import (
 	"html/template"
 	"strings"
 
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
+	"github.com/pkg/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
 
-	"github.com/pkg/errors"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +

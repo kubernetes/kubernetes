@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestFor(t *testing.T) {

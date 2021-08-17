@@ -23,7 +23,7 @@ import (
 	"io"
 	"strings"
 
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,7 +31,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	"github.com/pkg/errors"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // DryRunGetter is an interface that must be supplied to the NewDryRunClient function in order to construct a fully functional fake dryrun clientset

@@ -22,10 +22,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
-
-	"github.com/pkg/errors"
 )
 
 const (

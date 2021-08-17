@@ -29,6 +29,12 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
+
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
@@ -37,12 +43,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
 )
 
 const (

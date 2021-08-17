@@ -21,16 +21,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+
+	clientcmd "k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-
-	clientcmd "k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
 )
 
 var (

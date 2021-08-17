@@ -20,16 +20,16 @@ import (
 	"io"
 	"time"
 
+	"github.com/spf13/cobra"
+
+	"k8s.io/klog/v2"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-
-	"k8s.io/klog/v2"
-
-	"github.com/spf13/cobra"
 )
 
 var (

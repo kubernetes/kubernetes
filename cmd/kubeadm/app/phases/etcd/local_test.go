@@ -25,13 +25,13 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/lithammer/dedent"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	"github.com/lithammer/dedent"
 )
 
 func TestGetEtcdPodSpec(t *testing.T) {

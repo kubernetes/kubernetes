@@ -22,11 +22,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 func assertExists(t *testing.T, path string) {

@@ -21,12 +21,12 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	utilsexec "k8s.io/utils/exec"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // ContainerRuntime is an interface for working with container runtimes

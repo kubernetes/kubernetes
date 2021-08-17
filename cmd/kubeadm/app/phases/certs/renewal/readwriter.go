@@ -22,15 +22,15 @@ import (
 	"os"
 	"path/filepath"
 
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"github.com/pkg/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
-	"github.com/pkg/errors"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // certificateReadWriter defines the behavior of a component that

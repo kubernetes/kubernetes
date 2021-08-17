@@ -20,6 +20,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -29,12 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 var controlPlanePrepareExample = cmdutil.Examples(`

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (

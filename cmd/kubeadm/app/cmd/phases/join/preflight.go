@@ -21,18 +21,18 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-
-	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 )
 
 var (

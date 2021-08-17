@@ -19,6 +19,11 @@ package config
 import (
 	"io/ioutil"
 
+	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -26,11 +31,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object

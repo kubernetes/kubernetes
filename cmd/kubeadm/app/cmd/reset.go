@@ -20,6 +20,14 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -30,14 +38,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 var (
