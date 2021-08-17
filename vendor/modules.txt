@@ -2031,7 +2031,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e => k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
+# k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8 => k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
 ## explicit
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -2269,7 +2269,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.5.0 => k8s.io/system-validators v1.5.0
 ## explicit
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9 => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+# k8s.io/utils v0.0.0-20210802155522-efc7438f0176 => k8s.io/utils v0.0.0-20210802155522-efc7438f0176
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -2742,7 +2742,7 @@ sigs.k8s.io/yaml
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.9.0
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
+# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
 # k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 # k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 # k8s.io/kubectl => ./staging/src/k8s.io/kubectl
@@ -2755,7 +2755,7 @@ sigs.k8s.io/yaml
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 # k8s.io/system-validators => k8s.io/system-validators v1.5.0
-# k8s.io/utils => k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+# k8s.io/utils => k8s.io/utils v0.0.0-20210802155522-efc7438f0176
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
 # modernc.org/mathutil => modernc.org/mathutil v1.0.0

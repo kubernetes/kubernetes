@@ -39,7 +39,7 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/mount-utils v0.0.0
-	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+	k8s.io/utils v0.0.0-20210802155522-efc7438f0176
 	sigs.k8s.io/yaml v1.2.0
 )
 
