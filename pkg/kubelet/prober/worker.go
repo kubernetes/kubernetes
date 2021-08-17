@@ -203,9 +203,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true // Wait for more information.
 	}
 
-
 	if w.containerID.String() != c.ContainerID {
-		klog.Infof("w.Container %+v c.ContainerID %+v",w.containerID.String(),c.ContainerID)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
@@ -232,7 +230,6 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}
-
 
 	// Graceful shutdown of the pod.
 	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {

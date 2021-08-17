@@ -120,7 +120,6 @@ func newTestManager(client *fake.Clientset) *manager {
 		nil, // runner
 		&record.FakeRecorder{},
 	).(*manager)
-	m.statusManager.Start()
 	// Don't actually execute probes.
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	return m

@@ -254,7 +254,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 					// The readiness worker has not yet reported to readinessManager, instead of just returning ready=false consult status_Manager
 					podStatus, found := m.statusManager.GetPodStatus(podUID)
 					if found {
-						for _,containerStatus := range podStatus.ContainerStatuses {
+						for _, containerStatus := range podStatus.ContainerStatuses {
 							if c.ContainerID == containerStatus.ContainerID {
 								ready = containerStatus.Ready
 								break

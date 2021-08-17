@@ -205,16 +205,16 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 func (m *manager) initializePodStatuses() {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
-	
+
 	pods, err := m.kubeClient.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		klog.InfoS("Error while receiving all existing pods",err)
+		klog.ErrorS(err, "Error while receiving all existing pods: ")
 		return
 	}
 
 	for _, pod := range pods.Items {
 		status := *pod.Status.DeepCopy()
-		m.updateStatusInternal(&pod,status,false)
+		m.updateStatusInternal(&pod, status, false)
 	}
 }
 
