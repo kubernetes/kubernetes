@@ -75,6 +75,7 @@ func init() {
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
+	// the health check is run every second and the result is stored for an immediate healthz response
 
 	clientValue := &atomic.Value{}
 
@@ -92,9 +93,12 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		return true, nil
 	}, wait.NeverStop)
 
-	return func() error {
+	healthzErrorMessage := &atomic.Value{}
+	healthzErrorMessage.Store("etcd client connection not yet established")
+	go wait.Until(func() {
 		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {
-			return fmt.Errorf(errMsg)
+			healthzErrorMessage.Store(errMsg)
+			return
 		}
 		client := clientValue.Load().(*clientv3.Client)
 		healthcheckTimeout := storagebackend.DefaultHealthcheckTimeout
@@ -106,9 +110,17 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
 		if err == nil {
-			return nil
+			healthzErrorMessage.Store("")
+			return
 		}
-		return fmt.Errorf("error getting data from etcd: %v", err)
+		healthzErrorMessage.Store(err.Error())
+	}, time.Second, wait.NeverStop)
+
+	return func() error {
+		if errMsg := healthzErrorMessage.Load().(string); len(errMsg) > 0 {
+			return fmt.Errorf(errMsg)
+		}
+		return nil
 	}, nil
 }
 
