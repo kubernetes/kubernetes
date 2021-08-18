@@ -92,7 +92,12 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return
 		}
 
-		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
+		decodeSerializer := s.Serializer
+		// TODO: put behind feature flag?
+		if strictValidation(req.URL) {
+			decodeSerializer = s.StrictSerializer
+		}
+		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
 
 		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {

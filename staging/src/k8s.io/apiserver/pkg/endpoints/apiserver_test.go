@@ -4388,6 +4388,61 @@ func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx conte
 	return nil, nil
 }
 
+func TestStrictValidation(t *testing.T) {
+	strictDecoderErr := "strict decoder error for"
+	// TODO: add test cases for yaml validation and protobuf early exit.
+	tests := []struct {
+		path        string
+		verb        string
+		data        []byte
+		contentType string
+		errContains string
+	}{
+
+		{path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`), errContains: strictDecoderErr},
+		{path: "/namespaces/default/simples/id", verb: "PUT", data: []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`), errContains: strictDecoderErr},
+		// TODO: there's a bug currently where query params are being stripped so this test does not pass yet.
+		//{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8", errContains: notImplementedErr},
+	}
+
+	server := httptest.NewServer(handle(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range tests {
+		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
+		if response.StatusCode == http.StatusBadRequest {
+			t.Fatalf("unexpected BadRequest: %#v", response)
+		}
+		response = runRequest(t, baseURL+test.path+"?validate=strict", test.verb, test.data, test.contentType)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(response.Body)
+		// TODO: better way of doing than string comparison since we are getting a response instead of a regular go error?
+		if response.StatusCode != http.StatusBadRequest && !strings.Contains(buf.String(), test.errContains) {
+			t.Fatalf("unexpected response: %#v", response)
+		}
+	}
+
+}
+
 func TestDryRunDisabled(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
 

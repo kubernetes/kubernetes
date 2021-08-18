@@ -456,6 +456,15 @@ func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
 }
 
+// TODO: currently strict validation is set via
+// query param. Alternatively we could use a request header.
+// TODO: maybe we should check content-type here and error for protobuf (ie take the full req instead of just the URL?)
+// TODO: what do we want the query param to actually be (I went with ?validate=strict but am open to whatever)
+func strictValidation(url *url.URL) bool {
+	validateParam := url.Query()["validate"]
+	return len(validateParam) == 1 && validateParam[0] == "strict"
+}
+
 type etcdError interface {
 	Code() grpccodes.Code
 	Error() string

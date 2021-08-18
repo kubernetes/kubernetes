@@ -70,6 +70,12 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
+		// TODO: put behind feature flag?
+		if strictValidation(req.URL) {
+			scope.err(errors.NewBadRequest("strict validation is not supported yet"), w, req)
+			return
+		}
+
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
 		contentType := req.Header.Get("Content-Type")
