@@ -20,6 +20,8 @@ rules:
   - "apps"
   resources:
   - deployments
+  resourceNames:
+  - metrics-server
   verbs:
   - get
   - list
