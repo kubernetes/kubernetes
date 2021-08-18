@@ -147,6 +147,10 @@ func (e *strictDecodingError) Error() string {
 	return s.String()
 }
 
+func (e *strictDecodingError) Errors() []error {
+	return e.errors
+}
+
 // IsStrictDecodingError returns true if the error indicates that the provided object
 // strictness violations.
 func IsStrictDecodingError(err error) bool {
@@ -155,4 +159,14 @@ func IsStrictDecodingError(err error) bool {
 	}
 	_, ok := err.(*strictDecodingError)
 	return ok
+}
+
+// AsStrictDecodingError returns a strict decoding error
+// containing all the strictness violations.
+func AsStrictDecodingError(err error) (*strictDecodingError, bool) {
+	if err == nil {
+		return nil, false
+	}
+	strictErr, ok := err.(*strictDecodingError)
+	return strictErr, ok
 }

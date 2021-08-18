@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -331,6 +332,30 @@ func TestDecode(t *testing.T) {
 			into:        &testDecodable{},
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `"value" already set in map`)
+			},
+			yaml:   true,
+			strict: true,
+		},
+		// Duplicate fields should return an error from the strict JSON deserializer for unstructured.
+		{
+			data:        []byte(`{"value":1,"value":1}`),
+			into:        &unstructured.Unstructured{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `duplicate field "value"`)
+			},
+			strict: true,
+		},
+		// Duplicate fields should return an error from the strict YAML deserializer for unstructured.
+		{
+			data: []byte("value: 1\n" +
+				"value: 1\n"),
+			into:        &unstructured.Unstructured{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{},
 			errFn: func(err error) bool {
 				return strings.Contains(err.Error(), `"value" already set in map`)
 			},

@@ -66,6 +66,7 @@ func identifier(options SerializerOptions) runtime.Identifier {
 		"name":   "json",
 		"yaml":   strconv.FormatBool(options.Yaml),
 		"pretty": strconv.FormatBool(options.Pretty),
+		"strict": strconv.FormatBool(options.Strict),
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
@@ -162,8 +163,11 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err), isUnstructured:
-			if err := kjson.UnmarshalCaseSensitivePreserveInts(data, into); err != nil {
+			strictErrs, err := s.unmarshal(into, data, originalData)
+			if err != nil {
 				return nil, actual, err
+			} else if len(strictErrs) > 0 {
+				return into, actual, runtime.NewStrictDecodingError(strictErrs)
 			}
 			return into, actual, nil
 		case err != nil:
@@ -186,34 +190,11 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		return nil, actual, err
 	}
 
-	// If the deserializer is non-strict, return here.
-	if !s.options.Strict {
-		if err := kjson.UnmarshalCaseSensitivePreserveInts(data, obj); err != nil {
-			return nil, actual, err
-		}
-		return obj, actual, nil
-	}
-
-	var allStrictErrs []error
-	if s.options.Yaml {
-		// In strict mode pass the original data through the YAMLToJSONStrict converter.
-		// This is done to catch duplicate fields in YAML that would have been dropped in the original YAMLToJSON conversion.
-		// TODO: rework YAMLToJSONStrict to return warnings about duplicate fields without terminating so we don't have to do this twice.
-		_, err := yaml.YAMLToJSONStrict(originalData)
-		if err != nil {
-			allStrictErrs = append(allStrictErrs, err)
-		}
-	}
-
-	strictJSONErrs, err := kjson.UnmarshalStrict(data, obj)
+	strictErrs, err := s.unmarshal(obj, data, originalData)
 	if err != nil {
-		// fatal decoding error, not due to strictness
 		return nil, actual, err
-	}
-	allStrictErrs = append(allStrictErrs, strictJSONErrs...)
-	if len(allStrictErrs) > 0 {
-		// return the successfully decoded object along with the strict errors
-		return obj, actual, runtime.NewStrictDecodingError(allStrictErrs)
+	} else if len(strictErrs) > 0 {
+		return obj, actual, runtime.NewStrictDecodingError(strictErrs)
 	}
 	return obj, actual, nil
 }
@@ -250,6 +231,50 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+// IsStrict indicates whether the serializer
+// uses strict decoding or not
+func (s *Serializer) IsStrict() bool {
+	return s.options.Strict
+}
+
+func (s *Serializer) unmarshal(into runtime.Object, data, originalData []byte) (strictErrs []error, err error) {
+	// If the deserializer is non-strict, return here.
+	if !s.options.Strict {
+		if err := kjson.UnmarshalCaseSensitivePreserveInts(data, into); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	if s.options.Yaml {
+		// In strict mode pass the original data through the YAMLToJSONStrict converter.
+		// This is done to catch duplicate fields in YAML that would have been dropped in the original YAMLToJSON conversion.
+		// TODO: rework YAMLToJSONStrict to return warnings about duplicate fields without terminating so we don't have to do this twice.
+		_, err := yaml.YAMLToJSONStrict(originalData)
+		if err != nil {
+			strictErrs = append(strictErrs, err)
+		}
+	}
+
+	var strictJSONErrs []error
+	if u, isUnstructured := into.(runtime.Unstructured); isUnstructured {
+		// Unstructured is a custom unmarshaler that gets delegated
+		// to, so inorder to detect strict JSON errors we need
+		// to unmarshal directly into the object.
+		m := u.UnstructuredContent()
+		strictJSONErrs, err = kjson.UnmarshalStrict(data, &m)
+		u.SetUnstructuredContent(m)
+	} else {
+		strictJSONErrs, err = kjson.UnmarshalStrict(data, into)
+	}
+	if err != nil {
+		// fatal decoding error, not due to strictness
+		return nil, err
+	}
+	strictErrs = append(strictErrs, strictJSONErrs...)
+	return strictErrs, nil
 }
 
 // Identifier implements runtime.Encoder interface.

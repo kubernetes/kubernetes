@@ -133,11 +133,18 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		}
 	}
 
+	var strictDecodingErr error
 	obj, gvk, err := c.decoder.Decode(data, defaultGVK, decodeInto)
 	if err != nil {
-		return nil, gvk, err
+		if obj != nil && runtime.IsStrictDecodingError(err) {
+			// save the strictDecodingError and the caller decide what to do with it
+			strictDecodingErr = err
+		} else {
+			return nil, gvk, err
+		}
 	}
 
+	// TODO: look into strict handling of nested object decoding
 	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
 		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{c.decoder}); err != nil {
 			return nil, gvk, err
@@ -153,14 +160,14 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 		// Short-circuit conversion if the into object is same object
 		if into == obj {
-			return into, gvk, nil
+			return into, gvk, strictDecodingErr
 		}
 
 		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
 
-		return into, gvk, nil
+		return into, gvk, strictDecodingErr
 	}
 
 	// perform defaulting if requested
@@ -172,7 +179,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	if err != nil {
 		return nil, gvk, err
 	}
-	return out, gvk, nil
+	return out, gvk, strictDecodingErr
 }
 
 // Encode ensures the provided object is output in the appropriate group and version, invoking

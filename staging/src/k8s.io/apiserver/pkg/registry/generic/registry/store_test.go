@@ -473,6 +473,7 @@ func TestNewDeleteOptionsFromUpdateOptions(t *testing.T) {
 
 		// DeleteOptions does not have these fields.
 		delete(inMap, "fieldManager")
+		delete(inMap, "fieldValidation")
 
 		// UpdateOptions does not have these fields.
 		delete(outMap, "gracePeriodSeconds")
