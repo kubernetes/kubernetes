@@ -4351,8 +4351,8 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	}
 }
 
-// runRequest is used by TestDryRun since it runs the test twice in a
-// row with a slightly different URL (one has ?dryRun, one doesn't).
+// runRequest is used by TestDryRun and TestStrictValidation since it runs the test
+// twice in a row with a slightly different URL (one has ?dryRun, one doesn't).
 func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
 	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
 	if err != nil {
@@ -4364,6 +4364,22 @@ func runRequest(t *testing.T, path, verb string, data []byte, contentType string
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	return response
+}
+
+// runRequestOrDie is like runRequest, but used for benchmarking.
+func runRequestOrDie(path, verb string, data []byte, contentType string) *http.Response {
+	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		panic(err)
 	}
 	return response
 }
@@ -4441,6 +4457,80 @@ func TestStrictValidation(t *testing.T) {
 		}
 	}
 
+}
+
+// TODO: this is a pretty crude benchmark since it only operates on the simples resource
+// I imagine we want to benchmark some meatier resources too, because maybe the discrepancy in
+// performance is greater for bigger objects?
+func BenchmarkNonStrictValidationSimples(b *testing.B) {
+	server := httptest.NewServer(handle(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+
+	for n := 0; n < b.N; n++ {
+		postPath := "/namespaces/default/simples"
+		postData := []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar"}`)
+		basePostURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		_ = runRequestOrDie(basePostURL+postPath, "POST", postData, "")
+
+		putPath := "/namespaces/default/simples/id"
+		putData := []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`)
+		basePutURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		_ = runRequestOrDie(basePutURL+putPath, "POST", putData, "")
+	}
+}
+func BenchmarkStrictValidationSimples(b *testing.B) {
+	server := httptest.NewServer(handle(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+
+	for n := 0; n < b.N; n++ {
+		postPath := "/namespaces/default/simples"
+		postData := []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar"}`)
+		basePostURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		_ = runRequestOrDie(basePostURL+postPath+"?validate=strict", "POST", postData, "")
+
+		putPath := "/namespaces/default/simples/id"
+		putData := []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`)
+		basePutURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		_ = runRequestOrDie(basePutURL+putPath+"?validate=strict", "POST", putData, "")
+	}
 }
 
 func TestDryRunDisabled(t *testing.T) {
