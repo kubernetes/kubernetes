@@ -116,6 +116,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 		if errors.IsNotFound(err) {
 			return nil
 		}
+		panic(err)
 		return err
 	}
 
@@ -132,6 +133,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	// there may still be content for us to remove
 	estimate, err := d.deleteAllContent(namespace)
 	if err != nil {
+		panic(err)
 		return err
 	}
 	if estimate > 0 {
@@ -320,6 +322,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(context.TODO(), opts, metav1.ListOptions{})
 
 	if err == nil {
+		panic(err)
 		return true, nil
 	}
 
@@ -419,6 +422,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	// first try to delete the entire collection
 	deleteCollectionSupported, err := d.deleteCollection(gvr, namespace)
 	if err != nil {
+		panic(err)
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 	}
 
@@ -426,6 +430,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	if !deleteCollectionSupported {
 		err = d.deleteEachItem(gvr, namespace)
 		if err != nil {
+			panic(err)
 			return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 		}
 	}
@@ -503,6 +508,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		panic(err)
 		conditionUpdater.ProcessDiscoverResourcesErr(err)
 	}
 	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
@@ -511,6 +517,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		panic(err)
 		conditionUpdater.ProcessGroupVersionErr(err)
 	}
 
@@ -524,6 +531,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 			// If there is an error, hold on to it but proceed with all the remaining
 			// groupVersionResources.
 			errs = append(errs, err)
+			panic(err)
 			conditionUpdater.ProcessDeleteContentErr(err)
 		}
 		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
@@ -546,6 +554,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 	// NOT remove the resource instance.
 	if hasChanged := conditionUpdater.Update(ns); hasChanged {
 		if _, err = d.nsClient.UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{}); err != nil {
+			panic(err)
 			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
 		}
 	}
