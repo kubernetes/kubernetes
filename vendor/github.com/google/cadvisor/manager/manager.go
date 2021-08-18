@@ -692,6 +692,10 @@ func (m *manager) GetRequestedContainersInfo(containerName string, options v2.Re
 	for name, data := range containers {
 		info, err := m.containerDataToContainerInfo(data, &query)
 		if err != nil {
+			if err == memory.ErrDataNotFound {
+				klog.Warningf("Error getting data for container %s because of race condition", name)
+				continue
+			}
 			errs.append(name, "containerDataToContainerInfo", err)
 		}
 		containersMap[name] = info
