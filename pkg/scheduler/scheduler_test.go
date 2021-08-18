@@ -46,7 +46,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	pvutil "k8s.io/component-helpers/storage/volume"
+	"k8s.io/component-helpers/storage/volume"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -2414,7 +2414,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
-				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "true")
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnBindCompleted, "true")
 				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
 				if pvName := pvc.Spec.VolumeName; pvName != "" {
 					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
