@@ -161,10 +161,23 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				os.Exit(1)
 			}
 
-			// logging config should be validate and apply early
-			if errs := logs.ValidateLoggingConfiguration(&kubeletConfig.Logging, field.NewPath("logging")); len(errs) > 0 {
-				klog.ErrorS(err, "Failed to validate kubelet logging config")
-				os.Exit(1)
+			isKubeletConfigFile := false
+			// load kubelet config file, if provided
+			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
+				kubeletConfig, err = loadConfigFile(configFile)
+				if err != nil {
+					klog.ErrorS(err, "Failed to load kubelet config file", "path", configFile)
+					os.Exit(1)
+				}
+				isKubeletConfigFile = true
+			}
+
+			if !isKubeletConfigFile {
+				// logging config should be validate and apply early
+				if errs := logs.ValidateLoggingConfiguration(&kubeletConfig.Logging, field.NewPath("logging")); len(errs) > 0 {
+					klog.ErrorS(err, "Failed to validate kubelet logging config")
+					os.Exit(1)
+				}
 			}
 
 			logOption := &logs.Options{Config: kubeletConfig.Logging}
@@ -210,12 +223,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 
 			// load kubelet config file, if provided
-			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
-				kubeletConfig, err = loadConfigFile(configFile)
-				if err != nil {
-					klog.ErrorS(err, "Failed to load kubelet config file", "path", configFile)
-					os.Exit(1)
-				}
+			if isKubeletConfigFile {
 				// We must enforce flag precedence by re-parsing the command line into the new object.
 				// This is necessary to preserve backwards-compatibility across binary upgrades.
 				// See issue #56171 for more details.
