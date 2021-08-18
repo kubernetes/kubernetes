@@ -504,7 +504,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	kubelet.podWorkers.(*fakePodWorkers).statusLock.Lock()
 	kubelet.podWorkers.(*fakePodWorkers).removeRuntime = map[types.UID]bool{pod.UID: true}
+	kubelet.podWorkers.(*fakePodWorkers).statusLock.Unlock()
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
