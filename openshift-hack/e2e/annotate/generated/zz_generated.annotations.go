@@ -683,7 +683,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-cli] Kubectl client Update Demo should scale a replication controller  [Conformance]": "should scale a replication controller  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-cli] Kubectl client kubectl wait should ignore not found error with --for=delete": "should ignore not found error with --for=delete [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-cli] Kubectl client kubectl wait should ignore not found error with --for=delete": "should ignore not found error with --for=delete [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-instrumentation] Events API should delete a collection of events [Conformance]": "should delete a collection of events [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
