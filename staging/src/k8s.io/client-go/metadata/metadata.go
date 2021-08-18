@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 )
@@ -38,11 +39,12 @@ var parameterScheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(parameterScheme)
 
-//var versionV1 = schema.GroupVersion{Version: "v1"}
+var versionV1 = schema.GroupVersion{Version: "v1"}
 
 func init() {
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	metav1.AddToGroupVersion(parameterScheme, metav1.SchemeGroupVersion)
+	metav1.AddToGroupVersion(scheme, versionV1)
+	metav1.AddToGroupVersion(parameterScheme, versionV1)
+	utilruntime.Must(metav1.AddMetaToScheme(scheme))
 }
 
 // Client allows callers to retrieve the object metadata for any
@@ -87,7 +89,7 @@ func NewForConfigOrDie(c *rest.Config) Interface {
 func NewForConfig(inConfig *rest.Config) (Interface, error) {
 	config := ConfigFor(inConfig)
 	// for serializing the options
-	config.GroupVersion = &metav1.SchemeGroupVersion
+	config.GroupVersion = &versionV1
 	config.APIPath = "/this-value-should-never-be-sent"
 
 	restClient, err := rest.RESTClientFor(config)
@@ -139,7 +141,7 @@ func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
 		Body(&opts).
-		SpecificallyVersionedParams(&listOptions, parameterCodec, metav1.SchemeGroupVersion).
+		SpecificallyVersionedParams(&listOptions, parameterCodec, versionV1).
 		Do(ctx)
 	return result.Error()
 }
@@ -151,7 +153,7 @@ func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, s
 	}
 	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
-		SpecificallyVersionedParams(&opts, parameterCodec, metav1.SchemeGroupVersion).
+		SpecificallyVersionedParams(&opts, parameterCodec, versionV1).
 		Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -187,7 +189,7 @@ func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, s
 func (c *client) List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
 	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).
 		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json").
-		SpecificallyVersionedParams(&opts, parameterCodec, metav1.SchemeGroupVersion).
+		SpecificallyVersionedParams(&opts, parameterCodec, versionV1).
 		Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -226,7 +228,7 @@ func (c *client) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inte
 	return c.client.client.Get().
 		AbsPath(c.makeURLSegments("")...).
 		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
-		SpecificallyVersionedParams(&opts, parameterCodec, metav1.SchemeGroupVersion).
+		SpecificallyVersionedParams(&opts, parameterCodec, versionV1).
 		Timeout(timeout).
 		Watch(ctx)
 }
@@ -241,7 +243,7 @@ func (c *client) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(data).
 		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
-		SpecificallyVersionedParams(&opts, parameterCodec, metav1.SchemeGroupVersion).
+		SpecificallyVersionedParams(&opts, parameterCodec, versionV1).
 		Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
