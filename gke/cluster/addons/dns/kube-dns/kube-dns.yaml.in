@@ -105,6 +105,8 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       volumes:
       - name: kube-dns-config
         configMap:

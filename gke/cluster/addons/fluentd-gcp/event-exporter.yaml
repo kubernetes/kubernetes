@@ -80,3 +80,6 @@ spec:
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

@@ -112,3 +112,6 @@ spec:
       - name: config-volume
         configMap:
           name: fluentd-es-config-v0.2.1
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

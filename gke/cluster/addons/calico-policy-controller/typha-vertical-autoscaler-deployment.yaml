@@ -36,3 +36,6 @@ spec:
           configMap:
             name: calico-typha-vertical-autoscaler
       serviceAccountName: calico-cpva
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

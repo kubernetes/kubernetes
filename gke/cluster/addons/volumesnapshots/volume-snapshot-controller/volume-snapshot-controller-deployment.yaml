@@ -27,3 +27,6 @@ spec:
             - "--v=5"
             - "--metrics-path=/metrics"
             - "--http-endpoint=:9102"
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

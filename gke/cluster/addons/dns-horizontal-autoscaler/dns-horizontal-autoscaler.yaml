@@ -105,4 +105,6 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       serviceAccountName: kube-dns-autoscaler

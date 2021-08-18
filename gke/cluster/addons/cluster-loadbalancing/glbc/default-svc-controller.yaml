@@ -43,3 +43,6 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

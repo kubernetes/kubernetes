@@ -41,6 +41,8 @@ spec:
         effect: "NoExecute"
       - operator: "Exists"
         effect: "NoSchedule"
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       containers:
       - name: metadata-proxy
         image: k8s.gcr.io/metadata-proxy:v0.1.12

@@ -225,6 +225,8 @@ spec:
           operator: "Exists"
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+        - key: "components.gke.io/gke-managed-components"
+          operator: "Exists"
 
 ---
 
@@ -292,6 +294,8 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+        - key: "components.gke.io/gke-managed-components"
+          operator: "Exists"
       volumes:
         - name: tmp-volume
           emptyDir: {}

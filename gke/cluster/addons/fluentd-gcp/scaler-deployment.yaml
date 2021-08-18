@@ -34,3 +34,6 @@ spec:
           value: "1"
         - name: MEMORY_LIMIT
           value: 500Mi
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"

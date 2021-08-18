@@ -136,6 +136,8 @@ spec:
         operator: "Exists"
       - effect: "NoSchedule"
         operator: "Exists"
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
       containers:
       - name: node-cache
         image: k8s.gcr.io/dns/k8s-dns-node-cache:1.17.0

@@ -66,6 +66,8 @@ spec:
         effect: "NoExecute"
       - operator: "Exists"
         effect: "NoSchedule"
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1
@@ -125,6 +127,9 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
+      tolerations:
+      - key: "components.gke.io/gke-managed-components"
+        operator: "Exists"
   strategy:
     rollingUpdate:
       maxUnavailable: 1
