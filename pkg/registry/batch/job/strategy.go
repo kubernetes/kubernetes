@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	batchapi "k8s.io/kubernetes/pkg/api/batch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -206,7 +207,10 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidation
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newJob := obj.(*batch.Job)
-	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, nil)
+	var warnings []string
+	warnings = append(warnings, pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, nil)...)
+	warnings = append(warnings, batchapi.GetWarningsForJob(newJob)...)
+	return warnings
 }
 
 // generateSelector adds a selector to a job and labels to its template
