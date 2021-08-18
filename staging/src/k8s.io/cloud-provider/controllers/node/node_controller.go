@@ -389,6 +389,16 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 
 	klog.Infof("Initializing node %s with cloud provider", nodeName)
 
+	if err := cloudnodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
+		Type:               cloudproviderapi.NodeInitializedByCloudProviderCondition,
+		Status:             v1.ConditionFalse,
+		Reason:             "NodeInitializing",
+		Message:            fmt.Sprintf("Node %s is being initialized", nodeName),
+		LastTransitionTime: metav1.Now(),
+	}); err != nil {
+		return err
+	}
+
 	copyNode := curNode.DeepCopy()
 	providerID, err := cnc.getProviderID(ctx, copyNode)
 	if err != nil {
@@ -397,11 +407,31 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 
 	instanceMetadata, err := cnc.getInstanceMetadata(ctx, providerID, copyNode)
 	if err != nil {
+		if err := cloudnodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
+			Type:               cloudproviderapi.NodeInitializedByCloudProviderCondition,
+			Status:             v1.ConditionFalse,
+			Reason:             "NodeInitializationFailed",
+			Message:            fmt.Sprintf("Node %s failed to initialize with error: %v", nodeName, err),
+			LastTransitionTime: metav1.Now(),
+		}); err != nil {
+			klog.ErrorS(err, "failed to set node condition", "condition", cloudproviderapi.NodeInitializedByCloudProviderCondition, "node", nodeName)
+		}
+
 		return fmt.Errorf("failed to get instance metadata for node %s: %v", nodeName, err)
 	}
 
 	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, providerID, copyNode, instanceMetadata)
 	if err != nil {
+		if err := cloudnodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
+			Type:               cloudproviderapi.NodeInitializedByCloudProviderCondition,
+			Status:             v1.ConditionFalse,
+			Reason:             "NodeInitializationFailed",
+			Message:            fmt.Sprintf("Node %s failed to initialize with error: %v", nodeName, err),
+			LastTransitionTime: metav1.Now(),
+		}); err != nil {
+			klog.ErrorS(err, "failed to set node condition", "condition", cloudproviderapi.NodeInitializedByCloudProviderCondition, "node", nodeName)
+		}
+
 		return fmt.Errorf("failed to get node modifiers from cloud provider: %v", err)
 	}
 
@@ -444,6 +474,16 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 
 		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), newNode, metav1.UpdateOptions{})
 		if err != nil {
+			return err
+		}
+
+		if err := cloudnodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
+			Type:               cloudproviderapi.NodeInitializedByCloudProviderCondition,
+			Status:             v1.ConditionTrue,
+			Reason:             "NodeInitialized",
+			Message:            fmt.Sprintf("Node %s was successfully initialized", nodeName),
+			LastTransitionTime: metav1.Now(),
+		}); err != nil {
 			return err
 		}
 
