@@ -24,8 +24,8 @@ REV = $(shell git describe --contains --always --match='v*')
 ARCH ?= amd64
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 1903, 1909 2004, 20H2
-OSVERSION ?= 1809 1903 1909 2004 20H2
+# OS Version for the Windows images: 1809, 1903, 1909 2004, 20H2, ltsc2022
+OSVERSION ?= 1809 1903 1909 2004 20H2 ltsc2022
 
 # The output type could either be docker (local), or registry.
 # If it is registry, it will also allow us to push the Windows images.
