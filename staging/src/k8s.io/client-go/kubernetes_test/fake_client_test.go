@@ -18,6 +18,7 @@ package kubernetes
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -64,8 +65,8 @@ func TestGetDecoding(t *testing.T) {
 	if err != nil || out != obj {
 		t.Fatal(err)
 	}
-
-	if obj.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+	// GVK for the object is expected to be empty
+	if !reflect.DeepEqual(obj.GetObjectKind().GroupVersionKind(), schema.GroupVersionKind{}) {
 		t.Fatal(obj.GetObjectKind().GroupVersionKind())
 	}
 }
@@ -86,8 +87,8 @@ func TestListDecoding(t *testing.T) {
 	if err != nil || out != obj {
 		t.Fatal(err)
 	}
-
-	if obj.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+	// GVK for the object is expected to be empty
+	if !reflect.DeepEqual(obj.GetObjectKind().GroupVersionKind(), schema.GroupVersionKind{}) {
 		t.Fatal(obj.GetObjectKind().GroupVersionKind())
 	}
 }
