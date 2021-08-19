@@ -25,8 +25,9 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -119,7 +120,7 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 	}
 	for _, node := range nodes.Items {
 		if node.Spec.PodCIDR != "" {
-			_, cidrRange, err := net.ParseCIDR(node.Spec.PodCIDR)
+			_, cidrRange, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
 				klog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)

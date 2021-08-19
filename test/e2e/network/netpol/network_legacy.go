@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 /*
@@ -1346,7 +1347,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				hostMask = 128
 			}
 			podServerCIDR := fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, hostMask)
@@ -1416,11 +1417,11 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 
 			allowMask := 24
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				allowMask = 64
 				hostMask = 128
 			}
-			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
 			framework.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 
@@ -1479,11 +1480,11 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 
 			allowMask := 24
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				allowMask = 64
 				hostMask = 128
 			}
-			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
 			framework.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 

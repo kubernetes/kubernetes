@@ -25,6 +25,7 @@ import (
 	"net"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,7 +81,7 @@ func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) 
 		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", node.Name, cidrs)
 	}
 
-	_, cidrRange, err := net.ParseCIDR(cidrs[0])
+	_, cidrRange, err := netutils.ParseCIDRSloppy(cidrs[0])
 	if err != nil {
 		return nil, err
 	}

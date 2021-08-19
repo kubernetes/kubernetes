@@ -17,7 +17,6 @@ limitations under the License.
 package proxy
 
 import (
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -29,13 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 )
 
 const testHostname = "test-hostname"
 
 func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
 	info := &BaseServiceInfo{
-		clusterIP: net.ParseIP(clusterIP),
+		clusterIP: netutils.ParseIPSloppy(clusterIP),
 		port:      port,
 		protocol:  v1.Protocol(protocol),
 	}

@@ -22,10 +22,12 @@ import (
 	"os"
 	"syscall"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 )
 
 func getIPNet(cidr string) *net.IPNet {
-	_, ipnet, _ := net.ParseCIDR(cidr)
+	_, ipnet, _ := netutils.ParseCIDRSloppy(cidr)
 	return ipnet
 }
 

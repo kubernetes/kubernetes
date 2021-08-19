@@ -34,7 +34,7 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	componentversion "k8s.io/component-base/version"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -635,7 +635,7 @@ func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
-	dnsIP, err := utilnet.GetIndexedIP(svcSubnetCIDR, 10)
+	dnsIP, err := netutils.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
@@ -649,7 +649,7 @@ func GetKubernetesServiceCIDR(svcSubnetList string, isDualStack bool) (*net.IPNe
 		// The default service address family for the cluster is the address family of the first
 		// service cluster IP range configured via the `--service-cluster-ip-range` flag
 		// of the kube-controller-manager and kube-apiserver.
-		svcSubnets, err := utilnet.ParseCIDRs(strings.Split(svcSubnetList, ","))
+		svcSubnets, err := netutils.ParseCIDRs(strings.Split(svcSubnetList, ","))
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
 		}
@@ -659,7 +659,7 @@ func GetKubernetesServiceCIDR(svcSubnetList string, isDualStack bool) (*net.IPNe
 		return svcSubnets[0], nil
 	}
 	// internal IP address for the API server
-	_, svcSubnet, err := net.ParseCIDR(svcSubnetList)
+	_, svcSubnet, err := netutils.ParseCIDRSloppy(svcSubnetList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
 	}
@@ -672,7 +672,7 @@ func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
-	internalAPIServerVirtualIP, err := utilnet.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := netutils.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
 	}

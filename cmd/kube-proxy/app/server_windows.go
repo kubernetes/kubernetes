@@ -23,7 +23,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"net"
 	goruntime "runtime"
 
 	// Enable pprof HTTP handlers.
@@ -45,6 +44,7 @@ import (
 	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 // NewProxyServer returns a new ProxyServer.
@@ -148,7 +148,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 		proxier, err = winuserspace.NewProxier(
 			winuserspace.NewLoadBalancerRR(),
-			net.ParseIP(config.BindAddress),
+			netutils.ParseIPSloppy(config.BindAddress),
 			netshInterface,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
 			// TODO @pires replace below with default values, if applicable

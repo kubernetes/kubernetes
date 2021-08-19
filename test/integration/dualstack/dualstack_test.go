@@ -54,7 +54,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -491,13 +491,13 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -718,13 +718,13 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -948,13 +948,13 @@ func TestUpgradeDowngrade(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1063,13 +1063,13 @@ func TestConvertToFromExternalName(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1153,7 +1153,7 @@ func TestExistingServiceDefaulting(t *testing.T) {
 	// Create an IPv4IPv6 dual stack control-plane
 	serviceCIDR := "10.0.0.0/16"
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1236,13 +1236,13 @@ func TestPreferDualStack(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
 
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1321,7 +1321,7 @@ func TestServiceUpdate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1486,7 +1486,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1545,7 +1545,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	closeFn()
 
 	secondaryServiceCIDR := "2001:db8:1::/48"
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
@@ -1582,12 +1582,12 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	secondaryServiceCIDR := "2001:db8:1::/48"
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 	dualStackCfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	dualStackCfg.ExtraConfig.ServiceIPRange = *cidr
-	_, secCidr, err := net.ParseCIDR(secondaryServiceCIDR)
+	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}

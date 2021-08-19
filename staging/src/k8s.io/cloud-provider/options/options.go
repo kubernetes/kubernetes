@@ -42,6 +42,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	netutils "k8s.io/utils/net"
 
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
@@ -88,7 +89,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP(componentConfig.Generic.Address),
+			BindAddress: netutils.ParseIPSloppy(componentConfig.Generic.Address),
 			BindPort:    int(componentConfig.Generic.Port),
 			BindNetwork: "tcp",
 		}).WithLoopback(),
@@ -247,7 +248,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 		return nil, err
 	}
 
-	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 

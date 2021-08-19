@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -638,7 +638,7 @@ func TestAPIServerService(t *testing.T) {
 
 func TestServiceAlloc(t *testing.T) {
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/29")
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
