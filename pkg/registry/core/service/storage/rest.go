@@ -759,6 +759,12 @@ func (rs *REST) handleClusterIPsForUpdatedService(oldService *api.Service, servi
 	}
 
 	// CASE B:
+
+	// if headless service then we bail out early (no clusterIPs management needed)
+	if len(oldService.Spec.ClusterIPs) > 0 && oldService.Spec.ClusterIPs[0] == api.ClusterIPNone {
+		return nil, nil, nil
+	}
+
 	// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
 	if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
 		toRelease = make(map[api.IPFamily]string)
@@ -773,11 +779,6 @@ func (rs *REST) handleClusterIPsForUpdatedService(oldService *api.Service, servi
 		}
 
 		return nil, toRelease, nil
-	}
-
-	// if headless service then we bail out early (no clusterIPs management needed)
-	if len(oldService.Spec.ClusterIPs) > 0 && oldService.Spec.ClusterIPs[0] == api.ClusterIPNone {
-		return nil, nil, nil
 	}
 
 	// upgrade and downgrade are specific to dualstack
