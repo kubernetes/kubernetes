@@ -210,7 +210,7 @@ func (t *grpcTunnel) DialContext(ctx context.Context, protocol, address string) 
 
 	klog.V(5).Infoln("DIAL_REQ sent to proxy server")
 
-	c := &conn{stream: t.stream}
+	c := &conn{stream: t.stream, random: random}
 
 	select {
 	case res := <-resCh:
