@@ -26,13 +26,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 )
 
 // WithFailedAuthenticationAudit decorates a failed http.Handler used in WithAuthentication handler.
 // It is meant to log only failed authentication requests.
-func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, policy policy.Checker) http.Handler {
+func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator) http.Handler {
 	if sink == nil || policy == nil {
 		return failedHandler
 	}

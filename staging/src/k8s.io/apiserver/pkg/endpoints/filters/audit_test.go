@@ -668,8 +668,8 @@ func TestAudit(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			sink := &fakeAuditSink{}
-			policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, test.omitStages)
-			handler := WithAudit(http.HandlerFunc(test.handler), sink, policyChecker, func(r *http.Request, ri *request.RequestInfo) bool {
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, test.omitStages)
+			handler := WithAudit(http.HandlerFunc(test.handler), sink, fakeRuleEvaluator, func(r *http.Request, ri *request.RequestInfo) bool {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
@@ -738,8 +738,8 @@ func TestAudit(t *testing.T) {
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, policyChecker, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -752,8 +752,8 @@ func TestAuditLevelNone(t *testing.T) {
 	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
 	})
-	policyChecker := policy.FakeChecker(auditinternal.LevelNone, nil)
-	handler = WithAudit(handler, sink, policyChecker, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
+	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -807,9 +807,8 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(200)
 			})
-			policyChecker := policy.FakeChecker(test.level, nil)
-
-			handler = WithAudit(handler, sink, policyChecker, nil)
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(test.level, nil)
+			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditID(handler)
 
 			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)

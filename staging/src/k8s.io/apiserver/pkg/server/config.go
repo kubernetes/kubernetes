@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
-	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -135,8 +134,8 @@ type Config struct {
 	Version *version.Info
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
-	// AuditPolicyChecker makes the decision of whether and how to audit log a request.
-	AuditPolicyChecker auditpolicy.Checker
+	// AuditPolicyRuleEvaluator makes the decision of whether and how to audit log a request.
+	AuditPolicyRuleEvaluator audit.PolicyRuleEvaluator
 	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
@@ -821,11 +820,11 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = filterlatency.TrackStarted(handler, "impersonation")
 
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator, c.LongRunningFunc)
 	handler = filterlatency.TrackStarted(handler, "audit")
 
 	failedHandler := genericapifilters.Unauthorized(c.Serializer)
-	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
+	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyRuleEvaluator)
 
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
@@ -838,13 +837,13 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
 
-	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyChecker,
+	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
-	handler = genericapifilters.WithAuditAnnotations(handler, c.AuditBackend, c.AuditPolicyChecker)
+	handler = genericapifilters.WithAuditAnnotations(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
