@@ -50,12 +50,13 @@ const respLoggerContextKey respLoggerContextKeyType = iota
 // the http.ResponseWriter. We can recover panics from go-restful, and
 // the logging value is questionable.
 type respLogger struct {
-	hijacked       bool
-	statusRecorded bool
-	status         int
-	statusStack    string
-	addedInfo      strings.Builder
-	startTime      time.Time
+	hijacked           bool
+	statusRecorded     bool
+	status             int
+	statusStack        string
+	addedInfo          strings.Builder
+	addedKeyValuePairs []interface{}
+	startTime          time.Time
 
 	captureErrorOutput bool
 
@@ -181,6 +182,20 @@ func AddInfof(ctx context.Context, format string, data ...interface{}) {
 	}
 }
 
+func (rl *respLogger) AddKeyValue(key string, value interface{}) {
+	rl.addedKeyValuePairs = append(rl.addedKeyValuePairs, key, value)
+}
+
+// AddKeyValue adds a (key, value) pair to the httplog associated
+// with the request.
+// Use this function if you want your data to show up in httplog
+// in a more structured and readable way.
+func AddKeyValue(ctx context.Context, key string, value interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.AddKeyValue(key, value)
+	}
+}
+
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
@@ -204,6 +219,7 @@ func (rl *respLogger) Log() {
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
 	}
+	keysAndValues = append(keysAndValues, rl.addedKeyValuePairs...)
 
 	if rl.hijacked {
 		keysAndValues = append(keysAndValues, "hijacked", true)
