@@ -824,42 +824,34 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		return nil // nothing more to do.
 	}
 
-	// Update-only prep work.
-	if oldService != nil {
-		np := service.Spec.IPFamilyPolicy
-
-		// If they didn't specify policy, or specified anything but
-		// single-stack AND they reduced these fields, it's an error.  They
-		// need to specify policy.
-		if np == nil || *np != api.IPFamilyPolicySingleStack {
-			el := make(field.ErrorList, 0)
-
-			if reducedClusterIPs(oldService, service) {
-				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
-					"must be 'SingleStack' to release the secondary cluster IP"))
-			}
-			if reducedIPFamilies(oldService, service) {
-				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
-					"must be 'SingleStack' to release the secondary IP family"))
-			}
-
-			if len(el) > 0 {
-				return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-			}
-		} else { // policy must be SingleStack
-			// Update: As long as ClusterIPs and IPFamilies have not changed,
-			// setting policy to single-stack is clear intent.
-			if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
-				// ClusterIPs[0] is immutable, so it is safe to keep.
-				if sameClusterIPs(oldService, service) && len(service.Spec.ClusterIPs) > 1 {
-					service.Spec.ClusterIPs = service.Spec.ClusterIPs[0:1]
-				}
-				if sameIPFamilies(oldService, service) && len(service.Spec.IPFamilies) > 1 {
-					service.Spec.IPFamilies = service.Spec.IPFamilies[0:1]
-				}
-			}
+	// If the user didn't specify ipFamilyPolicy, we can infer a default.  We
+	// don't want a static default because we want to make sure that we never
+	// change between single- and dual-stack modes with explicit direction, as
+	// provided by ipFamilyPolicy.  Consider these cases:
+	//   * Create (POST): If they didn't specify a policy we can assume it's
+	//     always SingleStack.
+	//   * Update (PUT): If they didn't specify a policy we need to adopt the
+	//     policy from before.  This is better than always assuming SingleStack
+	//     because a PUT that changes clusterIPs from 2 to 1 value but doesn't
+	//     specify ipFamily would work.
+	//   * Update (PATCH): If they didn't specify a policy it will adopt the
+	//     policy from before.
+	if service.Spec.IPFamilyPolicy == nil {
+		if oldService != nil && oldService.Spec.IPFamilyPolicy != nil {
+			// Update from an object with policy, use the old policy
+			service.Spec.IPFamilyPolicy = oldService.Spec.IPFamilyPolicy
+		} else if service.Spec.ClusterIP == api.ClusterIPNone && len(service.Spec.Selector) == 0 {
+			// Special-case: headless + selectorless defaults to dual.
+			requireDualStack := api.IPFamilyPolicyRequireDualStack
+			service.Spec.IPFamilyPolicy = &requireDualStack
+		} else {
+			// create or update from an object without policy (e.g.
+			// ExternalName) to one that needs policy
+			singleStack := api.IPFamilyPolicySingleStack
+			service.Spec.IPFamilyPolicy = &singleStack
 		}
 	}
+	// Henceforth we can assume ipFamilyPolicy is set.
 
 	// Do some loose pre-validation of the input.  This makes it easier in the
 	// rest of allocation code to not have to consider corner cases.
@@ -871,6 +863,32 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 
 	//TODO(thockin): Move this logic to validation?
 	el := make(field.ErrorList, 0)
+
+	// Update-only prep work.
+	if oldService != nil {
+		if getIPFamilyPolicy(service) == api.IPFamilyPolicySingleStack {
+			// As long as ClusterIPs and IPFamilies have not changed, setting
+			// the policy to single-stack is clear intent.
+			// ClusterIPs[0] is immutable, so it is safe to keep.
+			if sameClusterIPs(oldService, service) && len(service.Spec.ClusterIPs) > 1 {
+				service.Spec.ClusterIPs = service.Spec.ClusterIPs[0:1]
+			}
+			if sameIPFamilies(oldService, service) && len(service.Spec.IPFamilies) > 1 {
+				service.Spec.IPFamilies = service.Spec.IPFamilies[0:1]
+			}
+		} else {
+			// If the policy is anything but single-stack AND they reduced these
+			// fields, it's an error.  They need to specify policy.
+			if reducedClusterIPs(oldService, service) {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+					"must be 'SingleStack' to release the secondary cluster IP"))
+			}
+			if reducedIPFamilies(oldService, service) {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
+					"must be 'SingleStack' to release the secondary IP family"))
+			}
+		}
+	}
 
 	// Make sure ipFamilyPolicy makes sense for the provided ipFamilies and
 	// clusterIPs.  Further checks happen below - after the special cases.
@@ -916,23 +934,10 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 
-	// Infer IPFamilyPolicy from IPFamilies[].  This block does not handle the
-	// final defaulting - that happens a bit later, after special cases.
-	if service.Spec.IPFamilyPolicy == nil && len(service.Spec.IPFamilies) == 2 {
-		requireDualStack := api.IPFamilyPolicyRequireDualStack
-		service.Spec.IPFamilyPolicy = &requireDualStack
-	}
-
 	// Special-case: headless + selectorless.  This has to happen before other
 	// checks because it explicitly allows combinations of inputs that would
 	// otherwise be errors.
-	if len(service.Spec.ClusterIPs) > 0 && service.Spec.ClusterIPs[0] == api.ClusterIPNone && len(service.Spec.Selector) == 0 {
-		// If the use said nothing about policy and we can't infer it, they get dual-stack
-		if service.Spec.IPFamilyPolicy == nil {
-			requireDualStack := api.IPFamilyPolicyRequireDualStack
-			service.Spec.IPFamilyPolicy = &requireDualStack
-		}
-
+	if service.Spec.ClusterIP == api.ClusterIPNone && len(service.Spec.Selector) == 0 {
 		// If IPFamilies was not set by the user, start with the default
 		// family.
 		if len(service.Spec.IPFamilies) == 0 {
@@ -979,13 +984,6 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 	// If we have validation errors, don't bother with the rest.
 	if len(el) > 0 {
 		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-	}
-
-	// Finally, if IPFamilyPolicy is *still* not set, we can default it to
-	// SingleStack. If there are any webhooks, they have already run.
-	if service.Spec.IPFamilyPolicy == nil {
-		singleStack := api.IPFamilyPolicySingleStack
-		service.Spec.IPFamilyPolicy = &singleStack
 	}
 
 	// nil families, gets cluster default

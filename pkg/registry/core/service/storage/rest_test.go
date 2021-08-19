@@ -349,6 +349,7 @@ func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 		create: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 			svctest.SetClusterIPs("1.2.3.4", "2000::1"),
 			svctest.SetPorts(
 				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
@@ -372,6 +373,7 @@ func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 		create: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 			svctest.SetClusterIPs("1.2.3.4", "2000::1"),
 			svctest.SetPorts(
 				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
