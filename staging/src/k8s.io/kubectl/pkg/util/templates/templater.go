@@ -23,10 +23,11 @@ import (
 	"text/template"
 	"unicode"
 
-	"k8s.io/kubectl/pkg/util/term"
-
+	wordwrap "github.com/mitchellh/go-wordwrap"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 type FlagExposer interface {
@@ -90,7 +91,7 @@ func (templater *templater) HelpFunc() func(*cobra.Command, []string) {
 		t := template.New("help")
 		t.Funcs(templater.templateFuncs())
 		template.Must(t.Parse(templater.HelpTemplate))
-		out := term.NewResponsiveWriter(c.OutOrStdout())
+		out := c.OutOrStderr()
 		err := t.Execute(out, c)
 		if err != nil {
 			c.Println(err)
@@ -126,6 +127,8 @@ func (templater *templater) templateFuncs(exposedFlags ...string) template.FuncM
 		"isRootCmd":           templater.isRootCmd,
 		"optionsCmdFor":       templater.optionsCmdFor,
 		"usageLine":           templater.usageLine,
+		"wrapString":          wordwrap.WrapString,
+		"wrapLimit":           term.GetWordWrapperLimit,
 		"exposed": func(c *cobra.Command) *flag.FlagSet {
 			exposed := flag.NewFlagSet("exposed", flag.ContinueOnError)
 			if len(exposedFlags) > 0 {
@@ -160,7 +163,7 @@ func (t *templater) cmdGroupsString(c *cobra.Command) string {
 		cmds := []string{cmdGroup.Message}
 		for _, cmd := range cmdGroup.Commands {
 			if cmd.IsAvailableCommand() {
-				cmds = append(cmds, "  "+rpad(cmd.Name(), cmd.NamePadding())+" "+cmd.Short)
+				cmds = append(cmds, "  "+rpad(cmd.Name(), cmd.NamePadding())+"   "+cmd.Short)
 			}
 		}
 		groups = append(groups, strings.Join(cmds, "\n"))
@@ -219,28 +222,80 @@ func (t *templater) usageLine(c *cobra.Command) string {
 }
 
 func flagsUsages(f *flag.FlagSet) string {
-	x := new(bytes.Buffer)
+	flagBuf := new(bytes.Buffer)
+	printer := NewHelpFlagPrinter(flagBuf)
+
+	wrapLimit := term.GetWordWrapperLimit()
+	minFlagLen := uint(getMinFlagLen(f))
+	maxFlagLen := uint(getMaxFlagLen(f))
+	tabWidth := uint(maxFlagLen - minFlagLen) // the maximum width that will be padded by tabWriter
 
 	f.VisitAll(func(flag *flag.Flag) {
 		if flag.Hidden {
 			return
 		}
-		format := "--%s=%s: %s\n"
-
-		if flag.Value.Type() == "string" {
-			format = "--%s='%s': %s\n"
-		}
-
-		if len(flag.Shorthand) > 0 {
-			format = "  -%s, " + format
-		} else {
-			format = "   %s   " + format
-		}
-
-		fmt.Fprintf(x, format, flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
+		printer.PrintHelpFlags(flag, wrapLimit, tabWidth, minFlagLen, maxFlagLen)
 	})
+	printer.FlushTabWriter()
+	return flagBuf.String()
+}
 
-	return x.String()
+func getFlagFormatWithTab(f *flag.Flag) string {
+	var format string
+	format = "--%s=%s:\t%s"
+	if f.Value.Type() == "string" {
+		format = "--%s='%s':\t%s"
+	}
+	if len(f.Shorthand) > 0 {
+		format = "    -%s, " + format
+	} else {
+		format = "     %s   " + format
+	}
+	return format
+}
+
+func getFlagFormatWithoutTab(f *flag.Flag) string {
+	var format string
+	format = "--%s=%s: %s"
+	if f.Value.Type() == "string" {
+		format = "--%s='%s': %s"
+	}
+	if len(f.Shorthand) > 0 {
+		format = "    -%s, " + format
+	} else {
+		format = "     %s   " + format
+	}
+	return format
+}
+
+func getMaxFlagLen(f *flag.FlagSet) int {
+	formatBuf := new(bytes.Buffer)
+	maxFlagLen := 0
+
+	f.VisitAll(func(flag *flag.Flag) {
+		formatBuf.Reset()
+		fmt.Fprintf(formatBuf, getFlagFormatWithTab(flag), flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
+		flagLen := len(formatBuf.String()) - len(flag.Usage)
+		if flagLen > maxFlagLen {
+			maxFlagLen = flagLen
+		}
+	})
+	return maxFlagLen
+}
+
+func getMinFlagLen(f *flag.FlagSet) int {
+	formatBuf := new(bytes.Buffer)
+	minFlagLen := 120
+
+	f.VisitAll(func(flag *flag.Flag) {
+		formatBuf.Reset()
+		fmt.Fprintf(formatBuf, getFlagFormatWithTab(flag), flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
+		flagLen := len(formatBuf.String()) - len(flag.Usage)
+		if flagLen < minFlagLen {
+			minFlagLen = flagLen
+		}
+	})
+	return minFlagLen
 }
 
 func rpad(s string, padding int) string {

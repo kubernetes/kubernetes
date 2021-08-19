@@ -32,18 +32,18 @@ const (
 
 	// SectionAliases is the help template section that displays command aliases.
 	SectionAliases = `{{if gt .Aliases 0}}Aliases:
-{{.NameAndAliases}}
+{{wrapString .NameAndAliases wrapLimit}}
 
 {{end}}`
 
 	// SectionExamples is the help template section that displays command examples.
 	SectionExamples = `{{if .HasExample}}Examples:
-{{trimRight .Example}}
+{{wrapString (trimRight .Example) wrapLimit}}
 
 {{end}}`
 
 	// SectionSubcommands is the help template section that displays the command's subcommands.
-	SectionSubcommands = `{{if .HasAvailableSubCommands}}{{cmdGroupsString .}}
+	SectionSubcommands = `{{if .HasAvailableSubCommands}}{{wrapString (cmdGroupsString .) wrapLimit}}
 
 {{end}}`
 
@@ -56,22 +56,22 @@ const (
 
 	// SectionUsage is the help template section that displays the command's usage.
 	SectionUsage = `{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}Usage:
-  {{$usageLine}}
+  {{wrapString $usageLine wrapLimit}}
 
 {{end}}`
 
 	// SectionTipsHelp is the help template section that displays the '--help' hint.
-	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> --help" for more information about a given command.
+	SectionTipsHelp = `{{if .HasSubCommands}}{{wrapString (print "Use \"" $rootCmd " <command> --help\"" " for more information about a given command.") wrapLimit}}
 {{end}}`
 
 	// SectionTipsGlobalOptions is the help template section that displays the 'options' hint for displaying global flags.
-	SectionTipsGlobalOptions = `{{if $optionsCmdFor}}Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).
+	SectionTipsGlobalOptions = `{{if $optionsCmdFor}}{{wrapString (print "Use \"" $optionsCmdFor "\" for a list of global command-line options (applies to all commands).") wrapLimit}}
 {{end}}`
 )
 
 // MainHelpTemplate if the template for 'help' used by most commands.
 func MainHelpTemplate() string {
-	return `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+	return `{{with or (wrapString .Long wrapLimit) (wrapString .Short wrapLimit) }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 }
 
 // MainUsageTemplate if the template for 'usage' used by most commands.

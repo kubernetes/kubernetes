@@ -74,6 +74,28 @@ func NewWordWrapWriter(w io.Writer, limit uint) io.Writer {
 	}
 }
 
+func GetWordWrapperLimit() uint {
+	stdout := os.Stdout
+	fd := stdout.Fd()
+	if !term.IsTerminal(fd) {
+		panic("file descriptor is not a terminal")
+	}
+	terminalSize := GetSize(fd)
+	if terminalSize == nil {
+		panic("terminal size is nil")
+	}
+	var limit uint
+	switch {
+	case terminalSize.Width >= 120:
+		limit = 120
+	case terminalSize.Width >= 100:
+		limit = 100
+	case terminalSize.Width >= 80:
+		limit = 80
+	}
+	return limit
+}
+
 func (w wordWrapWriter) Write(p []byte) (nn int, err error) {
 	if w.limit == 0 {
 		return w.writer.Write(p)
