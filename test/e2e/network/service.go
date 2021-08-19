@@ -2188,87 +2188,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func() {
-		// windows kube-proxy does not support this feature yet
-		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
-		// This behavior is not supported if Kube-proxy is in "userspace" mode.
-		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := proxyMode(f); err == nil {
-			if proxyMode == "userspace" {
-				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
-			}
-		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-		}
-
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
-		framework.ExpectNoError(err)
-		nodeCounts := len(nodes.Items)
-		if nodeCounts < 2 {
-			e2eskipper.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
-		}
-		node0 := nodes.Items[0]
-		node1 := nodes.Items[1]
-
-		serviceName := "svc-itp"
-		ns := f.Namespace.Name
-		servicePort := 8000
-
-		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
-		local := v1.ServiceInternalTrafficPolicyLocal
-		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
-			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(8000)},
-			}
-			svc.Spec.InternalTrafficPolicy = &local
-		})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
-		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.HostNetwork = true
-		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
-
-		_, err = cs.CoreV1().Pods(ns).Create(context.TODO(), webserverPod0, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
-
-		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
-		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
-		e2epod.SetNodeSelection(&pausePod0.Spec, e2epod.NodeSelection{Name: node0.Name})
-
-		pausePod0, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod0, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pausePod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-
-		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
-		e2epod.SetNodeSelection(&pausePod1.Spec, e2epod.NodeSelection{Name: node1.Name})
-
-		pausePod1, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
-
-		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
-		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
-			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
-			// note that the expected hostname is the node name because the backend pod is on host network
-			execHostnameTest(*pausePod0, serviceAddress, node0.Name)
-
-			// the second pause pod is on a different node, so it should see a connection error every time
-			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
-		}
-	})
-
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func() {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func() {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2295,20 +2215,23 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
 		servicePort := 80
+		// If the pod can't bind to this port, it will fail to start, and it will fail the test,
+		// because is using hostNetwork. Using a not common port will reduce this possibility.
+		endpointPort := 10180
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(endpointPort)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(endpointPort))
 		webserverPod0.Labels = jig.Labels
 		webserverPod0.Spec.HostNetwork = true
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
@@ -2317,11 +2240,10 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{webserverPod0.Name: {endpointPort}})
 
-		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
+		ginkgo.By("Creating 2 pause pods that will try to connect to the webserver")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
-		pausePod0.Spec.HostNetwork = true
 		e2epod.SetNodeSelection(&pausePod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		pausePod0, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod0, metav1.CreateOptions{})
@@ -2329,7 +2251,6 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pausePod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
-		pausePod1.Spec.HostNetwork = true
 		e2epod.SetNodeSelection(&pausePod1.Spec, e2epod.NodeSelection{Name: node1.Name})
 
 		pausePod1, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod1, metav1.CreateOptions{})
@@ -2346,6 +2267,35 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+		}
+
+		ginkgo.By("Creating 2 pause hostNetwork pods that will try to connect to the webserver")
+		pausePod2 := e2epod.NewAgnhostPod(ns, "pause-pod-2", nil, nil, nil)
+		pausePod2.Spec.HostNetwork = true
+		e2epod.SetNodeSelection(&pausePod2.Spec, e2epod.NodeSelection{Name: node0.Name})
+
+		pausePod2, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod2, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pausePod2.Name, f.Namespace.Name, framework.PodStartTimeout))
+
+		pausePod3 := e2epod.NewAgnhostPod(ns, "pause-pod-3", nil, nil, nil)
+		pausePod3.Spec.HostNetwork = true
+		e2epod.SetNodeSelection(&pausePod3.Spec, e2epod.NodeSelection{Name: node1.Name})
+
+		pausePod3, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pausePod3, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pausePod3.Name, f.Namespace.Name, framework.PodStartTimeout))
+
+		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
+		for i := 0; i < 5; i++ {
+			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
+			// note that the expected hostname is the node name because the backend pod is on host network
+			execHostnameTest(*pausePod2, serviceAddress, node0.Name)
+
+			// the second pause pod is on a different node, so it should see a connection error every time
+			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
+			_, err := framework.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
