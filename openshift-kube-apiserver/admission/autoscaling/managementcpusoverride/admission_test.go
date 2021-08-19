@@ -169,22 +169,21 @@ func TestAdmit(t *testing.T) {
 			expectedError:      fmt.Errorf(`failed to get workload annotation effect: the workload annotation value map["test":"test"] does not have "effect" key`),
 		},
 		{
-			name:               "should return admission error when the infrastructure resource status has empty ControlPlaneTopology",
+			name:               "should return admission error when the infrastructure resource status empty",
 			pod:                testManagedPod("", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
-			infra:              testClusterInfraWithoutControlPlaneTopology(),
-			expectedError:      fmt.Errorf("%s infrastructure resource has empty status.controlPlaneTopology or status.infrastructureTopology", PluginName),
+			infra:              testClusterInfraWithoutAnyStatusFields(),
+			expectedError:      fmt.Errorf("%s infrastructure resource has empty status", PluginName),
 		},
 		{
-			name:               "should return admission error when the infrastructure resource status has empty InfrastructureTopology",
+			name:               "should skip the admission when both topology fields empty",
 			pod:                testManagedPod("", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{testNodeWithManagementResource()},
-			infra:              testClusterInfraWithoutInfrastructureTopology(),
-			expectedError:      fmt.Errorf("%s infrastructure resource has empty status.controlPlaneTopology or status.infrastructureTopology", PluginName),
+			infra:              testClusterInfraWithoutTopologyFields(),
 		},
 		{
 			name:               "should delete CPU requests and update workload CPU annotations for the burstable pod with managed annotation",
@@ -262,10 +261,7 @@ func TestAdmit(t *testing.T) {
 			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
-			expectedAnnotations: map[string]string{
-				workloadAdmissionWarning: "only single-node clusters support workload partitioning",
-			},
-			nodes: []*corev1.Node{},
+			nodes:              []*corev1.Node{},
 			infra: &configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: infraClusterName,
@@ -694,26 +690,30 @@ func testNodeWithManagementResource() *corev1.Node {
 	}
 }
 
+func testClusterInfraWithoutAnyStatusFields() *configv1.Infrastructure {
+	return &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: infraClusterName,
+		},
+	}
+}
+
 func testClusterSNOInfra() *configv1.Infrastructure {
 	return &configv1.Infrastructure{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: infraClusterName,
 		},
 		Status: configv1.InfrastructureStatus{
+			APIServerURL:           "test",
 			ControlPlaneTopology:   configv1.SingleReplicaTopologyMode,
 			InfrastructureTopology: configv1.SingleReplicaTopologyMode,
 		},
 	}
 }
 
-func testClusterInfraWithoutControlPlaneTopology() *configv1.Infrastructure {
+func testClusterInfraWithoutTopologyFields() *configv1.Infrastructure {
 	infra := testClusterSNOInfra()
 	infra.Status.ControlPlaneTopology = ""
-	return infra
-}
-
-func testClusterInfraWithoutInfrastructureTopology() *configv1.Infrastructure {
-	infra := testClusterSNOInfra()
 	infra.Status.InfrastructureTopology = ""
 	return infra
 }
