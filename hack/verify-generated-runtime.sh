@@ -27,14 +27,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-runtime_versions=("v1alpha2" "v1")
+runtime_version="v1"
 
 kube::golang::setup_env
 
 function cleanup {
-	for v in "${runtime_versions[@]}"; do
-		rm -rf "${KUBE_REMOTE_RUNTIME_ROOT}/${v}/_tmp/"
-	done
+	rm -rf "${KUBE_REMOTE_RUNTIME_ROOT}/${runtime_version}/_tmp/"
 }
 
 trap cleanup EXIT
@@ -57,6 +55,4 @@ function verify_generated_code() {
 	fi
 }
 
-for v in "${runtime_versions[@]}"; do
-	verify_generated_code "${v}"
-done
+verify_generated_code "${runtime_version}"

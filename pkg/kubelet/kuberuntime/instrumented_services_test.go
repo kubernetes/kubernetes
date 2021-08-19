@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/component-base/metrics/legacyregistry"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 

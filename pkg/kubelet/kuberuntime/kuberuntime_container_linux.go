@@ -26,7 +26,7 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
 )
 

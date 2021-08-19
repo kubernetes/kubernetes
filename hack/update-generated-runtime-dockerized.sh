@@ -25,7 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-runtime_versions=("v1alpha2" "v1")
+runtime_version="v1"
 
 kube::golang::setup_env
 
@@ -42,10 +42,8 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 function cleanup {
-	for v in "${runtime_versions[@]}"; do
-		rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${v}/api.pb.go.bak"
-		rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${v}/api.pb.go.tmp"
-	done
+	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${runtime_version}/api.pb.go.bak"
+	rm -f "${KUBE_REMOTE_RUNTIME_ROOT}/${runtime_version}/api.pb.go.tmp"
 }
 
 trap cleanup EXIT
@@ -70,6 +68,4 @@ function generate_code() {
 	gofmt -l -s -w "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go"
 }
 
-for v in "${runtime_versions[@]}"; do
-	generate_code "${v}"
-done
+generate_code "${runtime_version}"

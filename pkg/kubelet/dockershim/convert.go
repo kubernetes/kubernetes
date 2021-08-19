@@ -25,7 +25,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
