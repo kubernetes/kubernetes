@@ -6243,10 +6243,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.ServicePort
-          elementRelationship: associative
-          keys:
-          - port
-          - protocol
+          elementRelationship: atomic
     - name: publishNotReadyAddresses
       type:
         scalar: boolean

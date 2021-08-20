@@ -9380,13 +9380,8 @@
             "$ref": "#/definitions/io.k8s.api.core.v1.ServicePort"
           },
           "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "port",
-            "protocol"
-          ],
-          "x-kubernetes-list-type": "map",
-          "x-kubernetes-patch-merge-key": "port",
-          "x-kubernetes-patch-strategy": "merge"
+          "x-kubernetes-list-type": "atomic",
+          "x-kubernetes-patch-strategy": "replace"
         },
         "publishNotReadyAddresses": {
           "description": "publishNotReadyAddresses indicates that any agent which deals with endpoints for this Service should disregard any indications of ready/not-ready. The primary use case for setting this field is for a StatefulSet's Headless Service to propagate SRV DNS records for its Pods for the purpose of peer discovery. The Kubernetes controllers that generate Endpoints and EndpointSlice resources for Services interpret this to mean that all endpoints are considered \"ready\" even if the Pods themselves are not. Agents which consume only Kubernetes generated endpoints through the Endpoints or EndpointSlice resources can safely assume this behavior.",
