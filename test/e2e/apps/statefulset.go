@@ -1140,7 +1140,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 	})
 	// Make sure minReadySeconds is honored
 	// Don't mark it as conformance yet
-	ginkgo.It("MinReadySeconds should be honored when enabled [Feature:StatefulSetMinReadySeconds] [alpha]", func() {
+	ginkgo.It("MinReadySeconds should be honored when enabled", func() {
 		ssName := "test-ss"
 		headlessSvcName := "test"
 		// Define StatefulSet Labels
