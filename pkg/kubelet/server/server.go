@@ -400,6 +400,7 @@ func (s *Server) InstallDefaultHandlers() {
 	p := compbasemetrics.NewKubeRegistry()
 	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
+	p.MustRegister(prober.ProberDuration)
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)

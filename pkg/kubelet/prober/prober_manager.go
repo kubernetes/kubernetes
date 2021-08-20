@@ -48,6 +48,20 @@ var ProberResults = metrics.NewCounterVec(
 		"pod_uid"},
 )
 
+// ProberDuration stores the duration of a successful probe lifecycle by result as prometheus metrics.
+var ProberDuration = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Subsystem:      "prober",
+		Name:           "probe_duration_seconds",
+		Help:           "Duration in seconds for a probe response.",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"probe_type",
+		"container",
+		"pod",
+		"namespace"},
+)
+
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
