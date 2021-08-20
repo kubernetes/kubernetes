@@ -442,7 +442,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		framework.Logf("Update the DaemonSet to trigger a rollout")
 		// We use a nonexistent image here, so that we make sure it won't finish
-		newImage := "foo:non-existent"
+		newImage := InvalidImage
 		newDS, err := updateDaemonSetWithRetries(c, ns, ds.Name, func(update *appsv1.DaemonSet) {
 			update.Spec.Template.Spec.Containers[0].Image = newImage
 		})

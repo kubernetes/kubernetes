@@ -928,7 +928,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	// We use a nonexistent image here, so that we make sure it won't finish
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
 	deploymentReplicas := int32(1)
-	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
+	deploymentImage := InvalidImage
 	deploymentStrategyType := appsv1.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %q", deploymentName)
 	newDeployment := e2edeployment.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
@@ -1229,7 +1229,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// will be blocked to simulate a partial rollout.
 	framework.Logf("Updating deployment %q with a non-existent image", deploymentName)
 	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Image = "webserver:404"
+		update.Spec.Template.Spec.Containers[0].Image = InvalidImage
 	})
 	framework.ExpectNoError(err)
 

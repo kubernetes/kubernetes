@@ -393,7 +393,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a ReplicationController")
-		replicationController := newTestReplicationControllerForQuota("test-rc", "nginx", 0)
+		replicationController := newTestReplicationControllerForQuota("test-rc", imageutils.GetE2EImage(imageutils.Nginx), 0)
 		replicationController, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), replicationController, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -449,7 +449,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a ReplicaSet")
-		replicaSet := newTestReplicaSetForQuota("test-rs", "nginx", 0)
+		replicaSet := newTestReplicaSetForQuota("test-rs", imageutils.GetE2EImage(imageutils.Nginx), 0)
 		replicaSet, err = f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), replicaSet, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
