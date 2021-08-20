@@ -238,6 +238,24 @@ type Config struct {
 	// EventSink receives events about the life cycle of the API server, e.g. readiness, serving, signals and termination.
 	EventSink EventSink
 
+	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
+	// Server during the graceful termination of the apiserver. If true, we wait
+	// for non longrunning requests in flight to be drained and then initiate a
+	// shutdown of the HTTP Server. If false, we initiate a shutdown of the HTTP
+	// Server as soon as ShutdownDelayDuration has elapsed.
+	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
+	// rejected with a 429 status code and a 'Retry-After' response.
+	ShutdownSendRetryAfter bool
+
+	// StartupSendRetryAfterUntilReady once set will reject incoming requests with
+	// a 429 status code and a 'Retry-After' response header until the apiserver
+	// hasn't fully initialized.
+	// This option ensures that the system stays consistent even when requests
+	// are received before the server has been initialized.
+	// In particular, it prevents child deletion in case of GC or/and orphaned
+	// content in case of the namespaces controller.
+	StartupSendRetryAfterUntilReady bool
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -474,6 +492,46 @@ func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	}
 }
 
+// shouldAddWithRetryAfterFilter returns an appropriate ShouldRespondWithRetryAfterFunc
+// if the apiserver should respond with a Retry-After response header based on option
+// 'shutdown-send-retry-after' or 'startup-send-retry-after-until-ready'.
+func (c *Config) shouldAddWithRetryAfterFilter() genericfilters.ShouldRespondWithRetryAfterFunc {
+	if !(c.ShutdownSendRetryAfter || c.StartupSendRetryAfterUntilReady) {
+		return nil
+	}
+
+	// follow lifecycle, avoiding go routines per request
+	const (
+		startup int32 = iota
+		running
+		terminating
+	)
+	state := startup
+	go func() {
+		<-c.lifecycleSignals.HasBeenReady.Signaled()
+		atomic.StoreInt32(&state, running)
+		<-c.lifecycleSignals.AfterShutdownDelayDuration.Signaled()
+		atomic.StoreInt32(&state, terminating)
+	}()
+
+	return func() (*genericfilters.RetryAfterParams, bool) {
+		state := atomic.LoadInt32(&state)
+		switch {
+		case c.StartupSendRetryAfterUntilReady && state == startup:
+			return &genericfilters.RetryAfterParams{
+				Message: "The apiserver hasn't been fully initialized yet, please try again later.",
+			}, true
+		case c.ShutdownSendRetryAfter && state == terminating:
+			return &genericfilters.RetryAfterParams{
+				TearDownConnection: true,
+				Message:            "The apiserver is shutting down, please try again later.",
+			}, true
+		default:
+			return nil, false
+		}
+	}
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
@@ -674,7 +732,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
 
-		lifecycleSignals: c.lifecycleSignals,
+		lifecycleSignals:       c.lifecycleSignals,
+		ShutdownSendRetryAfter: c.ShutdownSendRetryAfter,
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
@@ -862,6 +921,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
+	if shouldRespondWithRetryAfterFn := c.shouldAddWithRetryAfterFilter(); shouldRespondWithRetryAfterFn != nil {
+		handler = genericfilters.WithRetryAfter(handler, shouldRespondWithRetryAfterFn)
+	}
 	handler = genericfilters.WithHTTPLogging(handler, c.newIsTerminatingFunc())
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
