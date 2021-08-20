@@ -229,14 +229,14 @@ func scaleOnIdleSideCar(name string, kind schema.GroupVersionKind, checkStabilit
 	}
 	scaleTest := &HPAContainerResourceScaleTest{
 		initPods:                    1,
-		totalInitialCPUUsage:        250,
-		perContainerCPURequest:      500,
+		totalInitialCPUUsage:        125,
+		perContainerCPURequest:      250,
 		targetCPUUtilizationPercent: 20,
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    700,
+		cpuBurst:                    500,
 		secondScale:                 5,
 		sidecarStatus:               e2eautoscaling.Enable,
 		sidecarType:                 e2eautoscaling.Idle,
