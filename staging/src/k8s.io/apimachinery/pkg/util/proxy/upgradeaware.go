@@ -60,6 +60,8 @@ type UpgradeAwareHandler struct {
 	// Location is the location of the upstream proxy. It is used as the location to Dial on the upstream server
 	// for upgrade requests unless UseRequestLocationOnUpgrade is true.
 	Location *url.URL
+	// AppendLocationPath determines if the original path of the Location should be appended to the upstream proxy request path
+	AppendLocationPath bool
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper
 	// UpgradeTransport, if specified, will be used as the backend transport when upgrade requests are provided.
@@ -239,7 +241,13 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		newReq.Host = h.Location.Host
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
+	// create the target location to use for the reverse proxy
+	reverseProxyLocation := &url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host}
+	if h.AppendLocationPath {
+		reverseProxyLocation.Path = h.Location.Path
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(reverseProxyLocation)
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
@@ -282,6 +290,9 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
+		if h.AppendLocationPath {
+			location.Path = singleJoiningSlash(h.Location.Path, location.Path)
+		}
 	}
 
 	clone := utilnet.CloneRequest(req)
@@ -412,6 +423,20 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
 
 	return true
+}
+
+// FIXME: Taken from net/http/httputil/reverseproxy.go as singleJoiningSlash is not exported to be re-used.
+// See-also: https://github.com/golang/go/issues/44290
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
 }
 
 func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, error) {

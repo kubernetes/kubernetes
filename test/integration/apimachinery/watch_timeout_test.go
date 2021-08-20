@@ -164,7 +164,7 @@ func TestWatchClientTimeout(t *testing.T) {
 	})
 
 	t.Run("kubectl proxy", func(t *testing.T) {
-		kubectlProxyServer, err := kubectlproxy.NewServer("", "/", "/static/", nil, &restclient.Config{Host: s.URL, Timeout: 2 * time.Second}, 0)
+		kubectlProxyServer, err := kubectlproxy.NewServer("", "/", "/static/", nil, &restclient.Config{Host: s.URL, Timeout: 2 * time.Second}, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}

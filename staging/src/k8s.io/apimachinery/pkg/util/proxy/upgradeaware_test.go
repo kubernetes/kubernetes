@@ -163,6 +163,7 @@ func TestServeHTTP(t *testing.T) {
 		expectedRespHeader    map[string]string
 		notExpectedRespHeader []string
 		upgradeRequired       bool
+		appendLocationPath    bool
 		expectError           func(err error) bool
 		useLocationHost       bool
 	}{
@@ -246,6 +247,27 @@ func TestServeHTTP(t *testing.T) {
 			expectedPath:    "/some/path",
 			useLocationHost: true,
 		},
+		{
+			name:               "append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base/base",
+			appendLocationPath: true,
+		},
+		{
+			name:               "append server path to request path with ending slash",
+			method:             "GET",
+			requestPath:        "/base/",
+			expectedPath:       "/base/base/",
+			appendLocationPath: true,
+		},
+		{
+			name:               "don't append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base",
+			appendLocationPath: false,
+		},
 	}
 
 	for i, test := range tests {
@@ -269,6 +291,7 @@ func TestServeHTTP(t *testing.T) {
 			backendURL.Path = test.requestPath
 			proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, test.upgradeRequired, responder)
 			proxyHandler.UseLocationHost = test.useLocationHost
+			proxyHandler.AppendLocationPath = test.appendLocationPath
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
 			proxyURL, _ := url.Parse(proxyServer.URL)
