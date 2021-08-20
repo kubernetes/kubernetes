@@ -22,13 +22,14 @@ import (
 	"strconv"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 // IPPart returns just the IP part of an IP or IP:port or endpoint string. If the IP
 // part is an IPv6 address enclosed in brackets (e.g. "[fd00:1::5]:9999"),
 // then the brackets are stripped as well.
 func IPPart(s string) string {
-	if ip := net.ParseIP(s); ip != nil {
+	if ip := netutils.ParseIPSloppy(s); ip != nil {
 		// IP address without port
 		return s
 	}
@@ -39,7 +40,7 @@ func IPPart(s string) string {
 		return ""
 	}
 	// Check if host string is a valid IP address
-	ip := net.ParseIP(host)
+	ip := netutils.ParseIPSloppy(host)
 	if ip == nil {
 		klog.Errorf("invalid IP part '%s'", host)
 		return ""

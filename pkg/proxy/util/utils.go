@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -88,7 +88,7 @@ func IsZeroCIDR(cidr string) bool {
 
 // IsProxyableIP checks if a given IP address is permitted to be proxied
 func IsProxyableIP(ip string) error {
-	netIP := net.ParseIP(ip)
+	netIP := netutils.ParseIPSloppy(ip)
 	if netIP == nil {
 		return ErrAddressNotAllowed
 	}
@@ -146,7 +146,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 	}
 
 	for _, addr := range addrs {
-		ip, _, err := net.ParseCIDR(addr.String())
+		ip, _, err := netutils.ParseCIDRSloppy(addr.String())
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 
 // GetLocalAddrSet return a local IPSet.
 // If failed to get local addr, will assume no local ips.
-func GetLocalAddrSet() utilnet.IPSet {
+func GetLocalAddrSet() netutils.IPSet {
 	localAddrs, err := GetLocalAddrs()
 	if err != nil {
 		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs")
@@ -167,7 +167,7 @@ func GetLocalAddrSet() utilnet.IPSet {
 		klog.InfoS("No local addresses were found")
 	}
 
-	localAddrSet := utilnet.IPSet{}
+	localAddrSet := netutils.IPSet{}
 	localAddrSet.Insert(localAddrs...)
 	return localAddrSet
 }
@@ -220,7 +220,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			continue
 		}
 
-		_, ipNet, _ := net.ParseCIDR(cidr)
+		_, ipNet, _ := netutils.ParseCIDRSloppy(cidr)
 		for _, addr := range addrs {
 			var ip net.IP
 			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
@@ -234,10 +234,10 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			}
 
 			if ipNet.Contains(ip) {
-				if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
+				if netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
 					uniqueAddressList.Insert(ip.String())
 				}
-				if !utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
+				if !netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
 					uniqueAddressList.Insert(ip.String())
 				}
 			}
@@ -295,23 +295,23 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 }
 
 func getIPFamilyFromIP(ipStr string) (v1.IPFamily, error) {
-	netIP := net.ParseIP(ipStr)
+	netIP := netutils.ParseIPSloppy(ipStr)
 	if netIP == nil {
 		return "", ErrAddressNotAllowed
 	}
 
-	if utilnet.IsIPv6(netIP) {
+	if netutils.IsIPv6(netIP) {
 		return v1.IPv6Protocol, nil
 	}
 	return v1.IPv4Protocol, nil
 }
 
 func getIPFamilyFromCIDR(cidrStr string) (v1.IPFamily, error) {
-	_, netCIDR, err := net.ParseCIDR(cidrStr)
+	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
 	if err != nil {
 		return "", ErrAddressNotAllowed
 	}
-	if utilnet.IsIPv6CIDR(netCIDR) {
+	if netutils.IsIPv6CIDR(netCIDR) {
 		return v1.IPv6Protocol, nil
 	}
 	return v1.IPv4Protocol, nil
@@ -335,7 +335,7 @@ func AppendPortIfNeeded(addr string, port int32) string {
 	}
 
 	// Simply return for invalid case. This should be caught by validation instead.
-	ip := net.ParseIP(addr)
+	ip := netutils.ParseIPSloppy(addr)
 	if ip == nil {
 		return addr
 	}
@@ -441,7 +441,7 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 		}
 
 		IsIPv6Family := (ipFamily == v1.IPv6Protocol)
-		if IsIPv6Family == utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		if IsIPv6Family == netutils.IsIPv6String(service.Spec.ClusterIP) {
 			return service.Spec.ClusterIP
 		}
 
@@ -492,7 +492,7 @@ func WriteBytesLine(buf *bytes.Buffer, bytes []byte) {
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
 // closes the ports opened in this sync.
-func RevertPorts(replacementPortsMap, originalPortsMap map[utilnet.LocalPort]utilnet.Closeable) {
+func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]netutils.Closeable) {
 	for k, v := range replacementPortsMap {
 		// Only close newly opened local ports - leave ones that were open before this update
 		if originalPortsMap[k] == nil {

@@ -31,6 +31,7 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	componentversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -139,7 +140,7 @@ func LowercaseSANs(sans []string) {
 // VerifyAPIServerBindAddress can be used to verify if a bind address for the API Server is 0.0.0.0,
 // in which case this address is not valid and should not be used.
 func VerifyAPIServerBindAddress(address string) error {
-	ip := net.ParseIP(address)
+	ip := netutils.ParseIPSloppy(address)
 	if ip == nil {
 		return errors.Errorf("cannot parse IP address: %s", address)
 	}
@@ -164,7 +165,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
 			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
-			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
+			defaultIP := netutils.ParseIPSloppy(constants.DefaultAPIServerBindAddress)
 			if defaultIP == nil {
 				return nil, errors.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
 			}

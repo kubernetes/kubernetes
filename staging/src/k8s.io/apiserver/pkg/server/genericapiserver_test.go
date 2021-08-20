@@ -54,6 +54,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -127,7 +128,7 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.ExternalAddress = "192.168.10.4:443"
-	config.PublicAddress = net.ParseIP("192.168.10.4")
+	config.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 

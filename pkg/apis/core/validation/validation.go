@@ -3112,7 +3112,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			if ip := net.ParseIP(ns); ip == nil {
+			if ip := netutils.ParseIPSloppy(ns); ip == nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
 			}
 		}
@@ -3246,7 +3246,7 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, hostAlias := range hostAliases {
-		if ip := net.ParseIP(hostAlias.IP); ip == nil {
+		if ip := netutils.ParseIPSloppy(hostAlias.IP); ip == nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
 		}
 		for _, hostname := range hostAlias.Hostnames {
@@ -5840,7 +5840,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 // - https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml
 func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	ip := net.ParseIP(ipAddress)
+	ip := netutils.ParseIPSloppy(ipAddress)
 	if ip == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address"))
 		return allErrs
@@ -6160,7 +6160,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			if isIP := (net.ParseIP(ingress.IP) != nil); !isIP {
+			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
 			}
 		}
@@ -6168,7 +6168,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
 			}
-			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
+			if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
 			}
 		}
@@ -6198,7 +6198,7 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 
 // ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
 func ValidateCIDR(cidr string) (*net.IPNet, error) {
-	_, net, err := net.ParseCIDR(cidr)
+	_, net, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		return nil, err
 	}

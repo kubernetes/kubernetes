@@ -28,9 +28,10 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	netutils "k8s.io/utils/net"
 )
 
 // PortForwardProtocolV1Name is the subprotocol used for port forwarding.
@@ -131,9 +132,9 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 				ip := listenAddress{address: "::1", protocol: "tcp6", failureMode: "all"}
 				parsed[ip.address] = ip
 			}
-		} else if net.ParseIP(address).To4() != nil {
+		} else if netutils.ParseIPSloppy(address).To4() != nil {
 			parsed[address] = listenAddress{address: address, protocol: "tcp4", failureMode: "any"}
-		} else if net.ParseIP(address) != nil {
+		} else if netutils.ParseIPSloppy(address) != nil {
 			parsed[address] = listenAddress{address: address, protocol: "tcp6", failureMode: "any"}
 		} else {
 			return nil, fmt.Errorf("%s is not a valid IP", address)

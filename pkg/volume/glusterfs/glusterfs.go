@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +34,7 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	netutils "k8s.io/utils/net"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -992,7 +992,7 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 		}
 		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
 		// IP validates if a string is a valid IP address.
-		ip := net.ParseIP(ipaddr)
+		ip := netutils.ParseIPSloppy(ipaddr)
 		if ip == nil {
 			return nil, fmt.Errorf("glusterfs server node ip address %s must be a valid IP address, (e.g. 10.9.8.7)", ipaddr)
 		}

@@ -20,7 +20,6 @@ package hostport
 
 import (
 	"bytes"
-	"net"
 	"strings"
 	"testing"
 
@@ -28,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 func TestOpenCloseHostports(t *testing.T) {
@@ -249,7 +249,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod1",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("10.1.1.2"),
+				IP:          netutils.ParseIPSloppy("10.1.1.2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -276,7 +276,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod2",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("10.1.1.3"),
+				IP:          netutils.ParseIPSloppy("10.1.1.3"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -303,7 +303,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod3",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("10.1.1.4"),
+				IP:          netutils.ParseIPSloppy("10.1.1.4"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -320,7 +320,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod3",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("192.168.12.12"),
+				IP:          netutils.ParseIPSloppy("192.168.12.12"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -337,7 +337,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod4",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("2001:beef::2"),
+				IP:          netutils.ParseIPSloppy("2001:beef::2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -356,7 +356,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod5",
 				Namespace:   "ns5",
-				IP:          net.ParseIP("10.1.1.5"),
+				IP:          netutils.ParseIPSloppy("10.1.1.5"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -380,7 +380,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod6",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("10.1.1.2"),
+				IP:          netutils.ParseIPSloppy("10.1.1.2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -555,7 +555,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod1",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("2001:beef::2"),
+				IP:          netutils.ParseIPSloppy("2001:beef::2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -581,7 +581,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod2",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("2001:beef::3"),
+				IP:          netutils.ParseIPSloppy("2001:beef::3"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -607,7 +607,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod3",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("2001:beef::4"),
+				IP:          netutils.ParseIPSloppy("2001:beef::4"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -623,7 +623,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod4",
 				Namespace:   "ns2",
-				IP:          net.ParseIP("192.168.2.2"),
+				IP:          netutils.ParseIPSloppy("192.168.2.2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{

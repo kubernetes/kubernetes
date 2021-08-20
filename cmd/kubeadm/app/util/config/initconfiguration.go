@@ -31,6 +31,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -122,7 +123,7 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 // SetAPIEndpointDynamicDefaults checks and sets configuration values for the APIEndpoint object
 func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	// validate cfg.API.AdvertiseAddress.
-	addressIP := net.ParseIP(cfg.AdvertiseAddress)
+	addressIP := netutils.ParseIPSloppy(cfg.AdvertiseAddress)
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
 		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}

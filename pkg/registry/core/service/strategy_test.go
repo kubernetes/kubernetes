@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
@@ -34,11 +33,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
-	_, testCIDR, err := net.ParseCIDR(cidr)
+	_, testCIDR, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		panic("invalid CIDR")
 	}

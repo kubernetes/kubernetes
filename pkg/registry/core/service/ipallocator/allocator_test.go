@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAllocate(t *testing.T) {
@@ -65,7 +66,7 @@ func TestAllocate(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, cidr, err := net.ParseCIDR(tc.cidr)
+		_, cidr, err := netutils.ParseCIDRSloppy(tc.cidr)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +111,7 @@ func TestAllocate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		released := net.ParseIP(tc.released)
+		released := netutils.ParseIPSloppy(tc.released)
 		if err := r.Release(released); err != nil {
 			t.Fatal(err)
 		}
@@ -132,12 +133,12 @@ func TestAllocate(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, outOfRange := range tc.outOfRange {
-			err = r.Allocate(net.ParseIP(outOfRange))
+			err = r.Allocate(netutils.ParseIPSloppy(outOfRange))
 			if _, ok := err.(*ErrNotInRange); !ok {
 				t.Fatal(err)
 			}
 		}
-		if err := r.Allocate(net.ParseIP(tc.alreadyAllocated)); err != ErrAllocated {
+		if err := r.Allocate(netutils.ParseIPSloppy(tc.alreadyAllocated)); err != ErrAllocated {
 			t.Fatal(err)
 		}
 		if f := r.Free(); f != 1 {
@@ -159,7 +160,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestAllocateTiny(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/32")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/32")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +177,7 @@ func TestAllocateTiny(t *testing.T) {
 }
 
 func TestAllocateSmall(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.240/30")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.240/30")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,10 +200,10 @@ func TestAllocateSmall(t *testing.T) {
 		found.Insert(ip.String())
 	}
 	for s := range found {
-		if !r.Has(net.ParseIP(s)) {
+		if !r.Has(netutils.ParseIPSloppy(s)) {
 			t.Fatalf("missing: %s", s)
 		}
-		if err := r.Allocate(net.ParseIP(s)); err != ErrAllocated {
+		if err := r.Allocate(netutils.ParseIPSloppy(s)); err != ErrAllocated {
 			t.Fatal(err)
 		}
 	}
@@ -220,7 +221,7 @@ func TestAllocateSmall(t *testing.T) {
 }
 
 func TestForEach(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +239,7 @@ func TestForEach(t *testing.T) {
 			t.Fatal(err)
 		}
 		for ips := range tc {
-			ip := net.ParseIP(ips)
+			ip := netutils.ParseIPSloppy(ips)
 			if err := r.Allocate(ip); err != nil {
 				t.Errorf("[%d] error allocating IP %v: %v", i, ip, err)
 			}
@@ -260,7 +261,7 @@ func TestForEach(t *testing.T) {
 }
 
 func TestSnapshot(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +284,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, network, err := net.ParseCIDR(dst.Range)
+	_, network, err := netutils.ParseCIDRSloppy(dst.Range)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +293,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatalf("mismatched networks: %s : %s", network, cidr)
 	}
 
-	_, otherCidr, err := net.ParseCIDR("192.168.2.0/24")
+	_, otherCidr, err := netutils.ParseCIDRSloppy("192.168.2.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +323,7 @@ func TestSnapshot(t *testing.T) {
 }
 
 func TestNewFromSnapshot(t *testing.T) {
-	_, cidr, err := net.ParseCIDR("192.168.0.0/24")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +367,7 @@ func TestNewFromSnapshot(t *testing.T) {
 func TestClusterIPMetrics(t *testing.T) {
 	// create IPv4 allocator
 	cidrIPv4 := "10.0.0.0/24"
-	_, clusterCIDRv4, _ := net.ParseCIDR(cidrIPv4)
+	_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy(cidrIPv4)
 	a, err := NewInMemory(clusterCIDRv4)
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
@@ -374,7 +375,7 @@ func TestClusterIPMetrics(t *testing.T) {
 	clearMetrics(map[string]string{"cidr": cidrIPv4})
 	// create IPv6 allocator
 	cidrIPv6 := "2001:db8::/112"
-	_, clusterCIDRv6, _ := net.ParseCIDR(cidrIPv6)
+	_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy(cidrIPv6)
 	b, err := NewInMemory(clusterCIDRv6)
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
@@ -420,10 +421,10 @@ func TestClusterIPMetrics(t *testing.T) {
 
 	// try to allocate the same IP addresses
 	for s := range found {
-		if !a.Has(net.ParseIP(s)) {
+		if !a.Has(netutils.ParseIPSloppy(s)) {
 			t.Fatalf("missing: %s", s)
 		}
-		if err := a.Allocate(net.ParseIP(s)); err != ErrAllocated {
+		if err := a.Allocate(netutils.ParseIPSloppy(s)); err != ErrAllocated {
 			t.Fatal(err)
 		}
 	}
@@ -437,10 +438,10 @@ func TestClusterIPMetrics(t *testing.T) {
 
 	// release the addresses allocated
 	for s := range found {
-		if !a.Has(net.ParseIP(s)) {
+		if !a.Has(netutils.ParseIPSloppy(s)) {
 			t.Fatalf("missing: %s", s)
 		}
-		if err := a.Release(net.ParseIP(s)); err != nil {
+		if err := a.Release(netutils.ParseIPSloppy(s)); err != nil {
 			t.Fatal(err)
 		}
 	}

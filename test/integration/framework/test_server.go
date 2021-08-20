@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/utils"
+	netutils "k8s.io/utils/net"
 )
 
 // This key is for testing purposes only and is not considered secure.
@@ -63,7 +64,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		os.RemoveAll(certDir)
 	}()
 
-	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
+	_, defaultServiceClusterIPRange, _ := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	proxySigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +106,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 
 	kubeAPIServerOptions := options.NewServerRunOptions()
 	kubeAPIServerOptions.SecureServing.Listener = listener
-	kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+	kubeAPIServerOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 	kubeAPIServerOptions.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
 	kubeAPIServerOptions.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")

@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	netutils "k8s.io/utils/net"
 )
 
 // Config is a struct of configuration directives for NewControlPlaneComponents.
@@ -205,7 +206,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 
 	if controlPlaneConfig.ExtraConfig.ServiceIPRange.IP == nil {
-		controlPlaneConfig.ExtraConfig.ServiceIPRange = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)}
+		controlPlaneConfig.ExtraConfig.ServiceIPRange = net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)}
 	}
 	m, err = controlPlaneConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
@@ -263,7 +264,7 @@ func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
 // configured with the provided options.
 func NewIntegrationTestControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlplane.Config {
 	controlPlaneConfig := NewControlPlaneConfigWithOptions(opts)
-	controlPlaneConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	controlPlaneConfig.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving

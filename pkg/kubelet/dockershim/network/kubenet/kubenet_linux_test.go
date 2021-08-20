@@ -40,6 +40,7 @@ import (
 	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+	netutils "k8s.io/utils/net"
 )
 
 // test it fulfills the NetworkPlugin interface
@@ -337,7 +338,7 @@ func TestGetRoutesConfig(t *testing.T) {
 	} {
 		var cidrs []*net.IPNet
 		for _, c := range test.cidrs {
-			_, cidr, err := net.ParseCIDR(c)
+			_, cidr, err := netutils.ParseCIDRSloppy(c)
 			assert.NoError(t, err)
 			cidrs = append(cidrs, cidr)
 		}
@@ -378,7 +379,7 @@ func TestGetRangesConfig(t *testing.T) {
 	} {
 		var cidrs []*net.IPNet
 		for _, c := range test.cidrs {
-			_, cidr, err := net.ParseCIDR(c)
+			_, cidr, err := netutils.ParseCIDRSloppy(c)
 			assert.NoError(t, err)
 			cidrs = append(cidrs, cidr)
 		}
