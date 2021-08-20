@@ -1299,7 +1299,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 		"initialization in progress; start ephemeral container": {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				status.ContainerStatuses[3].State = kubecontainer.ContainerStateRunning
-				status.ContainerStatuses = status.ContainerStatuses[:4]
+				status.ContainerStatuses = status.ContainerStatuses[3:4]
 			},
 			actions: podActions{
 				SandboxID:                  baseStatus.SandboxStatuses[0].Id,
@@ -1365,6 +1365,34 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				status.ContainerStatuses[4].State = kubecontainer.ContainerStateUnknown
 			},
 			actions: noAction,
+		},
+		"Kill redundant running container for pod": {
+			mutatePodFn: func(pod *v1.Pod) {},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+					ID:    kubecontainer.ContainerID{ID: "id5"},
+					Name:  "foo3",
+					State: kubecontainer.ContainerStateRunning,
+					Hash: kubecontainer.HashContainer(&v1.Container{
+						Name:  "foo3",
+						Image: "busybox",
+					}),
+				})
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{},
+				ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+					{
+						Type: "",
+						ID:   "id5",
+					}: {
+						name:      "foo3",
+						container: &basePod.Spec.Containers[2],
+						message:   "",
+					},
+				},
+			},
 		},
 	} {
 		pod, status := makeBasePodAndStatusWithInitAndEphemeralContainers()

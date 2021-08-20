@@ -629,8 +629,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		return changes
 	}
 
-	// Number of running containers to keep.
-	keepCount := 0
+	// container IDs of running containers to keep.
+	containersToKeep := make(map[kubecontainer.ContainerID]int)
+
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
@@ -685,7 +686,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			reason = reasonStartupProbe
 		} else {
 			// Keep the container.
-			keepCount++
+			containersToKeep[containerStatus.ID] = idx
 			continue
 		}
 
@@ -706,10 +707,43 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
 
-	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+	if len(containersToKeep) == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
 	}
 
+	// compute containers to be killed
+	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
+	for _, containerStatus := range runningContainerStatuses {
+		if _, ok := containersToKeep[containerStatus.ID]; !ok {
+			var podContainer *v1.Container
+			var killMessage string
+			// skip EphemeralContainers
+			if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+				ephemeralContainer := false
+				for _, c := range pod.Spec.EphemeralContainers {
+					if c.Name == containerStatus.Name {
+						ephemeralContainer = true
+						break
+					}
+				}
+				if ephemeralContainer {
+					continue
+				}
+			}
+			for i, c := range pod.Spec.Containers {
+				if c.Name == containerStatus.Name {
+					podContainer = &pod.Spec.Containers[i]
+					killMessage = fmt.Sprintf("Multiple running containers with name [%s], container with Id [%s] will be killed.", containerStatus.Name, containerStatus.ID)
+					break
+				}
+			}
+			changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+				name:      containerStatus.Name,
+				container: podContainer,
+				message:   killMessage,
+			}
+		}
+	}
 	return changes
 }
 
