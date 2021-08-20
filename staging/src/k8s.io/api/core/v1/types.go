@@ -4094,12 +4094,9 @@ const (
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	// +patchMergeKey=port
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=port
-	// +listMapKey=protocol
-	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
+	// +listType=atomic
+	// +patchStrategy=replace
+	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"replace" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this
 	// selector. If empty or not present, the service is assumed to have an
