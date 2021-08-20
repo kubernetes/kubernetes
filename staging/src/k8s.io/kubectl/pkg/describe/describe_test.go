@@ -3734,6 +3734,19 @@ func TestDescribeEvents(t *testing.T) {
 		Items: []corev1.Event{
 			{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "event-1",
+					Namespace: "foo",
+				},
+				Source:         corev1.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+				Type:           corev1.EventTypeNormal,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "event-2",
 					Namespace: "foo",
 				},
 				Source:    corev1.EventSource{Component: "kubelet"},
