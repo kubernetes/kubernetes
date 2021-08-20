@@ -410,7 +410,7 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 			addrType = discovery.AddressTypeIPv6
 		}
 		serviceSupportedAddresses[addrType] = struct{}{}
-		klog.V(2).Infof("couldn't find ipfamilies for headless service: %v/%v. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use %s as the IP Family based on familyOf(ClusterIP:%v).", service.Namespace, service.Name, addrType, service.Spec.ClusterIP)
+		klog.V(2).Infof("couldn't find ipfamilies for service: %v/%v. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use %s as the IP Family based on familyOf(ClusterIP:%v).", service.Namespace, service.Name, addrType, service.Spec.ClusterIP)
 		return serviceSupportedAddresses
 	}
 
