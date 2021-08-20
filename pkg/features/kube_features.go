@@ -706,8 +706,9 @@ const (
 	WindowsHostProcessContainers featuregate.Feature = "WindowsHostProcessContainers"
 
 	// owner: @ravig
+	// kep: https://kep.k8s.io/2607
 	// alpha: v1.22
-	//
+	// beta: v1.23
 	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
 	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 
@@ -873,7 +874,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
 	DisableKubeletCloudCredentialProviders:         {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetMinReadySeconds:                     {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetMinReadySeconds:                     {Default: true, PreRelease: featuregate.Beta},
 	ExpandedDNSConfig:                              {Default: false, PreRelease: featuregate.Alpha},
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
 	PodSecurity:                                    {Default: false, PreRelease: featuregate.Alpha},
