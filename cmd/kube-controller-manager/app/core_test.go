@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/controller-manager/controller"
 )
 
 // TestClientBuilder inherits ClientBuilder and can accept a given fake clientset.
@@ -104,7 +104,7 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 	}
 }
 
-type controllerInitFunc func(ControllerContext) (http.Handler, bool, error)
+type controllerInitFunc func(ControllerContext) (controller.Interface, bool, error)
 
 func TestController_DiscoveryError(t *testing.T) {
 	controllerInitFuncMap := map[string]controllerInitFunc{
