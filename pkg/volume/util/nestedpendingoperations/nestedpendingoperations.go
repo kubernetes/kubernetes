@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -106,6 +106,13 @@ type NestedPendingOperations interface {
 		volumeName v1.UniqueVolumeName,
 		podName volumetypes.UniquePodName,
 		nodeName types.NodeName) bool
+
+	// IsOperationSafeToRetry returns false if an operation for the given volumeName
+	// and one of podName or nodeName is pending or in exponential backoff, otherwise it returns true
+	IsOperationSafeToRetry(
+		volumeName v1.UniqueVolumeName,
+		podName volumetypes.UniquePodName,
+		nodeName types.NodeName, operationName string) bool
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
@@ -184,6 +191,33 @@ func (grm *nestedPendingOperations) Run(
 	}()
 
 	return nil
+}
+func (grm *nestedPendingOperations) IsOperationSafeToRetry(
+	volumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName,
+	operationName string) bool {
+
+	grm.lock.RLock()
+	defer grm.lock.RUnlock()
+
+	opKey := operationKey{volumeName, podName, nodeName}
+	exist, previousOpIndex := grm.isOperationExists(opKey)
+	if !exist {
+		return true
+	}
+	previousOp := grm.operations[previousOpIndex]
+	if previousOp.operationPending {
+		return false
+	}
+	backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
+	if backOffErr != nil {
+		if previousOp.operationName == operationName {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (grm *nestedPendingOperations) IsOperationPending(
