@@ -289,33 +289,31 @@ type realIPGetter struct {
 	nl NetLinkHandle
 }
 
-// NodeIPs returns all LOCAL type IP addresses from host which are taken as the Node IPs of NodePort service.
-// It will list source IP exists in local route table with `kernel` protocol type, and filter out IPVS proxier
-// created dummy device `kube-ipvs0` For example,
-// $ ip route show table local type local proto kernel
-// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
-// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
-// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
-// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
-// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
-// 127.0.0.1 dev lo  scope host  src 127.0.0.1
-// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
-// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
-// Then filter out dev==kube-ipvs0, and cut the unique src IP fields,
-// Node IP set: [100.106.89.164, 172.17.0.1, 192.168.122.1]
-// Note that loopback addresses are excluded.
+// NodeIPs returns all LOCAL type IP addresses from host which are
+// taken as the Node IPs of NodePort service. Filtered addresses:
+//
+//  * Loopback addresses
+//  * Addresses of the "other" family (not handled by this proxier instance)
+//  * Link-local IPv6 addresses
+//  * Addresses on the created dummy device `kube-ipvs0`
+//
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
-	// Pass in empty filter device name for list all LOCAL type addresses.
-	nodeAddress, err := r.nl.GetLocalAddresses("", DefaultDummyDevice)
+
+	nodeAddress, err := r.nl.GetAllLocalAddresses()
 	if err != nil {
 		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
 	}
+
+	// We must exclude the addresses on the IPVS dummy interface
+	bindedAddress, err := r.BindedIPs()
+	if err != nil {
+		return nil, err
+	}
+	ipset := nodeAddress.Difference(bindedAddress)
+
 	// translate ip string to IP
-	for _, ipStr := range nodeAddress.UnsortedList() {
+	for _, ipStr := range ipset.UnsortedList() {
 		a := netutils.ParseIPSloppy(ipStr)
-		if a.IsLoopback() {
-			continue
-		}
 		ips = append(ips, a)
 	}
 	return ips, nil
@@ -323,7 +321,7 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 
 // BindedIPs returns all addresses that are binded to the IPVS dummy interface kube-ipvs0
 func (r *realIPGetter) BindedIPs() (sets.String, error) {
-	return r.nl.GetLocalAddresses(DefaultDummyDevice, "")
+	return r.nl.GetLocalAddresses(DefaultDummyDevice)
 }
 
 // Proxier implements proxy.Provider
