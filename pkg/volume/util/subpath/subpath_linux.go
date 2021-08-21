@@ -44,11 +44,11 @@ const (
 )
 
 type subpath struct {
-	mounter mount.Interface
+	mounter MountInterface
 }
 
 // New returns a subpath.Interface for the current system
-func New(mounter mount.Interface) Interface {
+func New(mounter MountInterface) Interface {
 	return &subpath{
 		mounter: mounter,
 	}
@@ -160,7 +160,7 @@ func getSubpathBindTarget(subpath Subpath) string {
 	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
 }
 
-func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, err error) {
+func doBindSubPath(mounter MountInterface, subpath Subpath) (hostPath string, err error) {
 	// Linux, kubelet runs on the host:
 	// - safely open the subpath
 	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
@@ -209,8 +209,9 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 
 	// Do the bind mount
 	options := []string{"bind"}
+	mountFlags := []string{"--no-canonicalize"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
+	if err = mounter.MountSensitiveWithFlags(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true
