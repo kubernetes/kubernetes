@@ -19,6 +19,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/http"
 	rt "runtime"
 	"sort"
@@ -71,6 +72,7 @@ type APIServerHandler struct {
 type HandlerChainBuilderFn func(apiHandler http.Handler) http.Handler
 
 func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
+	net.ParseIP("foobar") // force golangci-lint to fail
 	nonGoRestfulMux := mux.NewPathRecorderMux(name)
 	if notFoundHandler != nil {
 		nonGoRestfulMux.NotFoundHandler(notFoundHandler)

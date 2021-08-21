@@ -1143,6 +1143,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the "external" IP happens to be an IP that is local to this
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
+			net.ParseIP("foobar") // force golangci-lint to fail
 			if (svcInfo.Protocol() != v1.ProtocolSCTP) && localAddrSet.Has(netutils.ParseIPSloppy(externalIP)) {
 				lp := netutils.LocalPort{
 					Description: "externalIP for " + svcNameString,
