@@ -476,15 +476,32 @@ func DefaultKubernetesUserAgent() string {
 		adjustCommit(version.Get().GitCommit))
 }
 
+// getServiceAccountFilePaths returns the paths to the serviceaccount token files
+// In the case of Windows HostProcess containers this prepends the CONTAINER_SANDBOX_MOUNT_POINT env variable
+// for other operating systems or if the sandbox env variable is not set it returns the standard mount points
+// see https://kubernetes.io/docs/tasks/configure-pod-container/create-hostprocess-pod/#volume-mounts
+func getServiceAccountFilePaths() (string, string) {
+	const (
+		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	)
+
+	if gruntime.GOOS == "windows" {
+		sandbox := os.Getenv("CONTAINER_SANDBOX_MOUNT_POINT")
+		if sandbox != "" {
+			return filepath.Join(sandbox, tokenFile), filepath.Join(sandbox, rootCAFile)
+		}
+	}
+	return tokenFile, rootCAFile
+}
+
 // InClusterConfig returns a config object which uses the service account
 // kubernetes gives to pods. It's intended for clients that expect to be
 // running inside a pod running on kubernetes. It will return ErrNotInCluster
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	const (
-		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-	)
+	tokenFile, rootCAFile := getServiceAccountFilePaths()
+
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
