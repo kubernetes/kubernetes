@@ -135,9 +135,9 @@ type SharedInformer interface {
 	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
 	// period.  Events to a single handler are delivered sequentially, but there is no coordination
 	// between different handlers.
-	// It returns a handle for the handler that can be used to remove
+	// It returns a registration handle for the handler that can be used to remove
 	// the handler again.
-	AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerRegistration, error)
+	AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer with the requested resync period; zero means
 	// this handler does not care about resyncs.  The resync operation
@@ -152,9 +152,9 @@ type SharedInformer interface {
 	// between any two resyncs may be longer than the nominal period
 	// because the implementation takes time to do work and there may
 	// be competing load and scheduling noise.
-	// It returns a handle for the handler that can be used to remove
+	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
-	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerRegistration, error)
+	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
 	// RemoveEventHandlerByRegistration removes a formerly added event handler given by
 	// its registration handle.
 	// If, for some reason, the same handler has been added multiple
@@ -165,7 +165,7 @@ type SharedInformer interface {
 	// Calling Remove on an already removed handle returns no error
 	// because the handler is finally (still) removed after calling this
 	// method.
-	RemoveEventHandlerByRegistration(handle *ResourceEventHandlerRegistration) error
+	RemoveEventHandlerByRegistration(handle ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -212,13 +212,6 @@ type SharedInformer interface {
 // could not be removed from a list anymore.
 type ResourceEventHandlerRegistration struct {
 	listener *processorListener
-}
-
-// isActive reports whether this registration is still active
-// meaning that the handler registered with this handle is
-// still registered.
-func (h *ResourceEventHandlerRegistration) isActive() bool {
-	return h.listener != nil
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -392,6 +385,10 @@ type deleteNotification struct {
 	oldObj interface{}
 }
 
+func (s *sharedIndexInformer) isRegistered(h ResourceEventHandlerRegistration) bool {
+	return s.processor.isRegistered(h.listener)
+}
+
 func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
@@ -502,7 +499,7 @@ func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerRegistration, error) {
+func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
 	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
 }
 
@@ -523,13 +520,13 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
-func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerRegistration, error) {
+func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
 	if s.stopped {
 		klog.V(2).Infof("Handler %v is not added to shared informer because it has stopped already", handler)
-		return nil, fmt.Errorf("handler %v is not added to shared informer because it has stopped already", handler)
+		return ResourceEventHandlerRegistration{}, fmt.Errorf("handler %v is not added to shared informer because it has stopped already", handler)
 	}
 
 	if resyncPeriod > 0 {
@@ -553,7 +550,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	}
 
 	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
-	handle := &ResourceEventHandlerRegistration{listener}
+	handle := ResourceEventHandlerRegistration{listener}
 
 	if !s.started {
 		s.processor.addListener(listener)
@@ -632,7 +629,7 @@ func (s *sharedIndexInformer) IsStopped() bool {
 // If a handler has been added multiple times, only the actual registration for the
 // handler will be removed. Other registrations of the same handler will still be
 // active until they are explicitly removes, also.
-func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle *ResourceEventHandlerRegistration) error {
+func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle ResourceEventHandlerRegistration) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -651,7 +648,6 @@ func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle *ResourceE
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 	s.processor.removeListener(handle.listener)
-	handle.listener = nil
 	return nil
 }
 
@@ -668,6 +664,19 @@ type sharedProcessor struct {
 	syncingListeners []*processorListener
 	clock            clock.Clock
 	wg               wait.Group
+}
+
+func (p *sharedProcessor) isRegistered(listener *processorListener) bool {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	for i := 0; i < len(p.listeners); i++ {
+		l := p.listeners[i]
+		if l == listener {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *sharedProcessor) addListener(listener *processorListener) {
@@ -690,18 +699,21 @@ func (p *sharedProcessor) removeListener(listener *processorListener) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
-	p.removeListenerLocked(listener)
-	if p.listenersStarted {
-		close(listener.addCh)
+	if p.removeListenerLocked(listener) {
+		if p.listenersStarted {
+			close(listener.addCh)
+		}
 	}
 }
 
-func (p *sharedProcessor) removeListenerLocked(listener *processorListener) {
+func (p *sharedProcessor) removeListenerLocked(listener *processorListener) bool {
+	found := false
 	for i := 0; i < len(p.listeners); i++ {
 		l := p.listeners[i]
 		if l == listener {
 			p.listeners = append(p.listeners[:i], p.listeners[i+1:]...)
 			i--
+			found = true
 		}
 	}
 	for i := 0; i < len(p.syncingListeners); i++ {
@@ -711,6 +723,7 @@ func (p *sharedProcessor) removeListenerLocked(listener *processorListener) {
 			i--
 		}
 	}
+	return found
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
