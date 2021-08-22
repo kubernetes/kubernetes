@@ -401,14 +401,107 @@ func TestSharedInformerRemoveHandler(t *testing.T) {
 	}
 
 	if err := informer.RemoveEventHandlerByRegistration(handle2); err != nil {
-		t.Errorf("removing of first pointer handler failed: %s", err)
+		t.Errorf("removing of second pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 1 {
 		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
 	}
 
 	if err := informer.RemoveEventHandlerByRegistration(handle1); err != nil {
+		t.Errorf("removing of first pointer handler failed: %s", err)
+	}
+	if eventHandlerCount(informer) != 0 {
+		t.Errorf("informer still has registered handlers after removing both handlers")
+	}
+}
+
+func TestSharedInformerRemoveForeignHandler(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+
+	source2 := fcache.NewFakeControllerSource()
+	source2.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	informer2 := NewSharedInformer(source2, &v1.Pod{}, 1*time.Second)
+
+	handler1 := &ResourceEventHandlerFuncs{}
+	handle1, err := informer.AddEventHandler(handler1)
+	if err != nil {
+		t.Errorf("informer did not add handler1: %s", err)
+		return
+	}
+	handler2 := &ResourceEventHandlerFuncs{}
+	handle2, err := informer.AddEventHandler(handler2)
+	if err != nil {
+		t.Errorf("informer did not add handler2: %s", err)
+		return
+	}
+
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
+	}
+	if eventHandlerCount(informer2) != 0 {
+		t.Errorf("informer2 has %d registered handler, instead of 0", eventHandlerCount(informer2))
+	}
+
+	// remove handle at foreign informer
+	if isRegistered(informer2, handle1) {
+		t.Errorf("handle1 registered for informer2")
+	}
+	if isRegistered(informer2, handle2) {
+		t.Errorf("handle2 registered for informer2")
+	}
+	if err := informer2.RemoveEventHandlerByRegistration(handle1); err != nil {
 		t.Errorf("removing of second pointer handler failed: %s", err)
+	}
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
+	}
+	if eventHandlerCount(informer2) != 0 {
+		t.Errorf("informer2 has %d registered handler, instead of 0", eventHandlerCount(informer2))
+	}
+	if !isRegistered(informer, handle1) {
+		t.Errorf("handle1 not registered anymore for informer")
+	}
+	if !isRegistered(informer, handle2) {
+		t.Errorf("handle2 not registered anymore for informer")
+	}
+
+	// remove empty handle
+	empty := ResourceEventHandlerRegistration{}
+	if isRegistered(informer, empty) {
+		t.Errorf("empty registered for informer")
+	}
+	if isRegistered(informer, empty) {
+		t.Errorf("empty registered for informer")
+	}
+	if err := informer2.RemoveEventHandlerByRegistration(empty); err != nil {
+		t.Errorf("removing of empty handle failed: %s", err)
+	}
+	if eventHandlerCount(informer) != 2 {
+		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
+	}
+	if eventHandlerCount(informer2) != 0 {
+		t.Errorf("informer2 has %d registered handler, instead of 0", eventHandlerCount(informer2))
+	}
+	if !isRegistered(informer, handle1) {
+		t.Errorf("handle1 not registered anymore for informer")
+	}
+	if !isRegistered(informer, handle2) {
+		t.Errorf("handle2 not registered anymore for informer")
+	}
+
+	if err := informer.RemoveEventHandlerByRegistration(handle2); err != nil {
+		t.Errorf("removing of second pointer handler failed: %s", err)
+	}
+	if eventHandlerCount(informer) != 1 {
+		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
+	}
+
+	if err := informer.RemoveEventHandlerByRegistration(handle1); err != nil {
+		t.Errorf("removing of first pointer handler failed: %s", err)
 	}
 	if eventHandlerCount(informer) != 0 {
 		t.Errorf("informer still has registered handlers after removing both handlers")
@@ -466,7 +559,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !isRegistered(informer,reg1) {
+	if !isRegistered(informer, reg1) {
 		t.Errorf("handle1 is not active after successful registration")
 		return
 	}
@@ -477,7 +570,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !isRegistered(informer,reg2) {
+	if !isRegistered(informer, reg2) {
 		t.Errorf("handle2 is not active after successful registration")
 		return
 	}
@@ -490,7 +583,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		t.Errorf("removing of duplicate handler registration failed: %s", err)
 	}
 
-	if isRegistered(informer,reg1) {
+	if isRegistered(informer, reg1) {
 		t.Errorf("handle1 is still active after successful remove")
 		return
 	}
@@ -511,7 +604,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		t.Errorf("removing of second handler registration failed: %s", err)
 	}
 
-	if isRegistered(informer,reg2) {
+	if isRegistered(informer, reg2) {
 		t.Errorf("handle2 is still active after successful remove")
 		return
 	}
@@ -537,14 +630,14 @@ func TestRemovingRemovedSharedInformer(t *testing.T) {
 		t.Errorf("removing of handler registration failed: %s", err)
 		return
 	}
-	if isRegistered(informer,reg) {
+	if isRegistered(informer, reg) {
 		t.Errorf("handle is still active after successful remove")
 		return
 	}
 	if err := informer.RemoveEventHandlerByRegistration(reg); err != nil {
 		t.Errorf("removing of already removed registration yields unexpected error: %s", err)
 	}
-	if isRegistered(informer,reg) {
+	if isRegistered(informer, reg) {
 		t.Errorf("handle is still active after second remove")
 		return
 	}
