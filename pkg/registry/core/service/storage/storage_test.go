@@ -11525,6 +11525,30 @@ func TestFeatureInternalTrafficPolicy(t *testing.T) {
 // ipfamilypolicy and list,
 // AllocateLoadBalancerNodePorts, LoadBalancerClass, status
 
+// this is local because it's not fully fleshed out enough for general use.
+func makePod(name string, ips ...string) api.Pod {
+	p := api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSDefault,
+			Containers:    []api.Container{{Name: "ctr", Image: "img", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+		Status: api.PodStatus{
+			PodIPs: []api.PodIP{},
+		},
+	}
+
+	for _, ip := range ips {
+		p.Status.PodIPs = append(p.Status.PodIPs, api.PodIP{IP: ip})
+	}
+
+	return p
+}
+
 func TestServiceRegistryResourceLocation(t *testing.T) {
 	pods := []api.Pod{
 		makePod("unnamed", "1.2.3.4", "1.2.3.5"),
