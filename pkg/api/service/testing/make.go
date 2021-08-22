@@ -48,7 +48,8 @@ func MakeService(name string, tweaks ...Tweak) *api.Service {
 	SetTypeClusterIP(svc)
 	// Default to 1 port
 	SetPorts(MakeServicePort("", 93, intstr.FromInt(76), api.ProtocolTCP))(svc)
-	// Default internalTrafficPolicy to "Cluster"
+	// Default internalTrafficPolicy to "Cluster".  This probably should not
+	// apply to ExternalName, but it went into beta and is not worth breaking.
 	SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)(svc)
 
 	for _, tweak := range tweaks {

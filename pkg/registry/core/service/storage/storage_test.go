@@ -10121,40 +10121,45 @@ func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCas
 				return
 			}
 			verifyExpectations(t, storage, tc.create, tc.create.svc, createdSvc)
+			lastSvc := createdSvc
 
-			// Allow callers to do something between create and update.
-			if tc.beforeUpdate != nil {
-				tc.beforeUpdate(t, storage)
-			}
+			// The update phase is optional.
+			if tc.update.svc != nil {
+				// Allow callers to do something between create and update.
+				if tc.beforeUpdate != nil {
+					tc.beforeUpdate(t, storage)
+				}
 
-			// Update the object to the new state and check the results.
-			obj, created, err := storage.Update(ctx, tc.update.svc.Name,
-				rest.DefaultUpdatedObjectInfo(tc.update.svc), rest.ValidateAllObjectFunc,
-				rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-			if tc.update.expectError && err != nil {
-				return
+				// Update the object to the new state and check the results.
+				obj, created, err := storage.Update(ctx, tc.update.svc.Name,
+					rest.DefaultUpdatedObjectInfo(tc.update.svc), rest.ValidateAllObjectFunc,
+					rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+				if tc.update.expectError && err != nil {
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected error updating service: %v", err)
+				}
+				if tc.update.expectError && err == nil {
+					t.Fatalf("unexpected success updating service")
+				}
+				if created {
+					t.Fatalf("unexpected create-on-update")
+				}
+				updatedSvc := obj.(*api.Service)
+				if !verifyEquiv(t, "update", &tc.update, updatedSvc) {
+					return
+				}
+				verifyExpectations(t, storage, tc.update, createdSvc, updatedSvc)
+				lastSvc = updatedSvc
 			}
-			if err != nil {
-				t.Fatalf("unexpected error updating service: %v", err)
-			}
-			if tc.update.expectError && err == nil {
-				t.Fatalf("unexpected success updating service")
-			}
-			if created {
-				t.Fatalf("unexpected create-on-update")
-			}
-			updatedSvc := obj.(*api.Service)
-			if !verifyEquiv(t, "update", &tc.update, updatedSvc) {
-				return
-			}
-			verifyExpectations(t, storage, tc.update, createdSvc, updatedSvc)
 
 			// Delete the object and check the results.
-			_, _, err = storage.Delete(ctx, tc.update.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			_, _, err = storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error deleting service: %v", err)
 			}
-			verifyExpectations(t, storage, svcTestCase{ /* all false */ }, updatedSvc, nil)
+			verifyExpectations(t, storage, svcTestCase{ /* all false */ }, lastSvc, nil)
 		})
 	}
 }
@@ -11331,8 +11336,192 @@ func TestFeatureExternalTrafficPolicy(t *testing.T) {
 	helpTestCreateUpdateDelete(t, testCases)
 }
 
+func TestFeatureInternalTrafficPolicy(t *testing.T) {
+	prove := func(proofs ...svcTestProof) []svcTestProof {
+		return proofs
+	}
+	proveITP := func(want api.ServiceInternalTrafficPolicyType) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			t.Helper()
+			if got := after.Spec.InternalTrafficPolicy; got == nil {
+				if want != "" {
+					t.Errorf("internalTrafficPolicy was nil")
+				}
+			} else if *got != want {
+				if want == "" {
+					want = "nil"
+				}
+				t.Errorf("wrong internalTrafficPoilcy: expected %s, got %s", want, *got)
+			}
+		}
+	}
+
+	testCases := []cudTestCase{{
+		name: "ExternalName_policy:none-ExternalName_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeExternalName),
+			prove: prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeExternalName,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			prove: prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "ExternalName_policy:Cluster-ExternalName_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeExternalName,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+			prove: prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeExternalName,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			prove: prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "ClusterIP_policy:none-ClusterIP_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeClusterIP,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "ClusterIP_policy:Cluster-ClusterIP_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeClusterIP,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+			expectClusterIPs: true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeClusterIP,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "NodePort_policy:none-NodePort_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeNodePort,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "NodePort_policy:Cluster-NodePort_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeNodePort,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeNodePort,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "LoadBalancer_policy:none-LoadBalancer_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "LoadBalancer_policy:Cluster-LoadBalancer_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+			prove:            prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "Headless_policy:none-Headless_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless),
+			expectHeadless: true,
+			prove:          prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectHeadless: true,
+			prove:          prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}, {
+		name: "Headless_policy:Cluster-Headless_policy:Local",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+			expectHeadless: true,
+			prove:          prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
+			expectHeadless: true,
+			prove:          prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
 // FIXME: externalIPs, lbip,
-// lbsourceranges, externalname, itp, PublishNotReadyAddresses,
+// lbsourceranges, externalname, PublishNotReadyAddresses,
 // ipfamilypolicy and list,
 // AllocateLoadBalancerNodePorts, LoadBalancerClass, status
 
