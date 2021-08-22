@@ -262,7 +262,7 @@ func TestLabelFunc(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		_, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)

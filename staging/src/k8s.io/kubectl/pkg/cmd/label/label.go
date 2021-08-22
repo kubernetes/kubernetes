@@ -18,7 +18,6 @@ package label
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -81,6 +80,21 @@ type LabelOptions struct {
 
 	// Common shared fields
 	genericclioptions.IOStreams
+}
+
+// operationType represents operation type
+type operationType int
+
+const (
+	LABELED operationType = 1 << iota
+	UNLABELED
+	NOTLABELED
+)
+
+var operationStr = map[operationType]string{
+	LABELED:    "labeled",
+	UNLABELED:  "unlabeled",
+	NOTLABELED: "not labeled",
 }
 
 var (
@@ -293,15 +307,10 @@ func (o *LabelOptions) RunLabel() error {
 			return err
 		}
 		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
-			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			dataChangeMsg, err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
-			newObj, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
 			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
@@ -318,7 +327,8 @@ func (o *LabelOptions) RunLabel() error {
 				}
 			}
 
-			if err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
+			dataChangeMsg, err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			if err != nil {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
@@ -328,7 +338,6 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
@@ -389,14 +398,6 @@ func (o *LabelOptions) RunLabel() error {
 	})
 }
 
-func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
-	msg := "not labeled"
-	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = "labeled"
-	}
-	return msg
-}
-
 func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
@@ -434,14 +435,14 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	return labels, remove, nil
 }
 
-func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
+func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, removeLabels []string) (string, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !overwrite {
 		if err := validateNoOverwrites(accessor, labels); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -450,16 +451,37 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		objLabels = make(map[string]string)
 	}
 
+	var operations operationType
 	for key, value := range labels {
-		objLabels[key] = value
+		oldValue, ok := objLabels[key]
+		if !ok || oldValue != value {
+			objLabels[key] = value
+			operations = LABELED
+		}
 	}
-	for _, label := range remove {
-		delete(objLabels, label)
+	for _, label := range removeLabels {
+		_, ok := objLabels[label]
+		if ok {
+			delete(objLabels, label)
+			operations = operations | UNLABELED
+		}
 	}
 	accessor.SetLabels(objLabels)
 
 	if len(resourceVersion) != 0 {
 		accessor.SetResourceVersion(resourceVersion)
 	}
-	return nil
+
+	var msg string
+	if (operations&LABELED) != 0 && (operations&UNLABELED) != 0 {
+		msg = operationStr[LABELED] + " & " + operationStr[UNLABELED]
+	} else if (operations & LABELED) != 0 {
+		msg = operationStr[LABELED]
+	} else if (operations & UNLABELED) != 0 {
+		msg = operationStr[UNLABELED]
+	} else {
+		msg = operationStr[NOTLABELED]
+	}
+
+	return msg, nil
 }
