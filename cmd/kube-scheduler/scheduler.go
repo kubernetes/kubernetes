@@ -34,7 +34,7 @@ import (
 
 func main() {
 	if err := runSchedulerCmd(); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to run scheduler command: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
@@ -50,7 +50,7 @@ func runSchedulerCmd() error {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		return fmt.Errorf("execute command: %w", err)
+		return err
 	}
 
 	return nil

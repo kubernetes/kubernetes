@@ -81,10 +81,10 @@ See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := opts.Complete(&namedFlagSets); err != nil {
-				return fmt.Errorf("completes the remaining instantiation of the options: %w", err)
+				return err
 			}
 			if err := runCommand(cmd, opts, registryOptions...); err != nil {
-				return fmt.Errorf("run command: %w", err)
+				return err
 			}
 			return nil
 		},
