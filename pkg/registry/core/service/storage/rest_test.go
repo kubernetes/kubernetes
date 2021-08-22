@@ -23,11 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -138,68 +135,4 @@ func makePod(name string, ips ...string) api.Pod {
 	}
 
 	return p
-}
-
-// Validate the internalTrafficPolicy field when set to "Cluster" then updated to "Local"
-func TestServiceRegistryInternalTrafficPolicyClusterThenLocal(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("internal-traffic-policy-cluster",
-		svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster),
-	)
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
-	}
-
-	createdSvc := obj.(*api.Service)
-	if *createdSvc.Spec.InternalTrafficPolicy != api.ServiceInternalTrafficPolicyCluster {
-		t.Errorf("Expecting internalTrafficPolicy field to have value Cluster, got: %s", *createdSvc.Spec.InternalTrafficPolicy)
-	}
-
-	update := createdSvc.DeepCopy()
-	local := api.ServiceInternalTrafficPolicyLocal
-	update.Spec.InternalTrafficPolicy = &local
-
-	updatedSvc, _, errUpdate := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if errUpdate != nil {
-		t.Fatalf("unexpected error during update %v", errUpdate)
-	}
-	updatedService := updatedSvc.(*api.Service)
-	if *updatedService.Spec.InternalTrafficPolicy != api.ServiceInternalTrafficPolicyLocal {
-		t.Errorf("Expected internalTrafficPolicy to be Local, got: %s", *updatedService.Spec.InternalTrafficPolicy)
-	}
-}
-
-// Validate the internalTrafficPolicy field when set to "Local" and then updated to "Cluster"
-func TestServiceRegistryInternalTrafficPolicyLocalThenCluster(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	svc := svctest.MakeService("internal-traffic-policy-cluster",
-		svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal),
-	)
-	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if obj == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
-	}
-
-	createdSvc := obj.(*api.Service)
-	if *createdSvc.Spec.InternalTrafficPolicy != api.ServiceInternalTrafficPolicyLocal {
-		t.Errorf("Expecting internalTrafficPolicy field to have value Local, got: %s", *createdSvc.Spec.InternalTrafficPolicy)
-	}
-
-	update := createdSvc.DeepCopy()
-	cluster := api.ServiceInternalTrafficPolicyCluster
-	update.Spec.InternalTrafficPolicy = &cluster
-
-	updatedSvc, _, errUpdate := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if errUpdate != nil {
-		t.Fatalf("unexpected error during update %v", errUpdate)
-	}
-	updatedService := updatedSvc.(*api.Service)
-	if *updatedService.Spec.InternalTrafficPolicy != api.ServiceInternalTrafficPolicyCluster {
-		t.Errorf("Expected internalTrafficPolicy to be Cluster, got: %s", *updatedService.Spec.InternalTrafficPolicy)
-	}
 }
