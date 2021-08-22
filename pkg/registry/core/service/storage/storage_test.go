@@ -6296,6 +6296,272 @@ func TestUpdateDryRun(t *testing.T) {
 	}
 }
 
+func TestUpdatePatchAllocatedValues(t *testing.T) {
+	prove := func(proofs ...svcTestProof) []svcTestProof {
+		return proofs
+	}
+	proveClusterIP := func(idx int, ip string) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			if want, got := ip, after.Spec.ClusterIPs[idx]; want != got {
+				t.Errorf("wrong ClusterIPs[%d]: want %q, got %q", idx, want, got)
+			}
+		}
+	}
+	proveNodePort := func(idx int, port int32) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			got := after.Spec.Ports[idx].NodePort
+			if port > 0 && got != port {
+				t.Errorf("wrong Ports[%d].NodePort: want %d, got %d", idx, port, got)
+			} else if port < 0 && got == -port {
+				t.Errorf("wrong Ports[%d].NodePort: wanted anything but %d", idx, got)
+			}
+		}
+	}
+	proveHCNP := func(port int32) svcTestProof {
+		return func(t *testing.T, storage *GenericREST, before, after *api.Service) {
+			got := after.Spec.HealthCheckNodePort
+			if port > 0 && got != port {
+				t.Errorf("wrong HealthCheckNodePort: want %d, got %d", port, got)
+			} else if port < 0 && got == -port {
+				t.Errorf("wrong HealthCheckNodePort: wanted anything but %d", got)
+			}
+		}
+	}
+
+	// each create needs clusterIP, NodePort, and HealthCheckNodePort allocated
+	// each update needs clusterIP, NodePort, and/or HealthCheckNodePort blank
+	testCases := []cudTestCase{{
+		name: "single-ip_single-port",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetClusterIPs("10.0.0.1"),
+				svctest.SetNodePorts(30093),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+			prove: prove(
+				proveClusterIP(0, "10.0.0.1"),
+				proveNodePort(0, 30093),
+				proveHCNP(30118)),
+		},
+	}, {
+		name: "multi-ip_multi-port",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP))),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+			prove: prove(
+				proveClusterIP(0, "10.0.0.1"),
+				proveClusterIP(1, "2000::1"),
+				proveNodePort(0, 30093),
+				proveNodePort(1, 30076),
+				proveHCNP(30118)),
+		},
+	}, {
+		name: "multi-ip_partial",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetClusterIPs("10.0.0.1")),
+			expectError: true,
+		},
+	}, {
+		name: "multi-port_partial",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 0)), // provide just 1 value
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+			prove: prove(
+				proveNodePort(0, 30093),
+				proveNodePort(1, 30076),
+				proveHCNP(30118)),
+		},
+	}, {
+		name: "swap-ports",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					// swapped from above
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP),
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP))),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+			prove: prove(
+				proveNodePort(0, 30076),
+				proveNodePort(1, 30093),
+				proveHCNP(30118)),
+		},
+	}, {
+		name: "partial-swap-ports",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30076, 0), // set [0] to [1]'s value, omit [1]
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+			prove: prove(
+				proveNodePort(0, 30076),
+				proveNodePort(1, -30076),
+				proveHCNP(30118)),
+		},
+	}, {
+		name: "swap-port-with-hcnp",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30076, 30118)), // set [0] to HCNP's value
+			expectError: true,
+		},
+	}, {
+		name: "partial-swap-port-with-hcnp",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30118, 0)), // set [0] to HCNP's value, omit [1]
+			expectError: true,
+		},
+	}}
+
+	helpTestCreateUpdateDelete(t, testCases)
+}
+
 // Proves that updates from single-stack work.
 func TestUpdateIPsFromSingleStack(t *testing.T) {
 	prove := func(proofs ...svcTestProof) []svcTestProof {
@@ -10382,95 +10648,107 @@ func TestFeaturePorts(t *testing.T) {
 	}, {
 		name: "swap_ports",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP),
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 	}, {
 		name: "modify_ports",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 8080, intstr.FromInt(8080), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 8443, intstr.FromInt(8443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 	}, {
 		name: "modify_protos",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolUDP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolUDP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 	}, {
 		name: "modify_ports_and_protos",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("r", 53, intstr.FromInt(53), api.ProtocolTCP),
 					svctest.MakeServicePort("s", 53, intstr.FromInt(53), api.ProtocolUDP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 	}, {
 		name: "add_alt_proto",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 	}, {
 		name: "wipe_all",
 		create: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
 					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
 					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
+			expectNodePorts:  true,
 		},
 		update: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts()),
-			expectError: true,
+			expectError:     true,
+			expectNodePorts: true,
 		},
 	}}
 
