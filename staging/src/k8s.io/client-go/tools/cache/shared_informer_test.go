@@ -110,6 +110,11 @@ func isStarted(i SharedInformer) bool {
 	return s.started
 }
 
+func isRegistered(i SharedInformer, h ResourceEventHandlerRegistration) bool {
+	s := i.(*sharedIndexInformer)
+	return s.isRegistered(h)
+}
+
 func TestListenerResyncPeriods(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
@@ -494,7 +499,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !reg1.isActive() {
+	if !isRegistered(informer,reg1) {
 		t.Errorf("handle1 is not active after successful registration")
 		return
 	}
@@ -505,7 +510,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		return
 	}
 
-	if !reg2.isActive() {
+	if !isRegistered(informer,reg2) {
 		t.Errorf("handle2 is not active after successful registration")
 		return
 	}
@@ -518,11 +523,11 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		t.Errorf("removing of duplicate handler registration failed: %s", err)
 	}
 
-	if reg1.isActive() {
+	if isRegistered(informer,reg1) {
 		t.Errorf("handle1 is still active after successful remove")
 		return
 	}
-	if !reg2.isActive() {
+	if !isRegistered(informer, reg2) {
 		t.Errorf("handle2 is not active after removing handle1")
 		return
 	}
@@ -539,7 +544,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 		t.Errorf("removing of second handler registration failed: %s", err)
 	}
 
-	if reg2.isActive() {
+	if isRegistered(informer,reg2) {
 		t.Errorf("handle2 is still active after successful remove")
 		return
 	}
@@ -565,14 +570,14 @@ func TestRemovingRemovedSharedInformer(t *testing.T) {
 		t.Errorf("removing of handler registration failed: %s", err)
 		return
 	}
-	if reg.isActive() {
+	if isRegistered(informer,reg) {
 		t.Errorf("handle is still active after successful remove")
 		return
 	}
 	if err := informer.RemoveEventHandlerByRegistration(reg); err != nil {
 		t.Errorf("removing of already removed registration yields unexpected error: %s", err)
 	}
-	if reg.isActive() {
+	if isRegistered(informer,reg) {
 		t.Errorf("handle is still active after second remove")
 		return
 	}
@@ -643,17 +648,13 @@ func TestAddOnStoppedSharedInformer(t *testing.T) {
 		return
 	}
 
-	handle, err := informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+	_, err := informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
 	if err == nil {
 		t.Errorf("stopped informer did not reject add handler")
 		return
 	}
 	if !strings.HasSuffix(err.Error(), "is not added to shared informer because it has stopped already") {
 		t.Errorf("adding handler to a stopped informer yields unexpected error: %s", err)
-		return
-	}
-	if handle != nil {
-		t.Errorf("got handle for added handler on stopped informer")
 		return
 	}
 }
