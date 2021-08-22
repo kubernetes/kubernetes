@@ -79,15 +79,14 @@ suitable Node. Multiple different schedulers may be used within a cluster;
 kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := opts.Complete(&namedFlagSets); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("completes the remaining instantiation of the options: %w", err)
 			}
 			if err := runCommand(cmd, opts, registryOptions...); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("run command: %w", err)
 			}
+			return nil
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
