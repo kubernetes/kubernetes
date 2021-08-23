@@ -926,10 +926,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		if err := start("container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx])); err != nil {
-			return
-		}
-		klog.V(4).InfoS("Completed container for pod", "containerName", &pod.Spec.Containers[idx].Name, "pod", klog.KObj(pod))
+		err = start("container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		utilruntime.HandleError(err)
 	}
 
 	return
