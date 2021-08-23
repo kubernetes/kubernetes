@@ -80,22 +80,58 @@ function print-deprecation-note() {
   echo "${dashline}"
 }
 
+# Use the gcloud defaults to find the project.  If it is already set in the
+# environment then go with that.
+# Copied from gke/cluster/gce/util.sh.
+#
+# Vars set:
+#   PROJECT
+#   NETWORK_PROJECT
+#   PROJECT_REPORTED
+function detect-project() {
+  if [[ -z "${PROJECT-}" ]]; then
+    PROJECT=$(gcloud config list project --format 'value(core.project)')
+  fi
+
+  NETWORK_PROJECT=${NETWORK_PROJECT:-${PROJECT}}
+
+  if [[ -z "${PROJECT-}" ]]; then
+    echo "Could not detect Google Cloud Platform project.  Set the default project using " >&2
+    echo "'gcloud config set project <PROJECT>'" >&2
+    exit 1
+  fi
+  if [[ -z "${PROJECT_REPORTED-}" ]]; then
+    echo "Project: ${PROJECT}" >&2
+    echo "Network Project: ${NETWORK_PROJECT}" >&2
+    echo "Zone: ${ZONE}" >&2
+    PROJECT_REPORTED=true
+  fi
+}
+
+# SSH to a node by name ($1) and run a command ($2).
+# Copied from gke/cluster/gce/util.sh.
+function ssh-to-node() {
+  local node="$1"
+  local cmd="$2"
+  # Loop until we can successfully ssh into the box
+  for (( i=0; i<5; i++)); do
+    if gcloud compute ssh --ssh-flag='-o LogLevel=quiet' --ssh-flag='-o ConnectTimeout=30' --project "${PROJECT}" --zone="${ZONE}" "${node}" --command 'echo test > /dev/null'; then
+      break
+    fi
+    sleep 5
+  done
+  # Then actually try the command.
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
+}
+
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
   if [[ -z "${use_custom_instance_list}" ]]; then
     : "${KUBE_CONFIG_FILE:=config-test.sh}"
-    echo 'Sourcing kube-util.sh'
-    source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
     echo 'Detecting project'
     detect-project 2>&1
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
-    # Source the below script for the ssh-to-node utility function.
-    # Hack to save and restore the value of the ZONE env as the script overwrites it.
-    local gke_zone="${ZONE:-}"
-    source "${KUBE_ROOT}/gke/cluster/gce/util.sh"
-    ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo 'LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances'
     exit 1
@@ -103,7 +139,16 @@ function setup() {
     echo 'LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances'
     exit 1
   fi
-  source "${KUBE_ROOT}/hack/lib/util.sh"
+
+  if [[ -e $(dirname "${BASH_SOURCE[0]}")/../../hack/lib/util.sh ]]; then
+    # When log-dump.sh is used from unpacked tarball, it's under cluster/.
+    KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+    source "${KUBE_ROOT}/hack/lib/util.sh"
+  else 
+    # When log-dump.sh is used directly from the repo, it's under gke/cluster/.
+    KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
+    source "${KUBE_ROOT}/hack/lib/util.sh"
+  fi
 }
 
 function log-dump-ssh() {
