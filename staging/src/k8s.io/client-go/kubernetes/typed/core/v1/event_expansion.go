@@ -66,6 +66,9 @@ func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
 func (e *events) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
+	if e.ns != "" && event.Namespace != e.ns {
+		return nil, fmt.Errorf("can't update an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	}
 	result := &v1.Event{}
 	err := e.client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
