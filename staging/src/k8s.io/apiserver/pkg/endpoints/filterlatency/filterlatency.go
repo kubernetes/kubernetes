@@ -18,6 +18,7 @@ package filterlatency
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -64,7 +65,7 @@ func TrackCompleted(handler http.Handler) http.Handler {
 		latency := completedAt.Sub(fr.startedTimestamp)
 		metrics.RecordFilterLatency(ctx, fr.name, latency)
 		if klog.V(3).Enabled() && latency > minFilterLatencyToLog {
-			httplog.AddInfof(ctx, "%s=%s", fr.name, latency.String())
+			httplog.AddKeyValue(ctx, fmt.Sprintf("fl_%s", fr.name), latency.String())
 		}
 	})
 }
