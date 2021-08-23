@@ -19,7 +19,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -48,10 +48,6 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, e
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
 func GetCgroupSubsystems() (*CgroupSubsystems, error) {
-	return nil, nil
-}
-
-func getCgroupProcs(dir string) ([]int, error) {
 	return nil, nil
 }
 
