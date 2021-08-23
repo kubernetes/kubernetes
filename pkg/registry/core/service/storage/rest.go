@@ -560,14 +560,14 @@ func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, 
 // executed successfully
 func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Service, service *api.Service, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
 
-	// We don't want to upgrade (add an IP) or downgrade (remove an IP)
-	// following a cluster downgrade/upgrade to/from dual-stackness
-	// a PreferDualStack service following principle of least surprise
-	// That means: PreferDualStack service will only be upgraded
-	// if:
-	// - changes type to RequireDualStack
-	// - manually adding or removing ClusterIP (secondary)
-	// - manually adding or removing IPFamily (secondary)
+	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
+	// PreferDualStack services following a cluster change to/from
+	// dual-stackness.
+	//
+	// That means a PreferDualStack service will only be upgraded/downgraded
+	// when:
+	// - changing ipFamilyPolicy to "RequireDualStack" or "SingleStack" AND
+	// - adding or removing a secondary clusterIP or ipFamily
 	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
 		return allocated, toRelease, nil // nothing more to do.
 	}
@@ -765,14 +765,14 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		return nil
 	}
 
-	// We don't want to upgrade (add an IP) or downgrade (remove an IP)
-	// following a cluster downgrade/upgrade to/from dual-stackness
-	// a PreferDualStack service following principle of least surprise
-	// That means: PreferDualStack service will only be upgraded
-	// if:
-	// - changes type to RequireDualStack
-	// - manually adding or removing ClusterIP (secondary)
-	// - manually adding or removing IPFamily (secondary)
+	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
+	// PreferDualStack services following a cluster change to/from
+	// dual-stackness.
+	//
+	// That means a PreferDualStack service will only be upgraded/downgraded
+	// when:
+	// - changing ipFamilyPolicy to "RequireDualStack" or "SingleStack" AND
+	// - adding or removing a secondary clusterIP or ipFamily
 	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
 		return nil // nothing more to do.
 	}
@@ -794,7 +794,8 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		}
 	}
 
-	// Infer IPFamilies[] from ClusterIPs[].
+	// Infer IPFamilies[] from ClusterIPs[].  Further checks happen below,
+	// after the special cases.
 	for i, ip := range service.Spec.ClusterIPs {
 		if ip == api.ClusterIPNone {
 			break
@@ -804,7 +805,7 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		// so the following is safe to do
 		isIPv6 := netutils.IsIPv6String(ip)
 
-		// Family is not specified yet.
+		// If the corresponding family is not specified, add it.
 		if i >= len(service.Spec.IPFamilies) {
 			if isIPv6 {
 				// first make sure that family(ip) is configured
@@ -825,13 +826,15 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 	}
 
 	// Infer IPFamilyPolicy from IPFamilies[].  This block does not handle the
-	// final defaulting - that happens a bit later, after special-cases.
+	// final defaulting - that happens a bit later, after special cases.
 	if service.Spec.IPFamilyPolicy == nil && len(service.Spec.IPFamilies) == 2 {
 		requireDualStack := api.IPFamilyPolicyRequireDualStack
 		service.Spec.IPFamilyPolicy = &requireDualStack
 	}
 
-	// Special-case: headless+selectorless
+	// Special-case: headless + selectorless.  This has to happen before other
+	// checks because it explicitly allows combinations of inputs that would
+	// otherwise be errors.
 	if len(service.Spec.ClusterIPs) > 0 && service.Spec.ClusterIPs[0] == api.ClusterIPNone && len(service.Spec.Selector) == 0 {
 		// If the use said nothing about policy and we can't infer it, they get dual-stack
 		if service.Spec.IPFamilyPolicy == nil {
@@ -863,24 +866,27 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		return nil
 	}
 
+	//
+	// Everything below this MUST happen *after* the above special cases.
+	//
+
 	// ipfamily check
 	// the following applies on all type of services including headless w/ selector
 	el := make(field.ErrorList, 0)
 
-	// asking for dual stack on a non dual stack cluster
-	// should fail without assigning any family
+	// Demanding dual-stack on a non dual-stack cluster.
 	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicyRequireDualStack && len(al.serviceIPAllocatorsByFamily) < 2 {
 		el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "Cluster is not configured for dual stack services"))
 	}
 
-	// if there is a family requested then it has to be configured on cluster
+	// If there is a family requested then it has to be configured on cluster.
 	for i, ipFamily := range service.Spec.IPFamilies {
 		if _, found := al.serviceIPAllocatorsByFamily[ipFamily]; !found {
 			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilies").Index(i), service.Spec.ClusterIPs, fmt.Sprintf("ipfamily %v is not configured on cluster", ipFamily)))
 		}
 	}
 
-	// if we have validation errors return them and bail out
+	// If we have validation errors, don't bother with the rest.
 	if len(el) > 0 {
 		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
@@ -892,13 +898,13 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		service.Spec.IPFamilyPolicy = &singleStack
 	}
 
-	// nil families, gets cluster default (if feature flag is not in effect, the strategy will take care of removing it)
+	// nil families, gets cluster default
 	if len(service.Spec.IPFamilies) == 0 {
 		service.Spec.IPFamilies = []api.IPFamily{al.defaultServiceIPFamily}
 	}
 
-	// is this service looking for dual stack, and this cluster does have two families?
-	// if so, then append the missing family
+	// If this service is looking for dual-stack and this cluster does have two
+	// families, append the missing family.
 	if *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack &&
 		len(service.Spec.IPFamilies) == 1 &&
 		len(al.serviceIPAllocatorsByFamily) == 2 {
