@@ -189,6 +189,9 @@ func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOpti
 }
 
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	// DeepCopy to prevent writes here propagating back to tests.
+	obj = obj.DeepCopyObject()
+
 	service := obj.(*api.Service)
 
 	// bag of clusterIPs allocated in the process of creation
