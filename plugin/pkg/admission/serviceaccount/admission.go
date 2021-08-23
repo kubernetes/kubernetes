@@ -26,6 +26,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -419,6 +421,8 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 // TokenVolumeSource returns the projected volume source for service account token.
 func TokenVolumeSource() *api.ProjectedVolumeSource {
 	return &api.ProjectedVolumeSource{
+		// explicitly set default value, see #104464
+		DefaultMode: pointer.Int32(v1.ProjectedVolumeSourceDefaultMode),
 		Sources: []api.VolumeProjection{
 			{
 				ServiceAccountToken: &api.ServiceAccountTokenProjection{
