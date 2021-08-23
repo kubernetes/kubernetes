@@ -535,7 +535,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		return quotas, err
 	}
 	if len(scopesHasNoCoveringQuota) > 0 {
-		return quotas, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota)
+		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota))
 	}
 
 	if len(interestingQuotaIndexes) == 0 {
