@@ -88,6 +88,8 @@ for more information about scheduling and the kube-scheduler component.`,
 			}
 			return nil
 		},
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
