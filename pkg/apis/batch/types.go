@@ -277,7 +277,7 @@ type JobStatus struct {
 	//     counter.
 	//
 	// This field is alpha-level. The job controller only makes use of this field
-	// when the feature gate PodTrackingWithFinalizers is enabled.
+	// when the feature gate JobTrackingWithFinalizers is enabled.
 	// Old jobs might not be tracked using this field, in which case the field
 	// remains null.
 	// +optional
