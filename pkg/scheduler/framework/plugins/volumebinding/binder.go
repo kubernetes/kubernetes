@@ -290,9 +290,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		}
 	}()
 
-	start := time.Now()
 	defer func() {
-		metrics.VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
 		if err != nil {
 			metrics.VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
 		}
@@ -376,9 +374,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 	podName := getPodName(assumedPod)
 
 	klog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
-	start := time.Now()
 	defer func() {
-		metrics.VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
 		if err != nil {
 			metrics.VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
 		}
@@ -450,9 +446,7 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes
 	podName := getPodName(assumedPod)
 	klog.V(4).Infof("BindPodVolumes for pod %q, node %q", podName, assumedPod.Spec.NodeName)
 
-	start := time.Now()
 	defer func() {
-		metrics.VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
 		if err != nil {
 			metrics.VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
 		}

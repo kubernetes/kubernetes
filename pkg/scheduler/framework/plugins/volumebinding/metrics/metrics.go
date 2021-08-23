@@ -35,18 +35,6 @@ var (
 		},
 		[]string{"operation"},
 	)
-	// VolumeSchedulingStageLatency tracks the latency of volume scheduling operations.
-	VolumeSchedulingStageLatency = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem:         VolumeSchedulerSubsystem,
-			Name:              "scheduling_duration_seconds",
-			Help:              "Volume scheduling stage latency (Deprecated since 1.19.0)",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.19.0",
-		},
-		[]string{"operation"},
-	)
 	// VolumeSchedulingStageFailed tracks the number of failed volume scheduling operations.
 	VolumeSchedulingStageFailed = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -63,6 +51,5 @@ var (
 // used by scheduler process.
 func RegisterVolumeSchedulingMetrics() {
 	legacyregistry.MustRegister(VolumeBindingRequestSchedulerBinderCache)
-	legacyregistry.MustRegister(VolumeSchedulingStageLatency)
 	legacyregistry.MustRegister(VolumeSchedulingStageFailed)
 }
