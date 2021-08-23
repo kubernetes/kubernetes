@@ -449,8 +449,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}()
 
 	// Extract the cgroup resource parameters
-	resourceConfig := cgroupConfig.ResourceParameters
-	resources := m.toResources(resourceConfig)
+	resources := m.toResources(cgroupConfig.ResourceParameters)
 
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
 		Resources: resources,
@@ -468,10 +467,6 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	// depending on the cgroup driver in use, so we need this conditional here.
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
-	}
-
-	if cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
-		resources.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
 	if unified {
@@ -510,10 +505,6 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
 	} else {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
-	}
-
-	if cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
-		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
 	// get the manager with the specified cgroup configuration
