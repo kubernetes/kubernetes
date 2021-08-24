@@ -85,6 +85,51 @@ var (
 		},
 		[]string{},
 	)
+	listEtcd3Queries = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_list_etcd3_queries",
+			Help:           "Number of etcd range queries used to satisfy a LIST request, split by path_prefix",
+			Buckets:        []float64{1, 2, 4, 8, 16},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"path_prefix"},
+	)
+	listEtcd3SansVersion = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_list_etcd3_sans_version",
+			Help:           "Number of etcd range queries without specified ResourceVersion used to satisfy a LIST request, split by path_prefix",
+			Buckets:        []float64{0, 1},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"path_prefix"},
+	)
+	listEtcd3NumFetched = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_list_etcd3_num_fetched",
+			Help:           "Number of objects read from etcd in the course of serving a LIST request, split by path_prefix",
+			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"path_prefix"},
+	)
+	listEtcd3NumSelectorEvals = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_list_etcd3_num_selector_evals",
+			Help:           "Number of label or field selector evaluations in the course of serving a LIST request from etcd, split by path_prefix",
+			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"path_prefix"},
+	)
+	listEtcd3NumReturned = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_list_etcd3_num_returned",
+			Help:           "Number of objects returned for a LIST request from etcd, split by path_prefix",
+			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"path_prefix"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -99,6 +144,11 @@ func Register() {
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(listEtcd3Queries)
+		legacyregistry.MustRegister(listEtcd3SansVersion)
+		legacyregistry.MustRegister(listEtcd3NumFetched)
+		legacyregistry.MustRegister(listEtcd3NumSelectorEvals)
+		legacyregistry.MustRegister(listEtcd3NumReturned)
 	})
 }
 
@@ -138,4 +188,13 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+func RecordListEtcd3Metrics(pathPrefix string, numQueries, numSansVersion, numFetched, numSelectorEvals, numReturned int) {
+	listEtcd3Queries.WithLabelValues(pathPrefix).Observe(float64(numQueries))
+	listEtcd3SansVersion.WithLabelValues(pathPrefix).Observe(float64(numSansVersion))
+	listEtcd3NumFetched.WithLabelValues(pathPrefix).Observe(float64(numFetched))
+	listEtcd3NumSelectorEvals.WithLabelValues(pathPrefix).Observe(float64(numSelectorEvals))
+	listEtcd3NumReturned.WithLabelValues(pathPrefix).Observe(float64(numReturned))
 }

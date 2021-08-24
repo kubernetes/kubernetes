@@ -499,7 +499,8 @@ func (s *store) GetToList(ctx context.Context, key string, listOpts storage.List
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
-		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
+		var selectorEvalCount int
+		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc, &selectorEvalCount); err != nil {
 			return err
 		}
 	}
@@ -716,21 +717,33 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 
 		options = append(options, clientv3.WithPrefix())
 	}
+	var numSansVersion int
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
+	} else {
+		numSansVersion = 1
 	}
 
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	var numRangeQueries int
+	var numFetched int
+	var numSelectorEvals int
+	defer func() {
+		numReturn := v.Len()
+		metrics.RecordListEtcd3Metrics(s.pathPrefix, numRangeQueries, numSansVersion, numFetched, numSelectorEvals, numReturn)
+	}()
 	for {
+		numRangeQueries += 1
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
+		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
@@ -761,7 +774,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc, &numSelectorEvals); err != nil {
 				return err
 			}
 		}
@@ -988,7 +1001,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object, selectorEvalCount *int) error {
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
 		return err
@@ -997,7 +1010,7 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 	if err := versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}
-	if matched, err := pred.Matches(obj); err == nil && matched {
+	if matched, err := pred.Matches(obj, selectorEvalCount); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
 	return nil

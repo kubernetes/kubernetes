@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
@@ -231,6 +232,8 @@ type Cacher struct {
 	// Incoming events that should be dispatched to watchers.
 	incoming chan watchCacheEvent
 
+	resourcePrefix string
+
 	sync.RWMutex
 
 	// Before accessing the cacher's cache, wait for the ready to be ok.
@@ -329,6 +332,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	objType := reflect.TypeOf(obj)
 	cacher := &Cacher{
+		resourcePrefix: config.ResourcePrefix,
 		ready:          newReady(),
 		storage:        config.Storage,
 		objectType:     objType,
@@ -491,11 +495,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	var numSelectorEvals int
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred, &numSelectorEvals), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -651,7 +656,8 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterWithAttrsFunction(key, pred)
+	var numSelectorEvals int
+	filter := filterWithAttrsFunction(key, pred, &numSelectorEvals)
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 	if err != nil {
@@ -716,9 +722,10 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterWithAttrsFunction(key, pred)
+	var numSelectorEvals int
+	filter := filterWithAttrsFunction(key, pred, &numSelectorEvals)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	objs, readResourceVersion, indexUsed, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
 	if err != nil {
 		return err
 	}
@@ -744,6 +751,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 			return err
 		}
 	}
+	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), numSelectorEvals, listVal.Len())
 	return nil
 }
 
@@ -1080,12 +1088,12 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
+func filterWithAttrsFunction(key string, p storage.SelectionPredicate, numSelectorEvals *int) filterWithAttrsFunc {
 	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesObjectAttributes(label, field)
+		return p.MatchesObjectAttributes(label, field, numSelectorEvals)
 	}
 	return filterFunc
 }
