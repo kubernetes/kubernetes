@@ -325,6 +325,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyTransportDial,
 		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 		s.serviceResolver,
+		c.GenericConfig.HasBeenReadySignal(),
 	)
 	if err != nil {
 		return nil, err
