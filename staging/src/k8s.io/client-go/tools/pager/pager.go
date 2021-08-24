@@ -118,9 +118,12 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 		// initialize the list and fill its contents
 		if list == nil {
 			list = &metainternalversion.List{Items: make([]runtime.Object, 0, options.Limit+1)}
-			list.ResourceVersion = m.GetResourceVersion()
 			list.SelfLink = m.GetSelfLink()
 		}
+
+		// the resource version of the last page is the resource version for the list
+		list.ResourceVersion = m.GetResourceVersion()
+
 		if err := meta.EachListItem(obj, func(obj runtime.Object) error {
 			list.Items = append(list.Items, obj)
 			return nil

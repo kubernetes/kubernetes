@@ -46,6 +46,7 @@ func list(count int, rv string) *metainternalversion.List {
 type testPager struct {
 	t          *testing.T
 	rv         string
+	rvs        []string
 	index      int
 	remaining  int
 	last       int
@@ -100,7 +101,15 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 	} else {
 		p.done = true
 	}
-	list.ResourceVersion = p.rv
+	switch {
+	case len(p.rvs) > 1:
+		list.ResourceVersion = p.rvs[0]
+		p.rvs = p.rvs[1:]
+	case len(p.rvs) == 1:
+		list.ResourceVersion = p.rvs[0]
+	default:
+		list.ResourceVersion = p.rv
+	}
 	return &list, nil
 }
 
@@ -199,6 +208,21 @@ func TestListPager_List(t *testing.T) {
 			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
 			args:      args{options: metav1.ListOptions{ResourceVersion: "rv:10"}},
 			want:      list(11, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name: "pager should return the resource version of the last page",
+			fields: fields{
+				PageSize: 10,
+				PageFn: (&testPager{
+					t:          t,
+					expectPage: 10,
+					remaining:  11,
+					rvs:        []string{"rv:20", "rv:30"},
+				}).PagedList,
+			},
+			args:      args{options: metav1.ListOptions{}},
+			want:      list(11, "rv:30"),
 			wantPaged: true,
 		},
 	}
