@@ -87,14 +87,14 @@ func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
 
 func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	queueNoteFn fq.QueueNoteFn,
 	execFn func(),
 ) {
 	if t.mockDecision == decisionSkipFilter {
 		panic("Handle should not be invoked")
 	}
-	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault)
+	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
 	switch t.mockDecision {
 	case decisionNoQueuingExecute:
 		execFn()
@@ -390,7 +390,7 @@ func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
 
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	_ fq.QueueNoteFn,
 	execFn func(),
 ) {
@@ -638,7 +638,7 @@ type fakeFilterRequestDigest struct {
 
 func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	_ fq.QueueNoteFn, _ func(),
 ) {
 	f.requestDigestGot = &requestDigest

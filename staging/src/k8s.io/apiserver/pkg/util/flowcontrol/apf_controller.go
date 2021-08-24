@@ -775,7 +775,7 @@ func (immediateRequest) Finish(execute func()) bool {
 // The returned bool indicates whether the request is exempt from
 // limitation.  The startWaitingTime is when the request started
 // waiting in its queue, or `Time{}` if this did not happen.
-func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
+func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time, flowDistinguisher string) {
 	klog.V(7).Infof("startRequest(%#+v)", rd)
 	cfgCtlr.lock.Lock()
 	defer cfgCtlr.lock.Unlock()
@@ -807,13 +807,12 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	plState := cfgCtlr.priorityLevelStates[plName]
 	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
 		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
-		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
+		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}, ""
 	}
 	var numQueues int32
 	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
 		numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
 	}
-	var flowDistinguisher string
 	var hashValue uint64
 	if numQueues > 1 {
 		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
@@ -825,7 +824,7 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	if idle {
 		cfgCtlr.maybeReapLocked(plName, plState)
 	}
-	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
+	return selectedFlowSchema, plState.pl, false, req, startWaitingTime, flowDistinguisher
 }
 
 // maybeReap will remove the last internal traces of the named
