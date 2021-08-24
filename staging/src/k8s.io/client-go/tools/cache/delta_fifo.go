@@ -123,7 +123,7 @@ type DeltaFIFO struct {
 	knownObjects KeyListerGetter
 
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
-	// Currently, not used to gate any of CRED operations.
+	// Currently, not used to gate any of CRUD operations.
 	closed bool
 
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
