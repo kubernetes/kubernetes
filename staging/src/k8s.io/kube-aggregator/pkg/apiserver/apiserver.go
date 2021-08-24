@@ -289,6 +289,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 		s.serviceResolver,
 		c.GenericConfig.EgressSelector,
+		c.GenericConfig.HasBeenReadySignal(),
 	)
 	if err != nil {
 		return nil, err
