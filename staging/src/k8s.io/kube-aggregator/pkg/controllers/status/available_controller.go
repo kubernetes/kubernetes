@@ -89,6 +89,9 @@ type AvailableConditionController struct {
 
 	// metrics registered into legacy registry
 	metrics *availabilityMetrics
+
+	// hasBeenReady is signaled when the readyz endpoint succeeds for the first time.
+	hasBeenReady <-chan struct{}
 }
 
 // NewAvailableConditionController returns a new AvailableConditionController.
@@ -100,6 +103,7 @@ func NewAvailableConditionController(
 	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
+	hasBeenReady <-chan struct{},
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -116,6 +120,7 @@ func NewAvailableConditionController(
 		proxyTransportDial:         proxyTransportDial,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
 		metrics:                    newAvailabilityMetrics(),
+		hasBeenReady:               hasBeenReady,
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -167,6 +172,18 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// the availability checks depend on fully initialized SDN
+	// OpenShift carries a few reachability checks that affect /readyz protocol
+	// record availability of the server so that we can
+	// skip posting failures to avoid getting false positives until the server becomes ready
+	hasBeenReady := false
+	select {
+	case <-c.hasBeenReady:
+		hasBeenReady = true
+	default:
+		// continue, we will skip posting only potential failures
 	}
 
 	// if a particular transport was specified, use that otherwise build one
@@ -359,6 +376,11 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		if lastError != nil {
+			if !hasBeenReady {
+				// returning an error will requeue the item in an exponential fashion
+				return fmt.Errorf("the server hasn't been ready yet, skipping updating availability of the aggreaged API until the server becomes ready to avoid false positives, lastError = %v", lastError)
+			}
+
 			availableCondition.Status = apiregistrationv1.ConditionFalse
 			availableCondition.Reason = "FailedDiscoveryCheck"
 			availableCondition.Message = lastError.Error()
