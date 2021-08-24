@@ -53,41 +53,7 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
-	al, err := ipallocator.NewInMemory(cidr)
-	if err != nil {
-		panic(fmt.Sprintf("error creating IP allocator: %v", err))
-	}
-	return al
-}
-
-func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface {
-	al, err := portallocator.NewInMemory(ports)
-	if err != nil {
-		panic(fmt.Sprintf("error creating port allocator: %v", err))
-	}
-	return al
-}
-
-func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
-	t.Helper()
-	ip := netutils.ParseIPSloppy(ipstr)
-	if ip == nil {
-		t.Errorf("error parsing IP %q", ipstr)
-		return false
-	}
-	return alloc.Has(ip)
-}
-
-func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bool {
-	t.Helper()
-	if port == 0 {
-		t.Errorf("port is 0")
-		return false
-	}
-	return alloc.Has(int(port))
-}
-
+// Most tests will use this to create a registry to run tests against.
 func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, *etcd3testing.EtcdTestServer) {
 	return newStorageWithPods(t, ipFamilies, nil, nil)
 }
@@ -162,6 +128,22 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	return &wrapperRESTForTests{serviceStorage}, statusStorage, server
 }
 
+func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
+	al, err := ipallocator.NewInMemory(cidr)
+	if err != nil {
+		panic(fmt.Sprintf("error creating IP allocator: %v", err))
+	}
+	return al
+}
+
+func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface {
+	al, err := portallocator.NewInMemory(ports)
+	if err != nil {
+		panic(fmt.Sprintf("error creating port allocator: %v", err))
+	}
+	return al
+}
+
 // wrapperRESTForTests is a *trivial* wrapper for the real REST, which allows us to do
 // things that are specifically to enhance test safety.
 type wrapperRESTForTests struct {
@@ -175,6 +157,10 @@ func (f *wrapperRESTForTests) Create(ctx context.Context, obj runtime.Object, cr
 	obj = obj.DeepCopyObject()
 	return f.GenericREST.Create(ctx, obj, createValidation, options)
 }
+
+//
+// Generic registry tests
+//
 
 // This is used in generic registry tests.
 func validService() *api.Service {
@@ -296,6 +282,10 @@ func TestGenericCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage, expected)
 }
 
+//
+// Tests of internal functions
+//
+
 func TestNormalizeClusterIPs(t *testing.T) {
 	makeServiceWithClusterIp := func(clusterIP string, clusterIPs []string) *api.Service {
 		return &api.Service{
@@ -312,120 +302,103 @@ func TestNormalizeClusterIPs(t *testing.T) {
 		newService         *api.Service
 		expectedClusterIP  string
 		expectedClusterIPs []string
-	}{
-		{
-			name:               "new - only clusterip used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "new - only clusterips used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
-			expectedClusterIP:  "", // this is a validation issue, and validation will catch it
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "new - both used",
-			oldService:         nil,
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - no change",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - malformed change",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11"}),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: []string{"10.0.0.11"},
-		},
-		{
-			name:               "update - malformed change on secondary ip",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11", "3000::1"}),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
-		},
-		{
-			name:               "update - upgrade",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
-		},
-		{
-			name:               "update - downgrade",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user cleared cluster IP",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
-			expectedClusterIP:  "",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user cleared both",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", nil),
-			expectedClusterIP:  "",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user cleared ClusterIP but changed clusterIPs",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("", []string{"10.0.0.11"}),
-			expectedClusterIP:  "", /* validation catches this */
-			expectedClusterIPs: []string{"10.0.0.11"},
-		},
-		{
-			name:               "update - user cleared ClusterIPs but changed ClusterIP",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("10.0.0.11", nil),
-			expectedClusterIP:  "10.0.0.11",
-			expectedClusterIPs: nil,
-		},
-		{
-			name:               "update - user changed from None to ClusterIP",
-			oldService:         makeServiceWithClusterIp("None", []string{"None"}),
-			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"None"}),
-			expectedClusterIP:  "10.0.0.10",
-			expectedClusterIPs: []string{"10.0.0.10"},
-		},
-		{
-			name:               "update - user changed from ClusterIP to None",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
-			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.10"}),
-			expectedClusterIP:  "None",
-			expectedClusterIPs: []string{"None"},
-		},
-		{
-			name:               "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
-			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
-			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.11", "2000::1"}),
-			expectedClusterIP:  "None",
-			expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
-		},
-	}
+	}{{
+		name:               "new - only clusterip used",
+		oldService:         nil,
+		newService:         makeServiceWithClusterIp("10.0.0.10", nil),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "new - only clusterips used",
+		oldService:         nil,
+		newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
+		expectedClusterIP:  "", // this is a validation issue, and validation will catch it
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "new - both used",
+		oldService:         nil,
+		newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "update - no change",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "update - malformed change",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11"}),
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: []string{"10.0.0.11"},
+	}, {
+		name:               "update - malformed change on secondary ip",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+		newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11", "3000::1"}),
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
+	}, {
+		name:               "update - upgrade",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
+	}, {
+		name:               "update - downgrade",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+		newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "update - user cleared cluster IP",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
+		expectedClusterIP:  "",
+		expectedClusterIPs: nil,
+	}, {
+		name:               "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("10.0.0.10", nil),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "update - user cleared both",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("", nil),
+		expectedClusterIP:  "",
+		expectedClusterIPs: nil,
+	}, {
+		name:               "update - user cleared ClusterIP but changed clusterIPs",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("", []string{"10.0.0.11"}),
+		expectedClusterIP:  "", /* validation catches this */
+		expectedClusterIPs: []string{"10.0.0.11"},
+	}, {
+		name:               "update - user cleared ClusterIPs but changed ClusterIP",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+		newService:         makeServiceWithClusterIp("10.0.0.11", nil),
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: nil,
+	}, {
+		name:               "update - user changed from None to ClusterIP",
+		oldService:         makeServiceWithClusterIp("None", []string{"None"}),
+		newService:         makeServiceWithClusterIp("10.0.0.10", []string{"None"}),
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:               "update - user changed from ClusterIP to None",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+		newService:         makeServiceWithClusterIp("None", []string{"10.0.0.10"}),
+		expectedClusterIP:  "None",
+		expectedClusterIPs: []string{"None"},
+	}, {
+		name:               "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
+		oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+		newService:         makeServiceWithClusterIp("None", []string{"10.0.0.11", "2000::1"}),
+		expectedClusterIP:  "None",
+		expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -655,6 +628,584 @@ func TestServiceDefaultOnRead(t *testing.T) {
 		})
 	}
 }
+
+//
+// Scaffolding for create-update-delete tests.  Many tests can and should be
+// written in terms of this.
+//
+
+type cudTestCase struct {
+	name         string
+	line         string // if not empty, will be logged with errors, use line() to set
+	create       svcTestCase
+	beforeUpdate func(t *testing.T, storage *wrapperRESTForTests)
+	update       svcTestCase
+}
+
+type svcTestCase struct {
+	svc         *api.Service
+	expectError bool
+
+	// We could calculate these by looking at the Service, but that's a
+	// vector for test bugs and more importantly it makes the test cases less
+	// self-documenting.
+	expectClusterIPs          bool
+	expectStackDowngrade      bool
+	expectHeadless            bool
+	expectNodePorts           bool
+	expectHealthCheckNodePort bool
+
+	// Additional proofs, provided by the tests which use this.
+	prove []svcTestProof
+}
+
+type svcTestProof func(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service)
+
+// Most tests will call this.
+func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
+	t.Helper()
+	helpTestCreateUpdateDeleteWithFamilies(t, testCases, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+}
+
+func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCase, ipFamilies []api.IPFamily) {
+	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
+	// attributed to lines in this function than the caller of it.
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	storage, _, server := newStorage(t, ipFamilies)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		name := tc.name
+		if tc.line != "" {
+			name += "__@L" + tc.line
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+
+			// Create the object as specified and check the results.
+			obj, err := storage.Create(ctx, tc.create.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tc.create.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			defer storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{}) // in case
+			if tc.create.expectError && err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			createdSvc := obj.(*api.Service)
+			if !verifyEquiv(t, "create", &tc.create, createdSvc) {
+				return
+			}
+			verifyExpectations(t, storage, tc.create, tc.create.svc, createdSvc)
+			lastSvc := createdSvc
+
+			// The update phase is optional.
+			if tc.update.svc != nil {
+				// Allow callers to do something between create and update.
+				if tc.beforeUpdate != nil {
+					tc.beforeUpdate(t, storage)
+				}
+
+				// Update the object to the new state and check the results.
+				obj, created, err := storage.Update(ctx, tc.update.svc.Name,
+					rest.DefaultUpdatedObjectInfo(tc.update.svc), rest.ValidateAllObjectFunc,
+					rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+				if tc.update.expectError && err != nil {
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected error updating service: %v", err)
+				}
+				if tc.update.expectError && err == nil {
+					t.Fatalf("unexpected success updating service")
+				}
+				if created {
+					t.Fatalf("unexpected create-on-update")
+				}
+				updatedSvc := obj.(*api.Service)
+				if !verifyEquiv(t, "update", &tc.update, updatedSvc) {
+					return
+				}
+				verifyExpectations(t, storage, tc.update, createdSvc, updatedSvc)
+				lastSvc = updatedSvc
+			}
+
+			// Delete the object and check the results.
+			_, _, err = storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error deleting service: %v", err)
+			}
+			verifyExpectations(t, storage, svcTestCase{ /* all false */ }, lastSvc, nil)
+		})
+	}
+}
+
+// line returns the line number of the caller, if possible.  This is useful in
+// tests with a large number of cases - when something goes wrong you can find
+// which case more easily.
+func line() string {
+	_, _, line, ok := stdruntime.Caller(1)
+	var s string
+	if ok {
+		s = fmt.Sprintf("%d", line)
+	} else {
+		s = "<??>"
+	}
+	return s
+}
+
+// This makes the test-helpers testable.
+type testingTInterface interface {
+	Helper()
+	Errorf(format string, args ...interface{})
+}
+
+type fakeTestingT struct {
+	t *testing.T
+}
+
+func (f fakeTestingT) Helper() {}
+
+func (f fakeTestingT) Errorf(format string, args ...interface{}) {
+	f.t.Logf(format, args...)
+}
+
+func verifyEquiv(t testingTInterface, call string, tc *svcTestCase, got *api.Service) bool {
+	t.Helper()
+
+	// For when we compare objects.
+	options := []cmp.Option{
+		// These are system-assigned values, we don't need to compare them.
+		cmpopts.IgnoreFields(api.Service{}, "UID", "ResourceVersion", "CreationTimestamp"),
+		// Treat nil slices and empty slices as the same (e.g. clusterIPs).
+		cmpopts.EquateEmpty(),
+	}
+
+	// For allocated fields, we want to be able to compare cleanly whether the
+	// input specified values or not.
+	want := tc.svc.DeepCopy()
+	if tc.expectClusterIPs || tc.expectHeadless {
+		if want.Spec.ClusterIP == "" {
+			want.Spec.ClusterIP = got.Spec.ClusterIP
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			if want.Spec.IPFamilyPolicy == nil {
+				want.Spec.IPFamilyPolicy = got.Spec.IPFamilyPolicy
+			}
+			if tc.expectStackDowngrade && len(want.Spec.ClusterIPs) > len(got.Spec.ClusterIPs) {
+				want.Spec.ClusterIPs = want.Spec.ClusterIPs[0:1]
+			} else if len(got.Spec.ClusterIPs) > len(want.Spec.ClusterIPs) {
+				want.Spec.ClusterIPs = append(want.Spec.ClusterIPs, got.Spec.ClusterIPs[len(want.Spec.ClusterIPs):]...)
+			}
+			if tc.expectStackDowngrade && len(want.Spec.IPFamilies) > len(got.Spec.ClusterIPs) {
+				want.Spec.IPFamilies = want.Spec.IPFamilies[0:1]
+			} else if len(got.Spec.IPFamilies) > len(want.Spec.IPFamilies) {
+				want.Spec.IPFamilies = append(want.Spec.IPFamilies, got.Spec.IPFamilies[len(want.Spec.IPFamilies):]...)
+			}
+		}
+	}
+
+	if tc.expectNodePorts {
+		for i := range want.Spec.Ports {
+			p := &want.Spec.Ports[i]
+			if p.NodePort == 0 {
+				p.NodePort = got.Spec.Ports[i].NodePort
+			}
+		}
+	}
+	if tc.expectHealthCheckNodePort {
+		if want.Spec.HealthCheckNodePort == 0 {
+			want.Spec.HealthCheckNodePort = got.Spec.HealthCheckNodePort
+		}
+	}
+
+	if !cmp.Equal(want, got, options...) {
+		t.Errorf("unexpected result from %s:\n%s", call, cmp.Diff(want, got, options...))
+		return false
+	}
+	return true
+}
+
+// Quis custodiet ipsos custodes?
+func TestVerifyEquiv(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  svcTestCase
+		output *api.Service
+		expect bool
+	}{{
+		name: "ExternalName",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeExternalName),
+		expect: true,
+	}, {
+		name: "ClusterIPs_unspecified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "ClusterIPs_specified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "ClusterIPs_wrong",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.0", "2000:0")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: false,
+	}, {
+		name: "ClusterIPs_partial",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1")),
+			expectClusterIPs: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
+		expect: true,
+	}, {
+		name: "NodePort_unspecified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetUniqueNodePorts),
+		expect: true,
+	}, {
+		name: "NodePort_specified",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+		expect: true,
+	}, {
+		name: "NodePort_wrong",
+		input: svcTestCase{
+			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(76)),
+		expect: false,
+	}, {
+		name: "NodePort_partial",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.SetNodePorts(93)),
+			expectClusterIPs: true,
+			expectNodePorts:  true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeNodePort,
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+			svctest.SetNodePorts(93, 76)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_unspecified",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(93)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_specified",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetHealthCheckNodePort(93)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(93)),
+		expect: true,
+	}, {
+		name: "HealthCheckNodePort_wrong",
+		input: svcTestCase{
+			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetHealthCheckNodePort(93)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetHealthCheckNodePort(76)),
+		expect: false,
+	}}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := verifyEquiv(fakeTestingT{t}, "test", &tc.input, tc.output)
+			if result != tc.expect {
+				t.Errorf("expected %v, got %v", tc.expect, result)
+			}
+		})
+	}
+}
+
+func verifyExpectations(t *testing.T, storage *wrapperRESTForTests, tc svcTestCase, before, after *api.Service) {
+	t.Helper()
+
+	if tc.expectClusterIPs {
+		proveClusterIPsAllocated(t, storage, before, after)
+	} else if tc.expectHeadless {
+		proveHeadless(t, storage, before, after)
+	} else {
+		proveClusterIPsDeallocated(t, storage, before, after)
+	}
+	if tc.expectNodePorts {
+		proveNodePortsAllocated(t, storage, before, after)
+	} else {
+		proveNodePortsDeallocated(t, storage, before, after)
+	}
+	if tc.expectHealthCheckNodePort {
+		proveHealthCheckNodePortAllocated(t, storage, before, after)
+	} else {
+		proveHealthCheckNodePortDeallocated(t, storage, before, after)
+	}
+
+	for _, p := range tc.prove {
+		p(t, storage, before, after)
+	}
+}
+
+func callName(before, after *api.Service) string {
+	if before == nil && after != nil {
+		return "create"
+	}
+	if before != nil && after != nil {
+		return "update"
+	}
+	if before != nil && after == nil {
+		return "delete"
+	}
+	panic("this test is broken: before and after are both nil")
+}
+
+func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
+	t.Helper()
+	ip := netutils.ParseIPSloppy(ipstr)
+	if ip == nil {
+		t.Errorf("error parsing IP %q", ipstr)
+		return false
+	}
+	return alloc.Has(ip)
+}
+
+func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bool {
+	t.Helper()
+	if port == 0 {
+		t.Errorf("port is 0")
+		return false
+	}
+	return alloc.Has(int(port))
+}
+
+func proveClusterIPsAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
+		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
+	}
+
+	clips := []string{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		clips = after.Spec.ClusterIPs
+	} else {
+		clips = append(clips, after.Spec.ClusterIP)
+	}
+	for _, clip := range clips {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
+			t.Errorf("%s: expected clusterIP to be allocated: %q", callName(before, after), clip)
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if lc, lf := len(after.Spec.ClusterIPs), len(after.Spec.IPFamilies); lc != lf {
+			t.Errorf("%s: expected same number of clusterIPs and ipFamilies: %d != %d", callName(before, after), lc, lf)
+		}
+	}
+
+	for i, fam := range after.Spec.IPFamilies {
+		if want, got := fam, familyOf(after.Spec.ClusterIPs[i]); want != got {
+			t.Errorf("%s: clusterIP is the wrong IP family: want %s, got %s", callName(before, after), want, got)
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if after.Spec.IPFamilyPolicy == nil {
+			t.Errorf("%s: expected ipFamilyPolicy to be set", callName(before, after))
+		} else {
+			pol := *after.Spec.IPFamilyPolicy
+			fams := len(after.Spec.IPFamilies)
+			clus := 1
+			if storage.secondaryIPFamily != "" {
+				clus = 2
+			}
+			if pol == api.IPFamilyPolicySingleStack && fams != 1 {
+				t.Errorf("%s: expected 1 ipFamily, got %d", callName(before, after), fams)
+			} else if pol == api.IPFamilyPolicyRequireDualStack && fams != 2 {
+				t.Errorf("%s: expected 2 ipFamilies, got %d", callName(before, after), fams)
+			} else if pol == api.IPFamilyPolicyPreferDualStack && fams != clus {
+				t.Errorf("%s: expected %d ipFamilies, got %d", callName(before, after), clus, fams)
+			}
+		}
+	}
+
+	if before != nil {
+		if before.Spec.ClusterIP != "" {
+			if want, got := before.Spec.ClusterIP, after.Spec.ClusterIP; want != got {
+				t.Errorf("%s: wrong clusterIP: wanted %q, got %q", callName(before, after), want, got)
+			}
+		}
+		min := func(x, y int) int {
+			if x < y {
+				return x
+			}
+			return y
+		}
+		for i := 0; i < min(len(before.Spec.ClusterIPs), len(after.Spec.ClusterIPs)); i++ {
+			if want, got := before.Spec.ClusterIPs[i], after.Spec.ClusterIPs[i]; want != got {
+				t.Errorf("%s: wrong clusterIPs[%d]: wanted %q, got %q", callName(before, after), i, want, got)
+			}
+		}
+		for i := 0; i < min(len(before.Spec.IPFamilies), len(after.Spec.IPFamilies)); i++ {
+			if want, got := before.Spec.IPFamilies[i], after.Spec.IPFamilies[i]; want != got {
+				t.Errorf("%s: wrong ipFamilies[%d]: wanted %q, got %q", callName(before, after), i, want, got)
+			}
+		}
+	}
+}
+
+func proveClusterIPsDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil && after.Spec.ClusterIP != api.ClusterIPNone {
+		if after.Spec.ClusterIP != "" {
+			t.Errorf("%s: expected clusterIP to be unset: %q", callName(before, after), after.Spec.ClusterIP)
+		}
+		if len(after.Spec.ClusterIPs) != 0 {
+			t.Errorf("%s: expected clusterIPs to be unset: %q", callName(before, after), after.Spec.ClusterIPs)
+		}
+	}
+
+	if before != nil && before.Spec.ClusterIP != api.ClusterIPNone {
+		clips := []string{}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			clips = before.Spec.ClusterIPs
+		} else {
+			clips = append(clips, before.Spec.ClusterIP)
+		}
+		for _, clip := range clips {
+			if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
+				t.Errorf("%s: expected clusterIP to be deallocated: %q", callName(before, after), clip)
+			}
+		}
+	}
+}
+
+func proveHeadless(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
+		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
+	}
+	if len(after.Spec.ClusterIPs) != 1 || after.Spec.ClusterIPs[0] != api.ClusterIPNone {
+		t.Errorf("%s: expected clusterIPs to be [%q]: %q", callName(before, after), api.ClusterIPNone, after.Spec.ClusterIPs)
+	}
+}
+
+func proveNodePortsAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	for _, p := range after.Spec.Ports {
+		if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+			t.Errorf("%s: expected nodePort to be allocated: %d", callName(before, after), p.NodePort)
+		}
+	}
+}
+
+func proveNodePortsDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil {
+		for _, p := range after.Spec.Ports {
+			if p.NodePort != 0 {
+				t.Errorf("%s: expected nodePort to be unset: %d", callName(before, after), p.NodePort)
+			}
+		}
+	}
+
+	if before != nil {
+		for _, p := range before.Spec.Ports {
+			if p.NodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+				t.Errorf("%s: expected nodePort to be deallocated: %d", callName(before, after), p.NodePort)
+			}
+		}
+	}
+}
+
+func proveHealthCheckNodePortAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, after.Spec.HealthCheckNodePort) {
+		t.Errorf("%s: expected healthCheckNodePort to be allocated: %d", callName(before, after), after.Spec.HealthCheckNodePort)
+	}
+}
+
+func proveHealthCheckNodePortDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
+	t.Helper()
+
+	if after != nil {
+		if after.Spec.HealthCheckNodePort != 0 {
+			t.Errorf("%s: expected healthCheckNodePort to be unset: %d", callName(before, after), after.Spec.HealthCheckNodePort)
+		}
+	}
+
+	if before != nil {
+		if before.Spec.HealthCheckNodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, before.Spec.HealthCheckNodePort) {
+			t.Errorf("%s: expected healthCheckNodePort to be deallocated: %d", callName(before, after), before.Spec.HealthCheckNodePort)
+		}
+	}
+}
+
+//
+// functional tests of the registry
+//
 
 func fmtIPFamilyPolicy(pol *api.IPFamilyPolicyType) string {
 	if pol == nil {
@@ -1061,20 +1612,6 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 			}
 		})
 	}
-}
-
-// line returns the line number of the caller, if possible.  This is useful in
-// tests with a large number of cases - when something goes wrong you can find
-// which case more easily.
-func line() string {
-	_, _, line, ok := stdruntime.Caller(1)
-	var s string
-	if ok {
-		s = fmt.Sprintf("%d", line)
-	} else {
-		s = "<??>"
-	}
-	return s
 }
 
 // Prove that create initializes IPFamily fields correctly.
@@ -5678,6 +6215,7 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 		})
 	}
 }
+
 func TestCreateDeleteReuse(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -10161,541 +10699,6 @@ func TestUpdateIPsFromDualStack(t *testing.T) {
 	t.Run("headless", func(t *testing.T) {
 		helpTestCreateUpdateDeleteWithFamilies(t, testCasesHeadless, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 	})
-}
-
-//FIXME: after all the tests are ported, move this all up near the top?
-type svcTestCase struct {
-	svc         *api.Service
-	expectError bool
-
-	// We could calculate these by looking at the Service, but that's a
-	// vector for test bugs and more importantly it makes the test cases less
-	// self-documenting.
-	expectClusterIPs          bool
-	expectStackDowngrade      bool
-	expectHeadless            bool
-	expectNodePorts           bool
-	expectHealthCheckNodePort bool
-
-	// Additional proofs, provided by the tests which use this.
-	prove []svcTestProof
-}
-
-type svcTestProof func(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service)
-
-func callName(before, after *api.Service) string {
-	if before == nil && after != nil {
-		return "create"
-	}
-	if before != nil && after != nil {
-		return "update"
-	}
-	if before != nil && after == nil {
-		return "delete"
-	}
-	panic("this test is broken: before and after are both nil")
-}
-
-func proveClusterIPsAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
-		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
-	}
-
-	clips := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		clips = after.Spec.ClusterIPs
-	} else {
-		clips = append(clips, after.Spec.ClusterIP)
-	}
-	for _, clip := range clips {
-		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
-			t.Errorf("%s: expected clusterIP to be allocated: %q", callName(before, after), clip)
-		}
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		if lc, lf := len(after.Spec.ClusterIPs), len(after.Spec.IPFamilies); lc != lf {
-			t.Errorf("%s: expected same number of clusterIPs and ipFamilies: %d != %d", callName(before, after), lc, lf)
-		}
-	}
-
-	for i, fam := range after.Spec.IPFamilies {
-		if want, got := fam, familyOf(after.Spec.ClusterIPs[i]); want != got {
-			t.Errorf("%s: clusterIP is the wrong IP family: want %s, got %s", callName(before, after), want, got)
-		}
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		if after.Spec.IPFamilyPolicy == nil {
-			t.Errorf("%s: expected ipFamilyPolicy to be set", callName(before, after))
-		} else {
-			pol := *after.Spec.IPFamilyPolicy
-			fams := len(after.Spec.IPFamilies)
-			clus := 1
-			if storage.secondaryIPFamily != "" {
-				clus = 2
-			}
-			if pol == api.IPFamilyPolicySingleStack && fams != 1 {
-				t.Errorf("%s: expected 1 ipFamily, got %d", callName(before, after), fams)
-			} else if pol == api.IPFamilyPolicyRequireDualStack && fams != 2 {
-				t.Errorf("%s: expected 2 ipFamilies, got %d", callName(before, after), fams)
-			} else if pol == api.IPFamilyPolicyPreferDualStack && fams != clus {
-				t.Errorf("%s: expected %d ipFamilies, got %d", callName(before, after), clus, fams)
-			}
-		}
-	}
-
-	if before != nil {
-		if before.Spec.ClusterIP != "" {
-			if want, got := before.Spec.ClusterIP, after.Spec.ClusterIP; want != got {
-				t.Errorf("%s: wrong clusterIP: wanted %q, got %q", callName(before, after), want, got)
-			}
-		}
-		min := func(x, y int) int {
-			if x < y {
-				return x
-			}
-			return y
-		}
-		for i := 0; i < min(len(before.Spec.ClusterIPs), len(after.Spec.ClusterIPs)); i++ {
-			if want, got := before.Spec.ClusterIPs[i], after.Spec.ClusterIPs[i]; want != got {
-				t.Errorf("%s: wrong clusterIPs[%d]: wanted %q, got %q", callName(before, after), i, want, got)
-			}
-		}
-		for i := 0; i < min(len(before.Spec.IPFamilies), len(after.Spec.IPFamilies)); i++ {
-			if want, got := before.Spec.IPFamilies[i], after.Spec.IPFamilies[i]; want != got {
-				t.Errorf("%s: wrong ipFamilies[%d]: wanted %q, got %q", callName(before, after), i, want, got)
-			}
-		}
-	}
-}
-
-func proveClusterIPsDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if after != nil && after.Spec.ClusterIP != api.ClusterIPNone {
-		if after.Spec.ClusterIP != "" {
-			t.Errorf("%s: expected clusterIP to be unset: %q", callName(before, after), after.Spec.ClusterIP)
-		}
-		if len(after.Spec.ClusterIPs) != 0 {
-			t.Errorf("%s: expected clusterIPs to be unset: %q", callName(before, after), after.Spec.ClusterIPs)
-		}
-	}
-
-	if before != nil && before.Spec.ClusterIP != api.ClusterIPNone {
-		clips := []string{}
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			clips = before.Spec.ClusterIPs
-		} else {
-			clips = append(clips, before.Spec.ClusterIP)
-		}
-		for _, clip := range clips {
-			if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[familyOf(clip)], clip) {
-				t.Errorf("%s: expected clusterIP to be deallocated: %q", callName(before, after), clip)
-			}
-		}
-	}
-}
-
-func proveHeadless(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if sing, plur := after.Spec.ClusterIP, after.Spec.ClusterIPs[0]; sing != plur {
-		t.Errorf("%s: expected clusterIP == clusterIPs[0]: %q != %q", callName(before, after), sing, plur)
-	}
-	if len(after.Spec.ClusterIPs) != 1 || after.Spec.ClusterIPs[0] != api.ClusterIPNone {
-		t.Errorf("%s: expected clusterIPs to be [%q]: %q", callName(before, after), api.ClusterIPNone, after.Spec.ClusterIPs)
-	}
-}
-
-func proveNodePortsAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	for _, p := range after.Spec.Ports {
-		if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
-			t.Errorf("%s: expected nodePort to be allocated: %d", callName(before, after), p.NodePort)
-		}
-	}
-}
-
-func proveNodePortsDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if after != nil {
-		for _, p := range after.Spec.Ports {
-			if p.NodePort != 0 {
-				t.Errorf("%s: expected nodePort to be unset: %d", callName(before, after), p.NodePort)
-			}
-		}
-	}
-
-	if before != nil {
-		for _, p := range before.Spec.Ports {
-			if p.NodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
-				t.Errorf("%s: expected nodePort to be deallocated: %d", callName(before, after), p.NodePort)
-			}
-		}
-	}
-}
-
-func proveHealthCheckNodePortAllocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if !portIsAllocated(t, storage.alloc.serviceNodePorts, after.Spec.HealthCheckNodePort) {
-		t.Errorf("%s: expected healthCheckNodePort to be allocated: %d", callName(before, after), after.Spec.HealthCheckNodePort)
-	}
-}
-
-func proveHealthCheckNodePortDeallocated(t *testing.T, storage *wrapperRESTForTests, before, after *api.Service) {
-	t.Helper()
-
-	if after != nil {
-		if after.Spec.HealthCheckNodePort != 0 {
-			t.Errorf("%s: expected healthCheckNodePort to be unset: %d", callName(before, after), after.Spec.HealthCheckNodePort)
-		}
-	}
-
-	if before != nil {
-		if before.Spec.HealthCheckNodePort != 0 && portIsAllocated(t, storage.alloc.serviceNodePorts, before.Spec.HealthCheckNodePort) {
-			t.Errorf("%s: expected healthCheckNodePort to be deallocated: %d", callName(before, after), before.Spec.HealthCheckNodePort)
-		}
-	}
-}
-
-type cudTestCase struct {
-	name         string
-	line         string // if not empty, will be logged with errors, use line() to set
-	create       svcTestCase
-	beforeUpdate func(t *testing.T, storage *wrapperRESTForTests)
-	update       svcTestCase
-}
-
-func helpTestCreateUpdateDelete(t *testing.T, testCases []cudTestCase) {
-	t.Helper()
-	helpTestCreateUpdateDeleteWithFamilies(t, testCases, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-}
-
-func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCase, ipFamilies []api.IPFamily) {
-	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
-	// attributed to lines in this function than the caller of it.
-
-	// This test is ONLY with the gate enabled.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
-	storage, _, server := newStorage(t, ipFamilies)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-
-	for _, tc := range testCases {
-		name := tc.name
-		if tc.line != "" {
-			name += "__@L" + tc.line
-		}
-		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.NewDefaultContext()
-
-			// Create the object as specified and check the results.
-			obj, err := storage.Create(ctx, tc.create.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-			if tc.create.expectError && err != nil {
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error creating service: %v", err)
-			}
-			defer storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{}) // in case
-			if tc.create.expectError && err == nil {
-				t.Fatalf("unexpected success creating service")
-			}
-			createdSvc := obj.(*api.Service)
-			if !verifyEquiv(t, "create", &tc.create, createdSvc) {
-				return
-			}
-			verifyExpectations(t, storage, tc.create, tc.create.svc, createdSvc)
-			lastSvc := createdSvc
-
-			// The update phase is optional.
-			if tc.update.svc != nil {
-				// Allow callers to do something between create and update.
-				if tc.beforeUpdate != nil {
-					tc.beforeUpdate(t, storage)
-				}
-
-				// Update the object to the new state and check the results.
-				obj, created, err := storage.Update(ctx, tc.update.svc.Name,
-					rest.DefaultUpdatedObjectInfo(tc.update.svc), rest.ValidateAllObjectFunc,
-					rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-				if tc.update.expectError && err != nil {
-					return
-				}
-				if err != nil {
-					t.Fatalf("unexpected error updating service: %v", err)
-				}
-				if tc.update.expectError && err == nil {
-					t.Fatalf("unexpected success updating service")
-				}
-				if created {
-					t.Fatalf("unexpected create-on-update")
-				}
-				updatedSvc := obj.(*api.Service)
-				if !verifyEquiv(t, "update", &tc.update, updatedSvc) {
-					return
-				}
-				verifyExpectations(t, storage, tc.update, createdSvc, updatedSvc)
-				lastSvc = updatedSvc
-			}
-
-			// Delete the object and check the results.
-			_, _, err = storage.Delete(ctx, tc.create.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-			if err != nil {
-				t.Fatalf("unexpected error deleting service: %v", err)
-			}
-			verifyExpectations(t, storage, svcTestCase{ /* all false */ }, lastSvc, nil)
-		})
-	}
-}
-
-type testingTInterface interface {
-	Helper()
-	Errorf(format string, args ...interface{})
-}
-
-type fakeTestingT struct {
-	t *testing.T
-}
-
-func (f fakeTestingT) Helper() {}
-
-func (f fakeTestingT) Errorf(format string, args ...interface{}) {
-	f.t.Logf(format, args...)
-}
-
-func verifyEquiv(t testingTInterface, call string, tc *svcTestCase, got *api.Service) bool {
-	t.Helper()
-
-	// For when we compare objects.
-	options := []cmp.Option{
-		// These are system-assigned values, we don't need to compare them.
-		cmpopts.IgnoreFields(api.Service{}, "UID", "ResourceVersion", "CreationTimestamp"),
-		// Treat nil slices and empty slices as the same (e.g. clusterIPs).
-		cmpopts.EquateEmpty(),
-	}
-
-	// For allocated fields, we want to be able to compare cleanly whether the
-	// input specified values or not.
-	want := tc.svc.DeepCopy()
-	if tc.expectClusterIPs || tc.expectHeadless {
-		if want.Spec.ClusterIP == "" {
-			want.Spec.ClusterIP = got.Spec.ClusterIP
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			if want.Spec.IPFamilyPolicy == nil {
-				want.Spec.IPFamilyPolicy = got.Spec.IPFamilyPolicy
-			}
-			if tc.expectStackDowngrade && len(want.Spec.ClusterIPs) > len(got.Spec.ClusterIPs) {
-				want.Spec.ClusterIPs = want.Spec.ClusterIPs[0:1]
-			} else if len(got.Spec.ClusterIPs) > len(want.Spec.ClusterIPs) {
-				want.Spec.ClusterIPs = append(want.Spec.ClusterIPs, got.Spec.ClusterIPs[len(want.Spec.ClusterIPs):]...)
-			}
-			if tc.expectStackDowngrade && len(want.Spec.IPFamilies) > len(got.Spec.ClusterIPs) {
-				want.Spec.IPFamilies = want.Spec.IPFamilies[0:1]
-			} else if len(got.Spec.IPFamilies) > len(want.Spec.IPFamilies) {
-				want.Spec.IPFamilies = append(want.Spec.IPFamilies, got.Spec.IPFamilies[len(want.Spec.IPFamilies):]...)
-			}
-		}
-	}
-
-	if tc.expectNodePorts {
-		for i := range want.Spec.Ports {
-			p := &want.Spec.Ports[i]
-			if p.NodePort == 0 {
-				p.NodePort = got.Spec.Ports[i].NodePort
-			}
-		}
-	}
-	if tc.expectHealthCheckNodePort {
-		if want.Spec.HealthCheckNodePort == 0 {
-			want.Spec.HealthCheckNodePort = got.Spec.HealthCheckNodePort
-		}
-	}
-
-	if !cmp.Equal(want, got, options...) {
-		t.Errorf("unexpected result from %s:\n%s", call, cmp.Diff(want, got, options...))
-		return false
-	}
-	return true
-}
-
-// Quis custodiet ipsos custodes?
-func TestVerifyEquiv(t *testing.T) {
-	testCases := []struct {
-		name   string
-		input  svcTestCase
-		output *api.Service
-		expect bool
-	}{{
-		name: "ExternalName",
-		input: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeExternalName),
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeExternalName),
-		expect: true,
-	}, {
-		name: "ClusterIPs_unspecified",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP),
-			expectClusterIPs: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
-		expect: true,
-	}, {
-		name: "ClusterIPs_specified",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
-			expectClusterIPs: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
-		expect: true,
-	}, {
-		name: "ClusterIPs_wrong",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.0", "2000:0")),
-			expectClusterIPs: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
-		expect: false,
-	}, {
-		name: "ClusterIPs_partial",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1")),
-			expectClusterIPs: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeClusterIP, svctest.SetClusterIPs("10.0.0.1", "2000:1")),
-		expect: true,
-	}, {
-		name: "NodePort_unspecified",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort),
-			expectClusterIPs: true,
-			expectNodePorts:  true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetUniqueNodePorts),
-		expect: true,
-	}, {
-		name: "NodePort_specified",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
-			expectClusterIPs: true,
-			expectNodePorts:  true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
-		expect: true,
-	}, {
-		name: "NodePort_wrong",
-		input: svcTestCase{
-			svc:              svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(93)),
-			expectClusterIPs: true,
-			expectNodePorts:  true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeNodePort, svctest.SetNodePorts(76)),
-		expect: false,
-	}, {
-		name: "NodePort_partial",
-		input: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
-				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
-				svctest.SetNodePorts(93)),
-			expectClusterIPs: true,
-			expectNodePorts:  true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeNodePort,
-			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
-			svctest.SetNodePorts(93, 76)),
-		expect: true,
-	}, {
-		name: "HealthCheckNodePort_unspecified",
-		input: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
-			expectClusterIPs:          true,
-			expectNodePorts:           true,
-			expectHealthCheckNodePort: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
-			svctest.SetHealthCheckNodePort(93)),
-		expect: true,
-	}, {
-		name: "HealthCheckNodePort_specified",
-		input: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
-				svctest.SetHealthCheckNodePort(93)),
-			expectClusterIPs:          true,
-			expectNodePorts:           true,
-			expectHealthCheckNodePort: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
-			svctest.SetHealthCheckNodePort(93)),
-		expect: true,
-	}, {
-		name: "HealthCheckNodePort_wrong",
-		input: svcTestCase{
-			svc: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
-				svctest.SetHealthCheckNodePort(93)),
-			expectClusterIPs:          true,
-			expectNodePorts:           true,
-			expectHealthCheckNodePort: true,
-		},
-		output: svctest.MakeService("foo", svctest.SetTypeLoadBalancer,
-			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
-			svctest.SetHealthCheckNodePort(76)),
-		expect: false,
-	}}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := verifyEquiv(fakeTestingT{t}, "test", &tc.input, tc.output)
-			if result != tc.expect {
-				t.Errorf("expected %v, got %v", tc.expect, result)
-			}
-		})
-	}
-}
-
-func verifyExpectations(t *testing.T, storage *wrapperRESTForTests, tc svcTestCase, before, after *api.Service) {
-	t.Helper()
-
-	if tc.expectClusterIPs {
-		proveClusterIPsAllocated(t, storage, before, after)
-	} else if tc.expectHeadless {
-		proveHeadless(t, storage, before, after)
-	} else {
-		proveClusterIPsDeallocated(t, storage, before, after)
-	}
-	if tc.expectNodePorts {
-		proveNodePortsAllocated(t, storage, before, after)
-	} else {
-		proveNodePortsDeallocated(t, storage, before, after)
-	}
-	if tc.expectHealthCheckNodePort {
-		proveHealthCheckNodePortAllocated(t, storage, before, after)
-	} else {
-		proveHealthCheckNodePortDeallocated(t, storage, before, after)
-	}
-
-	for _, p := range tc.prove {
-		p(t, storage, before, after)
-	}
 }
 
 func TestFeatureExternalName(t *testing.T) {
