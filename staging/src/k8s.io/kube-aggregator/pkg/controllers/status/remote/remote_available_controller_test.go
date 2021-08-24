@@ -128,6 +128,9 @@ func setupAPIServices(t T, apiServices []runtime.Object) (*AvailableConditionCon
 		}
 	}
 
+	alwaysReadyChan := make(chan struct{})
+	close(alwaysReadyChan)
+
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1(),
 		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
@@ -141,7 +144,8 @@ func setupAPIServices(t T, apiServices []runtime.Object) (*AvailableConditionCon
 			workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 30*time.Second),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "AvailableConditionController"},
 		),
-		metrics: availabilitymetrics.New(),
+		metrics:      availabilitymetrics.New(),
+		hasBeenReady: alwaysReadyChan,
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -401,6 +405,8 @@ func TestSync(t *testing.T) {
 				w.WriteHeader(tc.backendStatus)
 			}))
 			defer testServer.Close()
+			alwaysReadyChan := make(chan struct{})
+			close(alwaysReadyChan)
 
 			c := AvailableConditionController{
 				apiServiceClient:           fakeClient.ApiregistrationV1(),
@@ -410,6 +416,7 @@ func TestSync(t *testing.T) {
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 				metrics:                    availabilitymetrics.New(),
+				hasBeenReady:               alwaysReadyChan,
 			}
 			err := c.sync(tc.apiServiceName)
 			if tc.expectedSyncError != "" {
