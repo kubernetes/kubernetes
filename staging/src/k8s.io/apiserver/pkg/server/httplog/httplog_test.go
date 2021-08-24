@@ -63,9 +63,11 @@ func TestWithLogging(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
+	shouldLogRequest := func() bool { return true }
 	var handler http.Handler
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	handler = WithLogging(WithLogging(handler, DefaultStacktracePred), DefaultStacktracePred)
+	handler = withLogging(withLogging(handler, DefaultStacktracePred, shouldLogRequest), DefaultStacktracePred, shouldLogRequest)
 
 	func() {
 		defer func() {
@@ -79,29 +81,40 @@ func TestWithLogging(t *testing.T) {
 }
 
 func TestLogOf(t *testing.T) {
-	logOfTests := []bool{true, false}
-	for _, makeLogger := range logOfTests {
-		req, err := http.NewRequest("GET", "http://example.com", nil)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		var want string
-		var handler http.Handler
-		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			got := reflect.TypeOf(LogOf(r, w)).String()
-			if want != got {
-				t.Errorf("Expected %v, got %v", want, got)
-			}
-		})
-		if makeLogger {
-			handler = WithLogging(handler, DefaultStacktracePred)
-			want = "*httplog.respLogger"
-		} else {
-			want = "*httplog.passthroughLogger"
-		}
+	tests := []struct {
+		name             string
+		shouldLogRequest bool
+		want             string
+	}{
+		{
+			name:             "request is being logged",
+			shouldLogRequest: true,
+			want:             "*httplog.respLogger",
+		},
+		{
+			name:             "request is not being logged",
+			shouldLogRequest: false,
+			want:             "*httplog.passthroughLogger",
+		},
+	}
 
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", "http://example.com", nil)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			var handler http.Handler
+			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got := reflect.TypeOf(LogOf(r, w)).String()
+				if test.want != got {
+					t.Errorf("Expected %v, got %v", test.want, got)
+				}
+			})
+			handler = withLogging(handler, DefaultStacktracePred, func() bool { return test.shouldLogRequest })
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+		})
 	}
 }
 
@@ -136,7 +149,7 @@ func TestLoggedStatus(t *testing.T) {
 	}
 
 	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
-	logger, _ := newLogged(req, tw)
+	logger := newLogged(req, tw)
 	logger.Write(nil)
 
 	if logger.status != http.StatusOK {
@@ -144,7 +157,7 @@ func TestLoggedStatus(t *testing.T) {
 	}
 
 	tw = new(responsewriter.FakeResponseWriter)
-	logger, _ = newLogged(req, tw)
+	logger = newLogged(req, tw)
 	logger.WriteHeader(http.StatusForbidden)
 	logger.Write(nil)
 
@@ -154,46 +167,58 @@ func TestLoggedStatus(t *testing.T) {
 }
 
 func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	tests := []struct {
+		name       string
+		r          func() http.ResponseWriter
+		hijackable bool
+	}{
+		{
+			name: "http2",
+			r: func() http.ResponseWriter {
+				return &responsewriter.FakeResponseWriterFlusherCloseNotifier{}
+			},
+			hijackable: false,
+		},
+		{
+			name: "http/1.x",
+			r: func() http.ResponseWriter {
+				return &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}
+			},
+			hijackable: true,
+		},
 	}
 
-	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
-	_, rwGot := newLogged(req, tw)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", "http://example.com", nil)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
 
-	switch v := rwGot.(type) {
-	case *respLogger:
-	default:
-		t.Errorf("Expected respLogger, got %v", reflect.TypeOf(v))
-	}
+			var handler http.Handler
+			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch v := w.(type) {
+				case *respLogger:
+					t.Errorf("Did not expect %v", reflect.TypeOf(v))
+					return
+				default:
+				}
 
-	tw = new(responsewriter.FakeResponseWriterFlusherCloseNotifier)
-	_, rwGot = newLogged(req, tw)
+				//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
+				if _, ok := w.(http.CloseNotifier); !ok {
+					t.Errorf("Expected the ResponseWriter object to implement http.CloseNotifier")
+				}
+				if _, ok := w.(http.Flusher); !ok {
+					t.Errorf("Expected the ResponseWriter object to implement http.Flusher")
+				}
+				if _, ok := w.(http.Hijacker); test.hijackable != ok {
+					t.Errorf("http.Hijacker does not match, want: %t, got: %t", test.hijackable, ok)
+				}
+			})
 
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := rwGot.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
-	}
-	if _, ok := rwGot.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
-	}
-	if _, ok := rwGot.(http.Hijacker); ok {
-		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
-	}
-
-	tw = new(responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker)
-	_, rwGot = newLogged(req, tw)
-
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := rwGot.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
-	}
-	if _, ok := rwGot.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
-	}
-	if _, ok := rwGot.(http.Hijacker); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.Hijacker")
+			handler = withLogging(handler, DefaultStacktracePred, func() bool { return true })
+			handler.ServeHTTP(test.r(), req)
+		})
 	}
 }
 
