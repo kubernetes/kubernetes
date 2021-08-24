@@ -453,6 +453,126 @@ func TestNormalizeClusterIPs(t *testing.T) {
 	}
 }
 
+func TestPatchAllocatedValues(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		before                  *api.Service
+		update                  *api.Service
+		expectSameClusterIPs    bool
+		expectReducedClusterIPs bool
+		expectSameNodePort      bool
+		expectSameHCNP          bool
+	}{{
+		name: "all_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+		expectSameClusterIPs: true,
+		expectSameNodePort:   true,
+		expectSameHCNP:       true,
+	}, {
+		name: "IPs_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP,
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			// these are not valid, but prove the test
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeClusterIP),
+		expectSameClusterIPs: true,
+	}, {
+		name: "NPs_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			svctest.SetUniqueNodePorts,
+			// this is not valid, but proves the test
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeNodePort,
+			svctest.SetClusterIPs("10.0.0.93", "2000::76")),
+		expectSameClusterIPs: true,
+		expectSameNodePort:   true,
+	}, {
+		name: "HCNP_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			svctest.SetUniqueNodePorts),
+		expectSameClusterIPs: true,
+		expectSameNodePort:   true,
+		expectSameHCNP:       true,
+	}, {
+		name: "nothing_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			// these are not valid, but prove the test
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("10.0.0.93", "2000::76"),
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			update := tc.update.DeepCopy()
+			patchAllocatedValues(update, tc.before)
+
+			beforeIP := tc.before.Spec.ClusterIP
+			updateIP := update.Spec.ClusterIP
+			if tc.expectSameClusterIPs || tc.expectReducedClusterIPs {
+				if beforeIP != updateIP {
+					t.Errorf("expected clusterIP to be patched: %q != %q", beforeIP, updateIP)
+				}
+			} else if beforeIP == updateIP {
+				t.Errorf("expected clusterIP to not be patched: %q == %q", beforeIP, updateIP)
+			}
+
+			beforeIPs := tc.before.Spec.ClusterIPs
+			updateIPs := update.Spec.ClusterIPs
+			if tc.expectSameClusterIPs {
+				if !cmp.Equal(beforeIPs, updateIPs) {
+					t.Errorf("expected clusterIPs to be patched: %q != %q", beforeIPs, updateIPs)
+				}
+			} else if tc.expectReducedClusterIPs {
+				if len(updateIPs) != 1 || beforeIPs[0] != updateIPs[0] {
+					t.Errorf("expected clusterIPs to be trim-patched: %q -> %q", beforeIPs, updateIPs)
+				}
+			} else if cmp.Equal(beforeIPs, updateIPs) {
+				t.Errorf("expected clusterIPs to not be patched: %q == %q", beforeIPs, updateIPs)
+			}
+			if b, u := tc.before.Spec.Ports[0].NodePort, update.Spec.Ports[0].NodePort; tc.expectSameNodePort && b != u {
+				t.Errorf("expected nodePort to be patched: %d != %d", b, u)
+			} else if !tc.expectSameNodePort && b == u {
+				t.Errorf("expected nodePort to not be patched: %d == %d", b, u)
+			}
+
+			if b, u := tc.before.Spec.HealthCheckNodePort, update.Spec.HealthCheckNodePort; tc.expectSameHCNP && b != u {
+				t.Errorf("expected healthCheckNodePort to be patched: %d != %d", b, u)
+			} else if !tc.expectSameHCNP && b == u {
+				t.Errorf("expected healthCheckNodePort to not be patched: %d == %d", b, u)
+			}
+		})
+	}
+}
+
 func TestServiceDefaultOnRead(t *testing.T) {
 	// Helper makes a mostly-valid ServiceList.  Test-cases can tweak it as needed.
 	makeServiceList := func(tweaks ...svctest.Tweak) *api.ServiceList {
