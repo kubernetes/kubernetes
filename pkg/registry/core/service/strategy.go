@@ -109,8 +109,6 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	//FIXME: Normalize is now called from BeginCreate in pkg/registry/core/service/storage
-	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
 }
 
@@ -120,8 +118,6 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	//FIXME: Normalize is now called from BeginUpdate in pkg/registry/core/service/storage
-	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
 }
@@ -357,70 +353,6 @@ func PatchAllocatedValues(newSvc, oldSvc *api.Service) {
 	if needsHCNodePort(oldSvc) && needsHCNodePort(newSvc) {
 		if newSvc.Spec.HealthCheckNodePort == 0 {
 			newSvc.Spec.HealthCheckNodePort = oldSvc.Spec.HealthCheckNodePort
-		}
-	}
-}
-
-// NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
-// consider any other fields.
-//FIXME: move this to pkg/registry/core/service/storage
-func NormalizeClusterIPs(oldSvc, newSvc *api.Service) {
-	// In all cases here, we don't need to over-think the inputs.  Validation
-	// will be called on the new object soon enough.  All this needs to do is
-	// try to divine what user meant with these linked fields. The below
-	// is verbosely written for clarity.
-
-	// **** IMPORTANT *****
-	// as a governing rule. User must (either)
-	// -- Use singular only (old client)
-	// -- singular and plural fields (new clients)
-
-	if oldSvc == nil {
-		// This was a create operation.
-		// User specified singular and not plural (e.g. an old client), so init
-		// plural for them.
-		if len(newSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
-			newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
-			return
-		}
-
-		// we don't init singular based on plural because
-		// new client must use both fields
-
-		// Either both were not specified (will be allocated) or both were
-		// specified (will be validated).
-		return
-	}
-
-	// This was an update operation
-
-	// ClusterIPs were cleared by an old client which was trying to patch
-	// some field and didn't provide ClusterIPs
-	if len(oldSvc.Spec.ClusterIPs) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
-		// if ClusterIP is the same, then it is an old client trying to
-		// patch service and didn't provide ClusterIPs
-		if oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP {
-			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
-		}
-	}
-
-	// clusterIP is not the same
-	if oldSvc.Spec.ClusterIP != newSvc.Spec.ClusterIP {
-		// this is a client trying to clear it
-		if len(oldSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIP) == 0 {
-			// if clusterIPs are the same, then clear on their behalf
-			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
-				newSvc.Spec.ClusterIPs = nil
-			}
-
-			// if they provided nil, then we are fine (handled by patching case above)
-			// if they changed it then validation will catch it
-		} else {
-			// ClusterIP has changed but not cleared *and* ClusterIPs are the same
-			// then we set ClusterIPs based on ClusterIP
-			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
-				newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
-			}
 		}
 	}
 }

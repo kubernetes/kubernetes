@@ -222,7 +222,7 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	// We might find Services that were written before ClusterIP became plural.
 	// We still want to present a consistent view of them.
 	// NOTE: the args are (old, new)
-	svcreg.NormalizeClusterIPs(nil, service)
+	normalizeClusterIPs(nil, service)
 
 	// The rest of this does not apply unless dual-stack is enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
@@ -324,7 +324,7 @@ func (r *GenericREST) beginCreate(ctx context.Context, obj runtime.Object, optio
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
 	// NOTE: the args are (old, new)
-	svcreg.NormalizeClusterIPs(nil, svc)
+	normalizeClusterIPs(nil, svc)
 
 	// Allocate IPs and ports. If we had a transactional store, this would just
 	// be part of the larger transaction.  We don't have that, so we have to do
@@ -359,7 +359,7 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
 	// NOTE: the args are (old, new)
-	svcreg.NormalizeClusterIPs(oldSvc, newSvc)
+	normalizeClusterIPs(oldSvc, newSvc)
 
 	// Allocate and initialize fields.
 	txn, err := r.alloc.allocateUpdate(newSvc, oldSvc, dryrun.IsDryRun(options.DryRun))
@@ -450,4 +450,67 @@ func (r *GenericREST) ResourceLocation(ctx context.Context, id string) (*url.URL
 		}
 	}
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+}
+
+// normalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
+// consider any other fields.
+func normalizeClusterIPs(oldSvc, newSvc *api.Service) {
+	// In all cases here, we don't need to over-think the inputs.  Validation
+	// will be called on the new object soon enough.  All this needs to do is
+	// try to divine what user meant with these linked fields. The below
+	// is verbosely written for clarity.
+
+	// **** IMPORTANT *****
+	// as a governing rule. User must (either)
+	// -- Use singular only (old client)
+	// -- singular and plural fields (new clients)
+
+	if oldSvc == nil {
+		// This was a create operation.
+		// User specified singular and not plural (e.g. an old client), so init
+		// plural for them.
+		if len(newSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
+			newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
+			return
+		}
+
+		// we don't init singular based on plural because
+		// new client must use both fields
+
+		// Either both were not specified (will be allocated) or both were
+		// specified (will be validated).
+		return
+	}
+
+	// This was an update operation
+
+	// ClusterIPs were cleared by an old client which was trying to patch
+	// some field and didn't provide ClusterIPs
+	if len(oldSvc.Spec.ClusterIPs) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
+		// if ClusterIP is the same, then it is an old client trying to
+		// patch service and didn't provide ClusterIPs
+		if oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP {
+			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
+		}
+	}
+
+	// clusterIP is not the same
+	if oldSvc.Spec.ClusterIP != newSvc.Spec.ClusterIP {
+		// this is a client trying to clear it
+		if len(oldSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIP) == 0 {
+			// if clusterIPs are the same, then clear on their behalf
+			if sameClusterIPs(oldSvc, newSvc) {
+				newSvc.Spec.ClusterIPs = nil
+			}
+
+			// if they provided nil, then we are fine (handled by patching case above)
+			// if they changed it then validation will catch it
+		} else {
+			// ClusterIP has changed but not cleared *and* ClusterIPs are the same
+			// then we set ClusterIPs based on ClusterIP
+			if sameClusterIPs(oldSvc, newSvc) {
+				newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
+			}
+		}
+	}
 }
