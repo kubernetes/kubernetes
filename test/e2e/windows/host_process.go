@@ -19,6 +19,8 @@ package windows
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -27,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -154,10 +157,118 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 		}
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
+
+	ginkgo.It("should be able to access the api service with token", func() {
+		trueVar := true
+		podName := "host-process-api-server-test-pod"
+		containerName := "inclusterclient"
+		user := "NT AUTHORITY\\Local service"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &user,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Name:  containerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"inclusterclient --poll-interval 5"},
+						Command: []string{
+							"powershell",
+							"-c",
+							"start-process",
+							"-wait",
+							"-nonewwindow",
+							"$env:CONTAINER_SANDBOX_MOUNT_POINT\\agnhost",
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+		}
+
+		ginkgo.By("Waiting for pod to run")
+		f.PodClient().Create(pod)
+		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
+			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+		}
+
+		framework.Logf("pod is ready")
+
+		ginkgo.By("ensure the pod can connect to the API server using the internal ")
+		var logs string
+		if err := wait.Poll(5*time.Second, 1*time.Minute, func() (done bool, err error) {
+			framework.Logf("polling logs")
+			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+			if err != nil {
+				framework.Logf("Error pulling logs: %v", err)
+				return false, nil
+			}
+
+			tokenCount, err := ParseInClusterClientLogs(logs)
+			if err != nil {
+				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+			}
+			if tokenCount < 2 {
+				framework.Logf("Retrying. Still waiting to see more successful connections: got=%d, want=2", tokenCount)
+				return false, nil
+			}
+
+			return true, nil
+		}); err != nil {
+			framework.Failf("Unexpected error: %v\n%s", err, logs)
+		}
+	})
 })
 
 func SkipUnlessWindowsHostProcessContainersEnabled() {
 	if !framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] {
 		e2eskipper.Skipf("Skipping test because feature 'WindowsHostProcessContainers' is not enabled")
 	}
+}
+
+// modified from https://github.com/kubernetes/kubernetes/blob/ef754331c453d3b5fdc31edf62da3d90771d5acd/test/e2e/auth/service_accounts.go#L952
+// example output from agnhost incluster client:
+// 	calling /healthz
+// 	authz_header=uoD86lIghNoggHPaVaKcZgtOQVOD1RW7jojjpMULgr4
+var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
+
+func ParseInClusterClientLogs(logs string) (int, error) {
+	count := 0
+
+	lines := strings.Split(logs, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "err") {
+			return 0, fmt.Errorf("saw error in logs: %s", line)
+		}
+		parts := reportLogsParser.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+
+		key, value := parts[1], parts[2]
+		switch key {
+		case "authz_header":
+			if value == "<empty>" {
+				return 0, fmt.Errorf("saw empty Authorization header")
+			}
+			count++
+		case "status":
+			if value == "failed" {
+				return 0, fmt.Errorf("saw status=failed")
+			}
+		}
+	}
+
+	return count, nil
 }
