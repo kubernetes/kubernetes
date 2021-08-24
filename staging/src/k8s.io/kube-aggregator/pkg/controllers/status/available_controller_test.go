@@ -121,6 +121,8 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 	for _, o := range apiServices {
 		apiServiceIndexer.Add(o)
 	}
+	alwaysReadyChan := make(chan struct{})
+	close(alwaysReadyChan)
 
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1(),
@@ -134,8 +136,9 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-		tlsCache: &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
-		metrics:  newAvailabilityMetrics(),
+		tlsCache:     &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
+		metrics:      newAvailabilityMetrics(),
+		hasBeenReady: alwaysReadyChan,
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -400,6 +403,8 @@ func TestSync(t *testing.T) {
 				w.WriteHeader(http.StatusForbidden)
 			}))
 			defer testServer.Close()
+			alwaysReadyChan := make(chan struct{})
+			close(alwaysReadyChan)
 
 			c := AvailableConditionController{
 				apiServiceClient:           fakeClient.ApiregistrationV1(),
@@ -410,6 +415,7 @@ func TestSync(t *testing.T) {
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 				tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
 				metrics:                    newAvailabilityMetrics(),
+				hasBeenReady:               alwaysReadyChan,
 			}
 			c.sync(tc.apiServiceName)
 
