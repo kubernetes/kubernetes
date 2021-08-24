@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -354,7 +355,7 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 
 	// Fix up allocated values that the client may have not specified (for
 	// idempotence).
-	svcreg.PatchAllocatedValues(newSvc, oldSvc)
+	patchAllocatedValues(newSvc, oldSvc)
 
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
@@ -513,4 +514,86 @@ func normalizeClusterIPs(oldSvc, newSvc *api.Service) {
 			}
 		}
 	}
+}
+
+// patchAllocatedValues allows clients to avoid a read-modify-write cycle while
+// preserving values that we allocated on their behalf.  For example, they
+// might create a Service without specifying the ClusterIP, in which case we
+// allocate one.  If they resubmit that same YAML, we want it to succeed.
+func patchAllocatedValues(newSvc, oldSvc *api.Service) {
+	if needsClusterIP(oldSvc) && needsClusterIP(newSvc) {
+		if newSvc.Spec.ClusterIP == "" {
+			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
+		}
+		if len(newSvc.Spec.ClusterIPs) == 0 && len(oldSvc.Spec.ClusterIPs) > 0 {
+			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
+		}
+	}
+
+	if needsNodePort(oldSvc) && needsNodePort(newSvc) {
+		nodePortsUsed := func(svc *api.Service) sets.Int32 {
+			used := sets.NewInt32()
+			for _, p := range svc.Spec.Ports {
+				if p.NodePort != 0 {
+					used.Insert(p.NodePort)
+				}
+			}
+			return used
+		}
+
+		// Build a set of all the ports in oldSvc that are also in newSvc.  We know
+		// we can't patch these values.
+		used := nodePortsUsed(oldSvc).Intersection(nodePortsUsed(newSvc))
+
+		// Map NodePorts by name.  The user may have changed other properties
+		// of the port, but we won't see that here.
+		np := map[string]int32{}
+		for i := range oldSvc.Spec.Ports {
+			p := &oldSvc.Spec.Ports[i]
+			np[p.Name] = p.NodePort
+		}
+
+		// If newSvc is missing values, try to patch them in when we know them and
+		// they haven't been used for another port.
+
+		for i := range newSvc.Spec.Ports {
+			p := &newSvc.Spec.Ports[i]
+			if p.NodePort == 0 {
+				oldVal := np[p.Name]
+				if !used.Has(oldVal) {
+					p.NodePort = oldVal
+				}
+			}
+		}
+	}
+
+	if needsHCNodePort(oldSvc) && needsHCNodePort(newSvc) {
+		if newSvc.Spec.HealthCheckNodePort == 0 {
+			newSvc.Spec.HealthCheckNodePort = oldSvc.Spec.HealthCheckNodePort
+		}
+	}
+}
+
+func needsClusterIP(svc *api.Service) bool {
+	if svc.Spec.Type == api.ServiceTypeExternalName {
+		return false
+	}
+	return true
+}
+
+func needsNodePort(svc *api.Service) bool {
+	if svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer {
+		return true
+	}
+	return false
+}
+
+func needsHCNodePort(svc *api.Service) bool {
+	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
+		return false
+	}
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+		return false
+	}
+	return true
 }
