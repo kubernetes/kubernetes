@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -101,8 +101,6 @@ type SchedulingQueue interface {
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
-	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
-	NumUnschedulablePods() int
 	// Run starts the goroutines managing the queue.
 	Run()
 }
@@ -719,13 +717,6 @@ func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface
 	bo1 := p.getBackoffTime(pInfo1)
 	bo2 := p.getBackoffTime(pInfo2)
 	return bo1.Before(bo2)
-}
-
-// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
-func (p *PriorityQueue) NumUnschedulablePods() int {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	return len(p.unschedulableQ.podInfoMap)
 }
 
 // newQueuedPodInfo builds a QueuedPodInfo object.
