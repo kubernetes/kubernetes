@@ -78,7 +78,7 @@ func TestTLSConnection(t *testing.T) {
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(cfg, nil)
+	storage, destroyFunc, err := newETCD3Storage(cfg, "/pods", nil)
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)

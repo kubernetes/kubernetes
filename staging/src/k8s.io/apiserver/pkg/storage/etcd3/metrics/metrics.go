@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -88,47 +89,47 @@ var (
 	listEtcd3Queries = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_etcd3_queries",
-			Help:           "Number of etcd range queries used to satisfy a LIST request, split by path_prefix",
+			Help:           "Number of etcd range queries used to satisfy a LIST request, split by resource_prefix",
 			Buckets:        []float64{1, 2, 4, 8, 16},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix"},
+		[]string{"resource_prefix"},
 	)
 	listEtcd3SansVersion = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_etcd3_sans_version",
-			Help:           "Number of etcd range queries without specified ResourceVersion used to satisfy a LIST request, split by path_prefix",
-			Buckets:        []float64{0, 1},
+			Help:           "Number of etcd range queries without specified ResourceVersion used to satisfy a LIST request, split by resource_prefix",
+			Buckets:        []float64{0},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix"},
+		[]string{"path_presource_prefixrefix"},
 	)
 	listEtcd3NumFetched = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_etcd3_num_fetched",
-			Help:           "Number of objects read from etcd in the course of serving a LIST request, split by path_prefix",
+			Help:           "Number of objects read from etcd in the course of serving a LIST request, split by resource_prefix",
 			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix"},
+		[]string{"resource_prefix"},
 	)
 	listEtcd3NumSelectorEvals = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_etcd3_num_selector_evals",
-			Help:           "Number of label or field selector evaluations in the course of serving a LIST request from etcd, split by path_prefix",
+			Help:           "Number of objects tested in the course of serving a LIST request from etcd, split by resource_prefix and predicate complexity",
 			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix"},
+		[]string{"resource_prefix", "predicate_complexity"},
 	)
 	listEtcd3NumReturned = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_etcd3_num_returned",
-			Help:           "Number of objects returned for a LIST request from etcd, split by path_prefix",
+			Help:           "Number of objects returned for a LIST request from etcd, split by resource_prefix",
 			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix"},
+		[]string{"resource_prefix"},
 	)
 )
 
@@ -191,10 +192,10 @@ func UpdateLeaseObjectCount(count int64) {
 }
 
 // RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
-func RecordListEtcd3Metrics(pathPrefix string, numQueries, numSansVersion, numFetched, numSelectorEvals, numReturned int) {
-	listEtcd3Queries.WithLabelValues(pathPrefix).Observe(float64(numQueries))
-	listEtcd3SansVersion.WithLabelValues(pathPrefix).Observe(float64(numSansVersion))
-	listEtcd3NumFetched.WithLabelValues(pathPrefix).Observe(float64(numFetched))
-	listEtcd3NumSelectorEvals.WithLabelValues(pathPrefix).Observe(float64(numSelectorEvals))
-	listEtcd3NumReturned.WithLabelValues(pathPrefix).Observe(float64(numReturned))
+func RecordListEtcd3Metrics(resourcePrefix string, numQueries, numSansVersion, numFetched, predicateComplexity, numEvald, numReturned int) {
+	listEtcd3Queries.WithLabelValues(resourcePrefix).Observe(float64(numQueries))
+	listEtcd3SansVersion.WithLabelValues(resourcePrefix).Observe(float64(numSansVersion))
+	listEtcd3NumFetched.WithLabelValues(resourcePrefix).Observe(float64(numFetched))
+	listEtcd3NumSelectorEvals.WithLabelValues(resourcePrefix, strconv.FormatInt(int64(predicateComplexity), 10)).Observe(float64(numEvald))
+	listEtcd3NumReturned.WithLabelValues(resourcePrefix).Observe(float64(numReturned))
 }

@@ -115,11 +115,9 @@ func componentStatusPredicate(options *metainternalversion.ListOptions) storage.
 func matchesPredicate(status api.ComponentStatus, pred *storage.SelectionPredicate) bool {
 	// currently no fields except the generic meta fields are supported for predicate matching
 	fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &status.ObjectMeta, true)
-	var numSelectorEvals int
 	return pred.MatchesObjectAttributes(
 		status.ObjectMeta.Labels,
 		fieldsSet,
-		&numSelectorEvals,
 	)
 }
 

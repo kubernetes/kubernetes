@@ -312,8 +312,7 @@ func (wc *watchChan) filter(obj runtime.Object) bool {
 	if wc.internalPred.Empty() {
 		return true
 	}
-	var selectorEvalCount int
-	matched, err := wc.internalPred.Matches(obj, &selectorEvalCount)
+	matched, err := wc.internalPred.Matches(obj)
 	return err == nil && matched
 }
 

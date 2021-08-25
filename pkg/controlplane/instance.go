@@ -249,11 +249,12 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
-	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
+	ipInfoResource := api.Resource("apiServerIPInfo")
+	config, err := c.ExtraConfig.StorageFactory.NewConfig(ipInfoResource)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config, nil)
+	leaseStorage, _, err := storagefactory.Create(*config, c.ExtraConfig.StorageFactory.ResourcePrefix(ipInfoResource), nil)
 	if err != nil {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}

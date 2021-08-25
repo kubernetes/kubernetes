@@ -84,7 +84,7 @@ type SelectionPredicate struct {
 // Matches returns true if the given object's labels and fields (as
 // returned by s.GetAttrs) match s.Label and s.Field. An error is
 // returned if s.GetAttrs fails.
-func (s *SelectionPredicate) Matches(obj runtime.Object, selectorEvalCount *int) (bool, error) {
+func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	if s.Empty() {
 		return true, nil
 	}
@@ -92,10 +92,8 @@ func (s *SelectionPredicate) Matches(obj runtime.Object, selectorEvalCount *int)
 	if err != nil {
 		return false, err
 	}
-	(*selectorEvalCount)++
 	matched := s.Label.Matches(labels)
 	if matched && s.Field != nil {
-		(*selectorEvalCount)++
 		matched = s.Field.Matches(fields)
 	}
 	return matched, nil
@@ -103,14 +101,12 @@ func (s *SelectionPredicate) Matches(obj runtime.Object, selectorEvalCount *int)
 
 // MatchesObjectAttributes returns true if the given labels and fields
 // match s.Label and s.Field.
-func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set, selectorEvalCount *int) bool {
+func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set) bool {
 	if s.Label.Empty() && s.Field.Empty() {
 		return true
 	}
-	(*selectorEvalCount)++
 	matched := s.Label.Matches(l)
 	if matched && s.Field != nil {
-		(*selectorEvalCount)++
 		matched = s.Field.Matches(f)
 	}
 	return matched

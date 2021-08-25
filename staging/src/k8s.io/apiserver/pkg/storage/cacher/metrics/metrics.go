@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strconv"
 	"sync"
 
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -41,23 +42,23 @@ var (
 		},
 		[]string{"path_prefix", "index_used"},
 	)
-	listCacheNumSelectorEvals = compbasemetrics.NewHistogramVec(
+	listCacheNumEvals = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_cache_num_selector_evals",
-			Help:           "Number of label or field selector evaluations in the course of serving a LIST request from watch cache, split by path_prefix and index_used",
+			Help:           "Number of objects tested in the course of serving a LIST request from watch cache, split by path_prefix and predicate_complexity",
 			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix", "index_used"},
+		[]string{"path_prefix", "predicate_complexity"},
 	)
 	listCacheNumReturned = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_list_cache_num_returned",
-			Help:           "Number of objects returned for a LIST request from watch cache, split by path_prefix and index_used",
+			Help:           "Number of objects returned for a LIST request from watch cache, split by path_prefix",
 			Buckets:        []float64{40, 80, 160, 320, 640, 1280, 2560, 5120, 10240},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"path_prefix", "index_used"},
+		[]string{"path_prefix"},
 	)
 )
 
@@ -68,14 +69,14 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(listCacheNumFetched)
-		legacyregistry.MustRegister(listCacheNumSelectorEvals)
+		legacyregistry.MustRegister(listCacheNumEvals)
 		legacyregistry.MustRegister(listCacheNumReturned)
 	})
 }
 
 // RecordListCacheMetrics notes various metrics of the cost to serve a LIST request
-func RecordListCacheMetrics(pathPrefix, indexUsed string, numFetched, numSelectorEvals, numReturned int) {
+func RecordListCacheMetrics(pathPrefix, indexUsed string, numFetched, predicateComplexity, numEvals, numReturned int) {
 	listCacheNumFetched.WithLabelValues(pathPrefix, indexUsed).Observe(float64(numFetched))
-	listCacheNumSelectorEvals.WithLabelValues(pathPrefix, indexUsed).Observe(float64(numSelectorEvals))
-	listCacheNumReturned.WithLabelValues(pathPrefix, indexUsed).Observe(float64(numReturned))
+	listCacheNumEvals.WithLabelValues(pathPrefix, strconv.FormatInt(int64(predicateComplexity), 10)).Observe(float64(numEvals))
+	listCacheNumReturned.WithLabelValues(pathPrefix).Observe(float64(numReturned))
 }

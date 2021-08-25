@@ -495,12 +495,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
-	var numSelectorEvals int
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred, &numSelectorEvals), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -656,8 +655,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	var numSelectorEvals int
-	filter := filterWithAttrsFunction(key, pred, &numSelectorEvals)
+	filter := filterWithAttrsFunction(key, pred)
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 	if err != nil {
@@ -722,8 +720,8 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	var numSelectorEvals int
-	filter := filterWithAttrsFunction(key, pred, &numSelectorEvals)
+	var numEvals int
+	filter := filterWithAttrsFunction(key, pred)
 
 	objs, readResourceVersion, indexUsed, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
 	if err != nil {
@@ -741,6 +739,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
+		numEvals++
 		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
@@ -751,8 +750,19 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 			return err
 		}
 	}
-	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), numSelectorEvals, listVal.Len())
+	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), predicateComplexity(pred), numEvals, listVal.Len())
 	return nil
+}
+
+func predicateComplexity(pred storage.SelectionPredicate) int {
+	var complexity int
+	if !(pred.Label == nil || pred.Label.Empty()) {
+		complexity += 1
+	}
+	if !(pred.Field == nil || pred.Field.Empty()) {
+		complexity += 2
+	}
+	return complexity
 }
 
 // GuaranteedUpdate implements storage.Interface.
@@ -1088,12 +1098,12 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterWithAttrsFunction(key string, p storage.SelectionPredicate, numSelectorEvals *int) filterWithAttrsFunc {
+func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
 	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesObjectAttributes(label, field, numSelectorEvals)
+		return p.MatchesObjectAttributes(label, field)
 	}
 	return filterFunc
 }

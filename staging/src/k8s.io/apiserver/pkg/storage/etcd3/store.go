@@ -64,14 +64,15 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client        *clientv3.Client
-	codec         runtime.Codec
-	versioner     storage.Versioner
-	transformer   value.Transformer
-	pathPrefix    string
-	watcher       *watcher
-	pagingEnabled bool
-	leaseManager  *leaseManager
+	client         *clientv3.Client
+	codec          runtime.Codec
+	versioner      storage.Versioner
+	transformer    value.Transformer
+	pathPrefix     string
+	resourcePrefix string
+	watcher        *watcher
+	pagingEnabled  bool
+	leaseManager   *leaseManager
 }
 
 type objState struct {
@@ -83,11 +84,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix, resourcePrefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, prefix, resourcePrefix, transformer, pagingEnabled, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix, resourcePrefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -98,9 +99,10 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix:   path.Join("/", prefix),
-		watcher:      newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
+		pathPrefix:     path.Join("/", prefix),
+		resourcePrefix: resourcePrefix,
+		watcher:        newWatcher(c, codec, newFunc, versioner, transformer),
+		leaseManager:   newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -499,8 +501,7 @@ func (s *store) GetToList(ctx context.Context, key string, listOpts storage.List
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
-		var selectorEvalCount int
-		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc, &selectorEvalCount); err != nil {
+		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 			return err
 		}
 	}
@@ -730,10 +731,10 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	var getResp *clientv3.GetResponse
 	var numRangeQueries int
 	var numFetched int
-	var numSelectorEvals int
+	var numEvald int
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordListEtcd3Metrics(s.pathPrefix, numRangeQueries, numSansVersion, numFetched, numSelectorEvals, numReturn)
+		metrics.RecordListEtcd3Metrics(s.resourcePrefix, numRangeQueries, numSansVersion, numFetched, predicateComplexity(pred), numEvald, numReturn)
 	}()
 	for {
 		numRangeQueries += 1
@@ -774,9 +775,10 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc, &numSelectorEvals); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
+			numEvald++
 		}
 
 		// indicate to the client which resource version was returned
@@ -822,6 +824,17 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 
 	// no continuation
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+}
+
+func predicateComplexity(pred storage.SelectionPredicate) int {
+	var complexity int
+	if !(pred.Label == nil || pred.Label.Empty()) {
+		complexity += 1
+	}
+	if !(pred.Field == nil || pred.Field.Empty()) {
+		complexity += 2
+	}
+	return complexity
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -1001,7 +1014,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object, selectorEvalCount *int) error {
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
 		return err
@@ -1010,7 +1023,7 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 	if err := versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}
-	if matched, err := pred.Matches(obj, selectorEvalCount); err == nil && matched {
+	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
 	return nil
