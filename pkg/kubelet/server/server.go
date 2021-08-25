@@ -338,8 +338,7 @@ func (s *Server) InstallDefaultHandlers() {
 
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
-	ws.
-		Path("/pods").
+	ws.Path("/pods").
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getPods).
