@@ -231,7 +231,7 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, d
 	return txn, nil
 }
 
-func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
 	allocated := make(map[api.IPFamily]string)
 
 	for family, ip := range toAlloc {
@@ -290,7 +290,7 @@ func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service, dryRun boo
 	// get clusterIP.. empty string if user did not specify an ip
 	toAlloc[al.defaultServiceIPFamily] = service.Spec.ClusterIP
 	// alloc
-	allocated, err := al.allocClusterIPs(service, toAlloc, dryRun)
+	allocated, err := al.allocIPs(service, toAlloc, dryRun)
 
 	// set
 	if err == nil {
@@ -360,7 +360,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bo
 	}
 
 	// allocate
-	allocated, err := al.allocClusterIPs(service, toAlloc, dryRun)
+	allocated, err := al.allocIPs(service, toAlloc, dryRun)
 
 	// set if successful
 	if err == nil {
@@ -491,7 +491,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 		toAllocate[service.Spec.IPFamilies[1]] = service.Spec.ClusterIPs[1]
 
 		// allocate
-		allocated, err := al.allocClusterIPs(service, toAllocate, dryRun)
+		allocated, err := al.allocIPs(service, toAllocate, dryRun)
 		// set if successful
 		if err == nil {
 			service.Spec.ClusterIPs[1] = allocated[service.Spec.IPFamilies[1]]
