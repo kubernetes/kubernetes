@@ -453,6 +453,32 @@ func (r *GenericREST) ResourceLocation(ctx context.Context, id string) (*url.URL
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
+func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
+	if addr.TargetRef == nil {
+		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
+	}
+	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
+		return fmt.Errorf("Address namespace doesn't match context namespace")
+	}
+	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return fmt.Errorf("failed to cast to pod: %v", obj)
+	}
+	if pod == nil {
+		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
+	}
+	for _, podIP := range pod.Status.PodIPs {
+		if podIP.IP == addr.IP {
+			return nil
+		}
+	}
+	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.Status.PodIPs, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+}
+
 // normalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
 // consider any other fields.
 func normalizeClusterIPs(oldSvc, newSvc *api.Service) {
