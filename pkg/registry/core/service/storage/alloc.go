@@ -746,12 +746,12 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, d
 	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
 	if (oldService.Spec.Type == api.ServiceTypeNodePort || oldService.Spec.Type == api.ServiceTypeLoadBalancer) &&
 		(service.Spec.Type == api.ServiceTypeExternalName || service.Spec.Type == api.ServiceTypeClusterIP) {
-		releaseNodePorts(oldService, nodePortOp)
+		al.releaseNodePorts(oldService, nodePortOp)
 	}
 
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
+		if err := al.updateNodePorts(oldService, service, nodePortOp); err != nil {
 			txn.Revert()
 			return nil, err
 		}
@@ -767,7 +767,7 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, d
 	return txn, nil
 }
 
-func releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
+func (al *RESTAllocStuff) releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
 	nodePorts := collectServiceNodePorts(service)
 
 	for _, nodePort := range nodePorts {
@@ -775,7 +775,7 @@ func releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAlloca
 	}
 }
 
-func updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (al *RESTAllocStuff) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	oldNodePortsNumbers := collectServiceNodePorts(oldService)
 	newNodePorts := []ServiceNodePort{}
 	portAllocated := map[int]bool{}
