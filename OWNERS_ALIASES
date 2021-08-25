@@ -121,8 +121,12 @@ aliases:
   build-image-approvers:
     - BenTheElder
     - cblecker
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - xmudrii # Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
