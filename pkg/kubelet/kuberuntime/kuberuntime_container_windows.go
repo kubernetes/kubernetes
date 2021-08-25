@@ -25,15 +25,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-// applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, _ *kubecontainer.ContainerID) error {
+// applyPlatformSpecificContainerConfig applies platform specific configurations to internalapi.ContainerConfig.
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *internalapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, _ *kubecontainer.ContainerID) error {
 	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, username)
 	if err != nil {
 		return err
@@ -45,10 +45,10 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
-	wc := &runtimeapi.WindowsContainerConfig{
-		Resources:       &runtimeapi.WindowsContainerResources{},
-		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*internalapi.WindowsContainerConfig, error) {
+	wc := &internalapi.WindowsContainerConfig{
+		Resources:       &internalapi.WindowsContainerResources{},
+		SecurityContext: &internalapi.WindowsContainerSecurityContext{},
 	}
 
 	cpuLimit := container.Resources.Limits.Cpu()

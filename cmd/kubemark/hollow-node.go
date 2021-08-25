@@ -25,8 +25,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -228,14 +228,14 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
-		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, "")
 		if err != nil {
 			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second, runtimeService.APIVersion())
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

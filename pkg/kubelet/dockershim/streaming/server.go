@@ -1,3 +1,6 @@
+//go:build !dockerless
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -34,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/tools/remotecommand"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 )
@@ -45,9 +48,9 @@ type Server interface {
 
 	// Get the serving URL for the requests.
 	// Requests must not be nil. Responses may be nil iff an error is returned.
-	GetExec(*internalapi.ExecRequest) (*internalapi.ExecResponse, error)
-	GetAttach(req *internalapi.AttachRequest) (*internalapi.AttachResponse, error)
-	GetPortForward(*internalapi.PortForwardRequest) (*internalapi.PortForwardResponse, error)
+	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
+	GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
+	GetPortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 
 	// Start the server.
 	// addr is the address to serve on (address:port) stayUp indicates whether the server should
@@ -161,7 +164,7 @@ type server struct {
 	server  *http.Server
 }
 
-func validateExecRequest(req *internalapi.ExecRequest) error {
+func validateExecRequest(req *runtimeapi.ExecRequest) error {
 	if req.ContainerId == "" {
 		return status.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
@@ -176,7 +179,7 @@ func validateExecRequest(req *internalapi.ExecRequest) error {
 	return nil
 }
 
-func (s *server) GetExec(req *internalapi.ExecRequest) (*internalapi.ExecResponse, error) {
+func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	if err := validateExecRequest(req); err != nil {
 		return nil, err
 	}
@@ -184,12 +187,12 @@ func (s *server) GetExec(req *internalapi.ExecRequest) (*internalapi.ExecRespons
 	if err != nil {
 		return nil, err
 	}
-	return &internalapi.ExecResponse{
+	return &runtimeapi.ExecResponse{
 		Url: s.buildURL("exec", token),
 	}, nil
 }
 
-func validateAttachRequest(req *internalapi.AttachRequest) error {
+func validateAttachRequest(req *runtimeapi.AttachRequest) error {
 	if req.ContainerId == "" {
 		return status.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
@@ -204,7 +207,7 @@ func validateAttachRequest(req *internalapi.AttachRequest) error {
 	return nil
 }
 
-func (s *server) GetAttach(req *internalapi.AttachRequest) (*internalapi.AttachResponse, error) {
+func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	if err := validateAttachRequest(req); err != nil {
 		return nil, err
 	}
@@ -212,12 +215,12 @@ func (s *server) GetAttach(req *internalapi.AttachRequest) (*internalapi.AttachR
 	if err != nil {
 		return nil, err
 	}
-	return &internalapi.AttachResponse{
+	return &runtimeapi.AttachResponse{
 		Url: s.buildURL("attach", token),
 	}, nil
 }
 
-func (s *server) GetPortForward(req *internalapi.PortForwardRequest) (*internalapi.PortForwardResponse, error) {
+func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	if req.PodSandboxId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "missing required pod_sandbox_id")
 	}
@@ -225,7 +228,7 @@ func (s *server) GetPortForward(req *internalapi.PortForwardRequest) (*internala
 	if err != nil {
 		return nil, err
 	}
-	return &internalapi.PortForwardResponse{
+	return &runtimeapi.PortForwardResponse{
 		Url: s.buildURL("portforward", token),
 	}, nil
 }
@@ -269,7 +272,7 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
 	}
-	exec, ok := cachedRequest.(*internalapi.ExecRequest)
+	exec, ok := cachedRequest.(*runtimeapi.ExecRequest)
 	if !ok {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
@@ -303,7 +306,7 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
 	}
-	attach, ok := cachedRequest.(*internalapi.AttachRequest)
+	attach, ok := cachedRequest.(*runtimeapi.AttachRequest)
 	if !ok {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
@@ -335,7 +338,7 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
 	}
-	pf, ok := cachedRequest.(*internalapi.PortForwardRequest)
+	pf, ok := cachedRequest.(*runtimeapi.PortForwardRequest)
 	if !ok {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return

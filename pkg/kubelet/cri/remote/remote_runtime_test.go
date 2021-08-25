@@ -23,8 +23,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	apitest "k8s.io/cri-api/pkg/apis/testing"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 )
@@ -47,7 +49,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout)
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, "")
 	require.NoError(t, err)
 
 	return runtimeService
@@ -67,7 +69,7 @@ func TestVersion(t *testing.T) {
 
 	r := createRemoteRuntimeService(endpoint, t)
 	version, err := r.Version(apitest.FakeVersion)
-	assert.NoError(t, err)
-	assert.Equal(t, apitest.FakeVersion, version.Version)
-	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
+	assert.Nil(t, version)
+	assert.NotNil(t, err)
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }

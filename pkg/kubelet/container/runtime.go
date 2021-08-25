@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -137,7 +137,7 @@ type StreamingRuntime interface {
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *internalapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)
@@ -302,7 +302,7 @@ type PodStatus struct {
 	ContainerStatuses []*Status
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
-	SandboxStatuses []*runtimeapi.PodSandboxStatus
+	SandboxStatuses []*internalapi.PodSandboxStatus
 }
 
 // Status represents the status of a container.
@@ -400,7 +400,7 @@ type Mount struct {
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
 	// Requested propagation mode
-	Propagation runtimeapi.MountPropagation
+	Propagation internalapi.MountPropagation
 }
 
 // PortMapping contains information about the port mapping.

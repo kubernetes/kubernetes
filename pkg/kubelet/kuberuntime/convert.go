@@ -19,13 +19,13 @@ package kuberuntime
 import (
 	"sort"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // This file contains help function to kuberuntime types to CRI runtime API types, or vice versa.
 
-func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
+func toKubeContainerImageSpec(image *internalapi.Image) kubecontainer.ImageSpec {
 	var annotations []kubecontainer.Annotation
 
 	if image.Spec != nil && len(image.Spec.Annotations) > 0 {
@@ -48,14 +48,14 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 	}
 }
 
-func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageSpec {
+func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *internalapi.ImageSpec {
 	var annotations = make(map[string]string)
 	if imageSpec.Annotations != nil {
 		for _, a := range imageSpec.Annotations {
 			annotations[a.Name] = a.Value
 		}
 	}
-	return &runtimeapi.ImageSpec{
+	return &internalapi.ImageSpec{
 		Image:       imageSpec.Image,
 		Annotations: annotations,
 	}

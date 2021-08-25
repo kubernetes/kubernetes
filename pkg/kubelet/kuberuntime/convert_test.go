@@ -21,17 +21,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestConvertToKubeContainerImageSpec(t *testing.T) {
 	testCases := []struct {
-		input    *runtimeapi.Image
+		input    *internalapi.Image
 		expected kubecontainer.ImageSpec
 	}{
 		{
-			input: &runtimeapi.Image{
+			input: &internalapi.Image{
 				Id:   "test",
 				Spec: nil,
 			},
@@ -41,9 +41,9 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 			},
 		},
 		{
-			input: &runtimeapi.Image{
+			input: &internalapi.Image{
 				Id: "test",
-				Spec: &runtimeapi.ImageSpec{
+				Spec: &internalapi.ImageSpec{
 					Annotations: nil,
 				},
 			},
@@ -53,9 +53,9 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 			},
 		},
 		{
-			input: &runtimeapi.Image{
+			input: &internalapi.Image{
 				Id: "test",
-				Spec: &runtimeapi.ImageSpec{
+				Spec: &internalapi.ImageSpec{
 					Annotations: map[string]string{},
 				},
 			},
@@ -65,9 +65,9 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 			},
 		},
 		{
-			input: &runtimeapi.Image{
+			input: &internalapi.Image{
 				Id: "test",
-				Spec: &runtimeapi.ImageSpec{
+				Spec: &internalapi.ImageSpec{
 					Annotations: map[string]string{
 						"kubernetes.io/os":             "linux",
 						"kubernetes.io/runtimehandler": "handler",
@@ -99,14 +99,14 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 	testCases := []struct {
 		input    kubecontainer.ImageSpec
-		expected *runtimeapi.ImageSpec
+		expected *internalapi.ImageSpec
 	}{
 		{
 			input: kubecontainer.ImageSpec{
 				Image:       "test",
 				Annotations: nil,
 			},
-			expected: &runtimeapi.ImageSpec{
+			expected: &internalapi.ImageSpec{
 				Image:       "test",
 				Annotations: map[string]string{},
 			},
@@ -116,7 +116,7 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 				Image:       "test",
 				Annotations: []kubecontainer.Annotation{},
 			},
-			expected: &runtimeapi.ImageSpec{
+			expected: &internalapi.ImageSpec{
 				Image:       "test",
 				Annotations: map[string]string{},
 			},
@@ -135,7 +135,7 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 					},
 				},
 			},
-			expected: &runtimeapi.ImageSpec{
+			expected: &internalapi.ImageSpec{
 				Image: "test",
 				Annotations: map[string]string{
 					"kubernetes.io/os":             "linux",

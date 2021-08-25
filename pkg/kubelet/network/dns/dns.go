@@ -30,9 +30,9 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
@@ -159,7 +159,7 @@ func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.
 	return nameservers
 }
 
-func (c *Configurer) formDNSConfigFitsLimits(dnsConfig *runtimeapi.DNSConfig, pod *v1.Pod) *runtimeapi.DNSConfig {
+func (c *Configurer) formDNSConfigFitsLimits(dnsConfig *internalapi.DNSConfig, pod *v1.Pod) *internalapi.DNSConfig {
 	dnsConfig.Servers = c.formDNSNameserversFitsLimits(dnsConfig.Servers, pod)
 	dnsConfig.Searches = c.formDNSSearchFitsLimits(dnsConfig.Searches, pod)
 	return dnsConfig
@@ -278,7 +278,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, options, utilerrors.NewAggregate(allErrors)
 }
 
-func (c *Configurer) getHostDNSConfig() (*runtimeapi.DNSConfig, error) {
+func (c *Configurer) getHostDNSConfig() (*internalapi.DNSConfig, error) {
 	var hostDNS, hostSearch, hostOptions []string
 	// Get host DNS settings
 	if c.ResolverConfig != "" {
@@ -293,7 +293,7 @@ func (c *Configurer) getHostDNSConfig() (*runtimeapi.DNSConfig, error) {
 			return nil, err
 		}
 	}
-	return &runtimeapi.DNSConfig{
+	return &internalapi.DNSConfig{
 		Servers:  hostDNS,
 		Searches: hostSearch,
 		Options:  hostOptions,
@@ -354,7 +354,7 @@ func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.Po
 // appendDNSConfig appends DNS servers, search paths and options given by
 // PodDNSConfig to the existing DNS config. Duplicated entries will be merged.
 // This assumes existingDNSConfig and dnsConfig are not nil.
-func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodDNSConfig) *runtimeapi.DNSConfig {
+func appendDNSConfig(existingDNSConfig *internalapi.DNSConfig, dnsConfig *v1.PodDNSConfig) *internalapi.DNSConfig {
 	existingDNSConfig.Servers = omitDuplicates(append(existingDNSConfig.Servers, dnsConfig.Nameservers...))
 	existingDNSConfig.Searches = omitDuplicates(append(existingDNSConfig.Searches, dnsConfig.Searches...))
 	existingDNSConfig.Options = mergeDNSOptions(existingDNSConfig.Options, dnsConfig.Options)
@@ -362,7 +362,7 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 }
 
 // GetPodDNS returns DNS settings for the pod.
-func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (c *Configurer) GetPodDNS(pod *v1.Pod) (*internalapi.DNSConfig, error) {
 	dnsConfig, err := c.getHostDNSConfig()
 	if err != nil {
 		return nil, err
@@ -376,7 +376,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	switch dnsType {
 	case podDNSNone:
 		// DNSNone should use empty DNS settings as the base.
-		dnsConfig = &runtimeapi.DNSConfig{}
+		dnsConfig = &internalapi.DNSConfig{}
 	case podDNSCluster:
 		if len(c.clusterDNS) != 0 {
 			// For a pod with DNSClusterFirst policy, the cluster DNS server is

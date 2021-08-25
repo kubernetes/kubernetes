@@ -36,7 +36,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -44,6 +43,7 @@ import (
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
@@ -379,7 +379,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -389,7 +389,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, r.APIVersion())
 	if err != nil {
 		return nil, nil, err
 	}

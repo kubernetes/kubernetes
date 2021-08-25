@@ -45,8 +45,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -170,7 +170,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *internalapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string) (string, error) {
 	container := spec.container
 
 	// Step 1: pull the image.
@@ -294,7 +294,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID) (*runtimeapi.ContainerConfig, func(), error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID) (*internalapi.ContainerConfig, func(), error) {
 	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP, podIPs)
 	if err != nil {
 		return nil, nil, err
@@ -318,12 +318,12 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
-	config := &runtimeapi.ContainerConfig{
-		Metadata: &runtimeapi.ContainerMetadata{
+	config := &internalapi.ContainerConfig{
+		Metadata: &internalapi.ContainerMetadata{
 			Name:    container.Name,
 			Attempt: restartCountUint32,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: imageRef},
+		Image:       &internalapi.ImageSpec{Image: imageRef},
 		Command:     command,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
@@ -343,10 +343,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	// set environment variables
-	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
+	envs := make([]*internalapi.KeyValue, len(opts.Envs))
 	for idx := range opts.Envs {
 		e := opts.Envs[idx]
-		envs[idx] = &runtimeapi.KeyValue{
+		envs[idx] = &internalapi.KeyValue{
 			Key:   e.Name,
 			Value: e.Value,
 		}
@@ -357,12 +357,12 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 }
 
 // makeDevices generates container devices for kubelet runtime v1.
-func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
-	devices := make([]*runtimeapi.Device, len(opts.Devices))
+func makeDevices(opts *kubecontainer.RunContainerOptions) []*internalapi.Device {
+	devices := make([]*internalapi.Device, len(opts.Devices))
 
 	for idx := range opts.Devices {
 		device := opts.Devices[idx]
-		devices[idx] = &runtimeapi.Device{
+		devices[idx] = &internalapi.Device{
 			HostPath:      device.PathOnHost,
 			ContainerPath: device.PathInContainer,
 			Permissions:   device.Permissions,
@@ -373,13 +373,13 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 }
 
 // makeMounts generates container volume mounts for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *v1.Container) []*runtimeapi.Mount {
-	volumeMounts := []*runtimeapi.Mount{}
+func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *v1.Container) []*internalapi.Mount {
+	volumeMounts := []*internalapi.Mount{}
 
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
 		selinuxRelabel := v.SELinuxRelabel && selinux.SELinuxEnabled()
-		mount := &runtimeapi.Mount{
+		mount := &internalapi.Mount{
 			HostPath:       v.HostPath,
 			ContainerPath:  v.ContainerPath,
 			Readonly:       v.ReadOnly,
@@ -419,7 +419,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			containerLogPath = volumeutil.MakeAbsolutePath(goruntime.GOOS, containerLogPath)
 			terminationMessagePath := volumeutil.MakeAbsolutePath(goruntime.GOOS, container.TerminationMessagePath)
 			selinuxRelabel := selinux.SELinuxEnabled()
-			volumeMounts = append(volumeMounts, &runtimeapi.Mount{
+			volumeMounts = append(volumeMounts, &internalapi.Mount{
 				HostPath:       containerLogPath,
 				ContainerPath:  terminationMessagePath,
 				SelinuxRelabel: selinuxRelabel,
@@ -433,11 +433,11 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 // getKubeletContainers lists containers managed by kubelet.
 // The boolean parameter specifies whether returns all containers including
 // those already exited and dead containers (used for garbage collection).
-func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeapi.Container, error) {
-	filter := &runtimeapi.ContainerFilter{}
+func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*internalapi.Container, error) {
+	filter := &internalapi.ContainerFilter{}
 	if !allContainers {
-		filter.State = &runtimeapi.ContainerStateValue{
-			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		filter.State = &internalapi.ContainerStateValue{
+			State: internalapi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
 
@@ -457,7 +457,7 @@ func makeUID() string {
 
 // getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
 // amount of those bytes, or returns true if the logs should be checked.
-func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
+func getTerminationMessage(status *internalapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
 	if len(terminationMessagePath) == 0 {
 		return "", fallbackToLogs
 	}
@@ -494,7 +494,7 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string)
 // getPodContainerStatuses gets all containers' statuses for the pod.
 func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.Status, error) {
 	// Select all containers of the given pod.
-	containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
+	containers, err := m.runtimeService.ListContainers(&internalapi.ContainerFilter{
 		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
 	})
 	if err != nil {
@@ -512,7 +512,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			return nil, err
 		}
 		cStatus := toKubeContainerStatus(status, m.runtimeName)
-		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		if status.State == internalapi.ContainerState_CONTAINER_EXITED {
 			// Populate the termination message if needed.
 			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 			// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
@@ -545,7 +545,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 	return statuses, nil
 }
 
-func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
+func toKubeContainerStatus(status *internalapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	cStatus := &kubecontainer.Status{
@@ -562,12 +562,12 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		CreatedAt:    time.Unix(0, status.CreatedAt),
 	}
 
-	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
+	if status.State != internalapi.ContainerState_CONTAINER_CREATED {
 		// If container is not in the created state, we have tried and
 		// started the container. Set the StartedAt time.
 		cStatus.StartedAt = time.Unix(0, status.StartedAt)
 	}
-	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+	if status.State == internalapi.ContainerState_CONTAINER_EXITED {
 		cStatus.Reason = status.Reason
 		cStatus.Message = status.Message
 		cStatus.ExitCode = int(status.ExitCode)
@@ -887,7 +887,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 
 // GetExec gets the endpoint the runtime will serve the exec request from.
 func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
-	req := &runtimeapi.ExecRequest{
+	req := &internalapi.ExecRequest{
 		ContainerId: id.ID,
 		Cmd:         cmd,
 		Tty:         tty,
@@ -905,7 +905,7 @@ func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []
 
 // GetAttach gets the endpoint the runtime will serve the attach request from.
 func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
-	req := &runtimeapi.AttachRequest{
+	req := &internalapi.AttachRequest{
 		ContainerId: id.ID,
 		Stdin:       stdin,
 		Stdout:      stdout,

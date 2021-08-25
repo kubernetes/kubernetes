@@ -33,8 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -63,13 +62,13 @@ var (
 	// delimiter is the delimiter for timestamp and stream type in log line.
 	delimiter = []byte{' '}
 	// tagDelimiter is the delimiter for log tags.
-	tagDelimiter = []byte(runtimeapi.LogTagDelimiter)
+	tagDelimiter = []byte(internalapi.LogTagDelimiter)
 )
 
 // logMessage is the CRI internal log type.
 type logMessage struct {
 	timestamp time.Time
-	stream    runtimeapi.LogStreamType
+	stream    internalapi.LogStreamType
 	log       []byte
 }
 
@@ -142,8 +141,8 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	if idx < 0 {
 		return fmt.Errorf("stream type is not found")
 	}
-	msg.stream = runtimeapi.LogStreamType(log[:idx])
-	if msg.stream != runtimeapi.Stdout && msg.stream != runtimeapi.Stderr {
+	msg.stream = internalapi.LogStreamType(log[:idx])
+	if msg.stream != internalapi.Stdout && msg.stream != internalapi.Stderr {
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
 	}
 
@@ -155,7 +154,7 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	}
 	// Keep this forward compatible.
 	tags := bytes.Split(log[:idx], tagDelimiter)
-	partial := runtimeapi.LogTag(tags[0]) == runtimeapi.LogTagPartial
+	partial := internalapi.LogTag(tags[0]) == internalapi.LogTagPartial
 	// Trim the tailing new line if this is a partial line.
 	if partial && len(log) > 0 && log[len(log)-1] == '\n' {
 		log = log[:len(log)-1]
@@ -191,7 +190,7 @@ func parseDockerJSONLog(log []byte, msg *logMessage) error {
 		return fmt.Errorf("failed with %v to unmarshal log %q", err, l)
 	}
 	msg.timestamp = l.Created
-	msg.stream = runtimeapi.LogStreamType(l.Stream)
+	msg.stream = internalapi.LogStreamType(l.Stream)
 	msg.log = []byte(l.Log)
 	return nil
 }
@@ -251,9 +250,9 @@ func (w *logWriter) write(msg *logMessage) error {
 	// Get the proper stream to write to.
 	var stream io.Writer
 	switch msg.stream {
-	case runtimeapi.Stdout:
+	case internalapi.Stdout:
 		stream = w.stdout
-	case runtimeapi.Stderr:
+	case internalapi.Stderr:
 		stream = w.stderr
 	default:
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
@@ -416,7 +415,7 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 		return false, err
 	}
 	// Only keep following container log when it is running.
-	if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
+	if s.State != internalapi.ContainerState_CONTAINER_RUNNING {
 		klog.V(5).InfoS("Container is not running", "containerId", id, "state", s.State)
 		// Do not return error because it's normal that the container stops
 		// during waiting.

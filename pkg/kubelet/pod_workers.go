@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -510,7 +510,7 @@ func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
 		}
 	}
 	for _, sb := range status.SandboxStatuses {
-		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if sb.State == internalapi.PodSandboxState_SANDBOX_READY {
 			runningSandboxes++
 		}
 	}

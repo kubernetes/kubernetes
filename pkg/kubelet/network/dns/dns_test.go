@@ -32,9 +32,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -614,12 +614,12 @@ func TestGetPodDNSCustom(t *testing.T) {
 		hostnetwork       bool
 		dnsPolicy         v1.DNSPolicy
 		dnsConfig         *v1.PodDNSConfig
-		expectedDNSConfig *runtimeapi.DNSConfig
+		expectedDNSConfig *internalapi.DNSConfig
 	}{
 		{
 			desc:              "DNSNone without DNSConfig should have empty DNS settings",
 			dnsPolicy:         v1.DNSNone,
-			expectedDNSConfig: &runtimeapi.DNSConfig{},
+			expectedDNSConfig: &internalapi.DNSConfig{},
 		},
 		{
 			desc:      "DNSNone with DNSConfig should have a merged DNS settings",
@@ -632,7 +632,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 					{Name: "debug"},
 				},
 			},
-			expectedDNSConfig: &runtimeapi.DNSConfig{
+			expectedDNSConfig: &internalapi.DNSConfig{
 				Servers:  []string{"203.0.113.1"},
 				Searches: []string{"my.domain", "second.domain"},
 				Options:  []string{"ndots:3", "debug"},
@@ -649,7 +649,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 					{Name: "debug"},
 				},
 			},
-			expectedDNSConfig: &runtimeapi.DNSConfig{
+			expectedDNSConfig: &internalapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
 				Options:  []string{"ndots:3", "debug"},
@@ -667,7 +667,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 					{Name: "debug"},
 				},
 			},
-			expectedDNSConfig: &runtimeapi.DNSConfig{
+			expectedDNSConfig: &internalapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
 				Options:  []string{"ndots:3", "debug"},
@@ -684,7 +684,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 					{Name: "debug"},
 				},
 			},
-			expectedDNSConfig: &runtimeapi.DNSConfig{
+			expectedDNSConfig: &internalapi.DNSConfig{
 				Servers:  []string{testHostNameserver, "10.0.0.11"},
 				Searches: []string{testHostDomain, "my.domain"},
 				Options:  []string{"ndots:3", "debug"},
@@ -709,7 +709,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 	}
 }
 
-func dnsConfigsAreEqual(resConfig, expectedConfig *runtimeapi.DNSConfig) bool {
+func dnsConfigsAreEqual(resConfig, expectedConfig *internalapi.DNSConfig) bool {
 	if len(resConfig.Servers) != len(expectedConfig.Servers) ||
 		len(resConfig.Searches) != len(expectedConfig.Searches) ||
 		len(resConfig.Options) != len(expectedConfig.Options) {

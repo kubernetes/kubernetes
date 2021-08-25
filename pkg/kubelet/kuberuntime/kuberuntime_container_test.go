@@ -34,8 +34,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -89,7 +89,7 @@ func TestRemoveContainer(t *testing.T) {
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
+	containers, err := fakeRuntime.ListContainers(&internalapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -134,8 +134,8 @@ func TestKillContainer(t *testing.T) {
 // different states.
 func TestToKubeContainerStatus(t *testing.T) {
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
-	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
-	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	meta := &internalapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	imageSpec := &internalapi.ImageSpec{Image: "fimage"}
 	var (
 		createdAt  int64 = 327
 		startedAt  int64 = 999
@@ -143,15 +143,15 @@ func TestToKubeContainerStatus(t *testing.T) {
 	)
 
 	for desc, test := range map[string]struct {
-		input    *runtimeapi.ContainerStatus
+		input    *internalapi.ContainerStatus
 		expected *kubecontainer.Status
 	}{
 		"created container": {
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
 				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_CREATED,
+				State:     internalapi.ContainerState_CONTAINER_CREATED,
 				CreatedAt: createdAt,
 			},
 			expected: &kubecontainer.Status{
@@ -162,11 +162,11 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 		"running container": {
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
 				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:     internalapi.ContainerState_CONTAINER_RUNNING,
 				CreatedAt: createdAt,
 				StartedAt: startedAt,
 			},
@@ -179,11 +179,11 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 		"exited container": {
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:         cid.ID,
 				Metadata:   meta,
 				Image:      imageSpec,
-				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				State:      internalapi.ContainerState_CONTAINER_EXITED,
 				CreatedAt:  createdAt,
 				StartedAt:  startedAt,
 				FinishedAt: finishedAt,
@@ -204,11 +204,11 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 		"unknown container": {
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
 				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+				State:     internalapi.ContainerState_CONTAINER_UNKNOWN,
 				CreatedAt: createdAt,
 				StartedAt: startedAt,
 			},

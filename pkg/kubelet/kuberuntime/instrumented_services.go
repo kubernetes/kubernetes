@@ -19,8 +19,7 @@ package kuberuntime
 import (
 	"time"
 
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -59,7 +58,11 @@ func recordError(operation string, err error) {
 	}
 }
 
-func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResponse, error) {
+func (in instrumentedRuntimeService) APIVersion() internalapi.APIVersion {
+	return in.service.APIVersion()
+}
+
+func (in instrumentedRuntimeService) Version(apiVersion string) (*internalapi.VersionResponse, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
@@ -68,7 +71,7 @@ func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.Ver
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
+func (in instrumentedRuntimeService) Status() (*internalapi.RuntimeStatus, error) {
 	const operation = "status"
 	defer recordOperation(operation, time.Now())
 
@@ -77,7 +80,7 @@ func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *internalapi.ContainerConfig, sandboxConfig *internalapi.PodSandboxConfig) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
@@ -113,7 +116,7 @@ func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
 	return err
 }
 
-func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+func (in instrumentedRuntimeService) ListContainers(filter *internalapi.ContainerFilter) ([]*internalapi.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
@@ -122,7 +125,7 @@ func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.Container
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
+func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*internalapi.ContainerStatus, error) {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
@@ -131,7 +134,7 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	return out, err
 }
 
-func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *internalapi.LinuxContainerResources) error {
 	const operation = "update_container"
 	defer recordOperation(operation, time.Now())
 
@@ -158,7 +161,7 @@ func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, 
 	return stdout, stderr, err
 }
 
-func (in instrumentedRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func (in instrumentedRuntimeService) Exec(req *internalapi.ExecRequest) (*internalapi.ExecResponse, error) {
 	const operation = "exec"
 	defer recordOperation(operation, time.Now())
 
@@ -167,7 +170,7 @@ func (in instrumentedRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtime
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func (in instrumentedRuntimeService) Attach(req *internalapi.AttachRequest) (*internalapi.AttachResponse, error) {
 	const operation = "attach"
 	defer recordOperation(operation, time.Now())
 
@@ -176,7 +179,7 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(config *internalapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
@@ -208,7 +211,7 @@ func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error
 	return err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*internalapi.PodSandboxStatus, error) {
 	const operation = "podsandbox_status"
 	defer recordOperation(operation, time.Now())
 
@@ -217,7 +220,7 @@ func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*run
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+func (in instrumentedRuntimeService) ListPodSandbox(filter *internalapi.PodSandboxFilter) ([]*internalapi.PodSandbox, error) {
 	const operation = "list_podsandbox"
 	defer recordOperation(operation, time.Now())
 
@@ -226,7 +229,7 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandbo
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ContainerStats(containerID string) (*internalapi.ContainerStats, error) {
 	const operation = "container_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -235,7 +238,7 @@ func (in instrumentedRuntimeService) ContainerStats(containerID string) (*runtim
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ListContainerStats(filter *internalapi.ContainerStatsFilter) ([]*internalapi.ContainerStats, error) {
 	const operation = "list_container_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -244,7 +247,7 @@ func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.Conta
 	return out, err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
+func (in instrumentedRuntimeService) PodSandboxStats(podSandboxID string) (*internalapi.PodSandboxStats, error) {
 	const operation = "podsandbox_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -253,7 +256,7 @@ func (in instrumentedRuntimeService) PodSandboxStats(podSandboxID string) (*runt
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+func (in instrumentedRuntimeService) ListPodSandboxStats(filter *internalapi.PodSandboxStatsFilter) ([]*internalapi.PodSandboxStats, error) {
 	const operation = "list_podsandbox_stats"
 	defer recordOperation(operation, time.Now())
 
@@ -262,7 +265,7 @@ func (in instrumentedRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodS
 	return out, err
 }
 
-func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+func (in instrumentedRuntimeService) PortForward(req *internalapi.PortForwardRequest) (*internalapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())
 
@@ -271,7 +274,7 @@ func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequ
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error {
+func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *internalapi.RuntimeConfig) error {
 	const operation = "update_runtime_config"
 	defer recordOperation(operation, time.Now())
 
@@ -280,7 +283,7 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	return err
 }
 
-func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ListImages(filter *internalapi.ImageFilter) ([]*internalapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
@@ -289,7 +292,7 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFil
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(image *internalapi.ImageSpec) (*internalapi.Image, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
@@ -298,7 +301,7 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(image *internalapi.ImageSpec, auth *internalapi.AuthConfig, podSandboxConfig *internalapi.PodSandboxConfig) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
@@ -307,7 +310,7 @@ func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec,
 	return imageRef, err
 }
 
-func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (in instrumentedImageManagerService) RemoveImage(image *internalapi.ImageSpec) error {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 
@@ -316,7 +319,7 @@ func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpe
 	return err
 }
 
-func (in instrumentedImageManagerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (in instrumentedImageManagerService) ImageFsInfo() ([]*internalapi.FilesystemUsage, error) {
 	const operation = "image_fs_info"
 	defer recordOperation(operation, time.Now())
 

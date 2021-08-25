@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	apitest "k8s.io/cri-api/pkg/apis/testing"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 	utilexec "k8s.io/utils/exec"
 )
@@ -47,8 +47,6 @@ func NewFakeRemoteRuntime() *RemoteRuntime {
 		RuntimeService: fakeRuntimeService,
 		ImageService:   fakeImageService,
 	}
-	kubeapi.RegisterRuntimeServiceServer(f.server, f)
-	kubeapi.RegisterImageServiceServer(f.server, f)
 
 	return f
 }

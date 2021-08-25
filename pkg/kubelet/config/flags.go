@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	criapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
 // ContainerRuntimeOptions defines options for the container runtime.
@@ -31,6 +32,8 @@ type ContainerRuntimeOptions struct {
 	ContainerRuntime string
 	// RuntimeCgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string
+	// CRIVersion specifies the Container Runtime Interface (CRI) version to be used.
+	CRIVersion string
 
 	// Docker-specific options.
 
@@ -88,6 +91,7 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	// General settings.
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote'.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+	fs.StringVar(&s.CRIVersion, "cri-version", s.CRIVersion, fmt.Sprintf("Specify the CRI version for the remote runtime and image endpoint to be used. Can be either empty (chosen automatically on connection) or forced to %q and %q (deprecated)", criapi.APIVersionV1, criapi.APIVersionV1alpha2))
 
 	// Docker-specific settings.
 	fs.StringVar(&s.DockershimRootDirectory, "experimental-dockershim-root-directory", s.DockershimRootDirectory, "Path to the dockershim root directory.")

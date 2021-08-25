@@ -24,8 +24,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -42,7 +42,7 @@ func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 // Newest first.
-type podSandboxByCreated []*runtimeapi.PodSandbox
+type podSandboxByCreated []*internalapi.PodSandbox
 
 func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
@@ -54,39 +54,39 @@ func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
-// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
-func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
+// toKubeContainerState converts internalapi.ContainerState to kubecontainer.State.
+func toKubeContainerState(state internalapi.ContainerState) kubecontainer.State {
 	switch state {
-	case runtimeapi.ContainerState_CONTAINER_CREATED:
+	case internalapi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
-	case runtimeapi.ContainerState_CONTAINER_RUNNING:
+	case internalapi.ContainerState_CONTAINER_RUNNING:
 		return kubecontainer.ContainerStateRunning
-	case runtimeapi.ContainerState_CONTAINER_EXITED:
+	case internalapi.ContainerState_CONTAINER_EXITED:
 		return kubecontainer.ContainerStateExited
-	case runtimeapi.ContainerState_CONTAINER_UNKNOWN:
+	case internalapi.ContainerState_CONTAINER_UNKNOWN:
 		return kubecontainer.ContainerStateUnknown
 	}
 
 	return kubecontainer.ContainerStateUnknown
 }
 
-// toRuntimeProtocol converts v1.Protocol to runtimeapi.Protocol.
-func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
+// toRuntimeProtocol converts v1.Protocol to internalapi.Protocol.
+func toRuntimeProtocol(protocol v1.Protocol) internalapi.Protocol {
 	switch protocol {
 	case v1.ProtocolTCP:
-		return runtimeapi.Protocol_TCP
+		return internalapi.Protocol_TCP
 	case v1.ProtocolUDP:
-		return runtimeapi.Protocol_UDP
+		return internalapi.Protocol_UDP
 	case v1.ProtocolSCTP:
-		return runtimeapi.Protocol_SCTP
+		return internalapi.Protocol_SCTP
 	}
 
 	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
-	return runtimeapi.Protocol_TCP
+	return internalapi.Protocol_TCP
 }
 
-// toKubeContainer converts runtimeapi.Container to kubecontainer.Container.
-func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*kubecontainer.Container, error) {
+// toKubeContainer converts internalapi.Container to kubecontainer.Container.
+func (m *kubeGenericRuntimeManager) toKubeContainer(c *internalapi.Container) (*kubecontainer.Container, error) {
 	if c == nil || c.Id == "" || c.Image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -102,11 +102,11 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 	}, nil
 }
 
-// sandboxToKubeContainer converts runtimeapi.PodSandbox to kubecontainer.Container.
+// sandboxToKubeContainer converts internalapi.PodSandbox to kubecontainer.Container.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSandbox) (*kubecontainer.Container, error) {
+func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *internalapi.PodSandbox) (*kubecontainer.Container, error) {
 	if s == nil || s.Id == "" {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -120,7 +120,7 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
 func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, error) {
-	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+	imageStatus, err := m.imageService.ImageStatus(&internalapi.ImageSpec{Image: image})
 	if err != nil {
 		return nil, "", err
 	}
@@ -188,8 +188,8 @@ func parsePodUIDFromLogsDirectory(name string) types.UID {
 	return types.UID(parts[len(parts)-1])
 }
 
-// toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.
-func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.RuntimeStatus {
+// toKubeRuntimeStatus converts the internalapi.RuntimeStatus to kubecontainer.RuntimeStatus.
+func toKubeRuntimeStatus(status *internalapi.RuntimeStatus) *kubecontainer.RuntimeStatus {
 	conditions := []kubecontainer.RuntimeCondition{}
 	for _, c := range status.GetConditions() {
 		conditions = append(conditions, kubecontainer.RuntimeCondition{
@@ -266,36 +266,36 @@ func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string
 	return ""
 }
 
-func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) *internalapi.SecurityProfile {
 	if scmp == nil {
 		if fallbackToRuntimeDefault {
-			return &runtimeapi.SecurityProfile{
-				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+			return &internalapi.SecurityProfile{
+				ProfileType: internalapi.SecurityProfile_RuntimeDefault,
 			}
 		}
-		return &runtimeapi.SecurityProfile{
-			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		return &internalapi.SecurityProfile{
+			ProfileType: internalapi.SecurityProfile_Unconfined,
 		}
 	}
 	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
-		return &runtimeapi.SecurityProfile{
-			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		return &internalapi.SecurityProfile{
+			ProfileType: internalapi.SecurityProfile_RuntimeDefault,
 		}
 	}
 	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
 		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-		return &runtimeapi.SecurityProfile{
-			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+		return &internalapi.SecurityProfile{
+			ProfileType:  internalapi.SecurityProfile_Localhost,
 			LocalhostRef: fname,
 		}
 	}
-	return &runtimeapi.SecurityProfile{
-		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	return &internalapi.SecurityProfile{
+		ProfileType: internalapi.SecurityProfile_Unconfined,
 	}
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *internalapi.SecurityProfile {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
 		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
@@ -307,47 +307,47 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	}
 
 	if fallbackToRuntimeDefault {
-		return &runtimeapi.SecurityProfile{
-			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		return &internalapi.SecurityProfile{
+			ProfileType: internalapi.SecurityProfile_RuntimeDefault,
 		}
 	}
 
-	return &runtimeapi.SecurityProfile{
-		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	return &internalapi.SecurityProfile{
+		ProfileType: internalapi.SecurityProfile_Unconfined,
 	}
 }
 
-func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+func ipcNamespaceForPod(pod *v1.Pod) internalapi.NamespaceMode {
 	if pod != nil && pod.Spec.HostIPC {
-		return runtimeapi.NamespaceMode_NODE
+		return internalapi.NamespaceMode_NODE
 	}
-	return runtimeapi.NamespaceMode_POD
+	return internalapi.NamespaceMode_POD
 }
 
-func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+func networkNamespaceForPod(pod *v1.Pod) internalapi.NamespaceMode {
 	if pod != nil && pod.Spec.HostNetwork {
-		return runtimeapi.NamespaceMode_NODE
+		return internalapi.NamespaceMode_NODE
 	}
-	return runtimeapi.NamespaceMode_POD
+	return internalapi.NamespaceMode_POD
 }
 
-func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+func pidNamespaceForPod(pod *v1.Pod) internalapi.NamespaceMode {
 	if pod != nil {
 		if pod.Spec.HostPID {
-			return runtimeapi.NamespaceMode_NODE
+			return internalapi.NamespaceMode_NODE
 		}
 		if pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
-			return runtimeapi.NamespaceMode_POD
+			return internalapi.NamespaceMode_POD
 		}
 	}
 	// Note that PID does not default to the zero value for v1.Pod
-	return runtimeapi.NamespaceMode_CONTAINER
+	return internalapi.NamespaceMode_CONTAINER
 }
 
-// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
+// namespacesForPod returns the internalapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
+func namespacesForPod(pod *v1.Pod) *internalapi.NamespaceOption {
+	return &internalapi.NamespaceOption{
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),

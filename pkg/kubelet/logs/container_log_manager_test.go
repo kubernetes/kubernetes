@@ -30,8 +30,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	critest "k8s.io/cri-api/pkg/apis/testing"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -119,30 +119,30 @@ func TestRotateLogs(t *testing.T) {
 	}
 	testContainers := []*critest.FakeContainer{
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-not-need-rotate",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:   internalapi.ContainerState_CONTAINER_RUNNING,
 				LogPath: filepath.Join(dir, testLogs[0]),
 			},
 		},
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-need-rotate",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:   internalapi.ContainerState_CONTAINER_RUNNING,
 				LogPath: filepath.Join(dir, testLogs[1]),
 			},
 		},
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-has-excess-log",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:   internalapi.ContainerState_CONTAINER_RUNNING,
 				LogPath: filepath.Join(dir, testLogs[2]),
 			},
 		},
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-is-not-running",
-				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
+				State:   internalapi.ContainerState_CONTAINER_EXITED,
 				LogPath: filepath.Join(dir, testLogs[3]),
 			},
 		},
@@ -197,23 +197,23 @@ func TestClean(t *testing.T) {
 	}
 	testContainers := []*critest.FakeContainer{
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-1",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:   internalapi.ContainerState_CONTAINER_RUNNING,
 				LogPath: filepath.Join(dir, testLogs[0]),
 			},
 		},
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-2",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				State:   internalapi.ContainerState_CONTAINER_RUNNING,
 				LogPath: filepath.Join(dir, testLogs[1]),
 			},
 		},
 		{
-			ContainerStatus: runtimeapi.ContainerStatus{
+			ContainerStatus: internalapi.ContainerStatus{
 				Id:      "container-3",
-				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
+				State:   internalapi.ContainerState_CONTAINER_EXITED,
 				LogPath: filepath.Join(dir, testLogs[2]),
 			},
 		},

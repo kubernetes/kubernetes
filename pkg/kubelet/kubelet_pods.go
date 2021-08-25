@@ -40,7 +40,6 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/storage/ephemeral"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -49,6 +48,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -279,24 +279,24 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 }
 
 // translateMountPropagation transforms v1.MountPropagationMode to
-// runtimeapi.MountPropagation.
-func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
+// internalapi.MountPropagation.
+func translateMountPropagation(mountMode *v1.MountPropagationMode) (internalapi.MountPropagation, error) {
 	if runtime.GOOS == "windows" {
 		// Windows containers doesn't support mount propagation, use private for it.
 		// Refer https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation.
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+		return internalapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	}
 
 	switch {
 	case mountMode == nil:
 		// PRIVATE is the default
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+		return internalapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	case *mountMode == v1.MountPropagationHostToContainer:
-		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+		return internalapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
 	case *mountMode == v1.MountPropagationBidirectional:
-		return runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
+		return internalapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
 	case *mountMode == v1.MountPropagationNone:
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+		return internalapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	default:
 		return 0, fmt.Errorf("invalid MountPropagation mode: %q", *mountMode)
 	}

@@ -24,10 +24,10 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
-func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
+func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *internalapi.ContainerConfig) error {
 	if i.cpuManager != nil {
 		allocatedCPUs := i.cpuManager.GetCPUAffinity(string(pod.UID), container.Name)
 		if !allocatedCPUs.IsEmpty() {

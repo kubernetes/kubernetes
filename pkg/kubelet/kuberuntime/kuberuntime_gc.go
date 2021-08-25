@@ -26,9 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -193,7 +192,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	newestGCTime := time.Now().Add(-minAge)
 	for _, container := range containers {
 		// Prune out running containers.
-		if container.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+		if container.State == internalapi.ContainerState_CONTAINER_RUNNING {
 			continue
 		}
 
@@ -207,7 +206,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			id:         container.Id,
 			name:       container.Metadata.Name,
 			createTime: createdAt,
-			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			unknown:    container.State == internalapi.ContainerState_CONTAINER_UNKNOWN,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
@@ -298,7 +297,7 @@ func (cgc *containerGC) evictSandboxes(evictNonDeletedPods bool) error {
 		}
 
 		// Set ready sandboxes to be active.
-		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if sandbox.State == internalapi.PodSandboxState_SANDBOX_READY {
 			sandboxInfo.active = true
 		}
 
@@ -359,7 +358,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 					// TODO: we should handle container not found (i.e. container was deleted) case differently
 					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
 					klog.InfoS("Error getting ContainerStatus for containerID", "containerID", containerID, "err", err)
-				} else if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
+				} else if status.State != internalapi.ContainerState_CONTAINER_EXITED {
 					// Here is how container log rotation works (see containerLogManager#rotateLatestLog):
 					//
 					// 1. rename current log to rotated log file whose filename contains current timestamp (fmt.Sprintf("%s.%s", log, timestamp))

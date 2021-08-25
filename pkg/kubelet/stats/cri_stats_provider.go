@@ -29,10 +29,9 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -45,7 +44,7 @@ var (
 
 // cpuUsageRecord holds the cpu usage stats and the calculated usageNanoCores.
 type cpuUsageRecord struct {
-	stats          *runtimeapi.CpuUsage
+	stats          *internalapi.CpuUsage
 	usageNanoCores *uint64
 }
 
@@ -122,14 +121,14 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
 
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := p.runtimeService.ListContainers(&internalapi.ContainerFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
 	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
+	podSandboxMap := make(map[string]*internalapi.PodSandbox)
+	podSandboxes, err := p.runtimeService.ListPodSandbox(&internalapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
@@ -140,19 +139,19 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
-	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
+	fsIDtoInfo := make(map[internalapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
 
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	resp, err := p.runtimeService.ListContainerStats(&internalapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
 	containers = removeTerminatedContainers(containers)
 	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
+	containerMap := make(map[string]*internalapi.Container)
 	for _, c := range containers {
 		containerMap[c.Id] = c
 	}
@@ -220,14 +219,14 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 
 // ListPodCPUAndMemoryStats returns the CPU and Memory stats of all the pod-managed containers.
 func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := p.runtimeService.ListContainers(&internalapi.ContainerFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
 	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
+	podSandboxMap := make(map[string]*internalapi.PodSandbox)
+	podSandboxes, err := p.runtimeService.ListPodSandbox(&internalapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
@@ -239,14 +238,14 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	resp, err := p.runtimeService.ListContainerStats(&internalapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
 	containers = removeTerminatedContainers(containers)
 	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
+	containerMap := make(map[string]*internalapi.Container)
 	for _, c := range containers {
 		containerMap[c.Id] = c
 	}
@@ -357,7 +356,7 @@ func (p *criStatsProvider) ImageFsDevice() (string, error) {
 // getFsInfo returns the information of the filesystem with the specified
 // fsID. If any error occurs, this function logs the error and returns
 // nil.
-func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cadvisorapiv2.FsInfo {
+func (p *criStatsProvider) getFsInfo(fsID *internalapi.FilesystemIdentifier) *cadvisorapiv2.FsInfo {
 	if fsID == nil {
 		klog.V(2).InfoS("Failed to get filesystem info: fsID is nil")
 		return nil
@@ -377,7 +376,7 @@ func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cad
 }
 
 // buildPodStats returns a PodStats that identifies the Pod managing cinfo
-func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
+func buildPodStats(podSandbox *internalapi.PodSandbox) *statsapi.PodStats {
 	return &statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name:      podSandbox.Metadata.Name,
@@ -506,11 +505,11 @@ func (p *criStatsProvider) addProcessStats(
 }
 
 func (p *criStatsProvider) makeContainerStats(
-	stats *runtimeapi.ContainerStats,
-	container *runtimeapi.Container,
+	stats *internalapi.ContainerStats,
+	container *internalapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
-	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
-	meta *runtimeapi.PodSandboxMetadata,
+	fsIDtoInfo map[internalapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	meta *internalapi.PodSandboxMetadata,
 	updateCPUNanoCoreUsage bool,
 ) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
@@ -589,8 +588,8 @@ func (p *criStatsProvider) makeContainerStats(
 }
 
 func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
-	stats *runtimeapi.ContainerStats,
-	container *runtimeapi.Container,
+	stats *internalapi.ContainerStats,
+	container *internalapi.Container,
 ) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
@@ -629,7 +628,7 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 }
 
 // getContainerUsageNanoCores gets the cached usageNanoCores.
-func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
+func (p *criStatsProvider) getContainerUsageNanoCores(stats *internalapi.ContainerStats) *uint64 {
 	if stats == nil || stats.Attributes == nil {
 		return nil
 	}
@@ -649,7 +648,7 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 // getContainerUsageNanoCores computes usageNanoCores based on the given and
 // the cached usageCoreNanoSeconds, updates the cache with the computed
 // usageNanoCores, and returns the usageNanoCores.
-func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
+func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *internalapi.ContainerStats) *uint64 {
 	if stats == nil || stats.Attributes == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
 		return nil
 	}
@@ -710,8 +709,8 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 // This is needed because:
 // 1) PodSandbox may be recreated;
 // 2) Pod may be recreated with the same name and namespace.
-func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbox {
-	podMap := make(map[statsapi.PodReference][]*runtimeapi.PodSandbox)
+func removeTerminatedPods(pods []*internalapi.PodSandbox) []*internalapi.PodSandbox {
+	podMap := make(map[statsapi.PodReference][]*internalapi.PodSandbox)
 	// Sort order by create time
 	sort.Slice(pods, func(i, j int) bool {
 		return pods[i].CreatedAt < pods[j].CreatedAt
@@ -725,7 +724,7 @@ func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbo
 		podMap[refID] = append(podMap[refID], pod)
 	}
 
-	result := make([]*runtimeapi.PodSandbox, 0)
+	result := make([]*internalapi.PodSandbox, 0)
 	for _, refs := range podMap {
 		if len(refs) == 1 {
 			result = append(result, refs[0])
@@ -733,7 +732,7 @@ func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbo
 		}
 		found := false
 		for i := 0; i < len(refs); i++ {
-			if refs[i].State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			if refs[i].State == internalapi.PodSandboxState_SANDBOX_READY {
 				found = true
 				result = append(result, refs[i])
 			}
@@ -747,8 +746,8 @@ func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbo
 
 // removeTerminatedContainers removes all terminated containers since they should
 // not be used for usage calculations.
-func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeapi.Container {
-	containerMap := make(map[containerID][]*runtimeapi.Container)
+func removeTerminatedContainers(containers []*internalapi.Container) []*internalapi.Container {
+	containerMap := make(map[containerID][]*internalapi.Container)
 	// Sort order by create time
 	sort.Slice(containers, func(i, j int) bool {
 		return containers[i].CreatedAt < containers[j].CreatedAt
@@ -761,10 +760,10 @@ func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeap
 		containerMap[refID] = append(containerMap[refID], container)
 	}
 
-	result := make([]*runtimeapi.Container, 0)
+	result := make([]*internalapi.Container, 0)
 	for _, refs := range containerMap {
 		for i := 0; i < len(refs); i++ {
-			if refs[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+			if refs[i].State == internalapi.ContainerState_CONTAINER_RUNNING {
 				result = append(result, refs[i])
 			}
 		}

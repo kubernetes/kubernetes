@@ -29,8 +29,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
@@ -132,11 +131,11 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	imageStatus, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+	imageStatus, err := rp.imageService.ImageStatus(&internalapi.ImageSpec{Image: image})
 	if err == nil && imageStatus != nil {
 		return nil, nil
 	}
-	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
+	_, err = rp.imageService.PullImage(&internalapi.ImageSpec{Image: image}, nil, nil)
 	return nil, err
 }
 

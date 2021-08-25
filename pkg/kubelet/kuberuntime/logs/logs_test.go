@@ -20,17 +20,17 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	apitesting "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestLogOptions(t *testing.T) {
@@ -177,15 +177,15 @@ func TestReadLogs(t *testing.T) {
 			fakeRuntimeService := &apitesting.FakeRuntimeService{
 				Containers: map[string]*apitesting.FakeContainer{
 					containerID: {
-						ContainerStatus: runtimeapi.ContainerStatus{
-							State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+						ContainerStatus: internalapi.ContainerStatus{
+							State: internalapi.ContainerState_CONTAINER_RUNNING,
 						},
 					},
 				},
 			}
 			// If follow is specified, mark the container as exited or else ReadLogs will run indefinitely
 			if tc.podLogOptions.Follow {
-				fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
+				fakeRuntimeService.Containers[containerID].State = internalapi.ContainerState_CONTAINER_EXITED
 			}
 
 			opts := NewLogOptions(&tc.podLogOptions, time.Now())
@@ -219,7 +219,7 @@ func TestParseLog(t *testing.T) {
 			line: `{"log":"docker stdout test log","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}` + "\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stdout,
+				stream:    internalapi.Stdout,
 				log:       []byte("docker stdout test log"),
 			},
 		},
@@ -227,7 +227,7 @@ func TestParseLog(t *testing.T) {
 			line: `{"log":"docker stderr test log","stream":"stderr","time":"2016-10-20T18:39:20.57606443Z"}` + "\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stderr,
+				stream:    internalapi.Stderr,
 				log:       []byte("docker stderr test log"),
 			},
 		},
@@ -235,7 +235,7 @@ func TestParseLog(t *testing.T) {
 			line: "2016-10-20T18:39:20.57606443Z stdout F cri stdout test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stdout,
+				stream:    internalapi.Stdout,
 				log:       []byte("cri stdout test log\n"),
 			},
 		},
@@ -243,7 +243,7 @@ func TestParseLog(t *testing.T) {
 			line: "2016-10-20T18:39:20.57606443Z stderr F cri stderr test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stderr,
+				stream:    internalapi.Stderr,
 				log:       []byte("cri stderr test log\n"),
 			},
 		},
@@ -256,7 +256,7 @@ func TestParseLog(t *testing.T) {
 			line: "2016-10-20T18:39:20.57606443Z stdout P cri stdout partial test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stdout,
+				stream:    internalapi.Stdout,
 				log:       []byte("cri stdout partial test log"),
 			},
 		},
@@ -264,7 +264,7 @@ func TestParseLog(t *testing.T) {
 			line: "2016-10-20T18:39:20.57606443Z stdout P:TAG1:TAG2 cri stdout partial test log\n",
 			msg: &logMessage{
 				timestamp: timestamp,
-				stream:    runtimeapi.Stdout,
+				stream:    internalapi.Stdout,
 				log:       []byte("cri stdout partial test log"),
 			},
 		},
@@ -287,26 +287,26 @@ func TestWriteLogs(t *testing.T) {
 	log := "abcdefg\n"
 
 	for c, test := range []struct {
-		stream       runtimeapi.LogStreamType
+		stream       internalapi.LogStreamType
 		since        time.Time
 		timestamp    bool
 		expectStdout string
 		expectStderr string
 	}{
 		{ // stderr log
-			stream:       runtimeapi.Stderr,
+			stream:       internalapi.Stderr,
 			expectStderr: log,
 		},
 		{ // stdout log
-			stream:       runtimeapi.Stdout,
+			stream:       internalapi.Stdout,
 			expectStdout: log,
 		},
 		{ // since is after timestamp
-			stream: runtimeapi.Stdout,
+			stream: internalapi.Stdout,
 			since:  timestamp.Add(1 * time.Second),
 		},
 		{ // timestamp enabled
-			stream:       runtimeapi.Stderr,
+			stream:       internalapi.Stderr,
 			timestamp:    true,
 			expectStderr: timestamp.Format(timeFormatOut) + " " + log,
 		},
@@ -383,13 +383,13 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
-			msg.stream = runtimeapi.Stdout
+			msg.stream = internalapi.Stdout
 			if err := w.write(msg); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
-			msg.stream = runtimeapi.Stderr
+			msg.stream = internalapi.Stderr
 			if err := w.write(msg); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}

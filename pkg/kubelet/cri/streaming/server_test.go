@@ -34,7 +34,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 )
 
@@ -67,12 +67,12 @@ func TestGetExec(t *testing.T) {
 	}, nil)
 	assert.NoError(t, err)
 
-	assertRequestToken := func(expectedReq *runtimeapi.ExecRequest, cache *requestCache, token string) {
+	assertRequestToken := func(expectedReq *internalapi.ExecRequest, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
 		assert.Equal(t, expectedReq, req)
 	}
-	request := &runtimeapi.ExecRequest{
+	request := &internalapi.ExecRequest{
 		ContainerId: testContainerID,
 		Cmd:         []string{"echo", "foo"},
 		Tty:         true,
@@ -155,7 +155,7 @@ func TestValidateExecAttachRequest(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			for _, c := range tc.configs {
 				// validate the exec request.
-				execReq := &runtimeapi.ExecRequest{
+				execReq := &internalapi.ExecRequest{
 					ContainerId: testContainerID,
 					Cmd:         []string{"date"},
 					Tty:         c.tty,
@@ -167,7 +167,7 @@ func TestValidateExecAttachRequest(t *testing.T) {
 				assert.Equal(t, tc.expectErr, err != nil, "config: %v,  err: %v", c, err)
 
 				// validate the attach request.
-				attachReq := &runtimeapi.AttachRequest{
+				attachReq := &internalapi.AttachRequest{
 					ContainerId: testContainerID,
 					Tty:         c.tty,
 					Stdin:       c.stdin,
@@ -193,13 +193,13 @@ func TestGetAttach(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	assertRequestToken := func(expectedReq *runtimeapi.AttachRequest, cache *requestCache, token string) {
+	assertRequestToken := func(expectedReq *internalapi.AttachRequest, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
 		assert.Equal(t, expectedReq, req)
 	}
 
-	request := &runtimeapi.AttachRequest{
+	request := &internalapi.AttachRequest{
 		ContainerId: testContainerID,
 		Stdin:       true,
 		Tty:         true,
@@ -225,7 +225,7 @@ func TestGetAttach(t *testing.T) {
 
 func TestGetPortForward(t *testing.T) {
 	podSandboxID := testPodSandboxID
-	request := &runtimeapi.PortForwardRequest{
+	request := &internalapi.PortForwardRequest{
 		PodSandboxId: podSandboxID,
 		Port:         []int32{1, 2, 3, 4},
 	}
@@ -242,7 +242,7 @@ func TestGetPortForward(t *testing.T) {
 		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := serv.(*server).cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
-		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
+		assert.Equal(t, testPodSandboxID, req.(*internalapi.PortForwardRequest).PodSandboxId)
 	}
 
 	{ // TLS
@@ -258,7 +258,7 @@ func TestGetPortForward(t *testing.T) {
 		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := tlsServer.(*server).cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
-		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
+		assert.Equal(t, testPodSandboxID, req.(*internalapi.PortForwardRequest).PodSandboxId)
 	}
 }
 
@@ -274,7 +274,7 @@ func TestServePortForward(t *testing.T) {
 	s, testServer := startTestServer(t)
 	defer testServer.Close()
 
-	resp, err := s.GetPortForward(&runtimeapi.PortForwardRequest{
+	resp, err := s.GetPortForward(&internalapi.PortForwardRequest{
 		PodSandboxId: testPodSandboxID,
 	})
 	require.NoError(t, err)
@@ -316,7 +316,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 	containerID := testContainerID
 	switch commandType {
 	case "exec":
-		resp, err := s.GetExec(&runtimeapi.ExecRequest{
+		resp, err := s.GetExec(&internalapi.ExecRequest{
 			ContainerId: containerID,
 			Cmd:         []string{"echo"},
 			Stdin:       stdin,
@@ -327,7 +327,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 		reqURL, err = url.Parse(resp.Url)
 		require.NoError(t, err)
 	case "attach":
-		resp, err := s.GetAttach(&runtimeapi.AttachRequest{
+		resp, err := s.GetAttach(&internalapi.AttachRequest{
 			ContainerId: containerID,
 			Stdin:       stdin,
 			Stdout:      stdout,

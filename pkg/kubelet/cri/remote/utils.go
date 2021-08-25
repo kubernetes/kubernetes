@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
 // maxMsgSize use 16MB as the default message size limit.
@@ -39,7 +39,7 @@ func getContextWithCancel() (context.Context, context.CancelFunc) {
 }
 
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
-func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
+func verifySandboxStatus(status *internalapi.PodSandboxStatus) error {
 	if status.Id == "" {
 		return fmt.Errorf("status.Id is not set")
 	}
@@ -61,7 +61,7 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 }
 
 // verifyContainerStatus verified whether all required fields are set in ContainerStatus.
-func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
+func verifyContainerStatus(status *internalapi.ContainerStatus) error {
 	if status.Id == "" {
 		return fmt.Errorf("status.Id is not set")
 	}

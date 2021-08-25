@@ -26,8 +26,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -205,7 +205,7 @@ func TestPullWithSecrets(t *testing.T) {
 		imageName           string
 		passedSecrets       []v1.Secret
 		builtInDockerConfig credentialprovider.DockerConfig
-		expectedAuth        *runtimeapi.AuthConfig
+		expectedAuth        *internalapi.AuthConfig
 	}{
 		"no matching secrets": {
 			"ubuntu",
@@ -219,7 +219,7 @@ func TestPullWithSecrets(t *testing.T) {
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
 			}),
-			&runtimeapi.AuthConfig{Username: "built-in", Password: "password"},
+			&internalapi.AuthConfig{Username: "built-in", Password: "password"},
 		},
 		"default keyring secrets unused": {
 			"ubuntu",
@@ -235,7 +235,7 @@ func TestPullWithSecrets(t *testing.T) {
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
 			}),
-			&runtimeapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
+			&internalapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
@@ -243,7 +243,7 @@ func TestPullWithSecrets(t *testing.T) {
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
 			}),
-			&runtimeapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
+			&internalapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
 		},
 	}
 	for description, test := range tests {
@@ -254,7 +254,7 @@ func TestPullWithSecrets(t *testing.T) {
 
 		_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
-		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
+		fakeImageService.AssertImagePulledWithAuth(t, &internalapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
 	}
 }
 

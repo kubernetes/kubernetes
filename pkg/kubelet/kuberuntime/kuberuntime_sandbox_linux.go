@@ -22,13 +22,13 @@ package kuberuntime
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
-func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
-	resources := &runtimeapi.LinuxContainerResources{}
+func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *internalapi.LinuxContainerResources {
+	resources := &internalapi.LinuxContainerResources{}
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		cpu := pod.Spec.Overhead.Cpu()
 		memory := pod.Spec.Overhead.Memory()
@@ -41,12 +41,12 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 	return resources
 }
 
-func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *internalapi.LinuxContainerResources {
 	req, lim := resourcehelper.PodRequestsAndLimitsWithoutOverhead(pod)
 	return m.calculateLinuxResources(req.Cpu(), lim.Cpu(), lim.Memory())
 }
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
+func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *internalapi.PodSandboxConfig) error {
 
 	if config.Linux == nil {
 		return nil

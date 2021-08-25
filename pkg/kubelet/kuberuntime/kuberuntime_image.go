@@ -19,16 +19,16 @@ package kuberuntime
 import (
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *internalapi.PodSandboxConfig) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
@@ -57,7 +57,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		auth := &runtimeapi.AuthConfig{
+		auth := &internalapi.AuthConfig{
 			Username:      currentCreds.Username,
 			Password:      currentCreds.Password,
 			Auth:          currentCreds.Auth,
@@ -117,7 +117,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 
 // RemoveImage removes the specified image.
 func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	err := m.imageService.RemoveImage(&runtimeapi.ImageSpec{Image: image.Image})
+	err := m.imageService.RemoveImage(&internalapi.ImageSpec{Image: image.Image})
 	if err != nil {
 		klog.ErrorS(err, "Failed to remove image", "image", image.Image)
 		return err

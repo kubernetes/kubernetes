@@ -47,9 +47,9 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -204,7 +204,7 @@ func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerNa
 		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
 	}
 	// Always use testContainerID
-	resp, err := fk.streamingRuntime.GetExec(&runtimeapi.ExecRequest{
+	resp, err := fk.streamingRuntime.GetExec(&internalapi.ExecRequest{
 		ContainerId: testContainerID,
 		Cmd:         cmd,
 		Tty:         streamOpts.TTY,
@@ -223,7 +223,7 @@ func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, container
 		fk.getAttachCheck(podFullName, podUID, containerName, streamOpts)
 	}
 	// Always use testContainerID
-	resp, err := fk.streamingRuntime.GetAttach(&runtimeapi.AttachRequest{
+	resp, err := fk.streamingRuntime.GetAttach(&internalapi.AttachRequest{
 		ContainerId: testContainerID,
 		Tty:         streamOpts.TTY,
 		Stdin:       streamOpts.Stdin,
@@ -241,7 +241,7 @@ func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types
 		fk.getPortForwardCheck(podName, podNamespace, podUID, portForwardOpts)
 	}
 	// Always use testPodSandboxID
-	resp, err := fk.streamingRuntime.GetPortForward(&runtimeapi.PortForwardRequest{
+	resp, err := fk.streamingRuntime.GetPortForward(&internalapi.PortForwardRequest{
 		PodSandboxId: testPodSandboxID,
 		Port:         portForwardOpts.Ports,
 	})

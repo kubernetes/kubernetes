@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -157,9 +157,9 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)
-						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
-							State: &runtimeapi.ContainerStateValue{
-								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+						containers, err := runtime.ListContainers(&internalapi.ContainerFilter{
+							State: &internalapi.ContainerStateValue{
+								State: internalapi.ContainerState_CONTAINER_RUNNING,
 							},
 						})
 						framework.ExpectNoError(err)

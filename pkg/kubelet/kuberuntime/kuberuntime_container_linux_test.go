@@ -32,27 +32,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *internalapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
 	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP, []string{podIP})
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
-	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
+	envs := make([]*internalapi.KeyValue, len(opts.Envs))
 
-	expectedConfig := &runtimeapi.ContainerConfig{
-		Metadata: &runtimeapi.ContainerMetadata{
+	expectedConfig := &internalapi.ContainerConfig{
+		Metadata: &internalapi.ContainerMetadata{
 			Name:    container.Name,
 			Attempt: restartCountUint32,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: container.Image},
+		Image:       &internalapi.ImageSpec{Image: container.Image},
 		Command:     container.Command,
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
@@ -134,8 +134,8 @@ func TestGenerateContainerConfig(t *testing.T) {
 	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err)
 
-	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID})
+	imageID, _ := imageService.PullImage(&internalapi.ImageSpec{Image: "busybox"}, nil, nil)
+	image, _ := imageService.ImageStatus(&internalapi.ImageSpec{Image: imageID})
 
 	image.Uid = nil
 	image.Username = "test"
@@ -156,7 +156,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 	tests := []struct {
 		name         string
 		podResources v1.ResourceRequirements
-		expected     *runtimeapi.LinuxContainerResources
+		expected     *internalapi.LinuxContainerResources
 	}{
 		{
 			name: "Request 128M/1C, Limit 256M/3C",
@@ -170,7 +170,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 					v1.ResourceCPU:    resource.MustParse("3"),
 				},
 			},
-			expected: &runtimeapi.LinuxContainerResources{
+			expected: &internalapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           300000,
 				CpuShares:          1024,
@@ -185,7 +185,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 					v1.ResourceCPU:    resource.MustParse("2"),
 				},
 			},
-			expected: &runtimeapi.LinuxContainerResources{
+			expected: &internalapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           0,
 				CpuShares:          2048,
@@ -234,14 +234,14 @@ func TestCalculateLinuxResources(t *testing.T) {
 		cpuReq   resource.Quantity
 		cpuLim   resource.Quantity
 		memLim   resource.Quantity
-		expected *runtimeapi.LinuxContainerResources
+		expected *internalapi.LinuxContainerResources
 	}{
 		{
 			name:   "Request128MBLimit256MB",
 			cpuReq: resource.MustParse("1"),
 			cpuLim: resource.MustParse("2"),
 			memLim: resource.MustParse("128Mi"),
-			expected: &runtimeapi.LinuxContainerResources{
+			expected: &internalapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
 				CpuShares:          1024,
@@ -253,7 +253,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 			cpuReq: resource.MustParse("2"),
 			cpuLim: resource.MustParse("8"),
 			memLim: resource.MustParse("0"),
-			expected: &runtimeapi.LinuxContainerResources{
+			expected: &internalapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           800000,
 				CpuShares:          2048,
@@ -325,7 +325,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	pod2MemoryHigh := float64(memoryNodeAllocatable.Value()) * m.memoryThrottlingFactor
 
 	type expectedResult struct {
-		containerConfig *runtimeapi.LinuxContainerConfig
+		containerConfig *internalapi.LinuxContainerConfig
 		memoryLow       int64
 		memoryHigh      int64
 	}
@@ -363,11 +363,11 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
-	var baseHugepage []*runtimeapi.HugepageLimit
+	var baseHugepage []*internalapi.HugepageLimit
 
 	// For each page size, limit to 0.
 	for _, pageSize := range cgroupfs.HugePageSizes {
-		baseHugepage = append(baseHugepage, &runtimeapi.HugepageLimit{
+		baseHugepage = append(baseHugepage, &internalapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),
 		})
@@ -376,7 +376,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 	tests := []struct {
 		name      string
 		resources v1.ResourceRequirements
-		expected  []*runtimeapi.HugepageLimit
+		expected  []*internalapi.HugepageLimit
 	}{
 		{
 			name: "Success2MB",
@@ -385,7 +385,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-2Mi": resource.MustParse("2Mi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "2MB",
 					Limit:    2097152,
@@ -399,7 +399,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-1Gi": resource.MustParse("2Gi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "1GB",
 					Limit:    2147483648,
@@ -413,7 +413,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-2MB": resource.MustParse("2Mi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "2MB",
 					Limit:    0,
@@ -427,7 +427,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-1GB": resource.MustParse("2Gi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "1GB",
 					Limit:    0,
@@ -443,7 +443,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-1Gi":                 resource.MustParse("2Gi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "2MB",
 					Limit:    2097152,
@@ -463,7 +463,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					"hugepages-1GB":                 resource.MustParse("2Gi"),
 				},
 			},
-			expected: []*runtimeapi.HugepageLimit{
+			expected: []*internalapi.HugepageLimit{
 				{
 					PageSize: "2MB",
 					Limit:    0,
@@ -530,7 +530,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		name   string
 		pod    *v1.Pod
 		target *kubecontainer.ContainerID
-		want   *runtimeapi.NamespaceOption
+		want   *internalapi.NamespaceOption
 	}{
 		{
 			"Default namespaces",
@@ -542,8 +542,8 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 				},
 			},
 			nil,
-			&runtimeapi.NamespaceOption{
-				Pid: runtimeapi.NamespaceMode_CONTAINER,
+			&internalapi.NamespaceOption{
+				Pid: internalapi.NamespaceMode_CONTAINER,
 			},
 		},
 		{
@@ -557,8 +557,8 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 				},
 			},
 			nil,
-			&runtimeapi.NamespaceOption{
-				Pid: runtimeapi.NamespaceMode_POD,
+			&internalapi.NamespaceOption{
+				Pid: internalapi.NamespaceMode_POD,
 			},
 		},
 		{
@@ -571,8 +571,8 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 				},
 			},
 			&kubecontainer.ContainerID{Type: "docker", ID: "really-long-id-string"},
-			&runtimeapi.NamespaceOption{
-				Pid:      runtimeapi.NamespaceMode_TARGET,
+			&internalapi.NamespaceOption{
+				Pid:      internalapi.NamespaceMode_TARGET,
 				TargetId: "really-long-id-string",
 			},
 		},

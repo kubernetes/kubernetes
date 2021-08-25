@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
@@ -382,7 +382,7 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 
 	for _, sandboxStatus := range status.SandboxStatuses {
 		// If at least one sandbox is ready, then use this status update's pod IP
-		if sandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if sandboxStatus.State == internalapi.PodSandboxState_SANDBOX_READY {
 			return status.IPs
 		}
 	}

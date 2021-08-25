@@ -33,9 +33,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	critest "k8s.io/cri-api/pkg/apis/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -185,7 +185,7 @@ func TestCRIListPodStats(t *testing.T) {
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
 		container0, container1, container2, container3, container4, container5, container6, container7, container8,
 	})
-	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
+	fakeRuntimeService.SetFakeContainerStats([]*internalapi.ContainerStats{
 		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
 	})
 
@@ -252,7 +252,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(sandbox0.CreatedAt, p0.StartTime.UnixNano())
 	assert.Equal(2, len(p0.Containers))
 
-	checkEphemeralStorageStats(assert, p0, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats0, containerStats1},
+	checkEphemeralStorageStats(assert, p0, ephemeralVolumes, []*internalapi.ContainerStats{containerStats0, containerStats1},
 		[]*volume.Metrics{containerLogStats0, containerLogStats1}, podLogStats0)
 
 	containerStatsMap := make(map[string]statsapi.ContainerStats)
@@ -280,7 +280,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
 	assert.Equal(1, len(p1.Containers))
 
-	checkEphemeralStorageStats(assert, p1, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats2},
+	checkEphemeralStorageStats(assert, p1, ephemeralVolumes, []*internalapi.ContainerStats{containerStats2},
 		[]*volume.Metrics{containerLogStats2}, podLogStats1)
 	c2 := p1.Containers[0]
 	assert.Equal(cName2, c2.Name)
@@ -296,7 +296,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
 	assert.Equal(1, len(p2.Containers))
 
-	checkEphemeralStorageStats(assert, p2, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats4},
+	checkEphemeralStorageStats(assert, p2, ephemeralVolumes, []*internalapi.ContainerStats{containerStats4},
 		[]*volume.Metrics{containerLogStats4}, nil)
 
 	c3 := p2.Containers[0]
@@ -376,7 +376,7 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
 		container0, container1,
 	})
-	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
+	fakeRuntimeService.SetFakeContainerStats([]*internalapi.ContainerStats{
 		containerStats0, containerStats1,
 	})
 
@@ -521,7 +521,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
 		container0, container1, container2, container3, container4, container5, container6, container7, container8, container9,
 	})
-	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
+	fakeRuntimeService.SetFakeContainerStats([]*internalapi.ContainerStats{
 		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8, containerStats9,
 	})
 
@@ -658,7 +658,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeImageService   = critest.NewFakeImageService()
 	)
 	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
-	fakeImageService.SetFakeFilesystemUsage([]*runtimeapi.FilesystemUsage{
+	fakeImageService.SetFakeFilesystemUsage([]*internalapi.FilesystemUsage{
 		imageFsUsage,
 	})
 
@@ -688,18 +688,18 @@ func TestCRIImagesFsStats(t *testing.T) {
 
 func makeFakePodSandbox(name, uid, namespace string, terminated bool) *critest.FakePodSandbox {
 	p := &critest.FakePodSandbox{
-		PodSandboxStatus: runtimeapi.PodSandboxStatus{
-			Metadata: &runtimeapi.PodSandboxMetadata{
+		PodSandboxStatus: internalapi.PodSandboxStatus{
+			Metadata: &internalapi.PodSandboxMetadata{
 				Name:      name,
 				Uid:       uid,
 				Namespace: namespace,
 			},
-			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
+			State:     internalapi.PodSandboxState_SANDBOX_READY,
 			CreatedAt: time.Now().UnixNano(),
 		},
 	}
 	if terminated {
-		p.PodSandboxStatus.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+		p.PodSandboxStatus.State = internalapi.PodSandboxState_SANDBOX_NOTREADY
 	}
 	p.PodSandboxStatus.Id = strings.ReplaceAll(string(uuid.NewUUID()), "-", "")
 	return p
@@ -709,9 +709,9 @@ func makeFakeContainer(sandbox *critest.FakePodSandbox, name string, attempt uin
 	sandboxID := sandbox.PodSandboxStatus.Id
 	c := &critest.FakeContainer{
 		SandboxID: sandboxID,
-		ContainerStatus: runtimeapi.ContainerStatus{
-			Metadata:  &runtimeapi.ContainerMetadata{Name: name, Attempt: attempt},
-			Image:     &runtimeapi.ImageSpec{},
+		ContainerStatus: internalapi.ContainerStatus{
+			Metadata:  &internalapi.ContainerMetadata{Name: name, Attempt: attempt},
+			Image:     &internalapi.ImageSpec{},
 			ImageRef:  "fake-image-ref",
 			CreatedAt: time.Now().UnixNano(),
 		},
@@ -723,49 +723,49 @@ func makeFakeContainer(sandbox *critest.FakePodSandbox, name string, attempt uin
 		"io.kubernetes.container.name": name,
 	}
 	if terminated {
-		c.ContainerStatus.State = runtimeapi.ContainerState_CONTAINER_EXITED
+		c.ContainerStatus.State = internalapi.ContainerState_CONTAINER_EXITED
 	} else {
-		c.ContainerStatus.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+		c.ContainerStatus.State = internalapi.ContainerState_CONTAINER_RUNNING
 	}
 	c.ContainerStatus.Id = strings.ReplaceAll(string(uuid.NewUUID()), "-", "")
 	return c
 }
 
-func makeFakeContainerStats(container *critest.FakeContainer, imageFsMountpoint string) *runtimeapi.ContainerStats {
-	containerStats := &runtimeapi.ContainerStats{
-		Attributes: &runtimeapi.ContainerAttributes{
+func makeFakeContainerStats(container *critest.FakeContainer, imageFsMountpoint string) *internalapi.ContainerStats {
+	containerStats := &internalapi.ContainerStats{
+		Attributes: &internalapi.ContainerAttributes{
 			Id:       container.ContainerStatus.Id,
 			Metadata: container.ContainerStatus.Metadata,
 		},
-		WritableLayer: &runtimeapi.FilesystemUsage{
+		WritableLayer: &internalapi.FilesystemUsage{
 			Timestamp:  time.Now().UnixNano(),
-			FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: imageFsMountpoint},
-			UsedBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64() / 100},
-			InodesUsed: &runtimeapi.UInt64Value{Value: rand.Uint64() / 100},
+			FsId:       &internalapi.FilesystemIdentifier{Mountpoint: imageFsMountpoint},
+			UsedBytes:  &internalapi.UInt64Value{Value: rand.Uint64() / 100},
+			InodesUsed: &internalapi.UInt64Value{Value: rand.Uint64() / 100},
 		},
 	}
-	if container.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+	if container.State == internalapi.ContainerState_CONTAINER_EXITED {
 		containerStats.Cpu = nil
 		containerStats.Memory = nil
 	} else {
-		containerStats.Cpu = &runtimeapi.CpuUsage{
+		containerStats.Cpu = &internalapi.CpuUsage{
 			Timestamp:            time.Now().UnixNano(),
-			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: rand.Uint64()},
+			UsageCoreNanoSeconds: &internalapi.UInt64Value{Value: rand.Uint64()},
 		}
-		containerStats.Memory = &runtimeapi.MemoryUsage{
+		containerStats.Memory = &internalapi.MemoryUsage{
 			Timestamp:       time.Now().UnixNano(),
-			WorkingSetBytes: &runtimeapi.UInt64Value{Value: rand.Uint64()},
+			WorkingSetBytes: &internalapi.UInt64Value{Value: rand.Uint64()},
 		}
 	}
 	return containerStats
 }
 
-func makeFakeImageFsUsage(fsMountpoint string) *runtimeapi.FilesystemUsage {
-	return &runtimeapi.FilesystemUsage{
+func makeFakeImageFsUsage(fsMountpoint string) *internalapi.FilesystemUsage {
+	return &internalapi.FilesystemUsage{
 		Timestamp:  time.Now().UnixNano(),
-		FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: fsMountpoint},
-		UsedBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64()},
-		InodesUsed: &runtimeapi.UInt64Value{Value: rand.Uint64()},
+		FsId:       &internalapi.FilesystemIdentifier{Mountpoint: fsMountpoint},
+		UsedBytes:  &internalapi.UInt64Value{Value: rand.Uint64()},
+		InodesUsed: &internalapi.UInt64Value{Value: rand.Uint64()},
 	}
 }
 
@@ -819,7 +819,7 @@ func checkCRIAcceleratorStats(assert *assert.Assertions, actual statsapi.Contain
 	}
 }
 
-func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *runtimeapi.ContainerStats, imageFsInfo *cadvisorapiv2.FsInfo) {
+func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *internalapi.ContainerStats, imageFsInfo *cadvisorapiv2.FsInfo) {
 	assert.Equal(cs.WritableLayer.Timestamp, actual.Rootfs.Time.UnixNano())
 	if imageFsInfo != nil {
 		assert.Equal(imageFsInfo.Available, *actual.Rootfs.AvailableBytes)
@@ -849,7 +849,7 @@ func checkCRILogsStats(assert *assert.Assertions, actual statsapi.ContainerStats
 func checkEphemeralStorageStats(assert *assert.Assertions,
 	actual statsapi.PodStats,
 	volumes []statsapi.VolumeStats,
-	containers []*runtimeapi.ContainerStats,
+	containers []*internalapi.ContainerStats,
 	containerLogStats []*volume.Metrics,
 	podLogStats *volume.Metrics) {
 	var totalUsed, inodesUsed uint64
@@ -916,7 +916,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 	tests := []struct {
 		desc          string
 		cpuUsageCache map[string]*cpuUsageRecord
-		stats         *runtimeapi.ContainerStats
+		stats         *internalapi.ContainerStats
 		expected      *uint64
 	}{
 		{
@@ -926,8 +926,8 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		{
 			desc:          "should return nil if cpu stats is nil",
 			cpuUsageCache: map[string]*cpuUsageRecord{},
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
 				Cpu: nil,
@@ -936,11 +936,11 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		{
 			desc:          "should return nil if usageCoreNanoSeconds is nil",
 			cpuUsageCache: map[string]*cpuUsageRecord{},
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp:            1,
 					UsageCoreNanoSeconds: nil,
 				},
@@ -949,13 +949,13 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		{
 			desc:          "should return nil if cpu stats is not cached yet",
 			cpuUsageCache: map[string]*cpuUsageRecord{},
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp: 1,
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+					UsageCoreNanoSeconds: &internalapi.UInt64Value{
 						Value: 10000000000,
 					},
 				},
@@ -963,22 +963,22 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc: "should return zero value if cached cpu stats is equal to current value",
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp: 1,
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+					UsageCoreNanoSeconds: &internalapi.UInt64Value{
 						Value: 10000000000,
 					},
 				},
 			},
 			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					stats: &runtimeapi.CpuUsage{
+					stats: &internalapi.CpuUsage{
 						Timestamp: 0,
-						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						UsageCoreNanoSeconds: &internalapi.UInt64Value{
 							Value: 10000000000,
 						},
 					},
@@ -988,22 +988,22 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc: "should return correct value if cached cpu stats is not equal to current value",
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp: int64(time.Second / time.Nanosecond),
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+					UsageCoreNanoSeconds: &internalapi.UInt64Value{
 						Value: 20000000000,
 					},
 				},
 			},
 			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					stats: &runtimeapi.CpuUsage{
+					stats: &internalapi.CpuUsage{
 						Timestamp: 0,
-						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						UsageCoreNanoSeconds: &internalapi.UInt64Value{
 							Value: 10000000000,
 						},
 					},
@@ -1013,22 +1013,22 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc: "should return correct value if elapsed UsageCoreNanoSeconds exceeds 18446744073",
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp: int64(time.Second / time.Nanosecond),
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+					UsageCoreNanoSeconds: &internalapi.UInt64Value{
 						Value: 68172016162105,
 					},
 				},
 			},
 			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					stats: &runtimeapi.CpuUsage{
+					stats: &internalapi.CpuUsage{
 						Timestamp: 0,
-						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						UsageCoreNanoSeconds: &internalapi.UInt64Value{
 							Value: 67983588375722,
 						},
 					},
@@ -1038,22 +1038,22 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc: "should return nil if cpuacct is reset to 0 in a live container",
-			stats: &runtimeapi.ContainerStats{
-				Attributes: &runtimeapi.ContainerAttributes{
+			stats: &internalapi.ContainerStats{
+				Attributes: &internalapi.ContainerAttributes{
 					Id: "1",
 				},
-				Cpu: &runtimeapi.CpuUsage{
+				Cpu: &internalapi.CpuUsage{
 					Timestamp: 2,
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+					UsageCoreNanoSeconds: &internalapi.UInt64Value{
 						Value: 0,
 					},
 				},
 			},
 			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					stats: &runtimeapi.CpuUsage{
+					stats: &internalapi.CpuUsage{
 						Timestamp: 1,
-						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						UsageCoreNanoSeconds: &internalapi.UInt64Value{
 							Value: 10000000000,
 						},
 					},

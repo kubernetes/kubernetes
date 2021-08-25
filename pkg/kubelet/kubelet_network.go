@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -81,6 +81,6 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 // GetPodDNS returns DNS settings for the pod.
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
-func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*internalapi.DNSConfig, error) {
 	return kl.dnsConfigurer.GetPodDNS(pod)
 }

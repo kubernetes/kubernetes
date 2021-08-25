@@ -27,15 +27,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
 func TestApplySandboxResources(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
-	config := &runtimeapi.PodSandboxConfig{
-		Linux: &runtimeapi.LinuxPodSandboxConfig{},
+	config := &internalapi.PodSandboxConfig{
+		Linux: &internalapi.LinuxPodSandboxConfig{},
 	}
 
 	require.NoError(t, err)
@@ -43,8 +43,8 @@ func TestApplySandboxResources(t *testing.T) {
 	tests := []struct {
 		description      string
 		pod              *v1.Pod
-		expectedResource *runtimeapi.LinuxContainerResources
-		expectedOverhead *runtimeapi.LinuxContainerResources
+		expectedResource *internalapi.LinuxContainerResources
+		expectedOverhead *internalapi.LinuxContainerResources
 	}{
 		{
 			description: "pod with overhead defined",
@@ -75,13 +75,13 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 			},
-			expectedResource: &runtimeapi.LinuxContainerResources{
+			expectedResource: &internalapi.LinuxContainerResources{
 				MemoryLimitInBytes: 268435456,
 				CpuPeriod:          100000,
 				CpuQuota:           400000,
 				CpuShares:          2048,
 			},
-			expectedOverhead: &runtimeapi.LinuxContainerResources{
+			expectedOverhead: &internalapi.LinuxContainerResources{
 				MemoryLimitInBytes: 134217728,
 				CpuPeriod:          100000,
 				CpuQuota:           100000,
@@ -111,13 +111,13 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 			},
-			expectedResource: &runtimeapi.LinuxContainerResources{
+			expectedResource: &internalapi.LinuxContainerResources{
 				MemoryLimitInBytes: 268435456,
 				CpuPeriod:          100000,
 				CpuQuota:           0,
 				CpuShares:          2,
 			},
-			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			expectedOverhead: &internalapi.LinuxContainerResources{},
 		},
 	}
 

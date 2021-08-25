@@ -37,12 +37,11 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -314,7 +313,7 @@ func newRuntimeVersion(version string) (*utilversion.Version, error) {
 	return utilversion.ParseGeneric(version)
 }
 
-func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeapi.VersionResponse, error) {
+func (m *kubeGenericRuntimeManager) getTypedVersion() (*internalapi.VersionResponse, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("get remote runtime typed version failed: %v", err)
@@ -340,7 +339,7 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	if err != nil {
 		return nil, err
 	}
-	typedVersion := versionObject.(*runtimeapi.VersionResponse)
+	typedVersion := versionObject.(*internalapi.VersionResponse)
 
 	return newRuntimeVersion(typedVersion.RuntimeApiVersion)
 }
@@ -487,7 +486,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 	readySandboxCount := 0
 	for _, s := range podStatus.SandboxStatuses {
-		if s.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if s.State == internalapi.PodSandboxState_SANDBOX_READY {
 			readySandboxCount++
 		}
 	}
@@ -499,7 +498,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
-	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
+	if sandboxStatus.State != internalapi.PodSandboxState_SANDBOX_READY {
 		klog.V(2).InfoS("No ready sandbox for pod can be found. Need to start a new one", "pod", klog.KObj(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
@@ -1030,7 +1029,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 
 	klog.V(4).InfoS("getSandboxIDByPodUID got sandbox IDs for pod", "podSandboxID", podSandboxIDs, "pod", klog.KObj(pod))
 
-	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
+	sandboxStatuses := make([]*internalapi.PodSandboxStatus, len(podSandboxIDs))
 	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
@@ -1041,7 +1040,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		sandboxStatuses[idx] = podSandboxStatus
 
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if idx == 0 && podSandboxStatus.State == internalapi.PodSandboxState_SANDBOX_READY {
 			podIPs = m.determinePodSandboxIPs(namespace, name, podSandboxStatus)
 		}
 	}
@@ -1078,8 +1077,8 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 	// field of the config?
 	klog.InfoS("Updating runtime config through cri with podcidr", "CIDR", podCIDR)
 	return m.runtimeService.UpdateRuntimeConfig(
-		&runtimeapi.RuntimeConfig{
-			NetworkConfig: &runtimeapi.NetworkConfig{
+		&internalapi.RuntimeConfig{
+			NetworkConfig: &internalapi.NetworkConfig{
 				PodCidr: podCIDR,
 			},
 		})

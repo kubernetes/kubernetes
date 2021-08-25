@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -52,7 +52,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	id, _, err := m.createPodSandbox(pod, 1)
 	assert.NoError(t, err)
 	assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
-	sandboxes, err := fakeRuntime.ListPodSandbox(&runtimeapi.PodSandboxFilter{Id: id})
+	sandboxes, err := fakeRuntime.ListPodSandbox(&internalapi.PodSandboxFilter{Id: id})
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
 	// TODO Check pod sandbox configuration
@@ -191,7 +191,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 		name                      string
 		hostProcessFeatureEnabled bool
 		podSpec                   *v1.PodSpec
-		expectedWindowsConfig     *runtimeapi.WindowsPodSandboxConfig
+		expectedWindowsConfig     *internalapi.WindowsPodSandboxConfig
 		expectedError             error
 	}{
 		{
@@ -202,8 +202,8 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 					Name: containerName,
 				}},
 			},
-			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
-				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			expectedWindowsConfig: &internalapi.WindowsPodSandboxConfig{
+				SecurityContext: &internalapi.WindowsSandboxSecurityContext{},
 			},
 			expectedError: nil,
 		},
@@ -220,8 +220,8 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 					Name: containerName,
 				}},
 			},
-			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
-				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+			expectedWindowsConfig: &internalapi.WindowsPodSandboxConfig{
+				SecurityContext: &internalapi.WindowsSandboxSecurityContext{
 					CredentialSpec: "gmsa-creds",
 				},
 			},
@@ -240,8 +240,8 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 					Name: containerName,
 				}},
 			},
-			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
-				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+			expectedWindowsConfig: &internalapi.WindowsPodSandboxConfig{
+				SecurityContext: &internalapi.WindowsSandboxSecurityContext{
 					RunAsUsername: "SYSTEM",
 				},
 			},
@@ -316,8 +316,8 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 					Name: containerName,
 				}},
 			},
-			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
-				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+			expectedWindowsConfig: &internalapi.WindowsPodSandboxConfig{
+				SecurityContext: &internalapi.WindowsSandboxSecurityContext{
 					HostProcess: true,
 				},
 			},

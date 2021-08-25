@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -31,7 +31,7 @@ type pullResult struct {
 }
 
 type imagePuller interface {
-	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *internalapi.PodSandboxConfig)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -44,7 +44,7 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 	return &parallelImagePuller{imageService}
 }
 
-func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *internalapi.PodSandboxConfig) {
 	go func() {
 		imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
@@ -72,10 +72,10 @@ type imagePullRequest struct {
 	spec             kubecontainer.ImageSpec
 	pullSecrets      []v1.Secret
 	pullChan         chan<- pullResult
-	podSandboxConfig *runtimeapi.PodSandboxConfig
+	podSandboxConfig *internalapi.PodSandboxConfig
 }
 
-func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *internalapi.PodSandboxConfig) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:             spec,
 		pullSecrets:      pullSecrets,

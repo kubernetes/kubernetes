@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/component-base/metrics/legacyregistry"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -73,19 +73,19 @@ func TestInstrumentedVersion(t *testing.T) {
 
 func TestStatus(t *testing.T) {
 	fakeRuntime, _, _, _ := createTestRuntimeManager()
-	fakeRuntime.FakeStatus = &runtimeapi.RuntimeStatus{
-		Conditions: []*runtimeapi.RuntimeCondition{
-			{Type: runtimeapi.RuntimeReady, Status: false},
-			{Type: runtimeapi.NetworkReady, Status: true},
+	fakeRuntime.FakeStatus = &internalapi.RuntimeStatus{
+		Conditions: []*internalapi.RuntimeCondition{
+			{Type: internalapi.RuntimeReady, Status: false},
+			{Type: internalapi.NetworkReady, Status: true},
 		},
 	}
 	irs := newInstrumentedRuntimeService(fakeRuntime)
 	actural, err := irs.Status()
 	assert.NoError(t, err)
-	expected := &runtimeapi.RuntimeStatus{
-		Conditions: []*runtimeapi.RuntimeCondition{
-			{Type: runtimeapi.RuntimeReady, Status: false},
-			{Type: runtimeapi.NetworkReady, Status: true},
+	expected := &internalapi.RuntimeStatus{
+		Conditions: []*internalapi.RuntimeCondition{
+			{Type: internalapi.RuntimeReady, Status: false},
+			{Type: internalapi.NetworkReady, Status: true},
 		},
 	}
 	assert.Equal(t, expected, actural)

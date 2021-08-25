@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -46,7 +46,7 @@ type HandlerRunner interface {
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
 	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
-	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
+	GetPodDNS(pod *v1.Pod) (dnsConfig *internalapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
@@ -262,16 +262,16 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 	return runningPod
 }
 
-// SandboxToContainerState converts runtimeapi.PodSandboxState to
+// SandboxToContainerState converts internalapi.PodSandboxState to
 // kubecontainer.State.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func SandboxToContainerState(state runtimeapi.PodSandboxState) State {
+func SandboxToContainerState(state internalapi.PodSandboxState) State {
 	switch state {
-	case runtimeapi.PodSandboxState_SANDBOX_READY:
+	case internalapi.PodSandboxState_SANDBOX_READY:
 		return ContainerStateRunning
-	case runtimeapi.PodSandboxState_SANDBOX_NOTREADY:
+	case internalapi.PodSandboxState_SANDBOX_NOTREADY:
 		return ContainerStateExited
 	}
 	return ContainerStateUnknown

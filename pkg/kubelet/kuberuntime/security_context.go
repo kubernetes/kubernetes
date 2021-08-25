@@ -18,17 +18,17 @@ package kuberuntime
 
 import (
 	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username string) *runtimeapi.LinuxContainerSecurityContext {
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username string) *internalapi.LinuxContainerSecurityContext {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
-		synthesized = &runtimeapi.LinuxContainerSecurityContext{
+		synthesized = &internalapi.LinuxContainerSecurityContext{
 			MaskedPaths:   securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount),
 			ReadonlyPaths: securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount),
 		}
@@ -46,7 +46,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
 		if uid != nil {
-			synthesized.RunAsUser = &runtimeapi.Int64Value{Value: *uid}
+			synthesized.RunAsUser = &internalapi.Int64Value{Value: *uid}
 		}
 		synthesized.RunAsUsername = username
 	}
@@ -77,21 +77,21 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	return synthesized
 }
 
-// convertToRuntimeSecurityContext converts v1.SecurityContext to runtimeapi.SecurityContext.
-func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runtimeapi.LinuxContainerSecurityContext {
+// convertToRuntimeSecurityContext converts v1.SecurityContext to internalapi.SecurityContext.
+func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *internalapi.LinuxContainerSecurityContext {
 	if securityContext == nil {
 		return nil
 	}
 
-	sc := &runtimeapi.LinuxContainerSecurityContext{
+	sc := &internalapi.LinuxContainerSecurityContext{
 		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
 	if securityContext.RunAsUser != nil {
-		sc.RunAsUser = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
+		sc.RunAsUser = &internalapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
 	}
 	if securityContext.RunAsGroup != nil {
-		sc.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsGroup)}
+		sc.RunAsGroup = &internalapi.Int64Value{Value: int64(*securityContext.RunAsGroup)}
 	}
 	if securityContext.Privileged != nil {
 		sc.Privileged = *securityContext.Privileged
@@ -103,13 +103,13 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 	return sc
 }
 
-// convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.
-func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *runtimeapi.SELinuxOption {
+// convertToRuntimeSELinuxOption converts v1.SELinuxOptions to internalapi.SELinuxOption.
+func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *internalapi.SELinuxOption {
 	if opts == nil {
 		return nil
 	}
 
-	return &runtimeapi.SELinuxOption{
+	return &internalapi.SELinuxOption{
 		User:  opts.User,
 		Role:  opts.Role,
 		Type:  opts.Type,
@@ -117,13 +117,13 @@ func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *runtimeapi.SELinuxO
 	}
 }
 
-// convertToRuntimeCapabilities converts v1.Capabilities to runtimeapi.Capability.
-func convertToRuntimeCapabilities(opts *v1.Capabilities) *runtimeapi.Capability {
+// convertToRuntimeCapabilities converts v1.Capabilities to internalapi.Capability.
+func convertToRuntimeCapabilities(opts *v1.Capabilities) *internalapi.Capability {
 	if opts == nil {
 		return nil
 	}
 
-	capabilities := &runtimeapi.Capability{
+	capabilities := &internalapi.Capability{
 		AddCapabilities:  make([]string, len(opts.Add)),
 		DropCapabilities: make([]string, len(opts.Drop)),
 	}

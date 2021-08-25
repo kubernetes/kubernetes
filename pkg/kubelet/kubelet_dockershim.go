@@ -20,12 +20,16 @@ limitations under the License.
 package kubelet
 
 import (
+	"net"
+
 	"k8s.io/klog/v2"
 
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
+	dockerstream "k8s.io/kubernetes/pkg/kubelet/dockershim/streaming"
 )
 
 func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
@@ -77,4 +81,16 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	return nil
+}
+
+// Gets the streaming server configuration to use with in-process CRI shims.
+func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, crOptions *config.ContainerRuntimeOptions) *dockerstream.Config {
+	config := &dockerstream.Config{
+		StreamIdleTimeout:               kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
+		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
+		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
+	}
+	config.Addr = net.JoinHostPort("localhost", "0")
+	return config
 }

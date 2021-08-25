@@ -2,4 +2,5 @@ rules:
   # prevent exposing internal api in streaming packages
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
+      - k8s.io/kubernetes/pkg/kubelet/apis/cri
       - k8s.io/kubernetes/pkg/kubelet/cri

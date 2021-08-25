@@ -21,9 +21,9 @@ package kuberuntime
 
 import (
 	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
+func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *internalapi.PodSandboxConfig) error {
 	return nil
 }

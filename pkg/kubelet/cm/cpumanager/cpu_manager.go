@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -42,7 +42,7 @@ import (
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
+	UpdateContainerResources(id string, resources *internalapi.LinuxContainerResources) error
 }
 
 type policyName string
@@ -505,7 +505,7 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
 		containerID,
-		&runtimeapi.LinuxContainerResources{
+		&internalapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),
 		})
 }

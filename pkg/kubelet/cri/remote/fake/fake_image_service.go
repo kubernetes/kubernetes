@@ -19,17 +19,17 @@ package fake
 import (
 	"context"
 
-	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 )
 
 // ListImages lists existing images.
-func (f *RemoteRuntime) ListImages(ctx context.Context, req *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
+func (f *RemoteRuntime) ListImages(ctx context.Context, req *internalapi.ListImagesRequest) (*internalapi.ListImagesResponse, error) {
 	images, err := f.ImageService.ListImages(req.Filter)
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.ListImagesResponse{
+	return &internalapi.ListImagesResponse{
 		Images: images,
 	}, nil
 }
@@ -37,23 +37,23 @@ func (f *RemoteRuntime) ListImages(ctx context.Context, req *kubeapi.ListImagesR
 // ImageStatus returns the status of the image. If the image is not
 // present, returns a response with ImageStatusResponse.Image set to
 // nil.
-func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
+func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *internalapi.ImageStatusRequest) (*internalapi.ImageStatusResponse, error) {
 	status, err := f.ImageService.ImageStatus(req.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.ImageStatusResponse{Image: status}, nil
+	return &internalapi.ImageStatusResponse{Image: status}, nil
 }
 
 // PullImage pulls an image with authentication config.
-func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
+func (f *RemoteRuntime) PullImage(ctx context.Context, req *internalapi.PullImageRequest) (*internalapi.PullImageResponse, error) {
 	image, err := f.ImageService.PullImage(req.Image, req.Auth, req.SandboxConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.PullImageResponse{
+	return &internalapi.PullImageResponse{
 		ImageRef: image,
 	}, nil
 }
@@ -61,21 +61,21 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 // RemoveImage removes the image.
 // This call is idempotent, and must not return an error if the image has
 // already been removed.
-func (f *RemoteRuntime) RemoveImage(ctx context.Context, req *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
+func (f *RemoteRuntime) RemoveImage(ctx context.Context, req *internalapi.RemoveImageRequest) (*internalapi.RemoveImageResponse, error) {
 	err := f.ImageService.RemoveImage(req.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.RemoveImageResponse{}, nil
+	return &internalapi.RemoveImageResponse{}, nil
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (f *RemoteRuntime) ImageFsInfo(ctx context.Context, req *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
+func (f *RemoteRuntime) ImageFsInfo(ctx context.Context, req *internalapi.ImageFsInfoRequest) (*internalapi.ImageFsInfoResponse, error) {
 	fsUsage, err := f.ImageService.ImageFsInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.ImageFsInfoResponse{ImageFilesystems: fsUsage}, nil
+	return &internalapi.ImageFsInfoResponse{ImageFilesystems: fsUsage}, nil
 }

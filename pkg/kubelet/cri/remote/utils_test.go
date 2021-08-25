@@ -19,12 +19,12 @@ package remote
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"testing"
 )
 
-func makePodSandboxMetadata(name, namespace, uid string) *runtimeapi.PodSandboxMetadata {
-	return &runtimeapi.PodSandboxMetadata{
+func makePodSandboxMetadata(name, namespace, uid string) *internalapi.PodSandboxMetadata {
+	return &internalapi.PodSandboxMetadata{
 		Name:      name,
 		Namespace: namespace,
 		Uid:       uid,
@@ -38,25 +38,25 @@ func TestVerifySandboxStatus(t *testing.T) {
 	metaWithoutUid := makePodSandboxMetadata("foo", "bar", "")
 
 	statuses := []struct {
-		input    *runtimeapi.PodSandboxStatus
+		input    *internalapi.PodSandboxStatus
 		expected error
 	}{
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				CreatedAt: ct,
 				Metadata:  makePodSandboxMetadata("foo", "bar", "1"),
 			},
 			expected: fmt.Errorf("status.Id is not set"),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:        "1",
 				CreatedAt: ct,
 			},
 			expected: fmt.Errorf("status.Metadata is not set"),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:        "2",
 				CreatedAt: ct,
 				Metadata:  metaWithoutName,
@@ -64,7 +64,7 @@ func TestVerifySandboxStatus(t *testing.T) {
 			expected: fmt.Errorf("metadata.Name, metadata.Namespace or metadata.Uid is not in metadata %q", metaWithoutName),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:        "3",
 				CreatedAt: ct,
 				Metadata:  metaWithoutNamespace,
@@ -72,7 +72,7 @@ func TestVerifySandboxStatus(t *testing.T) {
 			expected: fmt.Errorf("metadata.Name, metadata.Namespace or metadata.Uid is not in metadata %q", metaWithoutNamespace),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:        "4",
 				CreatedAt: ct,
 				Metadata:  metaWithoutUid,
@@ -80,14 +80,14 @@ func TestVerifySandboxStatus(t *testing.T) {
 			expected: fmt.Errorf("metadata.Name, metadata.Namespace or metadata.Uid is not in metadata %q", metaWithoutUid),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:       "5",
 				Metadata: makePodSandboxMetadata("foo", "bar", "1"),
 			},
 			expected: fmt.Errorf("status.CreatedAt is not set"),
 		},
 		{
-			input: &runtimeapi.PodSandboxStatus{
+			input: &internalapi.PodSandboxStatus{
 				Id:        "6",
 				CreatedAt: ct,
 				Metadata:  makePodSandboxMetadata("foo", "bar", "1"),
@@ -107,41 +107,41 @@ func TestVerifySandboxStatus(t *testing.T) {
 }
 
 func TestVerifyContainerStatus(t *testing.T) {
-	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
-	metaWithoutName := &runtimeapi.ContainerMetadata{Attempt: 3}
-	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
-	imageSpecWithoutImage := &runtimeapi.ImageSpec{}
+	meta := &internalapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	metaWithoutName := &internalapi.ContainerMetadata{Attempt: 3}
+	imageSpec := &internalapi.ImageSpec{Image: "fimage"}
+	imageSpecWithoutImage := &internalapi.ImageSpec{}
 
 	statuses := []struct {
-		input    *runtimeapi.ContainerStatus
+		input    *internalapi.ContainerStatus
 		expected error
 	}{
 		{
-			input:    &runtimeapi.ContainerStatus{},
+			input:    &internalapi.ContainerStatus{},
 			expected: fmt.Errorf("status.Id is not set"),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id: "1",
 			},
 			expected: fmt.Errorf("status.Metadata is not set"),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:       "2",
 				Metadata: metaWithoutName,
 			},
 			expected: fmt.Errorf("metadata.Name is not in metadata %q", metaWithoutName),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:       "3",
 				Metadata: meta,
 			},
 			expected: fmt.Errorf("status.CreatedAt is not set"),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        "4",
 				Metadata:  meta,
 				CreatedAt: 1,
@@ -150,7 +150,7 @@ func TestVerifyContainerStatus(t *testing.T) {
 			expected: fmt.Errorf("status.Image is not set"),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        "5",
 				Metadata:  meta,
 				Image:     imageSpec,
@@ -159,7 +159,7 @@ func TestVerifyContainerStatus(t *testing.T) {
 			expected: fmt.Errorf("status.ImageRef is not set"),
 		},
 		{
-			input: &runtimeapi.ContainerStatus{
+			input: &internalapi.ContainerStatus{
 				Id:        "5",
 				Metadata:  meta,
 				Image:     imageSpec,

@@ -31,8 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
-	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/utils/clock"
 )
@@ -212,7 +211,7 @@ func (c *containerLogManager) rotateLogs() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	// TODO(#59998): Use kubelet pod cache.
-	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := c.runtimeService.ListContainers(&internalapi.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %v", err)
 	}
@@ -220,7 +219,7 @@ func (c *containerLogManager) rotateLogs() error {
 	for _, container := range containers {
 		// Only rotate logs for running containers. Non-running containers won't
 		// generate new output, it doesn't make sense to keep an empty latest log.
-		if container.GetState() != runtimeapi.ContainerState_CONTAINER_RUNNING {
+		if container.GetState() != internalapi.ContainerState_CONTAINER_RUNNING {
 			continue
 		}
 		id := container.GetId()

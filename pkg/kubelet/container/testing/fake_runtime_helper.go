@@ -19,7 +19,7 @@ package testing
 import (
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -46,8 +46,8 @@ func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
-func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	return &runtimeapi.DNSConfig{
+func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*internalapi.DNSConfig, error) {
+	return &internalapi.DNSConfig{
 		Servers:  f.DNSServers,
 		Searches: f.DNSSearches,
 		Options:  f.DNSOptions}, f.Err
