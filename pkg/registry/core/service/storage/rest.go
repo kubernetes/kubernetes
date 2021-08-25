@@ -385,7 +385,7 @@ func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, dryRun bool) (ma
 }
 
 func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *api.Service, dryRun bool) (transaction, error) {
-	allocated, released, err := al.handleClusterIPsForUpdatedService(oldService, service, dryRun)
+	allocated, released, err := al.updateClusterIPs(oldService, service, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *
 // this func does not perform actual release of clusterIPs. it returns
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
-func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Service, service *api.Service, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+func (al *RESTAllocStuff) updateClusterIPs(oldService *api.Service, service *api.Service, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
 
 	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
 	// PreferDualStack services following a cluster change to/from
