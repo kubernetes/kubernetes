@@ -331,7 +331,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 	// when no modifications are required this function could sometimes return a
 	// copy of the volume and sometimes return a ref to the original
 	claimClone := claim.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	if !modified {
 		return claimClone, nil
 	}
@@ -348,7 +348,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 
 func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, pvutil.AnnDynamicallyProvisioned)
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, false)
 	if !modified {
 		return volumeClone, nil
 	}
@@ -365,12 +365,14 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 }
 
 // updateMigrationAnnotations takes an Annotations map and checks for a
-// provisioner name using the provisionerKey. It will then add a
-// "pv.kubernetes.io/migrated-to" annotation if migration with the CSI
-// driver name for that provisioner is "on" based on feature flags, it will also
-// remove the annotation is migration is "off" for that provisioner in rollback
+// provisioner name depending if the annotation came from a PVC or not.
+// It will then add a "pv.kubernetes.io/migrated-to" annotation if migration with
+// the CSI driver name for that provisioner is "on" based on feature flags, it will also
+// remove the annotation if migration is "off" for that provisioner in rollback
 // scenarios. Returns true if the annotations map was modified and false otherwise.
-func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, provisionerKey string) bool {
+// Parameters:
+// - claim: true means the ann came from a PVC, false means the ann came from a PV
+func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, claim bool) bool {
 	var csiDriverName string
 	var err error
 
@@ -379,10 +381,24 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 		// this is migrated - no change
 		return false
 	}
+	var provisionerKey string
+	if claim {
+		provisionerKey = pvutil.AnnStorageProvisioner
+	} else {
+		provisionerKey = pvutil.AnnDynamicallyProvisioned
+	}
 	provisioner, ok := ann[provisionerKey]
 	if !ok {
-		// Volume not dynamically provisioned. Ignore
-		return false
+		if claim {
+			// Also check beta AnnStorageProvisioner annontation to make sure
+			provisioner, ok = ann[pvutil.AnnBetaStorageProvisioner]
+			if !ok {
+				return false
+			}
+		} else {
+			// Volume not dynamically provisioned. Ignore
+			return false
+		}
 	}
 
 	migratedToDriver := ann[pvutil.AnnMigratedTo]
@@ -547,7 +563,7 @@ func (ctrl *PersistentVolumeController) resync() {
 }
 
 // setClaimProvisioner saves
-// claim.Annotations[pvutil.AnnStorageProvisioner] = class.Provisioner
+// claim.Annotations["volume.kubernetes.io/storage-provisioner"] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
 	if val, ok := claim.Annotations[pvutil.AnnStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
@@ -557,8 +573,10 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
+	// TODO: remove the beta storage provisioner anno after the deprecation period
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
-	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
