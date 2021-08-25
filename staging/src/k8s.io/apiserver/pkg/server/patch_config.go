@@ -37,3 +37,14 @@ func (c *Config) newIsTerminatingFunc() func() bool {
 		}
 	}
 }
+
+func (c *Config) newServerFullyInitializedFunc() func() bool {
+	return func() bool {
+		select {
+		case <-c.lifecycleSignals.HasBeenReady.Signaled():
+			return true
+		default:
+			return false
+		}
+	}
+}
