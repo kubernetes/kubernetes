@@ -1119,6 +1119,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	if c.ShutdownSendRetryAfter {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
 	}
+	handler = genericfilters.WithOptInRetryAfter(handler, c.newServerFullyInitializedFunc())
 	handler = genericfilters.WithHTTPLogging(handler, c.newIsTerminatingFunc())
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
