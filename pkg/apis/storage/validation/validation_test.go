@@ -1230,7 +1230,7 @@ func TestCSINodeValidation(t *testing.T) {
 	}
 
 	nodeIDCase := storage.CSINode{
-		// node ID length > 128 but < 192
+		// node ID length > 192 but < 256
 		ObjectMeta: metav1.ObjectMeta{Name: "foo7"},
 		Spec: storage.CSINodeSpec{
 			Drivers: []storage.CSINodeDriver{
