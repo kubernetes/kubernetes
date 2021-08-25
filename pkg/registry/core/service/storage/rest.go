@@ -258,7 +258,7 @@ func (al *RESTAllocStuff) allocIPs(service *api.Service, toAlloc map[api.IPFamil
 }
 
 // releases clusterIPs per family
-func (al *RESTAllocStuff) releaseClusterIPs(toRelease map[api.IPFamily]string) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPFamily]string, error) {
 	if toRelease == nil {
 		return nil, nil
 	}
@@ -314,7 +314,7 @@ func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) 
 			if dryRun {
 				return
 			}
-			released, err := al.releaseClusterIPs(toReleaseClusterIPs)
+			released, err := al.releaseIPs(toReleaseClusterIPs)
 			if err != nil {
 				klog.Warningf("failed to release clusterIPs for failed new service:%v allocated:%v released:%v error:%v",
 					service.Name, toReleaseClusterIPs, released, err)
@@ -400,7 +400,7 @@ func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *
 			if dryRun {
 				return
 			}
-			if actuallyReleased, err := al.releaseClusterIPs(released); err != nil {
+			if actuallyReleased, err := al.releaseIPs(released); err != nil {
 				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v",
 					service.Namespace, service.Name, err, released, actuallyReleased)
 			}
@@ -409,7 +409,7 @@ func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *
 			if dryRun {
 				return
 			}
-			if actuallyReleased, err := al.releaseClusterIPs(allocated); err != nil {
+			if actuallyReleased, err := al.releaseIPs(allocated); err != nil {
 				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v",
 					service.Namespace, service.Name, err, allocated, actuallyReleased)
 			}
@@ -523,7 +523,7 @@ func (al *RESTAllocStuff) releaseServiceClusterIP(service *api.Service) (release
 		toRelease[api.IPv4Protocol] = service.Spec.ClusterIP
 	}
 
-	return al.releaseClusterIPs(toRelease)
+	return al.releaseIPs(toRelease)
 }
 
 // releases allocated ClusterIPs for service that is about to be deleted
@@ -550,7 +550,7 @@ func (al *RESTAllocStuff) releaseServiceClusterIPs(service *api.Service) (releas
 			toRelease[api.IPv4Protocol] = ip
 		}
 	}
-	return al.releaseClusterIPs(toRelease)
+	return al.releaseIPs(toRelease)
 }
 
 // tests if two preferred dual-stack service have matching ClusterIPFields
