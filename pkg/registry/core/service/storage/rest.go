@@ -85,7 +85,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 	}
 
 	// Allocate ports
-	if txn, err := al.allocServiceNodePortsNew(service, dryRun); err != nil {
+	if txn, err := al.txnAllocNodePorts(service, dryRun); err != nil {
 		result.Revert()
 		return nil, err
 	} else {
@@ -956,8 +956,7 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 	return nil
 }
 
-//FIXME: rename and merge with initNodePorts
-func (al *RESTAllocStuff) allocServiceNodePortsNew(service *api.Service, dryRun bool) (transaction, error) {
+func (al *RESTAllocStuff) txnAllocNodePorts(service *api.Service, dryRun bool) (transaction, error) {
 	// The allocator tracks dry-run-ness internally.
 	nodePortOp := portallocator.StartOperation(al.serviceNodePorts, dryRun)
 
